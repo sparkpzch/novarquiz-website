@@ -1,0 +1,39 @@
+{
+  "name": "novarquiz-website",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "set-admin": "npx tsx scripts/set-admin.ts",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.10.2",
+    "firebase": "^12.12.1",
+    "firebase-admin": "^13.0.0",
+    "i18next": "^24.0.0",
+    "jose": "^6.2.2",
+    "motion": "^12.38.0",
+    "next": "16.2.4",
+    "pg": "^8.13.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-i18next": "^15.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pg": "^8",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.4",
+    "tailwindcss": "^4",
+    "tsx": "^4.19.0",
+    "typescript": "^5"
+  }
+}
