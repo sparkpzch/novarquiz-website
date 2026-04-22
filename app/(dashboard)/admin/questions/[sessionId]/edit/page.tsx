@@ -92,7 +92,6 @@ function toFlowEdges(connections: QuestionConnection[]): AppEdge[] {
       source: c.from_question_id,
       sourceHandle: c.from_choice_label,
       target: c.to_question_id,
-      type: 'default',
       style: { stroke: color, strokeWidth: 2 },
       markerEnd: { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },
     };
@@ -110,7 +109,7 @@ const toolbarBtnStyle = (color: string): React.CSSProperties => ({
 // ─── Inner canvas ─────────────────────────────────────────────────────────────
 
 function EditorCanvas({
-  nodes, edges, setNodes, setEdges, onNodesChange, onEdgesChange, onSave, saving,
+  nodes, edges, setNodes, setEdges, onNodesChange, onEdgesChange, onSave, saving, sessionId,
 }: {
   nodes: AppNode[];
   edges: AppEdge[];
@@ -120,11 +119,13 @@ function EditorCanvas({
   onEdgesChange: ReturnType<typeof useEdgesState>[2];
   onSave: (publish: boolean) => void;
   saving: boolean;
+  sessionId: string;
 }) {
   const { screenToFlowPosition } = useReactFlow();
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
   const [editNode, setEditNode] = useState<AppNode | null>(null);
   const [inspectedNode, setInspectedNode] = useState<AppNode | null>(null);
+  const [inspectorDraft, setInspectorDraft] = useState<AppNodeData | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const closeCtx = useCallback(() => setCtxMenu(null), []);
@@ -141,7 +142,7 @@ function EditorCanvas({
   const onConnect = useCallback((params: Connection) => {
     const color = CHOICE_COLORS[params.sourceHandle ?? ''] ?? '#6366f1';
     setEdges(es => addEdge({
-      ...params, type: 'default', animated: false,
+      ...params,
       style: { stroke: color, strokeWidth: 2 },
       markerEnd: { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },
     }, es));
@@ -159,8 +160,17 @@ function EditorCanvas({
   }, []);
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
-    setInspectedNode(node as AppNode);
+    const n = node as AppNode;
+    setInspectedNode(n);
+    setInspectorDraft(structuredClone(n.data as AppNodeData));
   }, []);
+
+  const applyInspector = useCallback((draft: AppNodeData) => {
+    setInspectorDraft(draft);
+    if (inspectedNode) {
+      setNodes(ns => ns.map(n => n.id === inspectedNode.id ? { ...n, data: draft } as AppNode : n));
+    }
+  }, [inspectedNode, setNodes]);
 
   const onNodeDblClick = useCallback((_: React.MouseEvent, node: Node) => {
     setEditNode(node as AppNode);
@@ -192,13 +202,14 @@ function EditorCanvas({
         onConnect={onConnect}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDblClick}
-        onPaneClick={() => { closeCtx(); setInspectedNode(null); }}
+        onPaneClick={() => { closeCtx(); setInspectedNode(null); setInspectorDraft(null); }}
         onPaneContextMenu={onPaneCtx}
         onNodeContextMenu={onNodeCtx}
         nodeTypes={nodeTypes}
         deleteKeyCode={['Backspace', 'Delete']}
         snapToGrid snapGrid={[16, 16]}
         fitView fitViewOptions={{ padding: 0.2 }}
+        defaultEdgeOptions={{ type: 'default', animated: false }}
         style={{ background: '#08080f' }}
         proOptions={{ hideAttribution: true }}
       >
@@ -230,15 +241,22 @@ function EditorCanvas({
           <Button onClick={() => onSave(true)} loading={saving} size="sm">Publish</Button>
         </div>
 
-        {/* Node Inspector */}
-        {inspectedNode && (() => {
-          const d = inspectedNode.data as AppNodeData;
+        {/* Node Inspector (editable) */}
+        {inspectedNode && inspectorDraft && (() => {
+          const d = inspectorDraft;
           const isNormal = inspectedNode.type === 'normalNode';
           const nd = isNormal ? d as NormalNodeData : null;
+          const COLORS: Record<string, string> = { A: '#ef4444', B: '#3b82f6', C: '#22c55e', D: '#f59e0b' };
+          const inputStyle: React.CSSProperties = {
+            width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 6, padding: '4px 8px', color: '#e2e8f0', fontSize: 11, outline: 'none',
+          };
           return (
             <div style={{
               position: 'absolute', top: 56, left: 12, zIndex: 10,
-              width: 220,
+              width: 256,
+              maxHeight: 'calc(100% - 80px)',
+              overflowY: 'auto',
               background: 'rgba(8,8,20,0.97)',
               border: '1px solid rgba(255,255,255,0.12)',
               borderRadius: 10,
@@ -247,36 +265,113 @@ function EditorCanvas({
               color: '#e2e8f0',
               boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
             }}>
+              {/* Header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={{ fontWeight: 700, fontSize: 10, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                   {isNormal ? '❓ Question' : '🎬 Situation'}
                 </span>
-                {d.is_entry_point && (
-                  <span style={{ background: 'rgba(16,185,129,0.18)', color: '#34d399', border: '1px solid rgba(52,211,153,0.35)', borderRadius: 4, padding: '1px 5px', fontSize: 9, fontWeight: 700 }}>START</span>
-                )}
+                <button
+                  onClick={() => { setInspectedNode(null); setInspectorDraft(null); }}
+                  style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}
+                >✕</button>
               </div>
-              <div style={{ color: d.question_text ? '#d1d5db' : '#4b5563', marginBottom: 8, lineHeight: 1.5, borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 8 }}>
-                {d.question_text || <span style={{ fontStyle: 'italic', color: '#4b5563' }}>No text</span>}
+
+              {/* Question text */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#6b7280', fontSize: 10, marginBottom: 3 }}>Text</div>
+                <textarea
+                  value={d.question_text}
+                  onChange={e => applyInspector({ ...d, question_text: e.target.value })}
+                  rows={2}
+                  placeholder={isNormal ? 'Question text…' : 'Scene description…'}
+                  style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+                />
               </div>
+
+              {/* Entry point toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                <span style={{ color: '#9ca3af' }}>Entry point</span>
+                <div
+                  onClick={() => applyInspector({ ...d, is_entry_point: !d.is_entry_point })}
+                  style={{
+                    width: 32, height: 17, borderRadius: 9, cursor: 'pointer', transition: 'background 0.2s',
+                    background: d.is_entry_point ? '#10b981' : 'rgba(255,255,255,0.12)',
+                    display: 'flex', alignItems: 'center', padding: '0 2px',
+                  }}
+                >
+                  <div style={{
+                    width: 13, height: 13, borderRadius: '50%', background: '#fff',
+                    transition: 'transform 0.2s',
+                    transform: d.is_entry_point ? 'translateX(15px)' : 'translateX(0)',
+                  }} />
+                </div>
+              </div>
+
+              {/* Normal-only: choices */}
               {nd && (
                 <>
-                  {nd.timer_override && (
-                    <div style={{ color: '#fbbf24', marginBottom: 6 }}>⏱ Timer override: {nd.timer_override}s</div>
-                  )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    {nd.choices?.map(c => {
-                      const cfg = { A: '#ef4444', B: '#3b82f6', C: '#22c55e', D: '#f59e0b' }[c.label] ?? '#6366f1';
-                      return (
-                        <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ width: 14, height: 14, borderRadius: '50%', background: cfg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 8, fontWeight: 800, flexShrink: 0 }}>{c.label}</span>
-                          <span style={{ flex: 1, color: c.choice_text ? '#d1d5db' : '#4b5563', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.choice_text || `Choice ${c.label}`}</span>
-                          {c.is_correct && <span style={{ color: '#34d399', fontSize: 10 }}>✓</span>}
-                        </div>
-                      );
-                    })}
+                  <div style={{ color: '#6b7280', fontSize: 10, marginBottom: 4 }}>Choices</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+                    {nd.choices?.map((c, idx) => (
+                      <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{
+                          width: 16, height: 16, borderRadius: '50%', background: COLORS[c.label] ?? '#6366f1',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: '#fff', fontSize: 8, fontWeight: 800, flexShrink: 0,
+                        }}>{c.label}</span>
+                        <input
+                          value={c.choice_text}
+                          onChange={e => {
+                            const choices = [...(nd.choices ?? [])];
+                            choices[idx] = { ...choices[idx], choice_text: e.target.value };
+                            applyInspector({ ...d, choices } as NormalNodeData);
+                          }}
+                          placeholder={`Choice ${c.label}`}
+                          style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                        />
+                        <button
+                          onClick={() => {
+                            const choices = (nd.choices ?? []).map((ch, i) => ({ ...ch, is_correct: i === idx }));
+                            applyInspector({ ...d, choices } as NormalNodeData);
+                          }}
+                          style={{
+                            flexShrink: 0, width: 20, height: 20, borderRadius: 4, border: 'none', cursor: 'pointer',
+                            background: c.is_correct ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.07)',
+                            color: c.is_correct ? '#34d399' : '#6b7280', fontSize: 10,
+                          }}
+                          title="Mark correct"
+                        >✓</button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Timer override */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                    <span style={{ color: '#9ca3af' }}>Timer override</span>
+                    {nd.timer_override !== null ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <input
+                          type="number" min={5} max={120}
+                          value={nd.timer_override}
+                          onChange={e => applyInspector({ ...d, timer_override: Number(e.target.value) } as NormalNodeData)}
+                          style={{ ...inputStyle, width: 52, textAlign: 'center' }}
+                        />
+                        <span style={{ color: '#6b7280' }}>s</span>
+                        <button
+                          onClick={() => applyInspector({ ...d, timer_override: null } as NormalNodeData)}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12 }}
+                        >✕</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => applyInspector({ ...d, timer_override: 30 } as NormalNodeData)}
+                        style={{ background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 5, color: '#a5b4fc', cursor: 'pointer', fontSize: 10, padding: '2px 8px' }}
+                      >+ Set</button>
+                    )}
                   </div>
                 </>
               )}
+
               {d.media_url && (
                 <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 6 }}>
                   {d.media_type === 'video' ? '🎬 Video' : '🖼 Image'} attached
@@ -312,6 +407,7 @@ function EditorCanvas({
 
       <EditNodeModal
         node={editNode ? { id: editNode.id, type: editNode.type as 'normalNode' | 'situationNode', data: editNode.data } : null}
+        sessionId={sessionId}
         onClose={() => setEditNode(null)}
         onSave={handleEditSave}
       />
@@ -330,6 +426,10 @@ export default function EditQuestionPage({ params }: { params: Promise<{ session
   const [sessionName, setSessionName] = useState('');
   const [description, setDescription] = useState('');
   const [timerSeconds, setTimerSeconds] = useState(30);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [pinCode, setPinCode] = useState('');
+  const [shareToken, setShareToken] = useState('');
+  const [linkCopied, setLinkCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(true);
 
@@ -349,6 +449,9 @@ export default function EditQuestionPage({ params }: { params: Promise<{ session
         setSessionName(session.name);
         setDescription(session.description ?? '');
         setTimerSeconds(session.timer_seconds);
+        setIsPrivate(session.is_private ?? false);
+        setPinCode(session.pin_code ?? '');
+        setShareToken(session.share_token ?? '');
       }
       setNodes(toFlowNodes(graph.questions ?? []));
       setEdges(toFlowEdges(graph.connections ?? []));
@@ -367,7 +470,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ session
       const sesRes = await fetch(`/api/questions/sessions/${sessionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: sessionName, description, timer_seconds: timerSeconds, is_published: publish }),
+        body: JSON.stringify({ name: sessionName, description, timer_seconds: timerSeconds, is_published: publish, is_private: isPrivate }),
       });
       if (!sesRes.ok) throw new Error((await sesRes.json()).error);
 
@@ -441,6 +544,52 @@ export default function EditQuestionPage({ params }: { params: Promise<{ session
         <Input label="Default Timer (seconds)" type="number" value={timerSeconds} onChange={e => setTimerSeconds(Number(e.target.value))} min={5} max={120} />
       </div>
 
+      {/* Session settings bar */}
+      <div className="flex flex-wrap items-center gap-3 flex-shrink-0 px-1">
+        {/* Private toggle */}
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <div
+            onClick={() => setIsPrivate(v => !v)}
+            className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${isPrivate ? 'bg-indigo-600' : 'bg-white/10'}`}
+          >
+            <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${isPrivate ? 'translate-x-4' : 'translate-x-0'}`} />
+          </div>
+          <span className="text-sm text-gray-300">Private</span>
+        </label>
+
+        {/* PIN display */}
+        {pinCode && (
+          <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-white/5 border border-white/10">
+            <span className="text-xs text-gray-500">PIN</span>
+            <span className="font-mono text-sm font-bold text-white tracking-widest">{pinCode}</span>
+          </div>
+        )}
+
+        {/* Share link */}
+        {shareToken && (
+          <button
+            onClick={async () => {
+              await navigator.clipboard.writeText(`${window.location.origin}/join/${shareToken}`);
+              setLinkCopied(true);
+              setTimeout(() => setLinkCopied(false), 2000);
+            }}
+            className="flex items-center gap-2 px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-sm text-gray-300 hover:bg-white/10 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+            {linkCopied ? 'Copied!' : 'Copy Join Link'}
+          </button>
+        )}
+
+        {/* Open Lobby */}
+        <button
+          onClick={() => router.push(`/admin/questions/${sessionId}/lobby`)}
+          className="flex items-center gap-2 px-3 py-1 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-sm text-indigo-400 hover:bg-indigo-600/30 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          Open Lobby
+        </button>
+      </div>
+
       {/* Canvas */}
       <div style={{ flex: 1, borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
         {fetching ? (
@@ -454,6 +603,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ session
               setNodes={setNodes} setEdges={setEdges}
               onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
               onSave={handleSave} saving={saving}
+              sessionId={sessionId}
             />
           </ReactFlowProvider>
         )}

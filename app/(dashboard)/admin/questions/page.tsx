@@ -60,6 +60,7 @@ export default function AdminQuestionsPage() {
                   <p className="text-xs text-gray-500 mt-0.5">👥 {s.play_count || 0} plays · avg score {s.avg_score || 0} pts</p>
                 </div>
                 <div className="flex gap-2" onClick={e => e.preventDefault()}>
+                  <Button variant="ghost" size="sm" onClick={() => router.push(`/admin/questions/${s.id}/lobby`)}>Lobby</Button>
                   <Button variant="ghost" size="sm" onClick={() => router.push(`/admin/questions/${s.id}/edit`)}>Edit</Button>
                   <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)} className="text-red-400 hover:text-red-300">Delete</Button>
                 </div>

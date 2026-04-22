@@ -82,8 +82,8 @@ function EditorCanvas({
   edges: AppEdge[];
   setNodes: React.Dispatch<React.SetStateAction<AppNode[]>>;
   setEdges: React.Dispatch<React.SetStateAction<AppEdge[]>>;
-  onNodesChange: Parameters<typeof useNodesState>[1];
-  onEdgesChange: Parameters<typeof useEdgesState>[1];
+  onNodesChange: ReturnType<typeof useNodesState>[2];
+  onEdgesChange: ReturnType<typeof useEdgesState>[2];
   onSave: (publish: boolean) => void;
   saving: boolean;
 }) {
@@ -110,8 +110,6 @@ function EditorCanvas({
     const color = CHOICE_COLORS[params.sourceHandle ?? ''] ?? '#6366f1';
     setEdges(es => addEdge({
       ...params,
-      type: 'smoothstep',
-      animated: false,
       style: { stroke: color, strokeWidth: 2 },
       markerEnd: { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },
     }, es));
@@ -176,6 +174,7 @@ function EditorCanvas({
         snapGrid={[16, 16]}
         fitView
         fitViewOptions={{ padding: 0.2 }}
+        defaultEdgeOptions={{ type: 'default', animated: false }}
         style={{ background: '#08080f' }}
         proOptions={{ hideAttribution: true }}
       >

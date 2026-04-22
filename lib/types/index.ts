@@ -7,6 +7,9 @@ export interface QuestionSession {
   cover_image_url: string | null;
   timer_seconds: number;
   is_published: boolean;
+  is_private: boolean;
+  pin_code: string;
+  share_token: string;
   created_by: string;
   created_at: string;
   updated_at: string;

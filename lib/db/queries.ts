@@ -33,17 +33,28 @@ export async function getSessionById(sessionId: string) {
   return result.rows[0] || null;
 }
 
+export async function getSessionByShareToken(token: string) {
+  const result = await pool.query(
+    `SELECT id, name, description, is_private, is_published, timer_seconds
+     FROM question_sessions WHERE share_token = $1`,
+    [token]
+  );
+  return result.rows[0] || null;
+}
+
 export async function createSession(data: {
   name: string;
   description?: string;
   cover_image_url?: string;
   timer_seconds?: number;
+  is_private?: boolean;
   created_by: string;
 }) {
+  const pin = String(Math.floor(100000 + Math.random() * 900000));
   const result = await pool.query(
-    `INSERT INTO question_sessions (name, description, cover_image_url, timer_seconds, created_by)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [data.name, data.description || null, data.cover_image_url || null, data.timer_seconds || 30, data.created_by]
+    `INSERT INTO question_sessions (name, description, cover_image_url, timer_seconds, created_by, is_private, pin_code)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [data.name, data.description || null, data.cover_image_url || null, data.timer_seconds || 30, data.created_by, data.is_private ?? false, pin]
   );
   return result.rows[0];
 }
@@ -54,6 +65,8 @@ export async function updateSession(sessionId: string, data: Partial<{
   cover_image_url: string;
   timer_seconds: number;
   is_published: boolean;
+  is_private: boolean;
+  pin_code: string;
 }>) {
   const fields: string[] = [];
   const values: unknown[] = [];

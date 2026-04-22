@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { storage } from '@/lib/firebase/config';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -15,6 +17,7 @@ type EditableNode = {
 
 interface EditNodeModalProps {
   node: EditableNode | null;
+  sessionId: string;
   onClose: () => void;
   onSave: (id: string, data: NormalNodeData | SituationNodeData) => void;
 }
@@ -23,8 +26,11 @@ const CHOICE_COLORS: Record<string, string> = {
   A: '#ef4444', B: '#3b82f6', C: '#22c55e', D: '#f59e0b',
 };
 
-export function EditNodeModal({ node, onClose, onSave }: EditNodeModalProps) {
+export function EditNodeModal({ node, sessionId, onClose, onSave }: EditNodeModalProps) {
   const [draft, setDraft] = useState<NormalNodeData | SituationNodeData | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (node) setDraft(structuredClone(node.data));
@@ -32,9 +38,43 @@ export function EditNodeModal({ node, onClose, onSave }: EditNodeModalProps) {
 
   if (!node || !draft) return null;
 
+  const handleFileUpload = (file: File) => {
+    if (!file) return;
+    const isVideo = file.type.startsWith('video/');
+    const isImage = file.type.startsWith('image/');
+    if (!isVideo && !isImage) return;
+
+    const mediaType = isVideo ? 'video' : 'image';
+    const ext = file.name.split('.').pop();
+    const path = `question-sessions/${sessionId}/${node.id}_${Date.now()}.${ext}`;
+    const storageRef = ref(storage, path);
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    const task = uploadBytesResumable(storageRef, file);
+    task.on(
+      'state_changed',
+      snap => setUploadProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+      () => setUploading(false),
+      async () => {
+        const url = await getDownloadURL(task.snapshot.ref);
+        setDraft(d => d ? { ...d, media_type: mediaType, media_url: url } : d);
+        setUploading(false);
+      },
+    );
+  };
+
+  const handleRemoveMedia = async () => {
+    const url = draft.media_url;
+    setDraft(d => d ? { ...d, media_type: null, media_url: null } : d);
+    if (url?.includes('firebasestorage')) {
+      try { await deleteObject(ref(storage, url)); } catch { /* ignore if already deleted */ }
+    }
+  };
+
   const isNormal = node.type === 'normalNode';
   const normalDraft = draft as NormalNodeData;
-  const situDraft = draft as SituationNodeData;
 
   const handleSave = () => {
     onSave(node.id, draft);
@@ -63,36 +103,69 @@ export function EditNodeModal({ node, onClose, onSave }: EditNodeModalProps) {
           <span className="text-sm text-gray-300">Start node (entry point)</span>
         </label>
 
-        {/* Media */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-gray-400 mb-1 block">Media Type</label>
-            <select
-              value={draft.media_type || ''}
-              onChange={e => setDraft(d => d ? { ...d, media_type: e.target.value || null, media_url: e.target.value ? d.media_url : null } : d)}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white text-sm focus:border-indigo-500 focus:outline-none"
+        {/* Media upload */}
+        <div>
+          <label className="text-xs text-gray-400 mb-2 block">Media (Image or Video)</label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ''; }}
+          />
+
+          {!draft.media_url && !uploading && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full rounded-xl border-2 border-dashed border-white/15 bg-white/3 hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-colors py-6 flex flex-col items-center gap-2"
             >
-              <option value="">None</option>
-              <option value="image">Image</option>
-              <option value="video">Video</option>
-            </select>
-          </div>
-          {draft.media_type ? (
-            <Input
-              label="Media URL"
-              value={draft.media_url || ''}
-              onChange={e => setDraft(d => d ? { ...d, media_url: e.target.value || null } : d)}
-              placeholder="https://…"
-            />
-          ) : (
-            <div />
+              <svg className="w-8 h-8 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-sm text-gray-400">Click to upload image or video</span>
+              <span className="text-xs text-gray-600">Stored in Firebase Storage</span>
+            </button>
+          )}
+
+          {uploading && (
+            <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-300">Uploading…</span>
+                <span className="text-indigo-400 font-medium">{uploadProgress}%</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                <div className="h-full bg-indigo-500 transition-all duration-200 rounded-full" style={{ width: `${uploadProgress}%` }} />
+              </div>
+            </div>
+          )}
+
+          {draft.media_url && !uploading && (
+            <div className="space-y-2">
+              {draft.media_type === 'image' ? (
+                <img src={draft.media_url} alt="Preview" className="w-full h-40 object-cover rounded-xl border border-white/10" />
+              ) : (
+                <video src={draft.media_url} controls className="w-full rounded-xl border border-white/10 max-h-40" />
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 py-2 text-sm text-gray-300 transition-colors"
+                >
+                  Replace
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRemoveMedia}
+                  className="flex-1 rounded-xl border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 py-2 text-sm text-red-400 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
           )}
         </div>
-
-        {/* Media preview */}
-        {draft.media_url && draft.media_type === 'image' && (
-          <img src={draft.media_url} alt="Preview" className="w-full h-40 object-cover rounded-xl border border-white/10" />
-        )}
 
         {/* Normal-only: choices + timer */}
         {isNormal && (
