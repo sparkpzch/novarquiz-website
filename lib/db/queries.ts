@@ -4,9 +4,11 @@ import pool from './postgres';
 
 export async function getAllSessions() {
   const result = await pool.query(
-    `SELECT qs.*, 
-      (SELECT COUNT(*) FROM questions q WHERE q.session_id = qs.id) as question_count
-     FROM question_sessions qs 
+    `SELECT qs.*,
+      (SELECT COUNT(*) FROM questions q WHERE q.session_id = qs.id)::int AS question_count,
+      (SELECT COUNT(*) FROM leaderboard_entries le WHERE le.session_id = qs.id)::int AS play_count,
+      (SELECT COALESCE(ROUND(AVG(le.total_score)), 0) FROM leaderboard_entries le WHERE le.session_id = qs.id)::int AS avg_score
+     FROM question_sessions qs
      ORDER BY qs.created_at DESC`
   );
   return result.rows;

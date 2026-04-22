@@ -38,8 +38,18 @@ export default function SignInPage() {
       const credential = await signInWithEmailAndPassword(auth, email, password);
       const idToken = await credential.user.getIdToken();
       await createSession(idToken);
-    } catch {
-      setError('Invalid email or password. Please try again.');
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      const msgs: Record<string, string> = {
+        'auth/invalid-credential': 'Incorrect email or password.',
+        'auth/user-not-found': 'No account found with this email.',
+        'auth/wrong-password': 'Incorrect password.',
+        'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.',
+        'auth/user-disabled': 'This account has been suspended.',
+        'auth/network-request-failed': 'Connection failed. Check your internet and try again.',
+        'auth/invalid-email': 'Please enter a valid email address.',
+      };
+      setError(msgs[code ?? ''] ?? 'Sign in failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -53,7 +63,15 @@ export default function SignInPage() {
       const idToken = await credential.user.getIdToken();
       await createSession(idToken);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google sign-in failed. Please try again.');
+      const code = (err as { code?: string }).code;
+      const msgs: Record<string, string> = {
+        'auth/popup-blocked': 'Popup was blocked — please allow popups for this site.',
+        'auth/popup-closed-by-user': 'Sign-in was cancelled.',
+        'auth/cancelled-popup-request': 'Sign-in was cancelled.',
+        'auth/network-request-failed': 'Connection failed. Check your internet and try again.',
+        'auth/account-exists-with-different-credential': 'An account already exists with this email using a different sign-in method.',
+      };
+      setError(msgs[code ?? ''] ?? 'Google sign-in failed. Please try again.');
     }
   };
 

@@ -11,6 +11,8 @@ export interface QuestionSession {
   created_at: string;
   updated_at: string;
   question_count?: number;
+  play_count?: number;
+  avg_score?: number;
 }
 
 export interface Question {

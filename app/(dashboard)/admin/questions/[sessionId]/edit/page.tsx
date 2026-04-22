@@ -92,7 +92,7 @@ function toFlowEdges(connections: QuestionConnection[]): AppEdge[] {
       source: c.from_question_id,
       sourceHandle: c.from_choice_label,
       target: c.to_question_id,
-      type: 'smoothstep',
+      type: 'default',
       style: { stroke: color, strokeWidth: 2 },
       markerEnd: { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },
     };
@@ -116,14 +116,15 @@ function EditorCanvas({
   edges: AppEdge[];
   setNodes: React.Dispatch<React.SetStateAction<AppNode[]>>;
   setEdges: React.Dispatch<React.SetStateAction<AppEdge[]>>;
-  onNodesChange: Parameters<typeof useNodesState>[1];
-  onEdgesChange: Parameters<typeof useEdgesState>[1];
+  onNodesChange: ReturnType<typeof useNodesState>[2];
+  onEdgesChange: ReturnType<typeof useEdgesState>[2];
   onSave: (publish: boolean) => void;
   saving: boolean;
 }) {
   const { screenToFlowPosition } = useReactFlow();
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
   const [editNode, setEditNode] = useState<AppNode | null>(null);
+  const [inspectedNode, setInspectedNode] = useState<AppNode | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const closeCtx = useCallback(() => setCtxMenu(null), []);
@@ -140,7 +141,7 @@ function EditorCanvas({
   const onConnect = useCallback((params: Connection) => {
     const color = CHOICE_COLORS[params.sourceHandle ?? ''] ?? '#6366f1';
     setEdges(es => addEdge({
-      ...params, type: 'smoothstep', animated: false,
+      ...params, type: 'default', animated: false,
       style: { stroke: color, strokeWidth: 2 },
       markerEnd: { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },
     }, es));
@@ -155,6 +156,10 @@ function EditorCanvas({
   const onNodeCtx = useCallback((e: React.MouseEvent, node: Node) => {
     e.preventDefault(); e.stopPropagation();
     setCtxMenu({ x: e.clientX, y: e.clientY, mode: 'node', nodeId: node.id });
+  }, []);
+
+  const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    setInspectedNode(node as AppNode);
   }, []);
 
   const onNodeDblClick = useCallback((_: React.MouseEvent, node: Node) => {
@@ -185,8 +190,9 @@ function EditorCanvas({
         nodes={nodes} edges={edges}
         onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDblClick}
-        onPaneClick={closeCtx}
+        onPaneClick={() => { closeCtx(); setInspectedNode(null); }}
         onPaneContextMenu={onPaneCtx}
         onNodeContextMenu={onNodeCtx}
         nodeTypes={nodeTypes}
@@ -223,6 +229,62 @@ function EditorCanvas({
           <Button variant="secondary" onClick={() => onSave(false)} loading={saving} size="sm">Save Draft</Button>
           <Button onClick={() => onSave(true)} loading={saving} size="sm">Publish</Button>
         </div>
+
+        {/* Node Inspector */}
+        {inspectedNode && (() => {
+          const d = inspectedNode.data as AppNodeData;
+          const isNormal = inspectedNode.type === 'normalNode';
+          const nd = isNormal ? d as NormalNodeData : null;
+          return (
+            <div style={{
+              position: 'absolute', top: 56, left: 12, zIndex: 10,
+              width: 220,
+              background: 'rgba(8,8,20,0.97)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 10,
+              padding: '10px 12px',
+              fontSize: 11,
+              color: '#e2e8f0',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 10, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  {isNormal ? '❓ Question' : '🎬 Situation'}
+                </span>
+                {d.is_entry_point && (
+                  <span style={{ background: 'rgba(16,185,129,0.18)', color: '#34d399', border: '1px solid rgba(52,211,153,0.35)', borderRadius: 4, padding: '1px 5px', fontSize: 9, fontWeight: 700 }}>START</span>
+                )}
+              </div>
+              <div style={{ color: d.question_text ? '#d1d5db' : '#4b5563', marginBottom: 8, lineHeight: 1.5, borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 8 }}>
+                {d.question_text || <span style={{ fontStyle: 'italic', color: '#4b5563' }}>No text</span>}
+              </div>
+              {nd && (
+                <>
+                  {nd.timer_override && (
+                    <div style={{ color: '#fbbf24', marginBottom: 6 }}>⏱ Timer override: {nd.timer_override}s</div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {nd.choices?.map(c => {
+                      const cfg = { A: '#ef4444', B: '#3b82f6', C: '#22c55e', D: '#f59e0b' }[c.label] ?? '#6366f1';
+                      return (
+                        <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ width: 14, height: 14, borderRadius: '50%', background: cfg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 8, fontWeight: 800, flexShrink: 0 }}>{c.label}</span>
+                          <span style={{ flex: 1, color: c.choice_text ? '#d1d5db' : '#4b5563', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.choice_text || `Choice ${c.label}`}</span>
+                          {c.is_correct && <span style={{ color: '#34d399', fontSize: 10 }}>✓</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+              {d.media_url && (
+                <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 6 }}>
+                  {d.media_type === 'video' ? '🎬 Video' : '🖼 Image'} attached
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {nodes.length === 0 && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 5 }}>

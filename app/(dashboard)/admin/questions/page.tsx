@@ -57,6 +57,7 @@ export default function AdminQuestionsPage() {
                 <div>
                   <h3 className="text-white font-semibold group-hover:text-indigo-400 transition-colors">{s.name}</h3>
                   <p className="text-sm text-gray-400">{s.question_count || 0} questions · {s.timer_seconds}s timer · {s.is_published ? '✅ Published' : '📝 Draft'}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">👥 {s.play_count || 0} plays · avg score {s.avg_score || 0} pts</p>
                 </div>
                 <div className="flex gap-2" onClick={e => e.preventDefault()}>
                   <Button variant="ghost" size="sm" onClick={() => router.push(`/admin/questions/${s.id}/edit`)}>Edit</Button>

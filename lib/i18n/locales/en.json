@@ -5,6 +5,7 @@
     "dashboard": "Dashboard",
     "profile": "Profile",
     "leaderboard": "Leaderboard",
+    "history": "History",
     "admin": "Admin",
     "questions": "Questions",
     "logout": "Logout",
@@ -100,7 +101,7 @@
     "view_leaderboard": "View Leaderboard"
   },
   "leaderboard": {
-    "title": "Leaderboard",
+    "title": "History",
     "rank": "Rank",
     "player": "Player",
     "score": "Score",

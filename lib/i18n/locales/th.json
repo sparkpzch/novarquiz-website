@@ -5,6 +5,7 @@
     "dashboard": "แดชบอร์ด",
     "profile": "โปรไฟล์",
     "leaderboard": "ลีดเดอร์บอร์ด",
+    "history": "ประวัติ",
     "admin": "ผู้ดูแลระบบ",
     "questions": "คำถาม",
     "logout": "ออกจากระบบ",
@@ -100,7 +101,7 @@
     "view_leaderboard": "ดูลีดเดอร์บอร์ด"
   },
   "leaderboard": {
-    "title": "ลีดเดอร์บอร์ด",
+    "title": "ประวัติ",
     "rank": "อันดับ",
     "player": "ผู้เล่น",
     "score": "คะแนน",

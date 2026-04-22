@@ -125,7 +125,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
             <p className="text-gray-400">{t('play.score')}</p>
           </div>
           <div className="flex gap-3">
-            <button onClick={() => router.push(`/leaderboard?session=${sessionId}`)} className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">
+            <button onClick={() => router.push(`/history?session=${sessionId}`)} className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">
               {t('play.view_leaderboard')}
             </button>
             <button onClick={() => router.push('/')} className="flex-1 px-4 py-3 rounded-xl bg-white/10 text-white font-semibold">Home</button>
