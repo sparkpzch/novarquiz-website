@@ -25,8 +25,12 @@ export default function PlayLobbyPage({ params }: { params: Promise<{ sessionId:
   if (!user) { router.push('/sign-in'); return null; }
 
   const handleStart = async () => {
-    // Initialize play session
-    await fetch(`/api/play/${sessionId}/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'start', user_id: user.uid }) });
+    // Initialize play session (guests skip analytics persistence)
+    await fetch(`/api/play/${sessionId}/answer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'start', user_id: user.uid, is_guest: user.isAnonymous }),
+    });
     router.push(`/play/${sessionId}/question`);
   };
 

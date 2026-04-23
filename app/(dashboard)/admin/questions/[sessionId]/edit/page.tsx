@@ -237,6 +237,11 @@ function EditorCanvas({
           box-shadow: 0 0 0 4px rgba(52,211,153,0.4), 0 0 18px rgba(52,211,153,0.7) !important;
           background: #34d399 !important;
         }
+        .react-flow__edge.selected .react-flow__edge-path {
+          stroke: #ffffff !important;
+          stroke-width: 3 !important;
+          filter: drop-shadow(0 0 6px rgba(255,255,255,0.55));
+        }
       `}</style>
       <ReactFlow
         nodes={nodes} edges={edges}

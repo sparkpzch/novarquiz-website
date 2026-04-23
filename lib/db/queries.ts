@@ -48,13 +48,14 @@ export async function createSession(data: {
   cover_image_url?: string;
   timer_seconds?: number;
   is_private?: boolean;
+  is_published?: boolean;
   created_by: string;
 }) {
   const pin = String(Math.floor(100000 + Math.random() * 900000));
   const result = await pool.query(
-    `INSERT INTO question_sessions (name, description, cover_image_url, timer_seconds, created_by, is_private, pin_code)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-    [data.name, data.description || null, data.cover_image_url || null, data.timer_seconds || 30, data.created_by, data.is_private ?? false, pin]
+    `INSERT INTO question_sessions (name, description, cover_image_url, timer_seconds, created_by, is_private, is_published, pin_code)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [data.name, data.description || null, data.cover_image_url || null, data.timer_seconds || 30, data.created_by, data.is_private ?? false, data.is_published ?? false, pin]
   );
   return result.rows[0];
 }
@@ -89,6 +90,23 @@ export async function updateSession(sessionId: string, data: Partial<{
 
 export async function deleteSession(sessionId: string) {
   await pool.query('DELETE FROM question_sessions WHERE id = $1', [sessionId]);
+}
+
+// Removes every trace of a Firebase user from analytics-bearing tables.
+export async function deleteUserData(uid: string) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM user_answers WHERE user_id = $1', [uid]);
+    await client.query('DELETE FROM play_sessions WHERE user_id = $1', [uid]);
+    await client.query('DELETE FROM leaderboard_entries WHERE user_id = $1', [uid]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // ===================== Questions =====================

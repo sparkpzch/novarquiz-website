@@ -66,6 +66,13 @@ export default function ProfilePage() {
   const handleDeleteAccount = async () => {
     if (!user) return;
     try {
+      // Purge analytics rows first — once the Firebase user is gone we can't
+      // prove ownership, so the backend cascade must run before deleteUser().
+      const idToken = await user.getIdToken();
+      await fetch(`/api/users/${user.uid}/data`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
       await deleteUser(user);
       router.push('/sign-in');
     } catch { showToast('Failed to delete account. Please re-login and try again.', 'error'); }

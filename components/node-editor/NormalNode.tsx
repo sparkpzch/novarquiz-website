@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, useNodeConnections, type NodeProps } from '@xyflow/react';
 
 export type NormalNodeData = {
   question_text: string;
@@ -29,6 +29,14 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
   const choices = d.choices?.length
     ? d.choices
     : ['A', 'B', 'C', 'D'].map(l => ({ label: l, choice_text: '', is_correct: false }));
+
+  // Track which choice handles already have outgoing connections — used to hide the
+  // white "connect all" handle once every choice is wired up.
+  const sourceConnections = useNodeConnections({ handleType: 'source' });
+  const connectedChoices = new Set(
+    sourceConnections.map(c => c.sourceHandle).filter((h): h is string => !!h)
+  );
+  const allChoicesConnected = ['A', 'B', 'C', 'D'].every(l => connectedChoices.has(l));
 
   // Top of choice area depends on whether media row is present
   const choiceAreaTop = H_HEADER + H_TEXT + (d.media_url ? H_MEDIA : 0);
@@ -72,26 +80,29 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
       {/*
         "Connect All" handle — white dot positioned just above choice A.
         Drag from this to connect ALL 4 choices to the target node at once.
-        Styled like Unreal Engine's exec pin.
+        Styled like Unreal Engine's exec pin. Hidden when every choice is
+        already connected, since the action would be a no-op.
       */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="all"
-        title="Drag to connect all choices to a node"
-        style={{
-          top: choiceAreaTop - 9,
-          width: 13,
-          height: 13,
-          background: '#ffffff',
-          border: '2px solid rgba(255,255,255,0.55)',
-          boxShadow: selected
-            ? '0 0 0 3px rgba(255,255,255,0.2), 0 0 12px rgba(255,255,255,0.6)'
-            : '0 0 5px rgba(255,255,255,0.25)',
-          transition: 'box-shadow 0.15s',
-          zIndex: 10,
-        }}
-      />
+      {!allChoicesConnected && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="all"
+          title="Drag to connect all choices to a node"
+          style={{
+            top: choiceAreaTop - 9,
+            width: 13,
+            height: 13,
+            background: '#ffffff',
+            border: '2px solid rgba(255,255,255,0.55)',
+            boxShadow: selected
+              ? '0 0 0 3px rgba(255,255,255,0.2), 0 0 12px rgba(255,255,255,0.6)'
+              : '0 0 5px rgba(255,255,255,0.25)',
+            transition: 'box-shadow 0.15s',
+            zIndex: 10,
+          }}
+        />
+      )}
 
       {/* Source handles — one per choice, aligned with each row */}
       {choices.map((c, idx) => {

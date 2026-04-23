@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { createTeamRoom } from '@/lib/firebase/rtdb';
+import { useToast } from '@/components/ui/Toast';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion, AnimatePresence } from 'motion/react';
@@ -18,6 +19,7 @@ function SoloOrTeamModal({
 }) {
   const router = useRouter();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [creatingTeam, setCreatingTeam] = useState(false);
 
   const handleSolo = () => {
@@ -26,7 +28,10 @@ function SoloOrTeamModal({
   };
 
   const handleTeam = async () => {
-    if (!user) return;
+    if (!user) {
+      showToast('Please sign in to host a team room', 'error');
+      return;
+    }
     setCreatingTeam(true);
     try {
       const { roomId } = await createTeamRoom(session.id, {
@@ -36,7 +41,9 @@ function SoloOrTeamModal({
       });
       onClose();
       router.push(`/play/${session.id}/team/${roomId}`);
-    } catch {
+    } catch (err) {
+      console.error('createTeamRoom failed:', err);
+      showToast(`Could not create team room: ${(err as Error).message || 'unknown error'}`, 'error');
       setCreatingTeam(false);
     }
   };

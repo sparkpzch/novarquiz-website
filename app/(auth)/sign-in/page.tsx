@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, Suspense } from 'react';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signInAnonymously } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -52,6 +52,25 @@ function SignInForm() {
         'auth/invalid-email': 'Please enter a valid email address.',
       };
       setError(msgs[code ?? ''] ?? 'Sign in failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGuestSignIn = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const credential = await signInAnonymously(auth);
+      const idToken = await credential.user.getIdToken();
+      await createSession(idToken);
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      setError(
+        code === 'auth/operation-not-allowed'
+          ? 'Guest sign-in is not enabled. Please contact support.'
+          : `Guest sign-in failed${code ? ` (${code})` : ''}. Please try again.`,
+      );
     } finally {
       setLoading(false);
     }
@@ -155,6 +174,23 @@ function SignInForm() {
       }>
         {t('auth.google')}
       </Button>
+
+      <Button
+        variant="ghost"
+        onClick={handleGuestSignIn}
+        loading={loading}
+        className="w-full mt-3"
+        icon={
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        }
+      >
+        Continue as Guest
+      </Button>
+      <p className="text-center text-xs text-gray-500 mt-2">
+        Guests can play without saving progress or analytics.
+      </p>
 
       <p className="text-center text-sm text-gray-400 mt-6">
         {t('auth.no_account')}{' '}

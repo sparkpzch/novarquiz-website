@@ -99,7 +99,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       await fetch(`/api/play/${sessionId}/answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.uid, question_id: question.id, chosen_label: label, is_correct: isCorrect, time_taken_ms: timeTaken }),
+        body: JSON.stringify({ user_id: user.uid, question_id: question.id, chosen_label: label, is_correct: isCorrect, time_taken_ms: timeTaken, is_guest: user.isAnonymous }),
       });
     } catch { /* continue */ }
 

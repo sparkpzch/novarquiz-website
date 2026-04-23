@@ -39,9 +39,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     const body = await request.json();
 
     if (body.action === 'start') {
+      // Guests skip play_session persistence — no analytics trail.
+      if (body.is_guest) return NextResponse.json({ is_guest: true });
       const playSession = await getOrCreatePlaySession(sessionId, body.user_id);
       return NextResponse.json(playSession);
     }
+
+    // Guests: no per-answer persistence (score stays client-side only).
+    if (body.is_guest) return NextResponse.json({ is_guest: true });
 
     // Save answer
     const points = body.is_correct ? Math.max(100, 1000) : 0;
