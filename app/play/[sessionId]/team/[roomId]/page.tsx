@@ -106,11 +106,17 @@ export default function TeamLobbyPage({
     if (!user || !room) return;
     setJoining(true);
     setPinError('');
-    const ok = await joinTeamRoom(roomId, pin, user);
-    if (ok) {
-      setPhase('lobby');
-    } else {
-      setPinError('Incorrect PIN. Try again.');
+    try {
+      const ok = await joinTeamRoom(roomId, pin, user);
+      if (ok) {
+        setPhase('lobby');
+      } else {
+        setPinError('Incorrect PIN. Try again.');
+        setJoining(false);
+      }
+    } catch (err) {
+      console.error('joinTeamRoom failed:', err);
+      setPinError(`Could not join: ${(err as Error).message || 'unknown error'}`);
       setJoining(false);
     }
   };
@@ -119,7 +125,10 @@ export default function TeamLobbyPage({
     setStarting(true);
     try {
       await startTeamRoom(roomId);
-    } catch {
+      // Navigate ourselves — don't rely solely on the RTDB watcher firing.
+      router.push(`/play/${sessionId}/question`);
+    } catch (err) {
+      console.error('startTeamRoom failed:', err);
       setStarting(false);
     }
   };

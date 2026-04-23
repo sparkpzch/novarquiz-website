@@ -35,13 +35,18 @@ function SignInForm() {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim() || !password) {
+      setError('Please enter your email and password.');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
-      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
       const idToken = await credential.user.getIdToken();
       await createSession(idToken);
     } catch (err) {
+      console.error('Email sign-in failed:', err);
       const code = (err as { code?: string }).code;
       const msgs: Record<string, string> = {
         'auth/invalid-credential': 'Incorrect email or password.',
@@ -52,7 +57,7 @@ function SignInForm() {
         'auth/network-request-failed': 'Connection failed. Check your internet and try again.',
         'auth/invalid-email': 'Please enter a valid email address.',
       };
-      setError(msgs[code ?? ''] ?? 'Sign in failed. Please try again.');
+      setError(msgs[code ?? ''] ?? `Sign in failed${code ? ` (${code})` : ''}. Please try again.`);
     } finally {
       setLoading(false);
     }
@@ -60,12 +65,14 @@ function SignInForm() {
 
   const handleGoogleSignIn = async () => {
     setError('');
+    setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
       const credential = await signInWithPopup(auth, provider);
       const idToken = await credential.user.getIdToken();
       await createSession(idToken);
     } catch (err) {
+      console.error('Google sign-in failed:', err);
       const code = (err as { code?: string }).code;
       const msgs: Record<string, string> = {
         'auth/popup-blocked': 'Popup was blocked — please allow popups for this site.',
@@ -73,8 +80,13 @@ function SignInForm() {
         'auth/cancelled-popup-request': 'Sign-in was cancelled.',
         'auth/network-request-failed': 'Connection failed. Check your internet and try again.',
         'auth/account-exists-with-different-credential': 'An account already exists with this email using a different sign-in method.',
+        'auth/unauthorized-domain': 'This domain is not authorized for Google sign-in. Please contact support.',
+        'auth/operation-not-allowed': 'Google sign-in is not enabled. Please contact support.',
+        'auth/internal-error': 'Google sign-in had an internal error. Please try again.',
       };
-      setError(msgs[code ?? ''] ?? 'Google sign-in failed. Please try again.');
+      setError(msgs[code ?? ''] ?? `Google sign-in failed${code ? ` (${code})` : ''}. Please try again.`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -162,7 +174,8 @@ function SignInForm() {
       <button
         type="button"
         onClick={handleGoogleSignIn}
-        className="w-full flex items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 transition-all py-3 text-sm font-medium text-gray-700 shadow-sm"
+        disabled={loading}
+        className="w-full flex items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 transition-all py-3 text-sm font-medium text-gray-700 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
         style={{ minHeight: '48px' }}
       >
         <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">

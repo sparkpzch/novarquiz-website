@@ -46,25 +46,31 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
     setJoining(true);
     setPinError('');
 
-    if (session.is_private) {
-      const res = await fetch(`/api/join/${token}/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        setPinError(data.error || 'Incorrect PIN');
-        setJoining(false);
-        return;
+    try {
+      if (session.is_private) {
+        const res = await fetch(`/api/join/${token}/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          setPinError(data.error || 'Incorrect PIN');
+          setJoining(false);
+          return;
+        }
       }
-    }
 
-    await joinWaitingRoom(session.id, user);
-    if (!session.is_private) {
-      await claimLeaderIfEmpty(session.id, user.uid);
+      await joinWaitingRoom(session.id, user);
+      if (!session.is_private) {
+        await claimLeaderIfEmpty(session.id, user.uid);
+      }
+      router.push(`/play/${session.id}/lobby`);
+    } catch (err) {
+      console.error('Join failed:', err);
+      setPinError(`Could not join: ${(err as Error).message || 'unknown error'}`);
+      setJoining(false);
     }
-    router.push(`/play/${session.id}/lobby`);
   };
 
   if (authLoading || !user) {

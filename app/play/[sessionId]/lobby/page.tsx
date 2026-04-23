@@ -75,7 +75,10 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
     setStarting(true);
     try {
       await startRoom(sessionId);
-    } catch {
+      // Navigate ourselves — don't rely solely on the RTDB watcher firing.
+      router.push(`/play/${sessionId}/question`);
+    } catch (err) {
+      console.error('startRoom failed:', err);
       setStarting(false);
     }
   };
