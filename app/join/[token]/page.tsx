@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { joinWaitingRoom, claimLeaderIfEmpty } from '@/lib/firebase/rtdb';
+import { joinWaitingRoom, claimLeaderIfEmpty, resolveJoinToken } from '@/lib/firebase/rtdb';
 import { motion } from 'motion/react';
 
 type SessionInfo = {
@@ -24,22 +24,39 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
   const [pinError, setPinError] = useState('');
   const [joining, setJoining] = useState(false);
 
-  useEffect(() => {
-    fetch(`/api/join/${token}`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.error) setFetchError(data.error);
-        else setSession(data);
-      })
-      .catch(() => setFetchError('Failed to load session'));
-  }, [token]);
-
-  // Redirect unauthenticated users to sign-in, returning here after
+  // Redirect unauthenticated users to sign-in, returning here after.
+  // Token lookup requires auth (RTDB rules), so we do it after sign-in.
   useEffect(() => {
     if (!authLoading && !user) {
       router.push(`/sign-in?next=/join/${token}`);
     }
   }, [authLoading, user, router, token]);
+
+  // Resolve join token → sessionId via RTDB, then fetch session info.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const sessionId = await resolveJoinToken(token);
+        if (cancelled) return;
+        if (!sessionId) {
+          setFetchError('This invite link is no longer valid. Ask the host for a new one.');
+          return;
+        }
+        const res = await fetch(`/api/questions/sessions/${sessionId}`);
+        if (!res.ok) {
+          setFetchError('Session not found');
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled) setSession({ id: data.id, name: data.name, description: data.description, is_private: data.is_private });
+      } catch {
+        if (!cancelled) setFetchError('Failed to load session');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [token, user]);
 
   const handleJoin = async () => {
     if (!session || !user) return;
@@ -48,7 +65,7 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
 
     try {
       if (session.is_private) {
-        const res = await fetch(`/api/join/${token}/verify`, {
+        const res = await fetch(`/api/questions/sessions/${session.id}/verify-pin`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pin }),

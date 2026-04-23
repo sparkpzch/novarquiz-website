@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Question } from '@/lib/types';
+import { updateScore, watchScores, type PlayerScore } from '@/lib/firebase/rtdb';
 
 const CHOICE_COLORS = { A: 'from-red-600 to-red-500', B: 'from-blue-600 to-blue-500', C: 'from-emerald-600 to-emerald-500', D: 'from-amber-600 to-amber-500' };
 const CHOICE_HOVERS = { A: 'hover:from-red-500 hover:to-red-400', B: 'hover:from-blue-500 hover:to-blue-400', C: 'hover:from-emerald-500 hover:to-emerald-400', D: 'hover:from-amber-500 hover:to-amber-400' };
@@ -27,6 +28,13 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const [loading, setLoading] = useState(true);
   const [questionStartTime, setQuestionStartTime] = useState(Date.now());
   const [nextLoading, setNextLoading] = useState(false);
+  const [scores, setScores] = useState<Record<string, PlayerScore>>({});
+
+  // Subscribe to live leaderboard for this session
+  useEffect(() => {
+    if (!user || user.isAnonymous) return;
+    return watchScores(sessionId, setScores);
+  }, [sessionId, user]);
 
   const isSituation = question?.node_type === 'situation';
 
@@ -87,12 +95,20 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     const choice = question.choices.find(c => c.label === label);
     const isCorrect = choice?.is_correct || false;
 
+    let nextScore = score;
     if (isCorrect) {
       const points = Math.max(100, Math.round(1000 * (timeLeft / timerMax)));
-      setScore(prev => prev + points);
+      nextScore = score + points;
+      setScore(nextScore);
       setStreak(prev => prev + 1);
     } else {
       setStreak(0);
+    }
+
+    // Broadcast our running score so other players can render the live leaderboard.
+    // Skipped for guests — they don't appear on the board.
+    if (!user.isAnonymous) {
+      updateScore(sessionId, user, nextScore).catch(() => { /* non-fatal */ });
     }
 
     try {
@@ -188,6 +204,10 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
 
   // ── Normal question view ─────────────────────────────────────────────────────
   const timerPercent = (timeLeft / timerMax) * 100;
+  const topScores = Object.entries(scores)
+    .map(([uid, s]) => ({ uid, ...s }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
 
   return (
     <div className="min-h-screen bg-[#0a0a1a] flex flex-col">
@@ -211,6 +231,29 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
           </div>
         </div>
       </div>
+
+      {/* Live leaderboard — top 5 players across the session */}
+      {topScores.length > 1 && (
+        <div className="px-4 pb-2">
+          <div className="mx-auto max-w-2xl rounded-xl border border-white/10 bg-white/5 backdrop-blur px-3 py-2">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">🏆 Live Leaderboard</span>
+              <span className="text-xs text-gray-500">· {Object.keys(scores).length} players</span>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {topScores.map((s, i) => (
+                <div key={s.uid} className="flex items-center gap-1.5 text-xs">
+                  <span className="text-gray-500">#{i + 1}</span>
+                  <span className={`font-medium truncate max-w-[120px] ${s.uid === user?.uid ? 'text-indigo-300' : 'text-gray-300'}`}>
+                    {s.uid === user?.uid ? 'You' : s.displayName}
+                  </span>
+                  <span className="text-white font-bold">{s.score}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 flex flex-col items-center justify-center p-4 gap-6">
         {/* Media */}

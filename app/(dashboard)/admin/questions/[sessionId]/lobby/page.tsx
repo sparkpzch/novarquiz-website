@@ -4,7 +4,7 @@ import { use, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useToast } from '@/components/ui/Toast';
-import { initRoom, startRoom, watchRoom, joinWaitingRoom, claimLeaderIfEmpty, type SessionRoom } from '@/lib/firebase/rtdb';
+import { initRoom, startRoom, watchRoom, joinWaitingRoom, claimLeaderIfEmpty, openLobby, closeLobby, type SessionRoom } from '@/lib/firebase/rtdb';
 import { motion, AnimatePresence } from 'motion/react';
 import type { QuestionSession } from '@/lib/types';
 
@@ -37,6 +37,7 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
   const [room, setRoom] = useState<SessionRoom | null>(null);
   const [starting, setStarting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [joinToken, setJoinToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !isAdmin) router.push('/');
@@ -49,16 +50,21 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
       .then(s => setSession(s));
   }, [sessionId]);
 
-  // Init RTDB room and subscribe
+  // Init RTDB room, mint a fresh join token, and subscribe to room state.
   useEffect(() => {
     if (!user) return;
-    initRoom(sessionId, user.uid);
+    let cancelled = false;
+    (async () => {
+      await initRoom(sessionId, user.uid);
+      const token = await openLobby(sessionId);
+      if (!cancelled) setJoinToken(token);
+    })();
     const unsubscribe = watchRoom(sessionId, setRoom);
-    return unsubscribe;
+    return () => { cancelled = true; unsubscribe(); };
   }, [sessionId, user]);
 
-  const shareLink = typeof window !== 'undefined' && session
-    ? `${window.location.origin}/join/${session.share_token}`
+  const shareLink = typeof window !== 'undefined' && joinToken
+    ? `${window.location.origin}/join/${joinToken}`
     : '';
 
   const copyLink = useCallback(async () => {
@@ -72,6 +78,8 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
     setStarting(true);
     try {
       await startRoom(sessionId);
+      // Invalidate the join URL once the game is rolling — no late-joiners.
+      await closeLobby(sessionId);
       showToast('Game started!', 'success');
       router.push('/admin/questions');
     } catch {
