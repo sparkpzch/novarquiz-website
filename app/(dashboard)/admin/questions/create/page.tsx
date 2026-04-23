@@ -273,6 +273,7 @@ function EditorCanvas({
           isEntryPoint={(ctxNodeData as AppNodeData | undefined)?.is_entry_point}
           onAddNormal={() => addNode('normalNode', { x: ctxMenu.flowX!, y: ctxMenu.flowY! })}
           onAddSituation={() => addNode('situationNode', { x: ctxMenu.flowX!, y: ctxMenu.flowY! })}
+          onAddEnd={() => addNode('endNode', { x: ctxMenu.flowX!, y: ctxMenu.flowY! })}
           onEdit={() => {
             const n = nodes.find(n => n.id === ctxMenu.nodeId);
             if (n) setEditNode(n);

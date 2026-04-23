@@ -20,9 +20,9 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const router = useRouter();
 
   const [question, setQuestion] = useState<Question | null>(null);
-  // Soft per-question cap (count-up timer expires here = no answer recorded,
-  // 0 points awarded). Defaults to session.timer_seconds; questions can override.
-  const [timerCap, setTimerCap] = useState(30);
+  // Per-question time cap (seconds). null = no timer. Derived from
+  // question.timer_override ?? question.session_timer_seconds.
+  const [timerCap, setTimerCap] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0); // seconds since question shown — count-up
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0); // consecutive answers with points > 0
@@ -48,7 +48,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
 
   const applyQuestion = useCallback((q: Question) => {
     setQuestion(q);
-    const cap = q.timer_override || 30;
+    const cap = q.timer_override ?? q.session_timer_seconds ?? null;
     setTimerCap(cap);
     setElapsed(0);
     setSelected(null);
@@ -87,11 +87,11 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
 
   useEffect(() => { loadQuestion(); }, [loadQuestion]);
 
-  // Count-up timer — increments every second until cap. On expiry: no answer
-  // is recorded; we navigate to the end (treated as session abandoned/timeout).
-  // End nodes have no timer and no answer — they're a terminal screen.
+  // Count-up timer — increments every second until cap. Skipped when timerCap
+  // is null (session has no timer). On expiry: no answer recorded, treated as
+  // timeout. End/situation nodes never have a timer.
   useEffect(() => {
-    if (loading || finished || selected || isSituation || isEnd) return;
+    if (loading || finished || selected || isSituation || isEnd || timerCap === null) return;
     const interval = setInterval(() => {
       setElapsed(prev => {
         const next = prev + 1;
@@ -407,10 +407,8 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   }
 
   // ── Normal question view ─────────────────────────────────────────────────────
-  // Count-up display: ring fills as elapsed approaches the cap. Last 5 seconds
-  // turn red as a soft warning.
-  const elapsedPercent = Math.min(100, (elapsed / timerCap) * 100);
-  const remaining = Math.max(0, timerCap - elapsed);
+  const elapsedPercent = timerCap ? Math.min(100, (elapsed / timerCap) * 100) : 0;
+  const remaining = timerCap ? Math.max(0, timerCap - elapsed) : null;
   const topScores = Object.entries(scores)
     .map(([uid, s]) => ({ uid, ...s }))
     .sort((a, b) => b.score - a.score)
@@ -421,16 +419,18 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       {/* Top bar — count-up timer + score with delta toast */}
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
-          <div className="relative w-12 h-12">
-            <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
-              <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
-              <circle cx="24" cy="24" r="20" fill="none" stroke={remaining <= 5 ? '#ef4444' : '#6366f1'} strokeWidth="3"
-                strokeDasharray={`${(elapsedPercent / 100) * 125.6} 125.6`} strokeLinecap="round" className="transition-all duration-1000" />
-            </svg>
-            <span className={`absolute inset-0 flex items-center justify-center text-sm font-bold tabular-nums ${remaining <= 5 ? 'text-red-400' : 'text-white'}`}>
-              {elapsed}
-            </span>
-          </div>
+          {timerCap !== null && (
+            <div className="relative w-12 h-12">
+              <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
+                <circle cx="24" cy="24" r="20" fill="none" stroke={(remaining ?? 99) <= 5 ? '#ef4444' : '#6366f1'} strokeWidth="3"
+                  strokeDasharray={`${(elapsedPercent / 100) * 125.6} 125.6`} strokeLinecap="round" className="transition-all duration-1000" />
+              </svg>
+              <span className={`absolute inset-0 flex items-center justify-center text-sm font-bold tabular-nums ${(remaining ?? 99) <= 5 ? 'text-red-400' : 'text-white'}`}>
+                {elapsed}
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-4">
           {streak > 1 && <span className="px-3 py-1 rounded-lg bg-orange-500/20 text-orange-400 text-sm font-semibold">🔥 {t('play.streak')} {streak}</span>}

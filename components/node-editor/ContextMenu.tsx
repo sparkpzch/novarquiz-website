@@ -9,6 +9,7 @@ interface ContextMenuProps {
   isEntryPoint?: boolean;
   onAddNormal: () => void;
   onAddSituation: () => void;
+  onAddEnd: () => void;
   onEdit: () => void;
   onSetEntry: () => void;
   onDelete: () => void;
@@ -49,7 +50,7 @@ const MenuItem = ({
 
 export function ContextMenu({
   x, y, mode, isEntryPoint,
-  onAddNormal, onAddSituation, onEdit, onSetEntry, onDelete, onClose,
+  onAddNormal, onAddSituation, onAddEnd, onEdit, onSetEntry, onDelete, onClose,
 }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -91,6 +92,7 @@ export function ContextMenu({
           </div>
           <MenuItem icon="❓" label="Question Node" onClick={() => { onAddNormal(); onClose(); }} />
           <MenuItem icon="🎬" label="Situation Node" onClick={() => { onAddSituation(); onClose(); }} />
+          <MenuItem icon="🏁" label="End Node" onClick={() => { onAddEnd(); onClose(); }} />
         </>
       ) : (
         <>

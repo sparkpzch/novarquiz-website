@@ -483,6 +483,7 @@ function EditorCanvas({
           isEntryPoint={(ctxNodeData as AppNodeData | undefined)?.is_entry_point}
           onAddNormal={() => addNode('normalNode', { x: ctxMenu.flowX!, y: ctxMenu.flowY! })}
           onAddSituation={() => addNode('situationNode', { x: ctxMenu.flowX!, y: ctxMenu.flowY! })}
+          onAddEnd={() => addNode('endNode', { x: ctxMenu.flowX!, y: ctxMenu.flowY! })}
           onEdit={() => { const n = nodes.find(n => n.id === ctxMenu.nodeId); if (n) setEditNode(n); }}
           onSetEntry={() => ctxMenu.nodeId && setAsEntry(ctxMenu.nodeId)}
           onDelete={() => ctxMenu.nodeId && deleteNode(ctxMenu.nodeId)}
@@ -510,7 +511,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ session
 
   const [sessionName, setSessionName] = useState('');
   const [description, setDescription] = useState('');
-  const [timerSeconds, setTimerSeconds] = useState(30);
+  const [timerSeconds, setTimerSeconds] = useState<number | null>(30);
   const [isPrivate, setIsPrivate] = useState(false);
   const [pinCode, setPinCode] = useState('');
   const [shareToken, setShareToken] = useState('');
@@ -533,7 +534,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ session
       if (session) {
         setSessionName(session.name);
         setDescription(session.description ?? '');
-        setTimerSeconds(session.timer_seconds);
+        setTimerSeconds(session.timer_seconds ?? null);
         setIsPrivate(session.is_private ?? false);
         setPinCode(session.pin_code ?? '');
         setShareToken(session.share_token ?? '');
@@ -627,7 +628,23 @@ export default function EditQuestionPage({ params }: { params: Promise<{ session
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-shrink-0">
         <Input label="Session Name" value={sessionName} onChange={e => setSessionName(e.target.value)} placeholder="e.g. Capital Cities" />
         <Input label="Description" value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional" />
-        <Input label="Default Timer (seconds)" type="number" value={timerSeconds} onChange={e => setTimerSeconds(Number(e.target.value))} min={5} max={120} />
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Default Timer</label>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+              <div
+                onClick={() => setTimerSeconds(v => v === null ? 30 : null)}
+                className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${timerSeconds === null ? 'bg-white/10' : 'bg-indigo-600'}`}
+              >
+                <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${timerSeconds === null ? 'translate-x-0' : 'translate-x-4'}`} />
+              </div>
+              <span className="text-sm text-gray-400">{timerSeconds === null ? 'No timer' : 'Timed'}</span>
+            </label>
+            {timerSeconds !== null && (
+              <Input type="number" value={timerSeconds} onChange={e => setTimerSeconds(Number(e.target.value))} min={5} max={120} placeholder="30" />
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Session settings bar */}

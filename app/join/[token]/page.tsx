@@ -2,6 +2,8 @@
 
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { signInAnonymously, updateProfile } from 'firebase/auth';
+import { auth } from '@/lib/firebase/config';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { joinWaitingRoom, claimLeaderIfEmpty, resolveJoinToken, trackUserSession } from '@/lib/firebase/rtdb';
 import { trackEvent } from '@/lib/firebase/analytics';
@@ -24,14 +26,17 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [joining, setJoining] = useState(false);
+  const [guestName, setGuestName] = useState('');
 
-  // Redirect unauthenticated users to sign-in, returning here after.
-  // Token lookup requires auth (RTDB rules), so we do it after sign-in.
+  // Sign in anonymously if there's no existing session.
+  // This lets anyone join via a shareable link without creating an account.
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push(`/sign-in?next=/join/${token}`);
+      signInAnonymously(auth).catch(() => {
+        setFetchError('Could not start a guest session. Please try again.');
+      });
     }
-  }, [authLoading, user, router, token]);
+  }, [authLoading, user]);
 
   // Resolve join token → sessionId via RTDB, then fetch session info.
   useEffect(() => {
@@ -67,6 +72,11 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
     trackEvent('session_join_attempted', { session_id: session.id, is_private: session.is_private });
 
     try {
+      // Apply guest display name before joining so the lobby shows it correctly.
+      if (user.isAnonymous && guestName.trim()) {
+        await updateProfile(user, { displayName: guestName.trim() });
+      }
+
       if (session.is_private) {
         const res = await fetch(`/api/questions/sessions/${session.id}/verify-pin`, {
           method: 'POST',
@@ -100,6 +110,7 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
     }
   };
 
+  // Show spinner while Firebase resolves auth state (including anonymous sign-in).
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -144,6 +155,23 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
               )}
             </div>
 
+            {user.isAnonymous && (
+              <div className="mb-6">
+                <label className="text-sm font-medium text-gray-300 block mb-2">
+                  Your name (optional)
+                </label>
+                <input
+                  type="text"
+                  maxLength={30}
+                  value={guestName}
+                  onChange={e => setGuestName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleJoin()}
+                  placeholder="Guest"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-indigo-500 focus:outline-none placeholder:text-gray-600"
+                />
+              </div>
+            )}
+
             {session.is_private && (
               <div className="mb-6">
                 <label className="text-sm font-medium text-gray-300 block mb-2">
@@ -187,7 +215,9 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
             </button>
 
             <p className="text-center text-xs text-gray-500 mt-4">
-              Joining as <span className="text-gray-300">{user.displayName || user.email}</span>
+              {user.isAnonymous
+                ? 'Playing as guest — progress won\'t be saved'
+                : <>Joining as <span className="text-gray-300">{user.displayName || user.email}</span></>}
             </p>
           </div>
         )}

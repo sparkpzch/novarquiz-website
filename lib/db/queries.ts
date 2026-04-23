@@ -55,7 +55,7 @@ export async function createSession(data: {
   const result = await pool.query(
     `INSERT INTO question_sessions (name, description, cover_image_url, timer_seconds, created_by, is_private, is_published, pin_code)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-    [data.name, data.description || null, data.cover_image_url || null, data.timer_seconds || 30, data.created_by, data.is_private ?? false, data.is_published ?? false, pin]
+    [data.name, data.description || null, data.cover_image_url || null, data.timer_seconds ?? null, data.created_by, data.is_private ?? false, data.is_published ?? false, pin]
   );
   return result.rows[0];
 }
@@ -140,12 +140,13 @@ export async function getQuestionById(questionId: string) {
 
 export async function getEntryQuestion(sessionId: string) {
   const result = await pool.query(
-    `SELECT q.*, 
+    `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
       json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.points) ORDER BY c.label) as choices
      FROM questions q
+     JOIN question_sessions qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
      WHERE q.session_id = $1 AND q.is_entry_point = TRUE
-     GROUP BY q.id`,
+     GROUP BY q.id, qs.timer_seconds`,
     [sessionId]
   );
   return result.rows[0] || null;
@@ -243,13 +244,14 @@ export async function saveConnections(sessionId: string, connections: Array<{ fr
 
 export async function getNextQuestion(fromQuestionId: string, choiceLabel: string) {
   const result = await pool.query(
-    `SELECT q.*, 
+    `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
       json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.points) ORDER BY c.label) as choices
      FROM question_connections qc
      JOIN questions q ON q.id = qc.to_question_id
+     JOIN question_sessions qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
      WHERE qc.from_question_id = $1 AND qc.from_choice_label = $2
-     GROUP BY q.id`,
+     GROUP BY q.id, qs.timer_seconds`,
     [fromQuestionId, choiceLabel]
   );
   return result.rows[0] || null;

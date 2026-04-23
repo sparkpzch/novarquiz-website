@@ -1,7 +1,7 @@
 'use client';
 
-import { memo } from 'react';
-import { Handle, Position, useNodeConnections, type NodeProps } from '@xyflow/react';
+import { memo, useState, useCallback } from 'react';
+import { Handle, Position, useNodeConnections, useReactFlow, type NodeProps } from '@xyflow/react';
 
 export type NormalNodeData = {
   question_text: string;
@@ -26,8 +26,27 @@ const H_TEXT = 52;
 const H_CHOICE = 32;
 const H_MEDIA = 22; // height of media indicator row when present
 
-export const NormalNode = memo(({ data, selected }: NodeProps) => {
+export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as NormalNodeData;
+  const { updateNodeData } = useReactFlow();
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: form });
+      if (!res.ok) return;
+      const { url } = await res.json();
+      updateNodeData(id, { media_type: file.type.startsWith('video/') ? 'video' : 'image', media_url: url });
+    } catch { /* non-fatal */ }
+  }, [id, updateNodeData]);
+
   const choices = d.choices?.length
     ? d.choices
     : ['A', 'B', 'C', 'D'].map(l => ({ label: l, choice_text: '', points: 0 }));
@@ -54,15 +73,32 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
   });
 
   return (
-    <div style={{
-      width: 248,
-      borderRadius: 12,
-      border: `2px solid ${selected ? '#6366f1' : 'rgba(255,255,255,0.12)'}`,
-      boxShadow: selected
-        ? '0 0 0 3px rgba(99,102,241,0.25), 0 8px 32px rgba(0,0,0,0.6)'
-        : '0 4px 24px rgba(0,0,0,0.5)',
-      position: 'relative',
-    }}>
+    <div
+      onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+      style={{
+        width: 248,
+        borderRadius: 12,
+        border: `2px solid ${dragOver ? '#6366f1' : selected ? '#6366f1' : 'rgba(255,255,255,0.12)'}`,
+        boxShadow: dragOver
+          ? '0 0 0 4px rgba(99,102,241,0.4), 0 8px 32px rgba(0,0,0,0.6)'
+          : selected
+            ? '0 0 0 3px rgba(99,102,241,0.25), 0 8px 32px rgba(0,0,0,0.6)'
+            : '0 4px 24px rgba(0,0,0,0.5)',
+        position: 'relative',
+      }}>
+      {dragOver && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 20, borderRadius: 10,
+          background: 'rgba(99,102,241,0.18)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none',
+        }}>
+          <span style={{ color: '#a5b4fc', fontSize: 11, fontWeight: 700 }}>Drop media here</span>
+        </div>
+      )}
+
       {/* Target handle (incoming) */}
       <Handle
         type="target"

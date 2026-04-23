@@ -5,7 +5,7 @@ export interface QuestionSession {
   name: string;
   description: string | null;
   cover_image_url: string | null;
-  timer_seconds: number;
+  timer_seconds: number | null;
   is_published: boolean;
   is_private: boolean;
   pin_code: string;
@@ -26,6 +26,7 @@ export interface Question {
   media_type: 'image' | 'video' | null;
   media_url: string | null;
   timer_override: number | null;
+  session_timer_seconds: number | null;
   is_entry_point: boolean;
   node_x: number;
   node_y: number;
