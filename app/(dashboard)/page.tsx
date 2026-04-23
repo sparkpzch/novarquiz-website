@@ -3,12 +3,143 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { createTeamRoom } from '@/lib/firebase/rtdb';
+import { createTeamRoom, resolveJoinToken, trackUserSession, watchUserSessions, type UserSessionEntry } from '@/lib/firebase/rtdb';
 import { useToast } from '@/components/ui/Toast';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion, AnimatePresence } from 'motion/react';
 import type { QuestionSession } from '@/lib/types';
+
+// Pull a token out of either a raw token string or a pasted invite URL like
+// https://host/join/<token>[?…]. Returns null if it can't extract one.
+function extractJoinToken(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  // Try URL form first
+  try {
+    const u = new URL(trimmed);
+    const m = u.pathname.match(/\/join\/([^/?#]+)/);
+    if (m) return m[1];
+  } catch { /* not a URL — fall through */ }
+  // Treat the whole thing as a raw token if it's URL-safe-ish
+  if (/^[A-Za-z0-9_-]{6,}$/.test(trimmed)) return trimmed;
+  return null;
+}
+
+function LiveSessionsWidget() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [entries, setEntries] = useState<Record<string, UserSessionEntry>>({});
+
+  useEffect(() => {
+    if (!user) return;
+    return watchUserSessions(user.uid, setEntries);
+  }, [user]);
+
+  const list = Object.values(entries).sort((a, b) => b.joinedAt - a.joinedAt);
+  if (list.length === 0) return null;
+
+  const resume = (entry: UserSessionEntry) => {
+    if (entry.mode === 'team' && entry.roomId) {
+      router.push(`/play/${entry.sessionId}/team/${entry.roomId}`);
+    } else {
+      router.push(`/play/${entry.sessionId}/lobby`);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-cyan-500/5 p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Live sessions</h3>
+        <span className="text-xs text-gray-400">· {list.length} active</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {list.map((entry, i) => {
+          const id = entry.roomId ? `${entry.sessionId}__${entry.roomId}` : entry.sessionId;
+          return (
+            <motion.button
+              key={id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              onClick={() => resume(entry)}
+              className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-emerald-500/30 p-3 text-left transition-all"
+            >
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
+                <span className="text-lg">{entry.mode === 'team' ? '👥' : '🎮'}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-medium truncate">{entry.sessionName}</p>
+                <p className="text-xs text-gray-400 capitalize">{entry.mode === 'team' ? 'Team room' : 'Public lobby'} · Resume →</p>
+              </div>
+            </motion.button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function JoinByCodeCard() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const handleJoin = async () => {
+    const token = extractJoinToken(code);
+    if (!token) {
+      showToast('Enter a valid invite code or link', 'error');
+      return;
+    }
+    if (!user) {
+      router.push(`/sign-in?next=/join/${token}`);
+      return;
+    }
+    setBusy(true);
+    // Optional pre-check so we can surface a nicer error than the join page's 404.
+    try {
+      const sessionId = await resolveJoinToken(token);
+      if (!sessionId) {
+        showToast('That invite link has expired. Ask the host for a new one.', 'error');
+        setBusy(false);
+        return;
+      }
+    } catch { /* swallow — let /join/{token} handle it */ }
+    router.push(`/join/${token}`);
+  };
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-indigo-600/10 to-purple-600/10 p-5">
+      <div className="flex items-center gap-3 mb-3">
+        <span className="text-xl">🎟️</span>
+        <div>
+          <p className="text-white font-semibold">Have an invite?</p>
+          <p className="text-xs text-gray-400">Paste a join code or link from the host</p>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={code}
+          onChange={e => setCode(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && !busy && handleJoin()}
+          placeholder="Code or invite link"
+          className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-white text-sm focus:border-indigo-500 focus:outline-none placeholder:text-gray-500"
+        />
+        <button
+          onClick={handleJoin}
+          disabled={busy || !code.trim()}
+          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:from-indigo-500 hover:to-purple-500 transition-all"
+        >
+          {busy ? '…' : 'Join'}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function SoloOrTeamModal({
   session,
@@ -38,6 +169,13 @@ function SoloOrTeamModal({
         uid: user.uid,
         displayName: user.displayName,
         photoURL: user.photoURL,
+      });
+      await trackUserSession(user.uid, {
+        sessionId: session.id,
+        sessionName: session.name,
+        mode: 'team',
+        roomId,
+        joinedAt: Date.now(),
       });
       onClose();
       router.push(`/play/${session.id}/team/${roomId}`);
@@ -145,6 +283,10 @@ export default function DashboardPage() {
           </motion.div>
         ))}
       </div>
+
+      <LiveSessionsWidget />
+
+      <JoinByCodeCard />
 
       <div>
         <h2 className="text-xl font-semibold text-white mb-4">{t('dashboard.available_quizzes')}</h2>

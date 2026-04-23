@@ -3,7 +3,8 @@
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { joinWaitingRoom, claimLeaderIfEmpty, resolveJoinToken } from '@/lib/firebase/rtdb';
+import { joinWaitingRoom, claimLeaderIfEmpty, resolveJoinToken, trackUserSession } from '@/lib/firebase/rtdb';
+import { trackEvent } from '@/lib/firebase/analytics';
 import { motion } from 'motion/react';
 
 type SessionInfo = {
@@ -63,6 +64,8 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
     setJoining(true);
     setPinError('');
 
+    trackEvent('session_join_attempted', { session_id: session.id, is_private: session.is_private });
+
     try {
       if (session.is_private) {
         const res = await fetch(`/api/questions/sessions/${session.id}/verify-pin`, {
@@ -82,6 +85,13 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
       if (!session.is_private) {
         await claimLeaderIfEmpty(session.id, user.uid);
       }
+      await trackUserSession(user.uid, {
+        sessionId: session.id,
+        sessionName: session.name,
+        mode: 'lobby',
+        joinedAt: Date.now(),
+      });
+      trackEvent('session_join_succeeded', { session_id: session.id });
       router.push(`/play/${session.id}/lobby`);
     } catch (err) {
       console.error('Join failed:', err);

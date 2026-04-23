@@ -3,7 +3,7 @@
 import { use, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { watchRoom, leaveWaitingRoom, startRoom, type SessionRoom } from '@/lib/firebase/rtdb';
+import { watchRoom, leaveWaitingRoom, type SessionRoom } from '@/lib/firebase/rtdb';
 import { motion, AnimatePresence } from 'motion/react';
 import type { QuestionSession } from '@/lib/types';
 
@@ -35,7 +35,6 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
   const router = useRouter();
   const [room, setRoom] = useState<SessionRoom | null>(null);
   const [session, setSession] = useState<QuestionSession | null>(null);
-  const [starting, setStarting] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   useEffect(() => {
@@ -71,25 +70,9 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
     router.push('/');
   }, [sessionId, user, router]);
 
-  const handleStart = async () => {
-    setStarting(true);
-    try {
-      await startRoom(sessionId);
-      // Navigate ourselves — don't rely solely on the RTDB watcher firing.
-      router.push(`/play/${sessionId}/question`);
-    } catch (err) {
-      console.error('startRoom failed:', err);
-      setStarting(false);
-    }
-  };
-
   if (loading || !user) return null;
 
   const players = Object.entries(room?.players ?? {});
-
-  const isLeader = session?.is_private
-    ? user.uid === session.created_by
-    : user.uid === room?.leaderId;
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
@@ -206,37 +189,15 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
           )}
         </motion.div>
 
-        {/* Start button (leader only) */}
-        {isLeader ? (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-            <button
-              onClick={handleStart}
-              disabled={starting || players.length === 0}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-indigo-500 hover:to-purple-500 transition-all shadow-lg shadow-indigo-500/20"
-            >
-              {starting ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Starting…
-                </span>
-              ) : (
-                `🚀 Start Game (${players.length} player${players.length !== 1 ? 's' : ''})`
-              )}
-            </button>
-            {players.length === 0 && (
-              <p className="text-center text-xs text-gray-500 mt-2">Waiting for at least one player to join</p>
-            )}
-          </motion.div>
-        ) : (
-          <div className="flex items-center justify-center gap-3 text-gray-500 text-sm">
-            <div className="flex gap-1">
-              {[0, 1, 2].map(i => (
-                <div key={i} className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-              ))}
-            </div>
-            <span>Waiting for the leader to start the game…</span>
+        {/* Players wait for the host (admin observer) to start the game from the admin lobby */}
+        <div className="flex items-center justify-center gap-3 text-gray-500 text-sm">
+          <div className="flex gap-1">
+            {[0, 1, 2].map(i => (
+              <div key={i} className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+            ))}
           </div>
-        )}
+          <span>Waiting for the host to start the game…</span>
+        </div>
       </div>
     </div>
   );

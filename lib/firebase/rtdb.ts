@@ -41,11 +41,28 @@ export type TeamRoom = {
 
 // ─── Host operations ─────────────────────────────────────────────────────────
 
-// Safe init: never overwrites a room that is already started/ended
+// Legacy: preserved for callers that just want to ensure a room exists in 'waiting'
+// without disturbing live state. Admin lobby should call `reopenLobby` instead.
 export async function initRoom(sessionId: string, hostId: string) {
   await runTransaction(ref(rtdb, `sessions/${sessionId}`), (current) => {
     if (current?.status === 'started' || current?.status === 'ended') return;
     return { ...(current ?? {}), status: 'waiting', hostId };
+  });
+}
+
+// Fully reset a session room when the admin (re-)opens the lobby. Wipes any
+// stale players/scores from a previous game and forces status back to 'waiting',
+// so new joiners don't auto-route to /question because of a leftover 'started' status.
+export async function reopenLobby(sessionId: string, hostId: string): Promise<void> {
+  await runTransaction(ref(rtdb, `sessions/${sessionId}`), (current) => {
+    // First time: create fresh
+    if (!current) return { status: 'waiting', hostId };
+    // Previous game finished — start clean (drop old players, scores, leaderId, joinToken)
+    if (current.status === 'started' || current.status === 'ended') {
+      return { status: 'waiting', hostId };
+    }
+    // Live waiting room — keep players, just refresh hostId
+    return { ...current, hostId, status: 'waiting' };
   });
 }
 
@@ -109,6 +126,15 @@ export type PlayerScore = {
   displayName: string;
   photoURL: string | null;
   score: number;
+  // Optional: which question the player is currently viewing. Powers the
+  // admin observation grid (#8). Null when finished or not yet navigated.
+  currentQuestionId?: string | null;
+  // Optional: human-readable label for the current question (e.g. "Q3" or
+  // truncated text) so the admin grid doesn't have to look it up.
+  currentQuestionLabel?: string | null;
+  // Optional: player has reached the end of their path. Used by the admin
+  // grid to render a "✓ done" badge instead of the current question.
+  finished?: boolean;
   updatedAt: number;
 };
 
@@ -116,11 +142,15 @@ export async function updateScore(
   sessionId: string,
   user: { uid: string; displayName: string | null; photoURL: string | null },
   score: number,
+  extras?: { currentQuestionId?: string | null; currentQuestionLabel?: string | null; finished?: boolean },
 ): Promise<void> {
   await set(ref(rtdb, `sessions/${sessionId}/scores/${user.uid}`), {
     displayName: user.displayName || 'Anonymous',
     photoURL: user.photoURL,
     score,
+    currentQuestionId: extras?.currentQuestionId ?? null,
+    currentQuestionLabel: extras?.currentQuestionLabel ?? null,
+    finished: extras?.finished ?? false,
     updatedAt: Date.now(),
   } satisfies PlayerScore);
 }
@@ -176,6 +206,76 @@ export async function resolveJoinToken(token: string): Promise<string | null> {
   const snap = await get(ref(rtdb, `joinTokens/${token}`));
   const data = snap.val() as { sessionId: string; createdAt: number } | null;
   return data?.sessionId ?? null;
+}
+
+// ─── Per-user active-session index ────────────────────────────────────────────
+//
+// Fan-out index so we can answer "which live sessions is THIS user in?" without
+// scanning every session. Written at join time, removed when the user leaves or
+// finishes. Each entry is auto-pruned if the tab disconnects (onDisconnect).
+//
+// Path: userSessions/{uid}/{entryId}
+//   entryId = sessionId for public lobbies,
+//   entryId = `${sessionId}__${roomId}` for team rooms.
+
+export type UserSessionEntry = {
+  sessionId: string;
+  sessionName: string;
+  mode: 'lobby' | 'team' | 'solo';
+  roomId?: string;
+  joinedAt: number;
+};
+
+function userSessionEntryId(sessionId: string, roomId?: string): string {
+  return roomId ? `${sessionId}__${roomId}` : sessionId;
+}
+
+export async function trackUserSession(
+  uid: string,
+  entry: UserSessionEntry,
+): Promise<void> {
+  const id = userSessionEntryId(entry.sessionId, entry.roomId);
+  const entryRef = ref(rtdb, `userSessions/${uid}/${id}`);
+  onDisconnect(entryRef).remove();
+  await set(entryRef, entry);
+}
+
+export async function untrackUserSession(
+  uid: string,
+  sessionId: string,
+  roomId?: string,
+): Promise<void> {
+  const id = userSessionEntryId(sessionId, roomId);
+  await set(ref(rtdb, `userSessions/${uid}/${id}`), null);
+}
+
+// Removes every userSessions entry for this uid that references `sessionId`
+// (both the public-lobby entry and any `${sessionId}__<roomId>` team entry).
+// Used when the player finishes the session and we don't know which modes
+// they joined through.
+export async function untrackAllUserSessionsFor(
+  uid: string,
+  sessionId: string,
+): Promise<void> {
+  const snap = await get(ref(rtdb, `userSessions/${uid}`));
+  const entries = (snap.val() as Record<string, UserSessionEntry> | null) ?? {};
+  const updates: Record<string, null> = {};
+  for (const [id, entry] of Object.entries(entries)) {
+    if (entry.sessionId === sessionId) updates[id] = null;
+  }
+  if (Object.keys(updates).length > 0) {
+    await update(ref(rtdb, `userSessions/${uid}`), updates);
+  }
+}
+
+export function watchUserSessions(
+  uid: string,
+  callback: (entries: Record<string, UserSessionEntry>) => void,
+): () => void {
+  const entriesRef = ref(rtdb, `userSessions/${uid}`);
+  const handler = (snap: DataSnapshot) => callback((snap.val() as Record<string, UserSessionEntry>) ?? {});
+  onValue(entriesRef, handler);
+  return () => off(entriesRef, 'value', handler);
 }
 
 // ─── Team Room operations ─────────────────────────────────────────────────────

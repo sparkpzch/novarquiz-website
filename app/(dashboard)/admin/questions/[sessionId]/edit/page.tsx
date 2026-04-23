@@ -54,11 +54,13 @@ const nodeTypes: NodeTypes = { normalNode: NormalNode, situationNode: SituationN
 
 const defaultNormalData = (): NormalNodeData => ({
   question_text: '',
+  // Default points = 0 per the per-choice scoring spec — admin sets values
+  // explicitly. See migration 003.
   choices: [
-    { label: 'A', choice_text: '', is_correct: false },
-    { label: 'B', choice_text: '', is_correct: false },
-    { label: 'C', choice_text: '', is_correct: false },
-    { label: 'D', choice_text: '', is_correct: false },
+    { label: 'A', choice_text: '', points: 0 },
+    { label: 'B', choice_text: '', points: 0 },
+    { label: 'C', choice_text: '', points: 0 },
+    { label: 'D', choice_text: '', points: 0 },
   ],
   media_type: null,
   media_url: null,
@@ -383,18 +385,30 @@ function EditorCanvas({
                         placeholder={`Choice ${c.label}`}
                         style={{ ...inputStyle, flex: 1, minWidth: 0 }}
                       />
-                      <button
-                        onClick={() => {
-                          const choices = (nd.choices ?? []).map((ch, i) => ({ ...ch, is_correct: i === idx }));
+                      <input
+                        type="number"
+                        step={1}
+                        value={c.points}
+                        onChange={e => {
+                          const v = e.target.value === '' ? 0 : Math.trunc(Number(e.target.value));
+                          const choices = [...(nd.choices ?? [])];
+                          choices[idx] = { ...choices[idx], points: Number.isFinite(v) ? v : 0 };
                           applyInspector({ ...d, choices } as NormalNodeData);
                         }}
+                        title="Points awarded for this choice (negative allowed)"
                         style={{
-                          flexShrink: 0, width: 20, height: 20, borderRadius: 4, border: 'none', cursor: 'pointer',
-                          background: c.is_correct ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.07)',
-                          color: c.is_correct ? '#34d399' : '#6b7280', fontSize: 10,
+                          flexShrink: 0, width: 38, height: 20, borderRadius: 4,
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          background: c.points > 0
+                            ? 'rgba(52,211,153,0.15)'
+                            : c.points < 0
+                              ? 'rgba(251,113,133,0.15)'
+                              : 'rgba(255,255,255,0.04)',
+                          color: c.points > 0 ? '#34d399' : c.points < 0 ? '#fb7185' : '#9ca3af',
+                          fontSize: 10, textAlign: 'center', outline: 'none',
+                          fontFamily: 'monospace',
                         }}
-                        title="Mark correct"
-                      >✓</button>
+                      />
                     </div>
                   ))}
                 </div>

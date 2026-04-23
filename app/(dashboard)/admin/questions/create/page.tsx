@@ -54,10 +54,10 @@ const nodeTypes: NodeTypes = { normalNode: NormalNode, situationNode: SituationN
 const defaultNormalData = (): NormalNodeData => ({
   question_text: '',
   choices: [
-    { label: 'A', choice_text: '', is_correct: false },
-    { label: 'B', choice_text: '', is_correct: false },
-    { label: 'C', choice_text: '', is_correct: false },
-    { label: 'D', choice_text: '', is_correct: false },
+    { label: 'A', choice_text: '', points: 0 },
+    { label: 'B', choice_text: '', points: 0 },
+    { label: 'C', choice_text: '', points: 0 },
+    { label: 'D', choice_text: '', points: 0 },
   ],
   media_type: null,
   media_url: null,

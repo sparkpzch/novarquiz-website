@@ -4,7 +4,8 @@ import { use, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useToast } from '@/components/ui/Toast';
-import { initRoom, startRoom, watchRoom, joinWaitingRoom, claimLeaderIfEmpty, openLobby, closeLobby, type SessionRoom } from '@/lib/firebase/rtdb';
+import { reopenLobby, startRoom, watchRoom, openLobby, closeLobby, type SessionRoom } from '@/lib/firebase/rtdb';
+import { trackEvent } from '@/lib/firebase/analytics';
 import { motion, AnimatePresence } from 'motion/react';
 import type { QuestionSession } from '@/lib/types';
 
@@ -50,14 +51,18 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
       .then(s => setSession(s));
   }, [sessionId]);
 
-  // Init RTDB room, mint a fresh join token, and subscribe to room state.
+  // Reset RTDB room (clears stale state from prior games), mint a fresh join token,
+  // and subscribe to room state.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     (async () => {
-      await initRoom(sessionId, user.uid);
+      await reopenLobby(sessionId, user.uid);
       const token = await openLobby(sessionId);
-      if (!cancelled) setJoinToken(token);
+      if (!cancelled) {
+        setJoinToken(token);
+        trackEvent('session_lobby_opened', { session_id: sessionId });
+      }
     })();
     const unsubscribe = watchRoom(sessionId, setRoom);
     return () => { cancelled = true; unsubscribe(); };
@@ -80,19 +85,13 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
       await startRoom(sessionId);
       // Invalidate the join URL once the game is rolling — no late-joiners.
       await closeLobby(sessionId);
+      trackEvent('session_started', { session_id: sessionId, player_count: players.length });
       showToast('Game started!', 'success');
-      router.push('/admin/questions');
+      router.push(`/admin/questions/${sessionId}/observe`);
     } catch {
       showToast('Failed to start game', 'error');
       setStarting(false);
     }
-  };
-
-  const handleJoinAndPlay = async () => {
-    if (!user) return;
-    await joinWaitingRoom(sessionId, user);
-    if (!session?.is_private) await claimLeaderIfEmpty(sessionId, user.uid);
-    router.push(`/play/${sessionId}/lobby`);
   };
 
   if (loading || !isAdmin) return null;
@@ -201,12 +200,9 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
         <p className="text-center text-xs text-gray-500">Waiting for at least one player to join before starting</p>
       )}
 
-      <button
-        onClick={handleJoinAndPlay}
-        className="w-full py-3 rounded-2xl border border-white/10 bg-white/5 text-gray-300 font-semibold text-sm hover:bg-white/10 hover:text-white transition-all"
-      >
-        👤 Join as Player & Play
-      </button>
+      <p className="text-center text-xs text-gray-500">
+        You are observing as the admin — players join via the link/PIN above.
+      </p>
     </div>
   );
 }

@@ -48,19 +48,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     // Guests: no per-answer persistence (score stays client-side only).
     if (body.is_guest) return NextResponse.json({ is_guest: true });
 
-    // Save answer
-    const points = body.is_correct ? Math.max(100, 1000) : 0;
-    const answer = await saveUserAnswer({
+    // Server computes points from the choice's stored value — clients never
+    // submit their own score, which would be trivially exploitable.
+    const result = await saveUserAnswer({
       session_id: sessionId,
       user_id: body.user_id,
       question_id: body.question_id,
       chosen_label: body.chosen_label,
-      is_correct: body.is_correct,
       time_taken_ms: body.time_taken_ms || 0,
-      points_earned: points,
     });
 
-    return NextResponse.json(answer);
+    return NextResponse.json(result);
   } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }

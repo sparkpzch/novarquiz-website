@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState, useCallback } from 'react';
+import { use, useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import {
@@ -8,6 +8,8 @@ import {
   joinTeamRoom,
   leaveTeamRoom,
   startTeamRoom,
+  trackUserSession,
+  untrackUserSession,
   type TeamRoom,
 } from '@/lib/firebase/rtdb';
 import { motion, AnimatePresence } from 'motion/react';
@@ -56,6 +58,24 @@ export default function TeamLobbyPage({
   const [starting, setStarting] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [copied, setCopied] = useState(false);
+  // PIN read from `?pin=…` on mount. Stored in a ref because the auto-join
+  // effect needs to know "did the URL pre-fill this?" without waiting for
+  // a re-render cycle to re-derive it from the input value.
+  const prefilledPinRef = useRef('');
+  const autoJoinTriedRef = useRef(false);
+
+  // Pre-fill PIN from share link query (?pin=123456) once after mount.
+  // Done in an effect (not useState initializer) so SSR-empty hydration
+  // doesn't lock in '' before the URL is available.
+  useEffect(() => {
+    const urlPin = (new URLSearchParams(window.location.search).get('pin') ?? '')
+      .replace(/\D/g, '')
+      .slice(0, 6);
+    if (urlPin) {
+      prefilledPinRef.current = urlPin;
+      setPin(urlPin);
+    }
+  }, []);
 
   useEffect(() => {
     fetch(`/api/questions/sessions/${sessionId}`)
@@ -102,13 +122,20 @@ export default function TeamLobbyPage({
     };
   }, [roomId, user, phase]);
 
-  const handleJoin = async () => {
+  const handleJoin = useCallback(async () => {
     if (!user || !room) return;
     setJoining(true);
     setPinError('');
     try {
       const ok = await joinTeamRoom(roomId, pin, user);
       if (ok) {
+        await trackUserSession(user.uid, {
+          sessionId,
+          sessionName: sessionName || 'Team room',
+          mode: 'team',
+          roomId,
+          joinedAt: Date.now(),
+        });
         setPhase('lobby');
       } else {
         setPinError('Incorrect PIN. Try again.');
@@ -119,7 +146,24 @@ export default function TeamLobbyPage({
       setPinError(`Could not join: ${(err as Error).message || 'unknown error'}`);
       setJoining(false);
     }
-  };
+  }, [user, room, roomId, pin]);
+
+  // Auto-join once if a valid PIN was supplied via share link (?pin=…) and we
+  // landed on the join screen. Single-shot so a wrong PIN doesn't loop.
+  useEffect(() => {
+    if (
+      phase === 'join' &&
+      !autoJoinTriedRef.current &&
+      prefilledPinRef.current.length === 6 &&
+      pin === prefilledPinRef.current &&
+      room &&
+      user &&
+      !joining
+    ) {
+      autoJoinTriedRef.current = true;
+      handleJoin();
+    }
+  }, [phase, pin, room, user, joining, handleJoin]);
 
   const handleStart = async () => {
     setStarting(true);
@@ -134,12 +178,16 @@ export default function TeamLobbyPage({
   };
 
   const handleLeave = useCallback(async () => {
-    if (user) await leaveTeamRoom(roomId, user.uid);
+    if (user) {
+      await leaveTeamRoom(roomId, user.uid);
+      await untrackUserSession(user.uid, sessionId, roomId);
+    }
     router.push('/');
-  }, [roomId, user, router]);
+  }, [roomId, sessionId, user, router]);
 
-  const shareUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/play/${sessionId}/team/${roomId}`
+  // Share URL embeds the PIN so invitees skip the PIN-entry screen.
+  const shareUrl = typeof window !== 'undefined' && room?.pin
+    ? `${window.location.origin}/play/${sessionId}/team/${roomId}?pin=${room.pin}`
     : '';
 
   const copyLink = async () => {

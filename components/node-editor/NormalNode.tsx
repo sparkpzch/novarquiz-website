@@ -5,7 +5,9 @@ import { Handle, Position, useNodeConnections, type NodeProps } from '@xyflow/re
 
 export type NormalNodeData = {
   question_text: string;
-  choices: Array<{ label: string; choice_text: string; is_correct: boolean }>;
+  // points: signed integer awarded when this choice is picked (default 0).
+  // Replaces the old is_correct boolean — see migration 003.
+  choices: Array<{ label: string; choice_text: string; points: number }>;
   media_type: string | null;
   media_url: string | null;
   is_entry_point: boolean;
@@ -28,7 +30,7 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
   const d = data as NormalNodeData;
   const choices = d.choices?.length
     ? d.choices
-    : ['A', 'B', 'C', 'D'].map(l => ({ label: l, choice_text: '', is_correct: false }));
+    : ['A', 'B', 'C', 'D'].map(l => ({ label: l, choice_text: '', points: 0 }));
 
   // Track which choice handles already have outgoing connections — used to hide the
   // white "connect all" handle once every choice is wired up.
@@ -212,8 +214,13 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
             }}>
               {c.choice_text || `Choice ${c.label}`}
             </span>
-            {c.is_correct && (
-              <span style={{ color: '#34d399', fontSize: 10, fontWeight: 700 }}>✓</span>
+            {c.points !== 0 && (
+              <span style={{
+                color: c.points > 0 ? '#34d399' : '#fb7185',
+                fontSize: 10, fontWeight: 700,
+              }}>
+                {c.points > 0 ? `+${c.points}` : c.points}
+              </span>
             )}
           </div>
         );

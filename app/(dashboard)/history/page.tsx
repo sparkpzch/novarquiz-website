@@ -1,21 +1,41 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion } from 'motion/react';
 import type { LeaderboardEntry, QuestionSession } from '@/lib/types';
 
+type UserHistoryRow = {
+  session_id: string;
+  session_name: string;
+  session_description: string | null;
+  total_score: number;
+  correct_count: number;
+  incorrect_count: number;
+  streak: number;
+  total_time_ms: number | null;
+  completed_at: string | null;
+  rank: number;
+  total_players: number;
+};
+
+type Tab = 'session' | 'mine';
+
 export default function HistoryPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>(searchParams.get('session') ? 'session' : 'mine');
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [selectedSession, setSelectedSession] = useState(searchParams.get('session') || '');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [mine, setMine] = useState<UserHistoryRow[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [mineLoading, setMineLoading] = useState(false);
 
   useEffect(() => {
     fetch('/api/questions/sessions').then(r => r.ok ? r.json() : []).then(setSessions).catch(() => {});
@@ -26,6 +46,17 @@ export default function HistoryPage() {
     setLoading(true);
     fetch(`/api/play/${selectedSession}/leaderboard`).then(r => r.ok ? r.json() : []).then(setEntries).catch(() => {}).finally(() => setLoading(false));
   }, [selectedSession]);
+
+  // Load personal attempts when the "My attempts" tab is active
+  useEffect(() => {
+    if (tab !== 'mine' || !user) return;
+    setMineLoading(true);
+    fetch(`/api/play/me/history?uid=${encodeURIComponent(user.uid)}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setMine)
+      .catch(() => setMine([]))
+      .finally(() => setMineLoading(false));
+  }, [tab, user]);
 
   const top3 = entries.slice(0, 3);
   const myEntry = entries.find(e => e.user_id === user?.uid);
@@ -40,6 +71,69 @@ export default function HistoryPage() {
     <div className="max-w-4xl mx-auto space-y-6">
       <h1 className="text-3xl font-bold text-white">{t('leaderboard.title')}</h1>
 
+      {/* Tabs */}
+      <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1">
+        <button
+          onClick={() => setTab('mine')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'mine' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
+        >
+          My attempts
+        </button>
+        <button
+          onClick={() => setTab('session')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'session' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
+        >
+          By session
+        </button>
+      </div>
+
+      {tab === 'mine' ? (
+        !user ? (
+          <div className="rounded-2xl border border-white/5 bg-white/5 p-10 text-center">
+            <p className="text-gray-400">Sign in to see your attempts</p>
+          </div>
+        ) : mineLoading || mine === null ? (
+          <div className="flex justify-center py-10"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
+        ) : mine.length === 0 ? (
+          <div className="rounded-2xl border border-white/5 bg-white/5 p-10 text-center">
+            <p className="text-gray-400">You haven't finished any sessions yet.</p>
+            <p className="text-gray-500 text-sm mt-1">Your results will appear here after completing a quiz.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {mine.map((row, i) => (
+              <motion.button
+                key={`${row.session_id}-${row.completed_at ?? i}`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04 }}
+                onClick={() => { setSelectedSession(row.session_id); setTab('session'); router.replace(`/history?session=${row.session_id}`); }}
+                className="w-full text-left rounded-2xl border border-white/5 bg-white/5 hover:bg-white/10 hover:border-indigo-500/30 p-5 transition-all flex items-center justify-between gap-4"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-semibold truncate">{row.session_name}</p>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                    <span>📅 {row.completed_at ? new Date(row.completed_at).toLocaleDateString() : '—'}</span>
+                    <span>🎯 {row.correct_count}/{row.correct_count + row.incorrect_count} correct</span>
+                    <span>🔥 Streak {row.streak}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-5 flex-shrink-0">
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Rank</p>
+                    <p className="text-white font-bold">#{row.rank}<span className="text-gray-500 text-sm">/{row.total_players}</span></p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Score</p>
+                    <p className="text-indigo-400 font-bold text-lg tabular-nums">{row.total_score}</p>
+                  </div>
+                </div>
+              </motion.button>
+            ))}
+          </div>
+        )
+      ) : (
+      <>
       <select value={selectedSession} onChange={e => setSelectedSession(e.target.value)}
         className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-indigo-500 focus:outline-none">
         <option value="" className="bg-gray-900">{t('leaderboard.select_session')}</option>
@@ -118,6 +212,8 @@ export default function HistoryPage() {
             </table>
           </div>
         </>
+      )}
+      </>
       )}
     </div>
   );

@@ -40,7 +40,9 @@ export interface Choice {
   id: string;
   label: 'A' | 'B' | 'C' | 'D';
   choice_text: string;
-  is_correct: boolean;
+  // Signed points awarded when this choice is picked. Final score = sum of
+  // points across all picked choices. Default 0, negative allowed.
+  points: number;
 }
 
 export interface QuestionConnection {
@@ -57,8 +59,10 @@ export interface UserAnswer {
   user_id: string;
   question_id: string;
   chosen_label: 'A' | 'B' | 'C' | 'D';
-  is_correct: boolean;
+  // Time spent on the question (count-up timer). Recorded for analytics only;
+  // does NOT affect points_earned.
   time_taken_ms: number;
+  // Equal to the picked choice's `points` value. Can be negative.
   points_earned: number;
   answered_at: string;
 }

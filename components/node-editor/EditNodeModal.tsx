@@ -203,7 +203,12 @@ export function EditNodeModal({ node, sessionId, onClose, onSave }: EditNodeModa
             </div>
 
             <div>
-              <label className="text-xs text-gray-400 mb-2 block">Answer Choices</label>
+              <label className="text-xs text-gray-400 mb-2 block">
+                Answer Choices
+                <span className="ml-2 text-gray-600 font-normal">
+                  Points awarded when picked — negative allowed (penalty), default 0
+                </span>
+              </label>
               <div className="space-y-2">
                 {normalDraft.choices?.map((c, idx) => (
                   <div key={c.label} className="flex items-center gap-2">
@@ -223,19 +228,26 @@ export function EditNodeModal({ node, sessionId, onClose, onSave }: EditNodeModa
                         setDraft(d => d ? { ...d, choices } : d);
                       }}
                     />
-                    <button
-                      onClick={() => {
-                        const choices = normalDraft.choices.map((ch, i) => ({ ...ch, is_correct: i === idx }));
+                    <input
+                      type="number"
+                      step={1}
+                      value={c.points}
+                      onChange={e => {
+                        // Empty string is treated as 0 so the input stays controlled.
+                        const v = e.target.value === '' ? 0 : Math.trunc(Number(e.target.value));
+                        const choices = [...normalDraft.choices];
+                        choices[idx] = { ...choices[idx], points: Number.isFinite(v) ? v : 0 };
                         setDraft(d => d ? { ...d, choices } : d);
                       }}
-                      className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                        c.is_correct
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-white/5 text-gray-500 hover:text-gray-300'
+                      title="Points awarded when this choice is picked"
+                      className={`w-20 rounded-xl border px-3 py-2 text-sm text-center font-mono focus:outline-none focus:border-indigo-500 transition-colors ${
+                        c.points > 0
+                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                          : c.points < 0
+                            ? 'border-rose-500/30 bg-rose-500/10 text-rose-300'
+                            : 'border-white/10 bg-white/5 text-gray-400'
                       }`}
-                    >
-                      {c.is_correct ? '✓ Correct' : 'Correct?'}
-                    </button>
+                    />
                   </div>
                 ))}
               </div>
