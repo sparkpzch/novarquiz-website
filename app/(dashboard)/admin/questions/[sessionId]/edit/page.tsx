@@ -241,146 +241,6 @@ function EditorCanvas({
           <Button onClick={() => onSave(true)} loading={saving} size="sm">Publish</Button>
         </div>
 
-        {/* Node Inspector (editable) */}
-        {inspectedNode && inspectorDraft && (() => {
-          const d = inspectorDraft;
-          const isNormal = inspectedNode.type === 'normalNode';
-          const nd = isNormal ? d as NormalNodeData : null;
-          const COLORS: Record<string, string> = { A: '#ef4444', B: '#3b82f6', C: '#22c55e', D: '#f59e0b' };
-          const inputStyle: React.CSSProperties = {
-            width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 6, padding: '4px 8px', color: '#e2e8f0', fontSize: 11, outline: 'none',
-          };
-          return (
-            <div style={{
-              position: 'absolute', top: 56, left: 12, zIndex: 10,
-              width: 256,
-              maxHeight: 'calc(100% - 80px)',
-              overflowY: 'auto',
-              background: 'rgba(8,8,20,0.97)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 10,
-              padding: '10px 12px',
-              fontSize: 11,
-              color: '#e2e8f0',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-            }}>
-              {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontWeight: 700, fontSize: 10, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  {isNormal ? '❓ Question' : '🎬 Situation'}
-                </span>
-                <button
-                  onClick={() => { setInspectedNode(null); setInspectorDraft(null); }}
-                  style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}
-                >✕</button>
-              </div>
-
-              {/* Question text */}
-              <div style={{ marginBottom: 8 }}>
-                <div style={{ color: '#6b7280', fontSize: 10, marginBottom: 3 }}>Text</div>
-                <textarea
-                  value={d.question_text}
-                  onChange={e => applyInspector({ ...d, question_text: e.target.value })}
-                  rows={2}
-                  placeholder={isNormal ? 'Question text…' : 'Scene description…'}
-                  style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
-                />
-              </div>
-
-              {/* Entry point toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                <span style={{ color: '#9ca3af' }}>Entry point</span>
-                <div
-                  onClick={() => applyInspector({ ...d, is_entry_point: !d.is_entry_point })}
-                  style={{
-                    width: 32, height: 17, borderRadius: 9, cursor: 'pointer', transition: 'background 0.2s',
-                    background: d.is_entry_point ? '#10b981' : 'rgba(255,255,255,0.12)',
-                    display: 'flex', alignItems: 'center', padding: '0 2px',
-                  }}
-                >
-                  <div style={{
-                    width: 13, height: 13, borderRadius: '50%', background: '#fff',
-                    transition: 'transform 0.2s',
-                    transform: d.is_entry_point ? 'translateX(15px)' : 'translateX(0)',
-                  }} />
-                </div>
-              </div>
-
-              {/* Normal-only: choices */}
-              {nd && (
-                <>
-                  <div style={{ color: '#6b7280', fontSize: 10, marginBottom: 4 }}>Choices</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
-                    {nd.choices?.map((c, idx) => (
-                      <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span style={{
-                          width: 16, height: 16, borderRadius: '50%', background: COLORS[c.label] ?? '#6366f1',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: '#fff', fontSize: 8, fontWeight: 800, flexShrink: 0,
-                        }}>{c.label}</span>
-                        <input
-                          value={c.choice_text}
-                          onChange={e => {
-                            const choices = [...(nd.choices ?? [])];
-                            choices[idx] = { ...choices[idx], choice_text: e.target.value };
-                            applyInspector({ ...d, choices } as NormalNodeData);
-                          }}
-                          placeholder={`Choice ${c.label}`}
-                          style={{ ...inputStyle, flex: 1, minWidth: 0 }}
-                        />
-                        <button
-                          onClick={() => {
-                            const choices = (nd.choices ?? []).map((ch, i) => ({ ...ch, is_correct: i === idx }));
-                            applyInspector({ ...d, choices } as NormalNodeData);
-                          }}
-                          style={{
-                            flexShrink: 0, width: 20, height: 20, borderRadius: 4, border: 'none', cursor: 'pointer',
-                            background: c.is_correct ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.07)',
-                            color: c.is_correct ? '#34d399' : '#6b7280', fontSize: 10,
-                          }}
-                          title="Mark correct"
-                        >✓</button>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Timer override */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                    <span style={{ color: '#9ca3af' }}>Timer override</span>
-                    {nd.timer_override !== null ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <input
-                          type="number" min={5} max={120}
-                          value={nd.timer_override}
-                          onChange={e => applyInspector({ ...d, timer_override: Number(e.target.value) } as NormalNodeData)}
-                          style={{ ...inputStyle, width: 52, textAlign: 'center' }}
-                        />
-                        <span style={{ color: '#6b7280' }}>s</span>
-                        <button
-                          onClick={() => applyInspector({ ...d, timer_override: null } as NormalNodeData)}
-                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12 }}
-                        >✕</button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => applyInspector({ ...d, timer_override: 30 } as NormalNodeData)}
-                        style={{ background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 5, color: '#a5b4fc', cursor: 'pointer', fontSize: 10, padding: '2px 8px' }}
-                      >+ Set</button>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {d.media_url && (
-                <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 6 }}>
-                  {d.media_type === 'video' ? '🎬 Video' : '🖼 Image'} attached
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
         {nodes.length === 0 && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 5 }}>
             <div style={{ textAlign: 'center', color: '#374151', maxWidth: 320 }}>
@@ -391,6 +251,141 @@ function EditorCanvas({
           </div>
         )}
       </ReactFlow>
+
+      {/* Node Inspector — outside ReactFlow to avoid overflow:hidden clipping */}
+      {inspectedNode && inspectorDraft && (() => {
+        const d = inspectorDraft;
+        const isNormal = inspectedNode.type === 'normalNode';
+        const nd = isNormal ? d as NormalNodeData : null;
+        const COLORS: Record<string, string> = { A: '#ef4444', B: '#3b82f6', C: '#22c55e', D: '#f59e0b' };
+        const inputStyle: React.CSSProperties = {
+          width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 6, padding: '4px 8px', color: '#e2e8f0', fontSize: 11, outline: 'none',
+        };
+        return (
+          <div style={{
+            position: 'absolute', top: 56, left: 12, zIndex: 20,
+            width: 256,
+            maxHeight: 'calc(100% - 80px)',
+            overflowY: 'auto',
+            background: 'rgba(8,8,20,0.97)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 10,
+            padding: '10px 12px',
+            fontSize: 11,
+            color: '#e2e8f0',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontWeight: 700, fontSize: 10, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                {isNormal ? '❓ Question' : '🎬 Situation'}
+              </span>
+              <button
+                onClick={() => { setInspectedNode(null); setInspectorDraft(null); }}
+                style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}
+              >✕</button>
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ color: '#6b7280', fontSize: 10, marginBottom: 3 }}>Text</div>
+              <textarea
+                value={d.question_text}
+                onChange={e => applyInspector({ ...d, question_text: e.target.value })}
+                rows={2}
+                placeholder={isNormal ? 'Question text…' : 'Scene description…'}
+                style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+              <span style={{ color: '#9ca3af' }}>Entry point</span>
+              <div
+                onClick={() => applyInspector({ ...d, is_entry_point: !d.is_entry_point })}
+                style={{
+                  width: 32, height: 17, borderRadius: 9, cursor: 'pointer', transition: 'background 0.2s',
+                  background: d.is_entry_point ? '#10b981' : 'rgba(255,255,255,0.12)',
+                  display: 'flex', alignItems: 'center', padding: '0 2px',
+                }}
+              >
+                <div style={{
+                  width: 13, height: 13, borderRadius: '50%', background: '#fff',
+                  transition: 'transform 0.2s',
+                  transform: d.is_entry_point ? 'translateX(15px)' : 'translateX(0)',
+                }} />
+              </div>
+            </div>
+
+            {nd && (
+              <>
+                <div style={{ color: '#6b7280', fontSize: 10, marginBottom: 4 }}>Choices</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+                  {nd.choices?.map((c, idx) => (
+                    <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{
+                        width: 16, height: 16, borderRadius: '50%', background: COLORS[c.label] ?? '#6366f1',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#fff', fontSize: 8, fontWeight: 800, flexShrink: 0,
+                      }}>{c.label}</span>
+                      <input
+                        value={c.choice_text}
+                        onChange={e => {
+                          const choices = [...(nd.choices ?? [])];
+                          choices[idx] = { ...choices[idx], choice_text: e.target.value };
+                          applyInspector({ ...d, choices } as NormalNodeData);
+                        }}
+                        placeholder={`Choice ${c.label}`}
+                        style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                      />
+                      <button
+                        onClick={() => {
+                          const choices = (nd.choices ?? []).map((ch, i) => ({ ...ch, is_correct: i === idx }));
+                          applyInspector({ ...d, choices } as NormalNodeData);
+                        }}
+                        style={{
+                          flexShrink: 0, width: 20, height: 20, borderRadius: 4, border: 'none', cursor: 'pointer',
+                          background: c.is_correct ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.07)',
+                          color: c.is_correct ? '#34d399' : '#6b7280', fontSize: 10,
+                        }}
+                        title="Mark correct"
+                      >✓</button>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                  <span style={{ color: '#9ca3af' }}>Timer override</span>
+                  {nd.timer_override !== null ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <input
+                        type="number" min={5} max={120}
+                        value={nd.timer_override}
+                        onChange={e => applyInspector({ ...d, timer_override: Number(e.target.value) } as NormalNodeData)}
+                        style={{ ...inputStyle, width: 52, textAlign: 'center' }}
+                      />
+                      <span style={{ color: '#6b7280' }}>s</span>
+                      <button
+                        onClick={() => applyInspector({ ...d, timer_override: null } as NormalNodeData)}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12 }}
+                      >✕</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => applyInspector({ ...d, timer_override: 30 } as NormalNodeData)}
+                      style={{ background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 5, color: '#a5b4fc', cursor: 'pointer', fontSize: 10, padding: '2px 8px' }}
+                    >+ Set</button>
+                  )}
+                </div>
+              </>
+            )}
+
+            {d.media_url && (
+              <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 6 }}>
+                {d.media_type === 'video' ? '🎬 Video' : '🖼 Image'} attached
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {ctxMenu && (
         <ContextMenu

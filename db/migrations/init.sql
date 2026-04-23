@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-create table question_sessions
+create table if not exists question_sessions
 (
     id              uuid                     default uuid_generate_v4() not null
         primary key,
@@ -14,10 +14,9 @@ create table question_sessions
     updated_at      timestamp with time zone default now()              not null
 );
 
-alter table question_sessions
-    owner to postgres;
 
-create table questions
+
+create table if not exists questions
 (
     id             uuid                     default uuid_generate_v4()          not null
         primary key,
@@ -40,13 +39,12 @@ create table questions
     node_type      varchar(20)              default 'normal'::character varying not null
 );
 
-alter table questions
-    owner to postgres;
 
-create index idx_questions_session
+
+create index if not exists idx_questions_session
     on questions (session_id);
 
-create table choices
+create table if not exists choices
 (
     id          uuid                     default uuid_generate_v4() not null
         primary key,
@@ -62,13 +60,12 @@ create table choices
     unique (question_id, label)
 );
 
-alter table choices
-    owner to postgres;
 
-create index idx_choices_question
+
+create index if not exists idx_choices_question
     on choices (question_id);
 
-create table question_connections
+create table if not exists question_connections
 (
     id                uuid                     default uuid_generate_v4() not null
         primary key,
@@ -88,16 +85,15 @@ create table question_connections
     unique (from_question_id, from_choice_label)
 );
 
-alter table question_connections
-    owner to postgres;
 
-create index idx_connections_session
+
+create index if not exists idx_connections_session
     on question_connections (session_id);
 
-create index idx_connections_from
+create index if not exists idx_connections_from
     on question_connections (from_question_id);
 
-create table user_answers
+create table if not exists user_answers
 (
     id            uuid                     default uuid_generate_v4() not null
         primary key,
@@ -117,16 +113,15 @@ create table user_answers
     answered_at   timestamp with time zone default now()              not null
 );
 
-alter table user_answers
-    owner to postgres;
 
-create index idx_user_answers_session_user
+
+create index if not exists idx_user_answers_session_user
     on user_answers (session_id, user_id);
 
-create index idx_user_answers_question
+create index if not exists idx_user_answers_question
     on user_answers (question_id);
 
-create table leaderboard_entries
+create table if not exists leaderboard_entries
 (
     id                uuid                     default uuid_generate_v4() not null
         primary key,
@@ -146,13 +141,12 @@ create table leaderboard_entries
     unique (session_id, user_id)
 );
 
-alter table leaderboard_entries
-    owner to postgres;
 
-create index idx_leaderboard_session_score
+
+create index if not exists idx_leaderboard_session_score
     on leaderboard_entries (session_id asc, total_score desc);
 
-create table play_sessions
+create table if not exists play_sessions
 (
     id                  uuid                     default uuid_generate_v4() not null
         primary key,
@@ -169,8 +163,7 @@ create table play_sessions
     unique (session_id, user_id)
 );
 
-alter table play_sessions
-    owner to postgres;
 
-create index idx_play_sessions_user
+
+create index if not exists idx_play_sessions_user
     on play_sessions (user_id);

@@ -1,0 +1,26 @@
+# apphosting.yaml
+
+# Cloud Run service configuration
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+  minInstances: 0
+  maxInstances: 100
+  concurrency: 80
+
+# Environment variables
+env:
+  - variable: POSTGRES_USER
+    secret: POSTGRES_USER
+  - variable: POSTGRES_PASSWORD
+    secret: POSTGRES_PASSWORD
+  - variable: POSTGRES_DB
+    secret: POSTGRES_DB
+  - variable: DATABASE_URL
+    secret: DATABASE_URL
+  - variable: FIREBASE_STORAGE_URL
+    secret: FIREBASE_STORAGE_URL
+  - variable: FIREBASE_STORAGE_PROFILE_FOLDER
+    secret: FIREBASE_STORAGE_PROFILE_FOLDER
+  - variable: SESSION_SECRET
+    secret: SESSION_SECRET
