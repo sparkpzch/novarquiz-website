@@ -115,8 +115,8 @@ function EditorCanvas({
   edges: AppEdge[];
   setNodes: React.Dispatch<React.SetStateAction<AppNode[]>>;
   setEdges: React.Dispatch<React.SetStateAction<AppEdge[]>>;
-  onNodesChange: ReturnType<typeof useNodesState>[2];
-  onEdgesChange: ReturnType<typeof useEdgesState>[2];
+  onNodesChange: any;
+  onEdgesChange: any;
   onSave: (publish: boolean) => void;
   saving: boolean;
   sessionId: string;
@@ -148,7 +148,7 @@ function EditorCanvas({
     }, es));
   }, [setEdges]);
 
-  const onPaneCtx = useCallback((e: React.MouseEvent) => {
+  const onPaneCtx = useCallback((e: React.MouseEvent | MouseEvent) => {
     e.preventDefault();
     const flow = screenToFlowPosition({ x: e.clientX, y: e.clientY });
     setCtxMenu({ x: e.clientX, y: e.clientY, mode: 'canvas', flowX: flow.x, flowY: flow.y });
@@ -198,7 +198,7 @@ function EditorCanvas({
     <div ref={wrapperRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <ReactFlow
         nodes={nodes} edges={edges}
-        onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
+        onNodesChange={onNodesChange as any} onEdgesChange={onEdgesChange as any}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDblClick}

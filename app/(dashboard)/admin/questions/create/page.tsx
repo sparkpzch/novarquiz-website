@@ -82,8 +82,8 @@ function EditorCanvas({
   edges: AppEdge[];
   setNodes: React.Dispatch<React.SetStateAction<AppNode[]>>;
   setEdges: React.Dispatch<React.SetStateAction<AppEdge[]>>;
-  onNodesChange: ReturnType<typeof useNodesState>[2];
-  onEdgesChange: ReturnType<typeof useEdgesState>[2];
+  onNodesChange: any;
+  onEdgesChange: any;
   onSave: (publish: boolean) => void;
   saving: boolean;
 }) {
@@ -116,7 +116,7 @@ function EditorCanvas({
   }, [setEdges]);
 
   // ── Context menus ────────────────────────────────────────────────────────
-  const onPaneCtx = useCallback((e: React.MouseEvent) => {
+  const onPaneCtx = useCallback((e: React.MouseEvent | MouseEvent) => {
     e.preventDefault();
     const flow = screenToFlowPosition({ x: e.clientX, y: e.clientY });
     setCtxMenu({ x: e.clientX, y: e.clientY, mode: 'canvas', flowX: flow.x, flowY: flow.y });
@@ -161,8 +161,8 @@ function EditorCanvas({
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        onNodesChange={onNodesChange as any}
+        onEdgesChange={onEdgesChange as any}
         onConnect={onConnect}
         onNodeDoubleClick={onNodeDblClick}
         onPaneClick={closeCtx}
@@ -273,6 +273,7 @@ function EditorCanvas({
           type: editNode.type as 'normalNode' | 'situationNode',
           data: editNode.data,
         } : null}
+        sessionId="draft"
         onClose={() => setEditNode(null)}
         onSave={handleEditSave}
       />
