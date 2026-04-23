@@ -1,25 +1,39 @@
 import admin from 'firebase-admin';
+import { readFileSync } from 'node:fs';
+import { isAbsolute, resolve } from 'node:path';
+
+function loadServiceAccountFromKeyFile(): admin.ServiceAccount | null {
+  const keyFile = process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.trim();
+  if (!keyFile) return null;
+  const filePath = isAbsolute(keyFile) ? keyFile : resolve(process.cwd(), keyFile);
+  try {
+    return JSON.parse(readFileSync(filePath, 'utf8'));
+  } catch (err) {
+    console.error(`Failed to read FIREBASE_SERVICE_ACCOUNT_KEY file at ${filePath}:`, err);
+    return null;
+  }
+}
+
+function loadServiceAccountFromJsonEnv(): admin.ServiceAccount | null {
+  const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
+  if (!json) return null;
+  try {
+    return JSON.parse(json);
+  } catch (err) {
+    console.error('FIREBASE_SERVICE_ACCOUNT_JSON is set but not valid JSON:', err);
+    return null;
+  }
+}
 
 function getFirebaseAdmin() {
   if (admin.apps.length > 0) {
     return admin.apps[0]!;
   }
 
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
-  let credential: admin.credential.Credential;
-  if (serviceAccountJson) {
-    try {
-      credential = admin.credential.cert(JSON.parse(serviceAccountJson));
-    } catch (err) {
-      console.error(
-        'FIREBASE_SERVICE_ACCOUNT_JSON is set but not valid JSON — falling back to application default credentials.',
-        err,
-      );
-      credential = admin.credential.applicationDefault();
-    }
-  } else {
-    credential = admin.credential.applicationDefault();
-  }
+  const serviceAccount = loadServiceAccountFromKeyFile() ?? loadServiceAccountFromJsonEnv();
+  const credential = serviceAccount
+    ? admin.credential.cert(serviceAccount)
+    : admin.credential.applicationDefault();
 
   return admin.initializeApp({
     credential,
