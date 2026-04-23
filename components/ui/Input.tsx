@@ -5,12 +5,14 @@ import { InputHTMLAttributes, useState } from 'react';
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  hint?: string;
   icon?: React.ReactNode;
 }
 
 export default function Input({
   label,
   error,
+  hint,
   icon,
   type = 'text',
   className = '',
@@ -22,7 +24,7 @@ export default function Input({
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-gray-300 mb-1.5">
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
           {label}
         </label>
       )}
@@ -34,11 +36,11 @@ export default function Input({
         )}
         <input
           type={isPassword && showPassword ? 'text' : type}
-          className={`w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 
+          className={`w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 placeholder-gray-400
             focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all duration-200
-            ${icon ? 'pl-10' : ''} 
-            ${isPassword ? 'pr-10' : ''} 
-            ${error ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''}
+            ${icon ? 'pl-10' : ''}
+            ${isPassword ? 'pr-10' : ''}
+            ${error ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20' : ''}
             ${className}`}
           {...props}
         />
@@ -46,7 +48,7 @@ export default function Input({
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
           >
             {showPassword ? (
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -61,6 +63,7 @@ export default function Input({
           </button>
         )}
       </div>
+      {hint && !error && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
       {error && <p className="mt-1.5 text-sm text-red-400">{error}</p>}
     </div>
   );
