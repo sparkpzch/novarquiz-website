@@ -8,6 +8,25 @@ import { initRoom, startRoom, watchRoom, type SessionRoom } from '@/lib/firebase
 import { motion, AnimatePresence } from 'motion/react';
 import type { QuestionSession } from '@/lib/types';
 
+function PlayerAvatar({ displayName, photoURL }: { displayName: string; photoURL: string | null }) {
+  const [imgError, setImgError] = useState(false);
+  if (photoURL && !imgError) {
+    return (
+      <img
+        src={photoURL}
+        alt={displayName}
+        className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+  return (
+    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold flex-shrink-0">
+      {displayName?.[0]?.toUpperCase() || '?'}
+    </div>
+  );
+}
+
 export default function HostLobbyPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = use(params);
   const { user, isAdmin, loading } = useAuth();
@@ -126,9 +145,7 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
                 exit={{ opacity: 0, height: 0 }}
                 className="flex items-center gap-3 px-5 py-3"
               >
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold flex-shrink-0">
-                  {player.displayName?.[0]?.toUpperCase() || '?'}
-                </div>
+                <PlayerAvatar displayName={player.displayName} photoURL={player.photoURL} />
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-medium truncate">{player.displayName}</p>
                   <p className="text-gray-500 text-xs">

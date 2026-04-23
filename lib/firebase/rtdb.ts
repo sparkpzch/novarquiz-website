@@ -6,6 +6,7 @@ import {
   onValue,
   off,
   onDisconnect,
+  runTransaction,
 } from 'firebase/database';
 import app from './config';
 
@@ -24,6 +25,7 @@ export type RoomStatus = 'waiting' | 'started' | 'ended';
 export type SessionRoom = {
   status: RoomStatus;
   hostId: string;
+  leaderId?: string;
   players?: Record<string, WaitingPlayer>;
 };
 
@@ -60,6 +62,15 @@ export async function joinWaitingRoom(
 
 export async function leaveWaitingRoom(sessionId: string, uid: string) {
   await set(ref(rtdb, `sessions/${sessionId}/players/${uid}`), null);
+}
+
+// Sets leaderId only if no leader exists yet (first-joiner wins for public rooms)
+export async function claimLeaderIfEmpty(sessionId: string, uid: string): Promise<void> {
+  const leaderRef = ref(rtdb, `sessions/${sessionId}/leaderId`);
+  await runTransaction(leaderRef, (current) => {
+    if (current === null || current === undefined) return uid;
+    return; // already claimed — abort transaction
+  });
 }
 
 // ─── Real-time listener ───────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { joinWaitingRoom } from '@/lib/firebase/rtdb';
+import { joinWaitingRoom, claimLeaderIfEmpty } from '@/lib/firebase/rtdb';
 import { motion } from 'motion/react';
 
 type SessionInfo = {
@@ -61,6 +61,9 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
     }
 
     await joinWaitingRoom(session.id, user);
+    if (!session.is_private) {
+      await claimLeaderIfEmpty(session.id, user.uid);
+    }
     router.push(`/play/${session.id}/lobby`);
   };
 

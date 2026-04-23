@@ -72,8 +72,10 @@ function SignInForm() {
         'auth/cancelled-popup-request': 'Sign-in was cancelled.',
         'auth/network-request-failed': 'Connection failed. Check your internet and try again.',
         'auth/account-exists-with-different-credential': 'An account already exists with this email using a different sign-in method.',
+        'auth/unauthorized-domain': 'This domain is not authorized for sign-in. Please contact support.',
+        'auth/operation-not-allowed': 'Google sign-in is not enabled. Please contact support.',
       };
-      setError(msgs[code ?? ''] ?? 'Google sign-in failed. Please try again.');
+      setError(msgs[code ?? ''] ?? `Google sign-in failed (${code ?? 'unknown'}). Please try again.`);
     }
   };
 
