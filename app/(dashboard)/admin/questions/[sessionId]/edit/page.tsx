@@ -27,14 +27,16 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import { NormalNode, type NormalNodeData } from '@/components/node-editor/NormalNode';
 import { SituationNode, type SituationNodeData } from '@/components/node-editor/SituationNode';
+import { EndNode, type EndNodeData } from '@/components/node-editor/EndNode';
 import { ContextMenu } from '@/components/node-editor/ContextMenu';
 import { EditNodeModal } from '@/components/node-editor/EditNodeModal';
 import type { Question, QuestionConnection, QuestionSession } from '@/lib/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type AppNodeData = NormalNodeData | SituationNodeData;
-type AppNode = Node<AppNodeData, 'normalNode' | 'situationNode'>;
+type AppNodeData = NormalNodeData | SituationNodeData | EndNodeData;
+type AppNodeType = 'normalNode' | 'situationNode' | 'endNode';
+type AppNode = Node<AppNodeData, AppNodeType>;
 type AppEdge = Edge;
 
 interface CtxMenu {
@@ -50,7 +52,7 @@ const CHOICE_COLORS: Record<string, string> = {
   A: '#ef4444', B: '#3b82f6', C: '#22c55e', D: '#f59e0b', continue: '#8b5cf6',
 };
 
-const nodeTypes: NodeTypes = { normalNode: NormalNode, situationNode: SituationNode };
+const nodeTypes: NodeTypes = { normalNode: NormalNode, situationNode: SituationNode, endNode: EndNode };
 
 const defaultNormalData = (): NormalNodeData => ({
   question_text: '',
@@ -75,15 +77,34 @@ const defaultSituationData = (): SituationNodeData => ({
   is_entry_point: false,
 });
 
+const defaultEndData = (): EndNodeData => ({
+  question_text: '',
+  media_type: null,
+  media_url: null,
+  is_entry_point: false,
+});
+
+function nodeTypeFor(q: Question): AppNodeType {
+  if (q.node_type === 'situation') return 'situationNode';
+  if (q.node_type === 'end') return 'endNode';
+  return 'normalNode';
+}
+
 function toFlowNodes(questions: Question[]): AppNode[] {
-  return questions.map(q => ({
-    id: q.id,
-    type: q.node_type === 'situation' ? 'situationNode' : 'normalNode',
-    position: { x: q.node_x ?? 0, y: q.node_y ?? 0 },
-    data: q.node_type === 'situation'
-      ? { question_text: q.question_text, media_type: q.media_type, media_url: q.media_url, is_entry_point: q.is_entry_point } as SituationNodeData
-      : { question_text: q.question_text, choices: q.choices ?? [], media_type: q.media_type, media_url: q.media_url, is_entry_point: q.is_entry_point, timer_override: q.timer_override } as NormalNodeData,
-  }));
+  return questions.map(q => {
+    const t = nodeTypeFor(q);
+    const common = {
+      question_text: q.question_text,
+      media_type: q.media_type,
+      media_url: q.media_url,
+      is_entry_point: q.is_entry_point,
+    };
+    const data: AppNodeData =
+      t === 'situationNode' ? (common as SituationNodeData) :
+      t === 'endNode' ? (common as EndNodeData) :
+      { ...common, choices: q.choices ?? [], timer_override: q.timer_override } as NormalNodeData;
+    return { id: q.id, type: t, position: { x: q.node_x ?? 0, y: q.node_y ?? 0 }, data };
+  });
 }
 
 function toFlowEdges(connections: QuestionConnection[]): AppEdge[] {
@@ -132,12 +153,13 @@ function EditorCanvas({
 
   const closeCtx = useCallback(() => setCtxMenu(null), []);
 
-  const addNode = useCallback((type: 'normalNode' | 'situationNode', pos: { x: number; y: number }) => {
+  const addNode = useCallback((type: AppNodeType, pos: { x: number; y: number }) => {
     const id = `${type}-${Date.now()}`;
     const isFirst = nodes.length === 0;
-    const data: AppNodeData = type === 'normalNode'
-      ? { ...defaultNormalData(), is_entry_point: isFirst }
-      : { ...defaultSituationData(), is_entry_point: isFirst };
+    const data: AppNodeData =
+      type === 'normalNode' ? { ...defaultNormalData(), is_entry_point: isFirst } :
+      type === 'situationNode' ? { ...defaultSituationData(), is_entry_point: isFirst } :
+      { ...defaultEndData(), is_entry_point: false }; // end nodes never start a session
     setNodes(ns => [...ns, { id, type, position: pos, data } as AppNode]);
   }, [nodes.length, setNodes]);
 
@@ -280,6 +302,9 @@ function EditorCanvas({
           <button onClick={() => addNode('situationNode', { x: 80 + nodes.length * 30, y: 80 + nodes.length * 20 })} style={toolbarBtnStyle('#8b5cf6')} title="Add Situation Node">
             <span style={{ fontSize: 14 }}>🎬</span> Situation Node
           </button>
+          <button onClick={() => addNode('endNode', { x: 80 + nodes.length * 30, y: 80 + nodes.length * 20 })} style={toolbarBtnStyle('#f43f5e')} title="Add End Node">
+            <span style={{ fontSize: 14 }}>🏁</span> End Node
+          </button>
           <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.1)' }} />
           <span style={{ fontSize: 11, color: '#6b7280' }}>Right-click canvas · Del to remove</span>
         </div>
@@ -305,6 +330,7 @@ function EditorCanvas({
       {inspectedNode && inspectorDraft && (() => {
         const d = inspectorDraft;
         const isNormal = inspectedNode.type === 'normalNode';
+        const isEnd = inspectedNode.type === 'endNode';
         const nd = isNormal ? d as NormalNodeData : null;
         const COLORS: Record<string, string> = { A: '#ef4444', B: '#3b82f6', C: '#22c55e', D: '#f59e0b' };
         const inputStyle: React.CSSProperties = {
@@ -327,7 +353,7 @@ function EditorCanvas({
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontWeight: 700, fontSize: 10, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                {isNormal ? '❓ Question' : '🎬 Situation'}
+                {isNormal ? '❓ Question' : isEnd ? '🏁 End' : '🎬 Situation'}
               </span>
               <button
                 onClick={() => { setInspectedNode(null); setInspectorDraft(null); }}
@@ -341,28 +367,31 @@ function EditorCanvas({
                 value={d.question_text}
                 onChange={e => applyInspector({ ...d, question_text: e.target.value })}
                 rows={2}
-                placeholder={isNormal ? 'Question text…' : 'Scene description…'}
+                placeholder={isNormal ? 'Question text…' : isEnd ? 'Final message…' : 'Scene description…'}
                 style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
               />
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-              <span style={{ color: '#9ca3af' }}>Entry point</span>
-              <div
-                onClick={() => applyInspector({ ...d, is_entry_point: !d.is_entry_point })}
-                style={{
-                  width: 32, height: 17, borderRadius: 9, cursor: 'pointer', transition: 'background 0.2s',
-                  background: d.is_entry_point ? '#10b981' : 'rgba(255,255,255,0.12)',
-                  display: 'flex', alignItems: 'center', padding: '0 2px',
-                }}
-              >
-                <div style={{
-                  width: 13, height: 13, borderRadius: '50%', background: '#fff',
-                  transition: 'transform 0.2s',
-                  transform: d.is_entry_point ? 'translateX(15px)' : 'translateX(0)',
-                }} />
+            {/* End nodes can never be entry points — hide the toggle */}
+            {!isEnd && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                <span style={{ color: '#9ca3af' }}>Entry point</span>
+                <div
+                  onClick={() => applyInspector({ ...d, is_entry_point: !d.is_entry_point })}
+                  style={{
+                    width: 32, height: 17, borderRadius: 9, cursor: 'pointer', transition: 'background 0.2s',
+                    background: d.is_entry_point ? '#10b981' : 'rgba(255,255,255,0.12)',
+                    display: 'flex', alignItems: 'center', padding: '0 2px',
+                  }}
+                >
+                  <div style={{
+                    width: 13, height: 13, borderRadius: '50%', background: '#fff',
+                    transition: 'transform 0.2s',
+                    transform: d.is_entry_point ? 'translateX(15px)' : 'translateX(0)',
+                  }} />
+                </div>
               </div>
-            </div>
+            )}
 
             {nd && (
               <>
@@ -538,6 +567,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ session
       for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i];
         const isNormal = node.type === 'normalNode';
+        const isEnd = node.type === 'endNode';
         const d = node.data as AppNodeData;
 
         const body: Record<string, unknown> = {
@@ -549,7 +579,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ session
           is_entry_point: d.is_entry_point,
           node_x: Math.round(node.position.x),
           node_y: Math.round(node.position.y),
-          node_type: isNormal ? 'normal' : 'situation',
+          node_type: isNormal ? 'normal' : isEnd ? 'end' : 'situation',
         };
         if (isNormal) {
           const nd = d as NormalNodeData;

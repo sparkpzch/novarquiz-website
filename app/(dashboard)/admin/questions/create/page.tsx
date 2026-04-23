@@ -27,13 +27,15 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import { NormalNode, type NormalNodeData } from '@/components/node-editor/NormalNode';
 import { SituationNode, type SituationNodeData } from '@/components/node-editor/SituationNode';
+import { EndNode, type EndNodeData } from '@/components/node-editor/EndNode';
 import { ContextMenu } from '@/components/node-editor/ContextMenu';
 import { EditNodeModal } from '@/components/node-editor/EditNodeModal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type AppNodeData = NormalNodeData | SituationNodeData;
-type AppNode = Node<AppNodeData, 'normalNode' | 'situationNode'>;
+type AppNodeData = NormalNodeData | SituationNodeData | EndNodeData;
+type AppNodeType = 'normalNode' | 'situationNode' | 'endNode';
+type AppNode = Node<AppNodeData, AppNodeType>;
 type AppEdge = Edge;
 
 interface CtxMenu {
@@ -49,7 +51,7 @@ const CHOICE_COLORS: Record<string, string> = {
   A: '#ef4444', B: '#3b82f6', C: '#22c55e', D: '#f59e0b', continue: '#8b5cf6',
 };
 
-const nodeTypes: NodeTypes = { normalNode: NormalNode, situationNode: SituationNode };
+const nodeTypes: NodeTypes = { normalNode: NormalNode, situationNode: SituationNode, endNode: EndNode };
 
 const defaultNormalData = (): NormalNodeData => ({
   question_text: '',
@@ -66,6 +68,13 @@ const defaultNormalData = (): NormalNodeData => ({
 });
 
 const defaultSituationData = (): SituationNodeData => ({
+  question_text: '',
+  media_type: null,
+  media_url: null,
+  is_entry_point: false,
+});
+
+const defaultEndData = (): EndNodeData => ({
   question_text: '',
   media_type: null,
   media_url: null,
@@ -95,12 +104,13 @@ function EditorCanvas({
   const closeCtx = useCallback(() => setCtxMenu(null), []);
 
   // ── Add nodes ────────────────────────────────────────────────────────────
-  const addNode = useCallback((type: 'normalNode' | 'situationNode', pos: { x: number; y: number }) => {
+  const addNode = useCallback((type: AppNodeType, pos: { x: number; y: number }) => {
     const id = `${type}-${Date.now()}`;
     const isFirst = nodes.length === 0;
-    const data: AppNodeData = type === 'normalNode'
-      ? { ...defaultNormalData(), is_entry_point: isFirst }
-      : { ...defaultSituationData(), is_entry_point: isFirst };
+    const data: AppNodeData =
+      type === 'normalNode' ? { ...defaultNormalData(), is_entry_point: isFirst } :
+      type === 'situationNode' ? { ...defaultSituationData(), is_entry_point: isFirst } :
+      { ...defaultEndData(), is_entry_point: false };
 
     setNodes(ns => [...ns, { id, type, position: pos, data } as AppNode]);
   }, [nodes.length, setNodes]);
@@ -208,6 +218,13 @@ function EditorCanvas({
           >
             <span style={{ fontSize: 14 }}>🎬</span> Situation Node
           </button>
+          <button
+            onClick={() => addNode('endNode', { x: 80 + nodes.length * 30, y: 80 + nodes.length * 20 })}
+            style={toolbarBtnStyle('#f43f5e')}
+            title="Add End Node — terminates a branch"
+          >
+            <span style={{ fontSize: 14 }}>🏁</span> End Node
+          </button>
           <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.1)' }} />
           <span style={{ fontSize: 11, color: '#6b7280' }}>
             Right-click canvas · Del to remove selected
@@ -270,7 +287,7 @@ function EditorCanvas({
       <EditNodeModal
         node={editNode ? {
           id: editNode.id,
-          type: editNode.type as 'normalNode' | 'situationNode',
+          type: editNode.type as AppNodeType,
           data: editNode.data,
         } : null}
         sessionId="draft"
@@ -340,6 +357,7 @@ export default function CreateQuestionPage() {
       for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i];
         const isNormal = node.type === 'normalNode';
+        const isEnd = node.type === 'endNode';
         const d = node.data as AppNodeData;
 
         const body: Record<string, unknown> = {
@@ -351,7 +369,7 @@ export default function CreateQuestionPage() {
           is_entry_point: d.is_entry_point,
           node_x: Math.round(node.position.x),
           node_y: Math.round(node.position.y),
-          node_type: isNormal ? 'normal' : 'situation',
+          node_type: isNormal ? 'normal' : isEnd ? 'end' : 'situation',
         };
 
         if (isNormal) {

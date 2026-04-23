@@ -29,7 +29,7 @@ export interface Question {
   is_entry_point: boolean;
   node_x: number;
   node_y: number;
-  node_type: 'normal' | 'situation';
+  node_type: 'normal' | 'situation' | 'end';
   created_at: string;
   updated_at: string;
   choices: Choice[];

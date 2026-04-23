@@ -65,6 +65,12 @@
         ".read": "auth != null",
         ".write": "auth != null"
       }
+    },
+    "userSessions": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
     }
   }
 }

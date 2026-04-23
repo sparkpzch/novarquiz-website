@@ -44,6 +44,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   }, [sessionId, user]);
 
   const isSituation = question?.node_type === 'situation';
+  const isEnd = question?.node_type === 'end';
 
   const applyQuestion = useCallback((q: Question) => {
     setQuestion(q);
@@ -88,8 +89,9 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
 
   // Count-up timer — increments every second until cap. On expiry: no answer
   // is recorded; we navigate to the end (treated as session abandoned/timeout).
+  // End nodes have no timer and no answer — they're a terminal screen.
   useEffect(() => {
-    if (loading || finished || selected || isSituation) return;
+    if (loading || finished || selected || isSituation || isEnd) return;
     const interval = setInterval(() => {
       setElapsed(prev => {
         const next = prev + 1;
@@ -103,7 +105,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [loading, finished, selected, isSituation, question?.id, timerCap, sessionId]);
+  }, [loading, finished, selected, isSituation, isEnd, question?.id, timerCap, sessionId]);
 
   const goToNext = async (fromQuestionId: string, choiceLabel: string) => {
     try {
@@ -309,6 +311,52 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
 
   if (loading || !question) {
     return <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
+  }
+
+  // ── End node view ───────────────────────────────────────────────────────────
+  // Terminal node — shows optional media/message, then finalizes the session
+  // on "Finish". Players never answer an end node.
+  if (isEnd) {
+    return (
+      <div className="min-h-screen bg-[#0a0a1a] flex flex-col">
+        {question.media_url ? (
+          <div className="flex-1 flex items-center justify-center">
+            {question.media_type === 'video' ? (
+              <video src={question.media_url} autoPlay controls className="w-full h-full object-contain max-h-[calc(100vh-200px)]" style={{ background: '#000' }} />
+            ) : (
+              <img src={question.media_url} alt="Ending" className="w-full h-full object-contain max-h-[calc(100vh-200px)]" style={{ background: '#000' }} />
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center max-w-lg px-6">
+              <div style={{ fontSize: 64 }}>🏁</div>
+              {question.question_text && (
+                <p className="text-white text-xl md:text-2xl mt-4 leading-relaxed">{question.question_text}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* If there's media AND text, show the text below the media */}
+        {question.media_url && question.question_text && (
+          <div className="px-6 pb-4 text-center">
+            <p className="text-white text-lg max-w-2xl mx-auto">{question.question_text}</p>
+          </div>
+        )}
+
+        <div className="p-6 flex justify-center flex-shrink-0">
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setFinished(true)}
+            className="w-full max-w-md py-5 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 text-white text-xl font-bold shadow-xl shadow-rose-500/30 transition-all"
+          >
+            Finish 🏁
+          </motion.button>
+        </div>
+      </div>
+    );
   }
 
   // ── Situation node view ──────────────────────────────────────────────────────

@@ -26,7 +26,7 @@ function SignInForm() {
     const res = await fetch('/api/auth/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({ idToken, rememberMe }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Session creation failed');

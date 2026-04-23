@@ -4,7 +4,8 @@ import { SignJWT } from 'jose';
 import { cookies } from 'next/headers';
 
 const COOKIE_NAME = 'session';
-const MAX_AGE = 60 * 60 * 24 * 5; // 5 days
+const DEFAULT_MAX_AGE = 60 * 60 * 24 * 5;   // 5 days — session-scoped default
+const REMEMBER_MAX_AGE = 60 * 60 * 24 * 30; // 30 days when user checks "remember me"
 
 function getSecret() {
   const secret = process.env.SESSION_SECRET;
@@ -14,26 +15,29 @@ function getSecret() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { idToken } = await request.json();
+    const { idToken, rememberMe } = await request.json();
     if (!idToken) {
       return NextResponse.json({ error: 'Missing idToken' }, { status: 400 });
     }
 
     const decoded = await adminAuth.verifyIdToken(idToken);
     const isAdmin = !!decoded.admin;
+    const maxAge = rememberMe ? REMEMBER_MAX_AGE : DEFAULT_MAX_AGE;
 
     const token = await new SignJWT({ uid: decoded.uid, isAdmin })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
-      .setExpirationTime(`${MAX_AGE}s`)
+      .setExpirationTime(`${maxAge}s`)
       .sign(getSecret());
 
     const cookieStore = await cookies();
     cookieStore.set(COOKIE_NAME, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: MAX_AGE,
+      // 'lax' lets the cookie ride top-level cross-site navigations (OAuth
+      // redirects, email-link sign-in), which 'strict' would block.
+      sameSite: 'lax',
+      maxAge,
       path: '/',
     });
 

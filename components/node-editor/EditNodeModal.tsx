@@ -8,18 +8,22 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import type { NormalNodeData } from './NormalNode';
 import type { SituationNodeData } from './SituationNode';
+import type { EndNodeData } from './EndNode';
+
+type EditableNodeType = 'normalNode' | 'situationNode' | 'endNode';
+type EditableNodeData = NormalNodeData | SituationNodeData | EndNodeData;
 
 type EditableNode = {
   id: string;
-  type: 'normalNode' | 'situationNode';
-  data: NormalNodeData | SituationNodeData;
+  type: EditableNodeType;
+  data: EditableNodeData;
 };
 
 interface EditNodeModalProps {
   node: EditableNode | null;
   sessionId: string;
   onClose: () => void;
-  onSave: (id: string, data: NormalNodeData | SituationNodeData) => void;
+  onSave: (id: string, data: EditableNodeData) => void;
 }
 
 const CHOICE_COLORS: Record<string, string> = {
@@ -27,7 +31,7 @@ const CHOICE_COLORS: Record<string, string> = {
 };
 
 export function EditNodeModal({ node, sessionId, onClose, onSave }: EditNodeModalProps) {
-  const [draft, setDraft] = useState<NormalNodeData | SituationNodeData | null>(null);
+  const [draft, setDraft] = useState<EditableNodeData | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -74,7 +78,16 @@ export function EditNodeModal({ node, sessionId, onClose, onSave }: EditNodeModa
   };
 
   const isNormal = node.type === 'normalNode';
+  const isEnd = node.type === 'endNode';
   const normalDraft = draft as NormalNodeData;
+
+  const title = isNormal ? 'Edit Question Node' : isEnd ? 'Edit End Node' : 'Edit Situation Node';
+  const textLabel = isNormal ? 'Question Text' : isEnd ? 'Final Message' : 'Description / Title';
+  const textPlaceholder = isNormal
+    ? 'Enter your question…'
+    : isEnd
+      ? 'Shown when the session ends on this branch…'
+      : 'Describe this scene…';
 
   const handleSave = () => {
     onSave(node.id, draft);
@@ -82,26 +95,28 @@ export function EditNodeModal({ node, sessionId, onClose, onSave }: EditNodeModa
   };
 
   return (
-    <Modal isOpen={!!node} onClose={onClose} title={isNormal ? 'Edit Question Node' : 'Edit Situation Node'} size="lg">
+    <Modal isOpen={!!node} onClose={onClose} title={title} size="lg">
       <div className="space-y-4">
         {/* Common: text */}
         <Input
-          label={isNormal ? 'Question Text' : 'Description / Title'}
+          label={textLabel}
           value={draft.question_text}
           onChange={e => setDraft(d => d ? { ...d, question_text: e.target.value } : d)}
-          placeholder={isNormal ? 'Enter your question…' : 'Describe this scene…'}
+          placeholder={textPlaceholder}
         />
 
-        {/* Entry point toggle */}
-        <label className="flex items-center gap-3 cursor-pointer select-none">
-          <div
-            onClick={() => setDraft(d => d ? { ...d, is_entry_point: !d.is_entry_point } : d)}
-            className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${draft.is_entry_point ? 'bg-emerald-500' : 'bg-white/10'}`}
-          >
-            <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${draft.is_entry_point ? 'translate-x-5' : 'translate-x-0'}`} />
-          </div>
-          <span className="text-sm text-gray-300">Start node (entry point)</span>
-        </label>
+        {/* Entry point toggle — end nodes are terminal, not entry points */}
+        {!isEnd && (
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <div
+              onClick={() => setDraft(d => d ? { ...d, is_entry_point: !d.is_entry_point } : d)}
+              className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${draft.is_entry_point ? 'bg-emerald-500' : 'bg-white/10'}`}
+            >
+              <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${draft.is_entry_point ? 'translate-x-5' : 'translate-x-0'}`} />
+            </div>
+            <span className="text-sm text-gray-300">Start node (entry point)</span>
+          </label>
+        )}
 
         {/* Media upload */}
         <div>
