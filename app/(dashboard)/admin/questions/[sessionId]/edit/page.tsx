@@ -140,6 +140,27 @@ function EditorCanvas({
   }, [nodes.length, setNodes]);
 
   const onConnect = useCallback((params: Connection) => {
+    if (params.sourceHandle === 'all') {
+      // Connect all 4 choices to the target at once — Unreal Engine style
+      setEdges(es => {
+        const filtered = es.filter(
+          e => !(e.source === params.source && ['A', 'B', 'C', 'D'].includes(e.sourceHandle ?? ''))
+        );
+        const newEdges: AppEdge[] = ['A', 'B', 'C', 'D'].map(label => {
+          const color = CHOICE_COLORS[label];
+          return {
+            id: `${params.source}-${label}-${params.target}`,
+            source: params.source!,
+            sourceHandle: label,
+            target: params.target!,
+            style: { stroke: color, strokeWidth: 2 },
+            markerEnd: { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },
+          };
+        });
+        return [...filtered, ...newEdges];
+      });
+      return;
+    }
     const color = CHOICE_COLORS[params.sourceHandle ?? ''] ?? '#6366f1';
     setEdges(es => addEdge({
       ...params,
@@ -196,6 +217,27 @@ function EditorCanvas({
 
   return (
     <div ref={wrapperRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+      {/* Handle hover / connecting states */}
+      <style>{`
+        .react-flow__handle:hover {
+          transform: scale(1.6) !important;
+          box-shadow: 0 0 0 3px rgba(255,255,255,0.15), 0 0 14px rgba(255,255,255,0.35) !important;
+          transition: transform 0.1s, box-shadow 0.1s !important;
+        }
+        .react-flow__handle[data-handleid="all"]:hover {
+          transform: scale(1.7) !important;
+          box-shadow: 0 0 0 4px rgba(255,255,255,0.25), 0 0 18px rgba(255,255,255,0.6) !important;
+        }
+        .react-flow__handle.connecting {
+          transform: scale(1.5) !important;
+          box-shadow: 0 0 0 4px rgba(99,102,241,0.4), 0 0 16px rgba(99,102,241,0.7) !important;
+        }
+        .react-flow__handle.valid {
+          transform: scale(1.7) !important;
+          box-shadow: 0 0 0 4px rgba(52,211,153,0.4), 0 0 18px rgba(52,211,153,0.7) !important;
+          background: #34d399 !important;
+        }
+      `}</style>
       <ReactFlow
         nodes={nodes} edges={edges}
         onNodesChange={onNodesChange as any} onEdgesChange={onEdgesChange as any}

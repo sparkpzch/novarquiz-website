@@ -1,18 +1,114 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { createTeamRoom } from '@/lib/firebase/rtdb';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
-import Link from 'next/link';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import type { QuestionSession } from '@/lib/types';
+
+function SoloOrTeamModal({
+  session,
+  onClose,
+}: {
+  session: QuestionSession;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const { user } = useAuth();
+  const [creatingTeam, setCreatingTeam] = useState(false);
+
+  const handleSolo = () => {
+    onClose();
+    router.push(`/play/${session.id}`);
+  };
+
+  const handleTeam = async () => {
+    if (!user) return;
+    setCreatingTeam(true);
+    try {
+      const { roomId } = await createTeamRoom(session.id, {
+        uid: user.uid,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+      });
+      onClose();
+      router.push(`/play/${session.id}/team/${roomId}`);
+    } catch {
+      setCreatingTeam(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 16 }}
+        className="w-full max-w-sm rounded-2xl border border-white/10 bg-gray-900 p-6"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="mb-5">
+          <h2 className="text-lg font-bold text-white mb-1">{session.name}</h2>
+          <p className="text-gray-400 text-sm">How do you want to play?</p>
+        </div>
+
+        <div className="space-y-3">
+          <button
+            onClick={handleSolo}
+            className="w-full flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-indigo-600/15 hover:border-indigo-500/40 transition-all text-left group"
+          >
+            <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center text-2xl flex-shrink-0 group-hover:bg-indigo-500/30 transition-colors">
+              🎮
+            </div>
+            <div>
+              <p className="text-white font-semibold">Solo</p>
+              <p className="text-gray-400 text-sm">Play by yourself at your own pace</p>
+            </div>
+          </button>
+
+          <button
+            onClick={handleTeam}
+            disabled={creatingTeam}
+            className="w-full flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-purple-600/15 hover:border-purple-500/40 transition-all text-left group disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-2xl flex-shrink-0 group-hover:bg-purple-500/30 transition-colors">
+              {creatingTeam ? (
+                <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+              ) : '👥'}
+            </div>
+            <div>
+              <p className="text-white font-semibold">Team</p>
+              <p className="text-gray-400 text-sm">Host a private room — invite friends with PIN</p>
+            </div>
+          </button>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="mt-4 w-full py-2 rounded-xl border border-white/10 text-gray-400 text-sm hover:text-white hover:border-white/20 transition-colors"
+        >
+          Cancel
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 export default function DashboardPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSession, setSelectedSession] = useState<QuestionSession | null>(null);
 
   useEffect(() => {
     fetch('/api/questions/sessions').then(r => r.ok ? r.json() : []).then(setSessions).catch(() => {}).finally(() => setLoading(false));
@@ -47,7 +143,7 @@ export default function DashboardPage() {
         <h2 className="text-xl font-semibold text-white mb-4">{t('dashboard.available_quizzes')}</h2>
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1,2,3].map(i => <div key={i} className="rounded-2xl border border-white/5 bg-white/5 p-5 animate-pulse"><div className="h-4 bg-white/10 rounded mb-3 w-3/4"/><div className="h-3 bg-white/5 rounded w-full"/></div>)}
+            {[1, 2, 3].map(i => <div key={i} className="rounded-2xl border border-white/5 bg-white/5 p-5 animate-pulse"><div className="h-4 bg-white/10 rounded mb-3 w-3/4" /><div className="h-3 bg-white/5 rounded w-full" /></div>)}
           </div>
         ) : sessions.length === 0 ? (
           <div className="rounded-2xl border border-white/5 bg-white/5 p-10 text-center">
@@ -56,24 +152,38 @@ export default function DashboardPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {sessions.map((s, idx) => (
-              <motion.div key={s.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
-                <Link href={`/play/${s.id}`}>
-                  <div className="rounded-2xl border border-white/5 bg-white/5 p-5 hover:bg-white/10 hover:border-indigo-500/30 transition-all duration-300 cursor-pointer group">
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-lg font-semibold text-white group-hover:text-indigo-400 transition-colors">{s.name}</h3>
-                      <span className="px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-400 text-xs font-medium">{s.question_count} Q</span>
-                    </div>
-                    {s.description && <p className="text-sm text-gray-400 mb-3 line-clamp-2">{s.description}</p>}
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
-                      <span>⏱ {s.timer_seconds}s</span><span>•</span><span>{t('dashboard.join_quiz')} →</span>
-                    </div>
-                  </div>
-                </Link>
+              <motion.div
+                key={s.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                onClick={() => setSelectedSession(s)}
+                className="rounded-2xl border border-white/5 bg-white/5 p-5 hover:bg-white/10 hover:border-indigo-500/30 transition-all duration-300 cursor-pointer group"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-white group-hover:text-indigo-400 transition-colors">{s.name}</h3>
+                  <span className="px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-400 text-xs font-medium">{s.question_count} Q</span>
+                </div>
+                {s.description && <p className="text-sm text-gray-400 mb-3 line-clamp-2">{s.description}</p>}
+                <div className="flex items-center gap-3 text-xs text-gray-500">
+                  <span>⏱ {s.timer_seconds}s</span>
+                  <span>•</span>
+                  <span className="group-hover:text-indigo-400 transition-colors">{t('dashboard.join_quiz')} →</span>
+                </div>
               </motion.div>
             ))}
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {selectedSession && (
+          <SoloOrTeamModal
+            session={selectedSession}
+            onClose={() => setSelectedSession(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

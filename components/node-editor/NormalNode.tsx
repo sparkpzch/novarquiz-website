@@ -19,16 +19,29 @@ const CHOICE_CFG = {
   D: { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
 } as const;
 
-// Fixed layout heights for handle positioning
 const H_HEADER = 36;
 const H_TEXT = 52;
 const H_CHOICE = 32;
+const H_MEDIA = 22; // height of media indicator row when present
 
 export const NormalNode = memo(({ data, selected }: NodeProps) => {
   const d = data as NormalNodeData;
   const choices = d.choices?.length
     ? d.choices
     : ['A', 'B', 'C', 'D'].map(l => ({ label: l, choice_text: '', is_correct: false }));
+
+  // Top of choice area depends on whether media row is present
+  const choiceAreaTop = H_HEADER + H_TEXT + (d.media_url ? H_MEDIA : 0);
+
+  const choiceHandleStyle = (color: string, idx: number): React.CSSProperties => ({
+    top: choiceAreaTop + idx * H_CHOICE + H_CHOICE / 2,
+    width: 10,
+    height: 10,
+    background: color,
+    border: `2px solid ${color}88`,
+    boxShadow: selected ? `0 0 0 3px ${color}30, 0 0 10px ${color}60` : 'none',
+    transition: 'box-shadow 0.15s',
+  });
 
   return (
     <div style={{
@@ -45,10 +58,42 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
         type="target"
         position={Position.Left}
         id="input"
-        style={{ top: H_HEADER / 2, width: 12, height: 12, background: '#6366f1', border: '2px solid #818cf8' }}
+        style={{
+          top: H_HEADER / 2,
+          width: 12,
+          height: 12,
+          background: '#6366f1',
+          border: '2px solid #818cf8',
+          boxShadow: selected ? '0 0 0 3px rgba(99,102,241,0.3), 0 0 10px rgba(99,102,241,0.5)' : 'none',
+          transition: 'box-shadow 0.15s',
+        }}
       />
 
-      {/* Source handles — one per choice, positioned to align with each row */}
+      {/*
+        "Connect All" handle — white dot positioned just above choice A.
+        Drag from this to connect ALL 4 choices to the target node at once.
+        Styled like Unreal Engine's exec pin.
+      */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="all"
+        title="Drag to connect all choices to a node"
+        style={{
+          top: choiceAreaTop - 9,
+          width: 13,
+          height: 13,
+          background: '#ffffff',
+          border: '2px solid rgba(255,255,255,0.55)',
+          boxShadow: selected
+            ? '0 0 0 3px rgba(255,255,255,0.2), 0 0 12px rgba(255,255,255,0.6)'
+            : '0 0 5px rgba(255,255,255,0.25)',
+          transition: 'box-shadow 0.15s',
+          zIndex: 10,
+        }}
+      />
+
+      {/* Source handles — one per choice, aligned with each row */}
       {choices.map((c, idx) => {
         const cfg = CHOICE_CFG[c.label as keyof typeof CHOICE_CFG] ?? CHOICE_CFG.A;
         return (
@@ -57,13 +102,7 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
             type="source"
             position={Position.Right}
             id={c.label}
-            style={{
-              top: H_HEADER + H_TEXT + idx * H_CHOICE + H_CHOICE / 2,
-              width: 10,
-              height: 10,
-              background: cfg.color,
-              border: `2px solid ${cfg.color}66`,
-            }}
+            style={choiceHandleStyle(cfg.color, idx)}
           />
         );
       })}
@@ -148,25 +187,17 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
             borderRadius: idx === choices.length - 1 ? '0 0 10px 10px' : 0,
           }}>
             <span style={{
-              width: 16,
-              height: 16,
+              width: 16, height: 16,
               borderRadius: '50%',
               background: cfg.color,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontWeight: 800,
-              fontSize: 9,
-              flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontWeight: 800, fontSize: 9, flexShrink: 0,
             }}>{c.label}</span>
             <span style={{
               flex: 1,
               color: c.choice_text ? '#d1d5db' : '#4b5563',
               fontSize: 11,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {c.choice_text || `Choice ${c.label}`}
             </span>

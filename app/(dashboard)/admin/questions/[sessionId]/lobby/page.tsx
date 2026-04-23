@@ -4,7 +4,7 @@ import { use, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useToast } from '@/components/ui/Toast';
-import { initRoom, startRoom, watchRoom, type SessionRoom } from '@/lib/firebase/rtdb';
+import { initRoom, startRoom, watchRoom, joinWaitingRoom, claimLeaderIfEmpty, type SessionRoom } from '@/lib/firebase/rtdb';
 import { motion, AnimatePresence } from 'motion/react';
 import type { QuestionSession } from '@/lib/types';
 
@@ -78,6 +78,13 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
       showToast('Failed to start game', 'error');
       setStarting(false);
     }
+  };
+
+  const handleJoinAndPlay = async () => {
+    if (!user) return;
+    await joinWaitingRoom(sessionId, user);
+    if (!session?.is_private) await claimLeaderIfEmpty(sessionId, user.uid);
+    router.push(`/play/${sessionId}/lobby`);
   };
 
   if (loading || !isAdmin) return null;
@@ -185,6 +192,13 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
       {players.length === 0 && (
         <p className="text-center text-xs text-gray-500">Waiting for at least one player to join before starting</p>
       )}
+
+      <button
+        onClick={handleJoinAndPlay}
+        className="w-full py-3 rounded-2xl border border-white/10 bg-white/5 text-gray-300 font-semibold text-sm hover:bg-white/10 hover:text-white transition-all"
+      >
+        👤 Join as Player & Play
+      </button>
     </div>
   );
 }
