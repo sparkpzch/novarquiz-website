@@ -7,8 +7,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ses
     const questions = await getQuestionsBySession(sessionId);
     const connections = await getConnectionsBySession(sessionId);
     return NextResponse.json({ questions, connections });
-  } catch {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  } catch (err) {
+    console.error(`Failed to load graph for session ${sessionId}:`, err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
 

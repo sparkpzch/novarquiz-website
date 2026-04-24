@@ -1,14 +1,20 @@
-import { NextResponse } from 'next/server';
-import { getAllSessions, getPublishedSessions, createSession } from '@/lib/db/queries';
+import { NextResponse } from "next/server";
+import {
+  getAllSessions,
+  getPublishedSessions,
+  createSession,
+} from "@/lib/db/queries";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const sessions = searchParams.get('all') === 'true'
-      ? await getAllSessions()
-      : await getPublishedSessions();
+    const sessions =
+      searchParams.get("all") === "true"
+        ? await getAllSessions()
+        : await getPublishedSessions();
     return NextResponse.json(sessions);
-  } catch {
+  } catch (error) {
+    console.error("Failed to load question sessions:", error);
     return NextResponse.json([], { status: 500 });
   }
 }

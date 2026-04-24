@@ -1,9 +1,10 @@
-import pool from './postgres';
+import { randomUUID } from 'node:crypto';
+import pool, { queryWithRetry } from './postgres';
 
 // ===================== Question Sessions =====================
 
 export async function getAllSessions() {
-  const result = await pool.query(
+  const result = await queryWithRetry(
     `SELECT qs.*,
       (SELECT COUNT(*) FROM questions q WHERE q.session_id = qs.id)::int AS question_count,
       (SELECT COUNT(*) FROM leaderboard_entries le WHERE le.session_id = qs.id)::int AS play_count,
@@ -15,7 +16,7 @@ export async function getAllSessions() {
 }
 
 export async function getPublishedSessions() {
-  const result = await pool.query(
+  const result = await queryWithRetry(
     `SELECT qs.*, 
       (SELECT COUNT(*) FROM questions q WHERE q.session_id = qs.id) as question_count
      FROM question_sessions qs 
@@ -26,7 +27,7 @@ export async function getPublishedSessions() {
 }
 
 export async function getSessionById(sessionId: string) {
-  const result = await pool.query(
+  const result = await queryWithRetry(
     'SELECT * FROM question_sessions WHERE id = $1',
     [sessionId]
   );
@@ -36,6 +37,7 @@ export async function getSessionById(sessionId: string) {
 // Removed: getSessionByShareToken — share tokens now live in Firebase RTDB (joinTokens/{token})
 
 export async function createSession(data: {
+  id?: string;
   name: string;
   description?: string;
   cover_image_url?: string;
@@ -43,10 +45,20 @@ export async function createSession(data: {
   is_published?: boolean;
   created_by: string;
 }) {
-  const result = await pool.query(
-    `INSERT INTO question_sessions (name, description, cover_image_url, timer_seconds, created_by, is_published)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [data.name, data.description || null, data.cover_image_url || null, data.timer_seconds ?? null, data.created_by, data.is_published ?? false]
+  const sessionId = data.id ?? randomUUID();
+  const result = await queryWithRetry(
+    `INSERT INTO question_sessions (id, name, description, cover_image_url, timer_seconds, created_by, is_published)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (id) DO UPDATE SET
+       name = EXCLUDED.name,
+       description = EXCLUDED.description,
+       cover_image_url = EXCLUDED.cover_image_url,
+       timer_seconds = EXCLUDED.timer_seconds,
+       is_published = EXCLUDED.is_published,
+       updated_at = NOW()
+     RETURNING *`,
+    [sessionId, data.name, data.description || null, data.cover_image_url || null, data.timer_seconds ?? null, data.created_by, data.is_published ?? false],
+    { allowWriteRetry: true }
   );
   return result.rows[0];
 }
@@ -70,9 +82,10 @@ export async function updateSession(sessionId: string, data: Partial<{
   fields.push(`updated_at = NOW()`);
   values.push(sessionId);
 
-  const result = await pool.query(
+  const result = await queryWithRetry(
     `UPDATE question_sessions SET ${fields.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
-    values
+    values,
+    { allowWriteRetry: true }
   );
   return result.rows[0];
 }
@@ -170,9 +183,9 @@ export async function deleteUserData(uid: string) {
 // ===================== Questions =====================
 
 export async function getQuestionsBySession(sessionId: string) {
-  const result = await pool.query(
+  const result = await queryWithRetry(
     `SELECT q.*, 
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.score_impact) ORDER BY c.label) as choices
+      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
      FROM questions q
      LEFT JOIN choices c ON c.question_id = q.id
      WHERE q.session_id = $1
@@ -184,9 +197,9 @@ export async function getQuestionsBySession(sessionId: string) {
 }
 
 export async function getQuestionById(questionId: string) {
-  const result = await pool.query(
+  const result = await queryWithRetry(
     `SELECT q.*, 
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.score_impact) ORDER BY c.label) as choices
+      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
      FROM questions q
      LEFT JOIN choices c ON c.question_id = q.id
      WHERE q.id = $1
@@ -197,9 +210,9 @@ export async function getQuestionById(questionId: string) {
 }
 
 export async function getEntryQuestion(sessionId: string) {
-  const result = await pool.query(
+  const result = await queryWithRetry(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.score_impact) ORDER BY c.label) as choices
+      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
      FROM questions q
      JOIN question_sessions qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
@@ -211,6 +224,7 @@ export async function getEntryQuestion(sessionId: string) {
 }
 
 export async function createQuestion(data: {
+  id?: string;
   session_id: string;
   question_order: number;
   question_text: string;
@@ -222,10 +236,25 @@ export async function createQuestion(data: {
   node_y?: number;
   node_type?: string;
 }) {
-  const result = await pool.query(
-    `INSERT INTO questions (session_id, question_order, question_text, media_type, media_url, timer_override, is_entry_point, node_x, node_y, node_type)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-    [data.session_id, data.question_order, data.question_text, data.media_type || null, data.media_url || null, data.timer_override || null, data.is_entry_point || false, data.node_x || 0, data.node_y || 0, data.node_type || 'normal']
+  const questionId = data.id ?? randomUUID();
+  const result = await queryWithRetry(
+    `INSERT INTO questions (id, session_id, question_order, question_text, media_type, media_url, timer_override, is_entry_point, node_x, node_y, node_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     ON CONFLICT (id) DO UPDATE SET
+       session_id = EXCLUDED.session_id,
+       question_order = EXCLUDED.question_order,
+       question_text = EXCLUDED.question_text,
+       media_type = EXCLUDED.media_type,
+       media_url = EXCLUDED.media_url,
+       timer_override = EXCLUDED.timer_override,
+       is_entry_point = EXCLUDED.is_entry_point,
+       node_x = EXCLUDED.node_x,
+       node_y = EXCLUDED.node_y,
+       node_type = EXCLUDED.node_type,
+       updated_at = NOW()
+     RETURNING *`,
+    [questionId, data.session_id, data.question_order, data.question_text, data.media_type || null, data.media_url || null, data.timer_override || null, data.is_entry_point || false, data.node_x || 0, data.node_y || 0, data.node_type || 'normal'],
+    { allowWriteRetry: true }
   );
   return result.rows[0];
 }
@@ -264,18 +293,42 @@ export async function deleteQuestion(questionId: string) {
 }
 
 export async function deleteQuestionsBySession(sessionId: string) {
-  await pool.query('DELETE FROM questions WHERE session_id = $1', [sessionId]);
+  await queryWithRetry('DELETE FROM questions WHERE session_id = $1', [sessionId], {
+    allowWriteRetry: true,
+  });
 }
 
 // ===================== Choices =====================
 
-export async function upsertChoices(questionId: string, choices: Array<{ label: string; choice_text: string; points: number }>) {
+export async function upsertChoices(questionId: string, choices: Array<{
+  label: string;
+  choice_text: string;
+  score_impact?: number;
+  points?: number;
+  explanation?: string;
+}>) {
   // Delete existing choices and insert new ones
-  await pool.query('DELETE FROM choices WHERE question_id = $1', [questionId]);
+  await queryWithRetry('DELETE FROM choices WHERE question_id = $1', [questionId], {
+    allowWriteRetry: true,
+  });
   for (const choice of choices) {
-    await pool.query(
-      `INSERT INTO choices (question_id, label, choice_text, score_impact) VALUES ($1, $2, $3, $4)`,
-      [questionId, choice.label, choice.choice_text, Number.isFinite(choice.points) ? Math.trunc(choice.points) : 0]
+    const rawScoreImpact =
+      typeof choice.score_impact === 'number' && Number.isFinite(choice.score_impact)
+        ? choice.score_impact
+        : typeof choice.points === 'number' && Number.isFinite(choice.points)
+          ? choice.points
+          : 0;
+    const scoreImpact = Math.trunc(rawScoreImpact);
+
+    await queryWithRetry(
+      `INSERT INTO choices (question_id, label, choice_text, score_impact, explanation)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (question_id, label) DO UPDATE SET
+         choice_text = EXCLUDED.choice_text,
+         score_impact = EXCLUDED.score_impact,
+         explanation = EXCLUDED.explanation`,
+      [questionId, choice.label, choice.choice_text, scoreImpact, choice.explanation ?? null],
+      { allowWriteRetry: true }
     );
   }
 }
@@ -283,7 +336,7 @@ export async function upsertChoices(questionId: string, choices: Array<{ label: 
 // ===================== Connections =====================
 
 export async function getConnectionsBySession(sessionId: string) {
-  const result = await pool.query(
+  const result = await queryWithRetry(
     'SELECT * FROM question_connections WHERE session_id = $1',
     [sessionId]
   );
@@ -291,19 +344,26 @@ export async function getConnectionsBySession(sessionId: string) {
 }
 
 export async function saveConnections(sessionId: string, connections: Array<{ from_question_id: string; from_choice_label: string; to_question_id: string }>) {
-  await pool.query('DELETE FROM question_connections WHERE session_id = $1', [sessionId]);
+  await queryWithRetry('DELETE FROM question_connections WHERE session_id = $1', [sessionId], {
+    allowWriteRetry: true,
+  });
   for (const conn of connections) {
-    await pool.query(
-      `INSERT INTO question_connections (session_id, from_question_id, from_choice_label, to_question_id) VALUES ($1, $2, $3, $4)`,
-      [sessionId, conn.from_question_id, conn.from_choice_label, conn.to_question_id]
+    await queryWithRetry(
+      `INSERT INTO question_connections (session_id, from_question_id, from_choice_label, to_question_id)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (from_question_id, from_choice_label) DO UPDATE SET
+         session_id = EXCLUDED.session_id,
+         to_question_id = EXCLUDED.to_question_id`,
+      [sessionId, conn.from_question_id, conn.from_choice_label, conn.to_question_id],
+      { allowWriteRetry: true }
     );
   }
 }
 
 export async function getNextQuestion(fromQuestionId: string, choiceLabel: string) {
-  const result = await pool.query(
+  const result = await queryWithRetry(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.score_impact) ORDER BY c.label) as choices
+      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
      FROM question_connections qc
      JOIN questions q ON q.id = qc.to_question_id
      JOIN question_sessions qs ON qs.id = q.session_id
@@ -416,7 +476,7 @@ export async function completePlaySession(data: {
 // Personal history across all sessions a user has played. Used by the
 // /history page "My attempts" tab.
 export async function getUserHistory(userId: string) {
-  const result = await pool.query(
+  const result = await queryWithRetry(
     `SELECT
        le.session_id,
        qs.name                             AS session_name,

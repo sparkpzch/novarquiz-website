@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 import { adminAuth } from '@/lib/firebase/admin';
-import pool from '@/lib/db/postgres';
+import { queryWithRetry } from '@/lib/db/postgres';
 
 function getSecret() {
   return new TextEncoder().encode(process.env.SESSION_SECRET!);
@@ -29,15 +29,15 @@ export async function GET(request: NextRequest) {
     monthlyResult,
     scoreDistResult,
     recentResult,
-  ] = await Promise.all([
+  ] = await Promise.allSettled([
     adminAuth.listUsers(1000),
-    pool.query(`
+    queryWithRetry(`
       SELECT
         (SELECT COUNT(*) FROM question_sessions WHERE is_published = TRUE)::int AS active_sessions,
         (SELECT COUNT(*) FROM questions)::int AS questions_created,
         (SELECT COALESCE(ROUND(AVG(total_score)), 0) FROM leaderboard_entries)::int AS avg_score
     `),
-    pool.query(`
+    queryWithRetry(`
       SELECT
         EXTRACT(MONTH FROM started_at)::int AS month,
         COUNT(*)::int AS count
@@ -46,13 +46,13 @@ export async function GET(request: NextRequest) {
       GROUP BY month
       ORDER BY month
     `),
-    pool.query(`
+    queryWithRetry(`
       SELECT
         COUNT(*) FILTER (WHERE utility_score > 0)::int AS correct,
         COUNT(*) FILTER (WHERE utility_score <= 0)::int AS incorrect
       FROM user_answers
     `),
-    pool.query(`
+    queryWithRetry(`
       SELECT
         le.user_display_name,
         qs.name AS session_name,
@@ -66,18 +66,48 @@ export async function GET(request: NextRequest) {
     `),
   ]);
 
-  const stats = coreStats.rows[0];
+  if (usersResult.status === 'rejected') {
+    console.error('Failed to load admin user stats:', usersResult.reason);
+  }
+  if (coreStats.status === 'rejected') {
+    console.error('Failed to load core admin stats:', coreStats.reason);
+  }
+  if (monthlyResult.status === 'rejected') {
+    console.error('Failed to load admin monthly activity:', monthlyResult.reason);
+  }
+  if (scoreDistResult.status === 'rejected') {
+    console.error('Failed to load admin score distribution:', scoreDistResult.reason);
+  }
+  if (recentResult.status === 'rejected') {
+    console.error('Failed to load admin recent activity:', recentResult.reason);
+  }
+
+  const stats =
+    coreStats.status === 'fulfilled'
+      ? coreStats.value.rows[0]
+      : {
+          active_sessions: 0,
+          questions_created: 0,
+          avg_score: 0,
+        };
 
   const monthlyData: number[] = new Array(12).fill(0);
-  for (const row of monthlyResult.rows) {
+  const monthlyRows = monthlyResult.status === 'fulfilled' ? monthlyResult.value.rows : [];
+  for (const row of monthlyRows) {
     monthlyData[row.month - 1] = row.count;
   }
 
-  const dist = scoreDistResult.rows[0];
+  const dist =
+    scoreDistResult.status === 'fulfilled'
+      ? scoreDistResult.value.rows[0]
+      : {
+          correct: 0,
+          incorrect: 0,
+        };
   const totalAnswers = dist.correct + dist.incorrect;
 
   return NextResponse.json({
-    totalUsers: usersResult.users.length,
+    totalUsers: usersResult.status === 'fulfilled' ? usersResult.value.users.length : 0,
     activeSessions: stats.active_sessions,
     questionsCreated: stats.questions_created,
     avgScore: stats.avg_score,
@@ -86,6 +116,6 @@ export async function GET(request: NextRequest) {
       correct: totalAnswers > 0 ? Math.round((dist.correct / totalAnswers) * 100) : 0,
       incorrect: totalAnswers > 0 ? Math.round((dist.incorrect / totalAnswers) * 100) : 0,
     },
-    recentActivity: recentResult.rows,
+    recentActivity: recentResult.status === 'fulfilled' ? recentResult.value.rows : [],
   });
 }
