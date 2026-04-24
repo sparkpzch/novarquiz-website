@@ -343,7 +343,7 @@ function SoloOrPartyModal({
                 "🎉"
               )}
             </div>
-            <p className="text-lg font-bold">PARTY</p>
+            <p className="text-lg font-bold text-white">PARTY</p>
             <p className="mt-2 text-sm text-[#B8C7EA]">
               Open a waiting lobby, invite friends, then start together as the
               host.

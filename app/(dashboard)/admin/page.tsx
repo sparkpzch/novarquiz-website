@@ -12,6 +12,8 @@ import type { Quiz } from "@/lib/types";
 import { useToast } from "@/components/ui/Toast";
 import {
   watchSessionRooms,
+  endRoom,
+  closeLobby,
   type PlayerScore,
   type SessionRoom,
 } from "@/lib/firebase/rtdb";
@@ -235,6 +237,18 @@ function AdminDashboardContent() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleCloseSession = async () => {
+    if (!currentLive) return;
+    if (!confirm("Close this session? Players will be disconnected.")) return;
+    try {
+      await endRoom(currentLive.session.id);
+      await closeLobby(currentLive.session.id);
+      showToast("Session closed", "success");
+    } catch {
+      showToast("Failed to close session", "error");
     }
   };
 
@@ -1018,15 +1032,17 @@ function AdminDashboardContent() {
                           Players who reached the end
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
-                          Lobby token
+                      <div className="rounded-2xl border border-[#0460A9]/40 bg-[#0460A9]/10 p-4">
+                        <p className="text-xs uppercase tracking-[0.18em] text-[#92BFFF]">
+                          Join PIN
                         </p>
-                        <p className="text-lg font-mono font-bold text-white mt-2 truncate">
-                          {currentLive.room.joinToken ?? "Not available"}
+                        <p className="text-3xl font-mono font-bold text-white mt-2 tracking-widest">
+                          {currentLive.room.joinToken
+                            ? currentLive.room.joinToken.toUpperCase().slice(0, 6)
+                            : "——"}
                         </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          Only the current live quiz appears here
+                        <p className="text-xs text-[#92BFFF]/70 mt-1 font-mono break-all">
+                          {currentLive.room.joinToken ?? "No token"}
                         </p>
                       </div>
                     </div>
@@ -1074,16 +1090,14 @@ function AdminDashboardContent() {
                   </div>
 
                   <div className="w-full xl:w-[320px] space-y-3">
-                    {liveShareLink && (
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
-                          Invite link
-                        </p>
-                        <p className="mt-2 break-all font-mono text-sm text-gray-200">
-                          {liveShareLink}
-                        </p>
-                      </div>
-                    )}
+                    <div className="rounded-2xl border border-[#0460A9]/30 bg-[#0460A9]/8 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-[#92BFFF] mb-2">
+                        Invite link
+                      </p>
+                      <p className="break-all font-mono text-sm text-[#92BFFF]/80 leading-relaxed">
+                        {liveShareLink || "—"}
+                      </p>
+                    </div>
                     <Button
                       className="w-full"
                       onClick={() =>
@@ -1120,6 +1134,12 @@ function AdminDashboardContent() {
                     >
                       Edit Live Quiz
                     </Button>
+                    <button
+                      onClick={handleCloseSession}
+                      className="w-full rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/20 transition-colors"
+                    >
+                      Close Session
+                    </button>
                     {liveSessions.length > 1 && (
                       <p className="text-xs text-amber-300">
                         Showing the most recent live session.{" "}

@@ -79,10 +79,27 @@ function HistoryPageContent() {
       .catch(() => setMine([]));
   }, [tab, user]);
 
-  const topThree = entries.slice(0, 3);
-  const podium = topThree.length >= 3 ? [topThree[1], topThree[0], topThree[2]] : topThree;
-  const myEntry = entries.find((entry) => entry.user_id === user?.uid);
-  const myRank = entries.findIndex((entry) => entry.user_id === user?.uid) + 1;
+  const sortedEntries = [...entries].sort((a, b) => {
+    if (b.total_score !== a.total_score) return b.total_score - a.total_score;
+    if (a.total_time_ms !== b.total_time_ms) return a.total_time_ms - b.total_time_ms;
+    return a.user_display_name.localeCompare(b.user_display_name);
+  });
+  const topThree = sortedEntries.slice(0, 3);
+  const podium =
+    topThree.length === 1
+      ? [{ entry: topThree[0], rank: 1, height: 'h-40', featured: true, surface: 'from-[#055A9E] via-[#0460A9] to-[#92BFFF]' }]
+      : topThree.length === 2
+        ? [
+            { entry: topThree[0], rank: 1, height: 'h-40', featured: true, surface: 'from-[#055A9E] via-[#0460A9] to-[#92BFFF]' },
+            { entry: topThree[1], rank: 2, height: 'h-32', featured: false, surface: 'from-[#7AA7E7] to-[#C9DDF7]' },
+          ]
+        : [
+            { entry: topThree[1], rank: 2, height: 'h-32', featured: false, surface: 'from-[#7AA7E7] to-[#C9DDF7]' },
+            { entry: topThree[0], rank: 1, height: 'h-40', featured: true, surface: 'from-[#055A9E] via-[#0460A9] to-[#92BFFF]' },
+            { entry: topThree[2], rank: 3, height: 'h-28', featured: false, surface: 'from-[#A9C6F4] to-[#DDEAFB]' },
+          ];
+  const myEntry = sortedEntries.find((entry) => entry.user_id === user?.uid);
+  const myRank = sortedEntries.findIndex((entry) => entry.user_id === user?.uid) + 1;
   const selectedSessionMeta = sessions.find((session) => session.id === selectedSession);
 
   const totalAttempts = mine?.length ?? 0;
@@ -93,7 +110,7 @@ function HistoryPageContent() {
   const bestRank =
     mine && mine.length ? Math.min(...mine.map((row) => row.rank)) : 0;
   const sessionBestScore =
-    entries.length ? Math.max(...entries.map((entry) => entry.total_score)) : 0;
+    sortedEntries.length ? Math.max(...sortedEntries.map((entry) => entry.total_score)) : 0;
 
   const switchTab = (nextTab: Tab) => {
     setTab(nextTab);
@@ -340,16 +357,7 @@ function HistoryPageContent() {
                     </div>
 
                     <div className="mt-8 flex flex-col items-center justify-center gap-6 md:flex-row md:items-end">
-                      {podium.map((entry, index) => {
-                        if (!entry) return null;
-                        const rank = index === 1 ? 1 : index === 0 ? 2 : 3;
-                        const height = index === 1 ? 'h-40' : index === 0 ? 'h-32' : 'h-28';
-                        const surface =
-                          index === 1
-                            ? 'from-[#055A9E] via-[#0460A9] to-[#92BFFF]'
-                            : index === 0
-                              ? 'from-[#7AA7E7] to-[#C9DDF7]'
-                              : 'from-[#A9C6F4] to-[#DDEAFB]';
+                      {podium.map(({ entry, rank, height, surface, featured }, index) => {
                         return (
                           <motion.div
                             key={entry.user_id}
@@ -364,14 +372,14 @@ function HistoryPageContent() {
                             <ProfileAvatar
                               displayName={entry.user_display_name}
                               photoURL={entry.user_photo_url}
-                              size={index === 1 ? 88 : 72}
+                              size={featured ? 88 : 72}
                               ringClassName="ring-4 ring-[#DDF0FF] shadow-[0_16px_28px_rgba(17,87,145,0.14)]"
                             />
                             <p className="mt-3 max-w-[156px] truncate text-center text-base font-bold text-[#16324F]">
                               {entry.user_display_name}
                             </p>
                             <p className="mt-1 text-sm font-semibold text-[#0460A9]">{entry.total_score} pts</p>
-                            <div className={`mt-4 flex w-28 items-start justify-center rounded-t-[28px] bg-linear-to-b ${surface} pt-4 text-xl font-bold ${index === 1 ? 'text-white' : 'text-[#16324F]'} ${height}`}>
+                            <div className={`mt-4 flex w-28 items-start justify-center rounded-t-[28px] bg-linear-to-b ${surface} pt-4 text-xl font-bold ${featured ? 'text-white' : 'text-[#16324F]'} ${height}`}>
                               {rank}
                             </div>
                           </motion.div>
@@ -452,7 +460,7 @@ function HistoryPageContent() {
                         </tr>
                       </thead>
                       <tbody>
-                        {entries.map((entry, index) => {
+                        {sortedEntries.map((entry, index) => {
                           const isMe = entry.user_id === user?.uid;
                           return (
                             <tr

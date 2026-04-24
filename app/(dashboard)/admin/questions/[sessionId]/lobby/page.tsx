@@ -106,12 +106,15 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
   const players = Object.entries(room?.players ?? {});
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">{session?.name ?? '…'}</h1>
-          <p className="text-gray-400 text-sm mt-1">Waiting room · {players.length} player{players.length !== 1 ? 's' : ''} joined</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#92BFFF]">Host Lobby</p>
+          <h1 className="text-2xl font-bold text-white mt-1">{session?.name ?? '…'}</h1>
+          <p className="text-[#92BFFF]/70 text-sm mt-1">
+            {players.length} player{players.length !== 1 ? 's' : ''} waiting
+          </p>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -119,24 +122,22 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
         </div>
       </div>
 
-      {/* Access info */}
+      {/* PIN + Share link */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Join token (RTDB-based) */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-          <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-2">Join Token</p>
-          <p className="text-sm font-mono font-bold text-white truncate">
-            {shareLink ? shareLink.split('/join/')[1]?.split('?')[0] ?? '—' : '—'}
+        <div className="rounded-2xl border border-[#92BFFF]/20 bg-[#0460A9]/20 p-5">
+          <p className="text-xs font-medium uppercase tracking-wider text-[#92BFFF] mb-2">Join PIN</p>
+          <p className="text-3xl font-mono font-bold text-white tracking-widest">
+            {joinToken ? joinToken.toUpperCase().slice(0, 6) : '——'}
           </p>
-          <p className="text-xs text-gray-500 mt-2">🌐 Public — share the link below to invite players</p>
+          <p className="text-xs text-[#92BFFF]/60 mt-2 font-mono break-all">{joinToken ?? '—'}</p>
         </div>
 
-        {/* Share link */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-          <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-2">Share Link</p>
-          <p className="text-sm text-gray-300 truncate mb-3 font-mono">{shareLink || '—'}</p>
+        <div className="rounded-2xl border border-[#92BFFF]/20 bg-[#0460A9]/20 p-5">
+          <p className="text-xs font-medium uppercase tracking-wider text-[#92BFFF] mb-2">Share Link</p>
+          <p className="text-sm text-[#92BFFF]/80 break-all mb-3 font-mono leading-relaxed">{shareLink || '—'}</p>
           <button
             onClick={copyLink}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-sm font-medium hover:bg-indigo-600/30 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0460A9]/40 border border-[#92BFFF]/30 text-[#92BFFF] text-sm font-medium hover:bg-[#0460A9]/60 transition-colors"
           >
             {copied ? (
               <><span>✓</span> Copied!</>
@@ -148,10 +149,10 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
       </div>
 
       {/* Player list */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
-        <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white">Players</h2>
-          <span className="text-xs text-gray-500">{players.length} waiting</span>
+      <div className="rounded-2xl border border-[#92BFFF]/15 bg-white/5 overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#92BFFF]/10 flex items-center justify-between bg-[#0460A9]/10">
+          <h2 className="text-sm font-semibold text-white">Players in lobby</h2>
+          <span className="text-xs text-[#92BFFF]">{players.length} waiting</span>
         </div>
 
         <div className="divide-y divide-white/5 min-h-[120px]">
@@ -167,7 +168,7 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
                 <PlayerAvatar displayName={player.displayName} photoURL={player.photoURL} />
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-medium truncate">{player.displayName}</p>
-                  <p className="text-gray-500 text-xs">
+                  <p className="text-[#92BFFF]/60 text-xs">
                     Joined at {formatJoinTime(player.joinedAt)}
                   </p>
                 </div>
@@ -177,9 +178,9 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
           </AnimatePresence>
 
           {players.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-10 text-gray-500">
+            <div className="flex flex-col items-center justify-center py-10 text-[#92BFFF]/50">
               <span className="text-3xl mb-2">👥</span>
-              <p className="text-sm">Share the link or PIN to invite players</p>
+              <p className="text-sm">Share the PIN or link to invite players</p>
             </div>
           )}
         </div>
@@ -189,7 +190,7 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
       <button
         onClick={handleStart}
         disabled={starting || players.length === 0}
-        className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-indigo-500 hover:to-purple-500 transition-all shadow-lg shadow-indigo-500/20"
+        className="w-full py-4 rounded-2xl bg-linear-to-r from-[#055A9E] to-[#0460A9] text-white font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-[#0460A9] hover:to-[#92BFFF]/80 transition-all shadow-lg shadow-[#0460A9]/30"
       >
         {starting ? (
           <span className="flex items-center justify-center gap-2">
@@ -202,11 +203,11 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
       </button>
 
       {players.length === 0 && (
-        <p className="text-center text-xs text-gray-500">Waiting for at least one player to join before starting</p>
+        <p className="text-center text-xs text-[#92BFFF]/50">Waiting for at least one player to join before starting</p>
       )}
 
-      <p className="text-center text-xs text-gray-500">
-        You are observing as the admin — players join via the link/PIN above.
+      <p className="text-center text-xs text-[#92BFFF]/40">
+        You are observing as the admin — players join via the link or PIN above.
       </p>
     </div>
   );

@@ -52,6 +52,9 @@ export default function TeamLobbyPage({
   const initialPin = typeof window === 'undefined'
     ? ''
     : (new URLSearchParams(window.location.search).get('pin') ?? '').replace(/\D/g, '').slice(0, 6);
+  const inviteNextPath = initialPin
+    ? `/play/${sessionId}/team/${roomId}?pin=${initialPin}`
+    : `/play/${sessionId}/team/${roomId}`;
 
   const [room, setRoom] = useState<TeamRoom | null>(null);
   const [sessionName, setSessionName] = useState('');
@@ -73,9 +76,9 @@ export default function TeamLobbyPage({
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push(`/sign-in?next=/play/${sessionId}/team/${roomId}`);
+      router.push(`/sign-in?next=${encodeURIComponent(inviteNextPath)}`);
     }
-  }, [authLoading, roomId, router, sessionId, user]);
+  }, [authLoading, inviteNextPath, router, user]);
 
   useEffect(() => {
     const unsubscribe = watchTeamRoom(roomId, (data) => {
@@ -232,7 +235,7 @@ export default function TeamLobbyPage({
             <button
               onClick={handleJoin}
               disabled={joining || pin.length !== 6}
-              className="mt-6 w-full rounded-[24px] bg-[#0460A9] px-4 py-4 text-sm font-semibold text-white disabled:opacity-60"
+              className="mt-6 w-full rounded-[24px] bg-linear-to-r from-[#0A6FD6] to-[#0460A9] px-4 py-4 text-sm font-semibold text-[#F8FBFF] shadow-[0_18px_40px_rgba(17,87,145,0.22)] disabled:opacity-60"
             >
               {joining ? 'Joining…' : 'Join party'}
             </button>
@@ -260,21 +263,21 @@ export default function TeamLobbyPage({
                   initial={{ opacity: 0, y: 18, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 18, scale: 0.98 }}
-                  className="nq-card w-full max-w-sm rounded-[30px] p-6 text-center"
+                  className="w-full max-w-sm rounded-[30px] border border-[#92BFFF]/45 bg-linear-to-b from-[#F9FCFF] via-[#EEF6FF] to-[#E3F0FF] p-6 text-center shadow-[0_30px_70px_rgba(17,87,145,0.22)]"
                 >
                   <div className="text-4xl">🚪</div>
                   <h2 className="mt-3 text-xl font-bold text-[#16324F]">Leave this party?</h2>
-                  <p className="mt-2 text-sm text-[#5D7EA1]">You&apos;ll be removed from the lobby and won&apos;t join when the game starts.</p>
+                  <p className="mt-2 text-sm text-[#456786]">You&apos;ll be removed from the lobby and won&apos;t join when the game starts.</p>
                   <div className="mt-6 flex gap-3">
                     <button
                       onClick={() => setShowLeaveConfirm(false)}
-                      className="flex-1 rounded-2xl border border-[#0460A9]/12 bg-white px-4 py-3 text-sm font-semibold text-[#16324F]"
+                      className="flex-1 rounded-2xl border border-[#92BFFF]/45 bg-white px-4 py-3 text-sm font-semibold text-[#16324F] shadow-[0_10px_24px_rgba(17,87,145,0.08)] transition hover:bg-[#F4F9FF]"
                     >
                       Stay
                     </button>
                     <button
                       onClick={handleLeave}
-                      className="flex-1 rounded-2xl bg-[#0E173A] px-4 py-3 text-sm font-semibold text-white"
+                      className="flex-1 rounded-2xl bg-linear-to-r from-[#D84D63] to-[#BA2F54] px-4 py-3 text-sm font-semibold text-[#FFF8FA] shadow-[0_14px_30px_rgba(186,47,84,0.28)] transition hover:brightness-105"
                     >
                       Leave
                     </button>
@@ -293,7 +296,7 @@ export default function TeamLobbyPage({
               </div>
               <button
                 onClick={() => setShowLeaveConfirm(true)}
-                className="rounded-2xl border border-[#0460A9]/12 bg-white px-4 py-3 text-sm font-semibold text-[#16324F]"
+                className="rounded-2xl border border-[#92BFFF]/40 bg-[#F7FBFF] px-4 py-3 text-sm font-semibold text-[#16324F] shadow-[0_10px_24px_rgba(17,87,145,0.08)] transition hover:bg-white"
               >
                 Leave
               </button>
@@ -301,18 +304,18 @@ export default function TeamLobbyPage({
 
             {isHost && room && (
               <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <div className="nq-card-dark rounded-[28px] p-5 text-white">
-                  <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8DA8D0]">Party PIN</p>
-                  <p className="mt-3 text-4xl font-bold tracking-[0.28em]">{room.pin}</p>
-                  <p className="mt-2 text-sm text-[#B8C7EA]">Share this code with players nearby.</p>
+                <div className="nq-card-blue rounded-[28px] p-5">
+                  <p className="nq-on-dark-soft text-xs font-semibold uppercase tracking-[0.26em]">Party PIN</p>
+                  <p className="nq-on-dark mt-3 text-4xl font-bold tracking-[0.28em]">{room.pin}</p>
+                  <p className="nq-on-dark-muted mt-2 text-sm">Share this code with players nearby.</p>
                 </div>
 
-                <div className="rounded-[28px] bg-white/72 p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#5D7EA1]">Invite Link</p>
+                <div className="rounded-[28px] border border-[#92BFFF]/30 bg-linear-to-b from-white/92 to-[#EAF4FF]/96 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#456786]">Invite Link</p>
                   <p className="mt-3 break-all text-sm text-[#16324F]">{shareUrl}</p>
                   <button
                     onClick={copyLink}
-                    className="mt-4 rounded-2xl bg-[#0460A9] px-4 py-3 text-sm font-semibold text-white"
+                    className="mt-4 rounded-2xl bg-linear-to-r from-[#0A6FD6] to-[#0460A9] px-4 py-3 text-sm font-semibold text-[#F8FBFF] shadow-[0_14px_30px_rgba(17,87,145,0.22)] transition hover:brightness-105"
                   >
                     {copied ? 'Copied!' : 'Copy invite URL'}
                   </button>
@@ -320,7 +323,7 @@ export default function TeamLobbyPage({
               </div>
             )}
 
-            <div className="mt-6 rounded-[28px] bg-white/72 p-5">
+            <div className="mt-6 rounded-[28px] border border-[#92BFFF]/30 bg-linear-to-b from-white/82 to-[#EAF4FF]/94 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
               {players.length === 0 ? (
                 <div className="flex min-h-40 flex-col items-center justify-center text-center">
                   <div className="text-4xl">👥</div>
@@ -345,12 +348,12 @@ export default function TeamLobbyPage({
               <button
                 onClick={handleStart}
                 disabled={starting || players.length === 0}
-                className="mt-6 w-full rounded-[24px] bg-[#0460A9] px-4 py-4 text-base font-semibold text-white shadow-[0_20px_42px_rgba(17,87,145,0.24)] disabled:opacity-60"
+                className="mt-6 w-full rounded-[24px] bg-linear-to-r from-[#0A6FD6] via-[#0460A9] to-[#03508E] px-4 py-4 text-base font-semibold text-[#F8FBFF] shadow-[0_20px_42px_rgba(17,87,145,0.24)] transition hover:brightness-105 disabled:opacity-60"
               >
                 {starting ? 'Starting…' : `Start party quiz (${players.length})`}
               </button>
             ) : (
-              <div className="mt-6 flex items-center justify-center gap-3 rounded-[22px] bg-[#0E173A] px-4 py-3 text-sm text-white">
+              <div className="mt-6 flex items-center justify-center gap-3 rounded-[22px] bg-[#0E173A] px-4 py-3 text-sm text-[#F8FBFF] shadow-[0_18px_34px_rgba(7,16,43,0.2)]">
                 <div className="flex gap-1">
                   {[0, 1, 2].map((index) => (
                     <div

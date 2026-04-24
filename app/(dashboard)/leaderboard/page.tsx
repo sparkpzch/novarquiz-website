@@ -34,10 +34,27 @@ function LeaderboardPageContent() {
       .finally(() => setLoading(false));
   }, [selectedSession]);
 
-  const myEntry = entries.find((entry) => entry.user_id === user?.uid);
-  const myRank = entries.findIndex((entry) => entry.user_id === user?.uid) + 1;
-  const topThree = entries.slice(0, 3);
-  const podium = topThree.length >= 3 ? [topThree[1], topThree[0], topThree[2]] : topThree;
+  const sortedEntries = [...entries].sort((a, b) => {
+    if (b.total_score !== a.total_score) return b.total_score - a.total_score;
+    if (a.total_time_ms !== b.total_time_ms) return a.total_time_ms - b.total_time_ms;
+    return a.user_display_name.localeCompare(b.user_display_name);
+  });
+  const myEntry = sortedEntries.find((entry) => entry.user_id === user?.uid);
+  const myRank = sortedEntries.findIndex((entry) => entry.user_id === user?.uid) + 1;
+  const topThree = sortedEntries.slice(0, 3);
+  const podium =
+    topThree.length === 1
+      ? [{ entry: topThree[0], rank: 1, height: 'h-36', featured: true }]
+      : topThree.length === 2
+        ? [
+            { entry: topThree[0], rank: 1, height: 'h-36', featured: true },
+            { entry: topThree[1], rank: 2, height: 'h-28', featured: false },
+          ]
+        : [
+            { entry: topThree[1], rank: 2, height: 'h-28', featured: false },
+            { entry: topThree[0], rank: 1, height: 'h-36', featured: true },
+            { entry: topThree[2], rank: 3, height: 'h-24', featured: false },
+          ];
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -86,10 +103,7 @@ function LeaderboardPageContent() {
         <>
           <section className="nq-card rounded-[34px] p-6 md:p-8">
             <div className="flex flex-col items-center justify-center gap-6 md:flex-row md:items-end">
-              {podium.map((entry, index) => {
-                if (!entry) return null;
-                const rank = index === 1 ? 1 : index === 0 ? 2 : 3;
-                const height = index === 1 ? 'h-36' : index === 0 ? 'h-28' : 'h-24';
+              {podium.map(({ entry, rank, height, featured }, index) => {
                 return (
                   <motion.div
                     key={entry.user_id}
@@ -101,7 +115,7 @@ function LeaderboardPageContent() {
                     <ProfileAvatar
                       displayName={entry.user_display_name}
                       photoURL={entry.user_photo_url}
-                      size={index === 1 ? 96 : 78}
+                      size={featured ? 96 : 78}
                       ringClassName="ring-4 ring-[#DDF0FF] shadow-[0_16px_28px_rgba(17,87,145,0.14)]"
                     />
                     <div className="mt-3 text-center">
@@ -132,7 +146,7 @@ function LeaderboardPageContent() {
 
           <section className="rounded-[34px] bg-[#EEF6E4]/80 p-4 md:p-5">
             <div className="space-y-3">
-              {entries.slice(3).map((entry, index) => {
+              {sortedEntries.slice(3).map((entry, index) => {
                 const rank = index + 4;
                 const isMe = entry.user_id === user?.uid;
                 return (
