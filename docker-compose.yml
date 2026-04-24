@@ -38,7 +38,7 @@ services:
     depends_on:
       NovartisDB:
         condition: service_healthy
-    command: sh -c "npm install && node --env-file=.env.local ./node_modules/next/dist/bin/next build --webpack && node --env-file=.env.local ./node_modules/next/dist/bin/next start -p 8080"
+    command: sh -c "npm install && npx dotenv -e .env.local -- next build --webpack && npx dotenv -e .env.local -- next start -p 8080"
 
 volumes:
   postgres_data:
