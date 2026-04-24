@@ -7,8 +7,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ses
     const session = await getSessionById(sessionId);
     if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return NextResponse.json(session);
-  } catch {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  } catch (err) {
+    console.error(`Failed to load session ${sessionId}:`, err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
 
@@ -18,8 +19,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ sess
     const body = await request.json();
     const session = await updateSession(sessionId, body);
     return NextResponse.json(session);
-  } catch {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  } catch (err) {
+    console.error(`Failed to update session ${sessionId}:`, err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
 
@@ -28,7 +30,8 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   try {
     await deleteSession(sessionId);
     return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  } catch (err) {
+    console.error(`Failed to delete session ${sessionId}:`, err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }

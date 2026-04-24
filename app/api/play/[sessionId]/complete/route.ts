@@ -3,7 +3,7 @@ import { completePlaySession } from '@/lib/db/queries';
 
 // Called by the play page when the player reaches the end of their path
 // (or runs out of time on the last question). Aggregates user_answers into
-// leaderboard_entries and marks play_sessions.finished_at.
+// leaderboard_entries and marks sessions.finished_at.
 export async function POST(request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
   try {

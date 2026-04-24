@@ -7,7 +7,7 @@ import { useToast } from '@/components/ui/Toast';
 import { reopenLobby, startRoom, watchRoom, openLobby, closeLobby, type SessionRoom } from '@/lib/firebase/rtdb';
 import { trackEvent } from '@/lib/firebase/analytics';
 import { motion, AnimatePresence } from 'motion/react';
-import type { QuestionSession } from '@/lib/types';
+import type { Quiz } from '@/lib/types';
 
 function PlayerAvatar({ displayName, photoURL }: { displayName: string; photoURL: string | null }) {
   const [imgError, setImgError] = useState(false);
@@ -28,13 +28,20 @@ function PlayerAvatar({ displayName, photoURL }: { displayName: string; photoURL
   );
 }
 
+function formatJoinTime(timestamp: number) {
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function HostLobbyPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = use(params);
   const { user, isAdmin, loading } = useAuth();
   const router = useRouter();
   const { showToast } = useToast();
 
-  const [session, setSession] = useState<QuestionSession | null>(null);
+  const [session, setSession] = useState<Quiz | null>(null);
   const [room, setRoom] = useState<SessionRoom | null>(null);
   const [starting, setStarting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -44,7 +51,7 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
     if (!loading && !isAdmin) router.push('/');
   }, [loading, isAdmin, router]);
 
-  // Fetch session metadata (includes share_token, pin_code)
+  // Fetch session metadata
   useEffect(() => {
     fetch(`/api/questions/sessions/${sessionId}`)
       .then(r => r.ok ? r.json() : null)
@@ -114,15 +121,13 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
 
       {/* Access info */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* PIN */}
+        {/* Join token (RTDB-based) */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-          <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-2">Join PIN</p>
-          <p className="text-4xl font-mono font-bold text-white tracking-[0.25em]">
-            {session?.pin_code ?? '······'}
+          <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-2">Join Token</p>
+          <p className="text-sm font-mono font-bold text-white truncate">
+            {shareLink ? shareLink.split('/join/')[1]?.split('?')[0] ?? '—' : '—'}
           </p>
-          <p className="text-xs text-gray-500 mt-2">
-            {session?.is_private ? '🔒 Private — PIN required to join' : '🌐 Public — PIN optional'}
-          </p>
+          <p className="text-xs text-gray-500 mt-2">🌐 Public — share the link below to invite players</p>
         </div>
 
         {/* Share link */}
@@ -163,7 +168,7 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-medium truncate">{player.displayName}</p>
                   <p className="text-gray-500 text-xs">
-                    Joined {Math.round((Date.now() - player.joinedAt) / 1000)}s ago
+                    Joined at {formatJoinTime(player.joinedAt)}
                   </p>
                 </div>
                 <div className="w-2 h-2 rounded-full bg-emerald-400" title="Online" />

@@ -8,21 +8,31 @@ import { useToast } from '@/components/ui/Toast';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion, AnimatePresence } from 'motion/react';
-import type { QuestionSession } from '@/lib/types';
+import type { Quiz } from '@/lib/types';
 
-// Pull a token out of either a raw token string or a pasted invite URL like
-// https://host/join/<token>[?…]. Returns null if it can't extract one.
-function extractJoinToken(input: string): string | null {
+type ParsedJoinInput =
+  | { type: 'token'; token: string }
+  | { type: 'team'; sessionId: string; roomId: string; pin: string }
+  | null;
+
+// Parse a raw token string or a pasted invite URL.
+// Handles:
+//   /join/<token>                             → lobby join via token
+//   /play/<sessionId>/team/<roomId>?pin=<pin> → team room direct join
+function parseJoinInput(input: string): ParsedJoinInput {
   const trimmed = input.trim();
   if (!trimmed) return null;
-  // Try URL form first
   try {
     const u = new URL(trimmed);
-    const m = u.pathname.match(/\/join\/([^/?#]+)/);
-    if (m) return m[1];
-  } catch { /* not a URL — fall through */ }
-  // Treat the whole thing as a raw token if it's URL-safe-ish
-  if (/^[A-Za-z0-9_-]{6,}$/.test(trimmed)) return trimmed;
+    const teamMatch = u.pathname.match(/\/play\/([^/]+)\/team\/([^/?#]+)/);
+    if (teamMatch) {
+      const pin = u.searchParams.get('pin') ?? '';
+      return { type: 'team', sessionId: teamMatch[1], roomId: teamMatch[2], pin };
+    }
+    const joinMatch = u.pathname.match(/\/join\/([^/?#]+)/);
+    if (joinMatch) return { type: 'token', token: joinMatch[1] };
+  } catch { /* not a URL */ }
+  if (/^[A-Za-z0-9_-]{6,}$/.test(trimmed)) return { type: 'token', token: trimmed };
   return null;
 }
 
@@ -89,26 +99,33 @@ function JoinByCodeCard() {
   const [busy, setBusy] = useState(false);
 
   const handleJoin = async () => {
-    const token = extractJoinToken(code);
-    if (!token) {
+    const parsed = parseJoinInput(code);
+    if (!parsed) {
       showToast('Enter a valid invite code or link', 'error');
       return;
     }
     if (!user) {
-      router.push(`/sign-in?next=/join/${token}`);
+      if (parsed.type === 'token') {
+        router.push(`/sign-in?next=/join/${parsed.token}`);
+      } else {
+        router.push(`/sign-in?next=/play/${parsed.sessionId}/team/${parsed.roomId}?pin=${parsed.pin}`);
+      }
       return;
     }
     setBusy(true);
-    // Optional pre-check so we can surface a nicer error than the join page's 404.
+    if (parsed.type === 'team') {
+      router.push(`/play/${parsed.sessionId}/team/${parsed.roomId}?pin=${parsed.pin}`);
+      return;
+    }
     try {
-      const sessionId = await resolveJoinToken(token);
+      const sessionId = await resolveJoinToken(parsed.token);
       if (!sessionId) {
         showToast('That invite link has expired. Ask the host for a new one.', 'error');
         setBusy(false);
         return;
       }
     } catch { /* swallow — let /join/{token} handle it */ }
-    router.push(`/join/${token}`);
+    router.push(`/join/${parsed.token}`);
   };
 
   return (
@@ -145,7 +162,7 @@ function SoloOrTeamModal({
   session,
   onClose,
 }: {
-  session: QuestionSession;
+  session: Quiz;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -248,16 +265,34 @@ function SoloOrTeamModal({
   );
 }
 
+type UserStats = { total_played: number; avg_score: number; best_streak: number };
+
 export default function DashboardPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const [sessions, setSessions] = useState<QuestionSession[]>([]);
+  const [sessions, setSessions] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSession, setSelectedSession] = useState<QuestionSession | null>(null);
+  const [selectedSession, setSelectedSession] = useState<Quiz | null>(null);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
 
   useEffect(() => {
     fetch('/api/questions/sessions').then(r => r.ok ? r.json() : []).then(setSessions).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!user || user.isAnonymous) return;
+    fetch(`/api/play/me/history?uid=${encodeURIComponent(user.uid)}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((history: Array<{ total_score: number; streak: number }>) => {
+        if (!history.length) return;
+        setUserStats({
+          total_played: history.length,
+          avg_score: Math.round(history.reduce((s, h) => s + h.total_score, 0) / history.length),
+          best_streak: Math.max(...history.map(h => h.streak)),
+        });
+      })
+      .catch(() => {});
+  }, [user]);
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -268,9 +303,9 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: t('dashboard.total_played'), value: '—', icon: '🎮', color: 'from-indigo-600 to-purple-600' },
-          { label: t('dashboard.avg_score'), value: '—', icon: '📊', color: 'from-emerald-600 to-cyan-600' },
-          { label: t('dashboard.best_streak'), value: '—', icon: '🔥', color: 'from-orange-600 to-red-600' },
+          { label: t('dashboard.total_played'), value: userStats ? String(userStats.total_played) : '—', icon: '🎮', color: 'from-indigo-600 to-purple-600' },
+          { label: t('dashboard.avg_score'), value: userStats ? `${userStats.avg_score} pts` : '—', icon: '📊', color: 'from-emerald-600 to-cyan-600' },
+          { label: t('dashboard.best_streak'), value: userStats ? String(userStats.best_streak) : '—', icon: '🔥', color: 'from-orange-600 to-red-600' },
         ].map((stat, idx) => (
           <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}
             className="rounded-2xl border border-white/5 bg-white/5 p-5">
@@ -307,17 +342,24 @@ export default function DashboardPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
                 onClick={() => setSelectedSession(s)}
-                className="rounded-2xl border border-white/5 bg-white/5 p-5 hover:bg-white/10 hover:border-indigo-500/30 transition-all duration-300 cursor-pointer group"
+                className="rounded-2xl border border-white/5 bg-white/5 hover:bg-white/10 hover:border-indigo-500/30 transition-all duration-300 cursor-pointer group overflow-hidden"
               >
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-white group-hover:text-indigo-400 transition-colors">{s.name}</h3>
-                  <span className="px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-400 text-xs font-medium">{s.question_count} Q</span>
-                </div>
-                {s.description && <p className="text-sm text-gray-400 mb-3 line-clamp-2">{s.description}</p>}
-                <div className="flex items-center gap-3 text-xs text-gray-500">
-                  <span>⏱ {s.timer_seconds}s</span>
-                  <span>•</span>
-                  <span className="group-hover:text-indigo-400 transition-colors">{t('dashboard.join_quiz')} →</span>
+                {s.cover_image_url && (
+                  <div className="h-36 overflow-hidden">
+                    <img src={s.cover_image_url} alt={s.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  </div>
+                )}
+                <div className="p-5">
+                  <div className="flex items-start justify-between mb-3">
+                    <h3 className="text-lg font-semibold text-white group-hover:text-indigo-400 transition-colors">{s.name}</h3>
+                    <span className="px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-400 text-xs font-medium flex-shrink-0 ml-2">{s.question_count} Q</span>
+                  </div>
+                  {s.description && <p className="text-sm text-gray-400 mb-3 line-clamp-2">{s.description}</p>}
+                  <div className="flex items-center gap-3 text-xs text-gray-500">
+                    <span>⏱ Count-up from 0</span>
+                    <span>•</span>
+                    <span className="group-hover:text-indigo-400 transition-colors">{t('dashboard.join_quiz')} →</span>
+                  </div>
                 </div>
               </motion.div>
             ))}

@@ -7,14 +7,14 @@ import Button from '@/components/ui/Button';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion } from 'motion/react';
-import type { QuestionSession } from '@/lib/types';
+import type { Quiz } from '@/lib/types';
 
 export default function PlayLobbyPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = use(params);
   const { t } = useTranslation();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [session, setSession] = useState<QuestionSession | null>(null);
+  const [session, setSession] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function PlayLobbyPage({ params }: { params: Promise<{ sessionId:
         {session.description && <p className="text-gray-400">{session.description}</p>}
         <div className="flex items-center justify-center gap-6 text-sm text-gray-400">
           <span>📝 {session.question_count || '?'} {t('play.questions_count')}</span>
-          <span>⏱ {session.timer_seconds} {t('play.time_per_question')}</span>
+          <span>⏱ Count-up timer from 0</span>
         </div>
         <h2 className="text-xl text-white">{t('play.ready')}</h2>
         <Button onClick={handleStart} size="lg" className="w-full text-lg">{t('play.start')} 🚀</Button>

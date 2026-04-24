@@ -28,7 +28,9 @@ export type SessionRoom = {
   status: RoomStatus;
   hostId: string;
   leaderId?: string;
+  joinToken?: string | null;
   players?: Record<string, WaitingPlayer>;
+  scores?: Record<string, PlayerScore>;
 };
 
 export type TeamRoom = {
@@ -113,6 +115,15 @@ export function watchRoom(
   const handler = (snap: DataSnapshot) => callback(snap.val() as SessionRoom | null);
   onValue(roomRef, handler);
   return () => off(roomRef, 'value', handler);
+}
+
+export function watchSessionRooms(
+  callback: (rooms: Record<string, SessionRoom>) => void,
+): () => void {
+  const sessionsRef = ref(rtdb, 'sessions');
+  const handler = (snap: DataSnapshot) => callback((snap.val() as Record<string, SessionRoom>) ?? {});
+  onValue(sessionsRef, handler);
+  return () => off(sessionsRef, 'value', handler);
 }
 
 // ─── Live score / leaderboard ────────────────────────────────────────────────

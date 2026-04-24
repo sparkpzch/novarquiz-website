@@ -5,9 +5,14 @@ import { Handle, Position, useNodeConnections, useReactFlow, type NodeProps } fr
 
 export type NormalNodeData = {
   question_text: string;
-  // points: signed integer awarded when this choice is picked (default 0).
-  // Replaces the old is_correct boolean — see migration 003.
-  choices: Array<{ label: string; choice_text: string; points: number }>;
+  // score_impact: signed integer for utility scoring (positive = healthy, negative = risk/danger).
+  // explanation: narrative/medical feedback shown after the player picks this choice.
+  choices: Array<{
+    label: string;
+    choice_text: string;
+    score_impact: number;
+    explanation: string;
+  }>;
   media_type: string | null;
   media_url: string | null;
   is_entry_point: boolean;
@@ -24,7 +29,7 @@ const CHOICE_CFG = {
 const H_HEADER = 36;
 const H_TEXT = 52;
 const H_CHOICE = 32;
-const H_MEDIA = 22; // height of media indicator row when present
+const H_MEDIA = 80; // height of media thumbnail when present
 
 export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as NormalNodeData;
@@ -49,7 +54,7 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
 
   const choices = d.choices?.length
     ? d.choices
-    : ['A', 'B', 'C', 'D'].map(l => ({ label: l, choice_text: '', points: 0 }));
+    : ['A', 'B', 'C', 'D'].map(l => ({ label: l, choice_text: '', score_impact: 0, explanation: '' }));
 
   // Track which choice handles already have outgoing connections — used to hide the
   // white "connect all" handle once every choice is wired up.
@@ -186,9 +191,6 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
             }}>START</span>
           )}
         </div>
-        {d.timer_override && (
-          <span style={{ color: '#fbbf24', fontSize: 10 }}>⏱ {d.timer_override}s</span>
-        )}
       </div>
 
       {/* Question text */}
@@ -208,16 +210,17 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
         {d.question_text || 'Double-click to edit…'}
       </div>
 
-      {/* Media indicator */}
+      {/* Media thumbnail */}
       {d.media_url && (
-        <div style={{
-          background: '#0d0d20',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          padding: '4px 10px',
-          fontSize: 10,
-          color: '#6b7280',
-        }}>
-          {d.media_type === 'video' ? '🎬 Video attached' : '🖼 Image attached'}
+        <div style={{ height: H_MEDIA, overflow: 'hidden', borderBottom: '1px solid rgba(255,255,255,0.06)', position: 'relative', background: '#0d0d20' }}>
+          {d.media_type === 'video' ? (
+            <video src={d.media_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
+          ) : (
+            <img src={d.media_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          )}
+          <span style={{ position: 'absolute', bottom: 3, right: 5, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
+            {d.media_type === 'video' ? '🎬' : '🖼'}
+          </span>
         </div>
       )}
 
@@ -250,14 +253,16 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
             }}>
               {c.choice_text || `Choice ${c.label}`}
             </span>
-            {c.points !== 0 && (
-              <span style={{
-                color: c.points > 0 ? '#34d399' : '#fb7185',
-                fontSize: 10, fontWeight: 700,
-              }}>
-                {c.points > 0 ? `+${c.points}` : c.points}
-              </span>
-            )}
+            {(() => {
+              const s = c.score_impact ?? 0; return s !== 0 && (
+                <span style={{
+                  color: s > 0 ? '#34d399' : '#fb7185',
+                  fontSize: 10, fontWeight: 700,
+                }}>
+                  {s > 0 ? `+${s}` : s}
+                </span>
+              );
+            })()}
           </div>
         );
       })}

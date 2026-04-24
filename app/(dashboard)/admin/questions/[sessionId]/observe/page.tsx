@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { watchScores, endRoom, type PlayerScore } from '@/lib/firebase/rtdb';
 import { motion, AnimatePresence } from 'motion/react';
-import type { QuestionSession } from '@/lib/types';
+import type { Quiz } from '@/lib/types';
 
 function Avatar({ displayName, photoURL, size = 48 }: { displayName: string; photoURL: string | null; size?: number }) {
   const [err, setErr] = useState(false);
@@ -32,7 +32,7 @@ export default function ObservePage({ params }: { params: Promise<{ sessionId: s
   const { isAdmin, loading } = useAuth();
   const router = useRouter();
   const [scores, setScores] = useState<Record<string, PlayerScore>>({});
-  const [session, setSession] = useState<QuestionSession | null>(null);
+  const [session, setSession] = useState<Quiz | null>(null);
   const [ending, setEnding] = useState(false);
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export default function ObservePage({ params }: { params: Promise<{ sessionId: s
     setEnding(true);
     try {
       await endRoom(sessionId);
-      router.push('/admin/questions');
+      router.push('/admin?tab=session-manager');
     } catch { setEnding(false); }
   };
 

@@ -6,13 +6,13 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion } from 'motion/react';
-import type { LeaderboardEntry, QuestionSession } from '@/lib/types';
+import type { LeaderboardEntry, Quiz } from '@/lib/types';
 
 export default function LeaderboardPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const searchParams = useSearchParams();
-  const [sessions, setSessions] = useState<QuestionSession[]>([]);
+  const [sessions, setSessions] = useState<Quiz[]>([]);
   const [selectedSession, setSelectedSession] = useState(searchParams.get('session') || '');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);

@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion } from 'motion/react';
-import type { LeaderboardEntry, QuestionSession } from '@/lib/types';
+import type { LeaderboardEntry, Quiz } from '@/lib/types';
 
 type UserHistoryRow = {
   session_id: string;
@@ -30,7 +30,7 @@ export default function HistoryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>(searchParams.get('session') ? 'session' : 'mine');
-  const [sessions, setSessions] = useState<QuestionSession[]>([]);
+  const [sessions, setSessions] = useState<Quiz[]>([]);
   const [selectedSession, setSelectedSession] = useState(searchParams.get('session') || '');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [mine, setMine] = useState<UserHistoryRow[] | null>(null);
@@ -62,7 +62,7 @@ export default function HistoryPage() {
   const myEntry = entries.find(e => e.user_id === user?.uid);
   const myRank = entries.findIndex(e => e.user_id === user?.uid) + 1;
 
-  const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3;
+  const podiumOrder = [top3[1], top3[0], top3[2]];
   const podiumHeights = ['h-24', 'h-32', 'h-20'];
   const podiumColors = ['from-gray-400 to-gray-300', 'from-amber-400 to-yellow-300', 'from-amber-700 to-amber-600'];
   const medals = ['🥈', '🥇', '🥉'];

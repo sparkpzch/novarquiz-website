@@ -20,9 +20,6 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const router = useRouter();
 
   const [question, setQuestion] = useState<Question | null>(null);
-  // Per-question time cap (seconds). null = no timer. Derived from
-  // question.timer_override ?? question.session_timer_seconds.
-  const [timerCap, setTimerCap] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0); // seconds since question shown — count-up
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0); // consecutive answers with points > 0
@@ -30,7 +27,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const [lastDelta, setLastDelta] = useState<number | null>(null); // toast: "+5" / "−2"
   const [finished, setFinished] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [questionStartTime, setQuestionStartTime] = useState(Date.now());
+  const [questionStartTime, setQuestionStartTime] = useState(0);
   const [nextLoading, setNextLoading] = useState(false);
   const [scores, setScores] = useState<Record<string, PlayerScore>>({});
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
@@ -48,12 +45,10 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
 
   const applyQuestion = useCallback((q: Question) => {
     setQuestion(q);
-    const cap = q.timer_override ?? q.session_timer_seconds ?? null;
-    setTimerCap(cap);
     setElapsed(0);
     setSelected(null);
     setLastDelta(null);
-    setQuestionStartTime(Date.now());
+    setQuestionStartTime(typeof performance !== 'undefined' ? performance.now() : 0);
 
     // Broadcast our current question to RTDB so admin observation can show
     // where each player is. Skipped for guests.
@@ -73,39 +68,45 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     });
   }, [sessionId, user, score]);
 
-  const loadQuestion = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/play/${sessionId}/answer?entry=true`);
-      if (!res.ok) { setFinished(true); return; }
-      const data = await res.json();
-      if (!data?.id) { setFinished(true); return; }
-      applyQuestion(data);
-    } catch { setFinished(true); }
-    finally { setLoading(false); }
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/play/${sessionId}/answer?entry=true`);
+        if (!res.ok) {
+          if (!cancelled) setFinished(true);
+          return;
+        }
+
+        const data = await res.json();
+        if (!data?.id) {
+          if (!cancelled) setFinished(true);
+          return;
+        }
+
+        if (!cancelled) applyQuestion(data);
+      } catch {
+        if (!cancelled) setFinished(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId, applyQuestion]);
 
-  useEffect(() => { loadQuestion(); }, [loadQuestion]);
-
-  // Count-up timer — increments every second until cap. Skipped when timerCap
-  // is null (session has no timer). On expiry: no answer recorded, treated as
-  // timeout. End/situation nodes never have a timer.
+  // Count-up timer — always starts at 0 for playable questions and records
+  // elapsed time for analytics only. It never auto-submits or times out.
   useEffect(() => {
-    if (loading || finished || selected || isSituation || isEnd || timerCap === null) return;
+    if (loading || finished || selected || isSituation || isEnd) return;
     const interval = setInterval(() => {
-      setElapsed(prev => {
-        const next = prev + 1;
-        if (next >= timerCap) {
-          clearInterval(interval);
-          setStreak(0);
-          trackEvent('question_timeout', { session_id: sessionId, question_id: question?.id });
-          setTimeout(() => setFinished(true), 800);
-        }
-        return next;
-      });
+      setElapsed(prev => prev + 1);
     }, 1000);
     return () => clearInterval(interval);
-  }, [loading, finished, selected, isSituation, isEnd, question?.id, timerCap, sessionId]);
+  }, [loading, finished, selected, isSituation, isEnd, question?.id]);
 
   const goToNext = async (fromQuestionId: string, choiceLabel: string) => {
     try {
@@ -117,10 +118,10 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     } catch { setFinished(true); }
   };
 
-  const handleAnswer = async (label: string) => {
+  const handleAnswer = async (label: string, answeredAt: number) => {
     if (selected || !question || !user) return;
     setSelected(label);
-    const timeTaken = Date.now() - questionStartTime;
+    const timeTaken = Math.max(0, Math.round(answeredAt - questionStartTime));
 
     // Server is source of truth for points — never trust client-side scoring.
     let pointsAwarded = 0;
@@ -259,7 +260,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
             </div>
           ) : top10.length === 0 ? (
             <div className="rounded-2xl border border-white/5 bg-white/5 p-6 text-center text-gray-500 text-sm">
-              You're the first to finish — share your score!
+              You&apos;re the first to finish - share your score!
             </div>
           ) : (
             <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
@@ -407,8 +408,6 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   }
 
   // ── Normal question view ─────────────────────────────────────────────────────
-  const elapsedPercent = timerCap ? Math.min(100, (elapsed / timerCap) * 100) : 0;
-  const remaining = timerCap ? Math.max(0, timerCap - elapsed) : null;
   const topScores = Object.entries(scores)
     .map(([uid, s]) => ({ uid, ...s }))
     .sort((a, b) => b.score - a.score)
@@ -419,18 +418,10 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       {/* Top bar — count-up timer + score with delta toast */}
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
-          {timerCap !== null && (
-            <div className="relative w-12 h-12">
-              <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
-                <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
-                <circle cx="24" cy="24" r="20" fill="none" stroke={(remaining ?? 99) <= 5 ? '#ef4444' : '#6366f1'} strokeWidth="3"
-                  strokeDasharray={`${(elapsedPercent / 100) * 125.6} 125.6`} strokeLinecap="round" className="transition-all duration-1000" />
-              </svg>
-              <span className={`absolute inset-0 flex items-center justify-center text-sm font-bold tabular-nums ${(remaining ?? 99) <= 5 ? 'text-red-400' : 'text-white'}`}>
-                {elapsed}
-              </span>
-            </div>
-          )}
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Time</p>
+            <p className="text-lg font-bold tabular-nums text-white">{elapsed}</p>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           {streak > 1 && <span className="px-3 py-1 rounded-lg bg-orange-500/20 text-orange-400 text-sm font-semibold">🔥 {t('play.streak')} {streak}</span>}
@@ -504,7 +495,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
               whileHover={!selected ? { scale: 1.02 } : {}}
               whileTap={!selected ? { scale: 0.98 } : {}}
               disabled={!!selected}
-              onClick={() => handleAnswer(choice.label)}
+              onClick={(event) => handleAnswer(choice.label, event.timeStamp)}
               className={`relative p-4 md:p-6 rounded-2xl bg-gradient-to-br ${CHOICE_COLORS[choice.label as keyof typeof CHOICE_COLORS]} ${!selected ? CHOICE_HOVERS[choice.label as keyof typeof CHOICE_HOVERS] : ''} transition-all duration-200 ${selected === choice.label ? 'ring-2 ring-white/40' : ''}`}
             >
               <div className="flex items-center gap-3">

@@ -12,7 +12,14 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./db/migrations:/docker-entrypoint-migrations:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-novarquiz_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   NovarquizAPI:
     image: node:latest
@@ -23,15 +30,15 @@ services:
       - .:/app
       - /app/node_modules
       - /app/.next
-    env_file:
-      - .env
     environment:
+      DB_PROVIDER: docker
       DATABASE_URL: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@NovartisDB:5432/${POSTGRES_DB:-novarquiz_db}"
     ports:
       - "8080:8080"
     depends_on:
-      - NovartisDB
-    command: sh -c "npm install && npm run build && npm start -- -p 8080"
+      NovartisDB:
+        condition: service_healthy
+    command: sh -c "npm install && npx dotenv -e .env.local -- next build --webpack && npx dotenv -e .env.local -- next start -p 8080"
 
 volumes:
   postgres_data:
