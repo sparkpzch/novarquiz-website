@@ -1,6 +1,3 @@
-import type { neonConfig } from '@neondatabase/serverless';
-import ws from 'ws';
-
 export type DatabaseProvider = 'docker' | 'neon';
 
 const SUPPORTED_DATABASE_PROVIDERS = new Set<DatabaseProvider>(['docker', 'neon']);
@@ -35,12 +32,6 @@ export function getDatabaseProvider(): DatabaseProvider {
 
 export function getDatabaseSslConfig() {
   return getDatabaseProvider() === 'neon' ? { rejectUnauthorized: false } : false;
-}
-
-export function configureNeonForNodeRuntime(config: typeof neonConfig) {
-  if (getDatabaseProvider() === 'neon') {
-    config.webSocketConstructor = ws;
-  }
 }
 
 export function getDatabaseConnectionOptions() {

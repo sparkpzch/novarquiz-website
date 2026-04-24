@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
     ],
   },
-  serverExternalPackages: ['pg', 'ws', '@neondatabase/serverless'],
+  serverExternalPackages: ['pg'],
 };
 
 export default nextConfig;

@@ -1,26 +1,8 @@
 import { setDefaultResultOrder } from 'dns';
-import {
-  neonConfig,
-  Pool as NeonPool,
-  type PoolClient as NeonPoolClient,
-  type QueryResult,
-  type QueryResultRow,
-} from '@neondatabase/serverless';
-import { Pool as PgPool } from 'pg';
-import {
-  configureNeonForNodeRuntime,
-  getDatabaseConnectionOptions,
-  getDatabaseProvider,
-} from './config';
+import { Pool as PgPool, type QueryResult, type QueryResultRow } from 'pg';
+import { getDatabaseConnectionOptions, getDatabaseProvider } from './config';
 
 setDefaultResultOrder('ipv4first');
-configureNeonForNodeRuntime(neonConfig);
-
-// ---------------------------------------------------------------------------
-// Minimal interface that both pg.Pool and @neondatabase/serverless Pool satisfy
-// at runtime. Avoids the union-type overload incompatibility that TS complains
-// about when you write NeonPool | PgPool directly.
-// ---------------------------------------------------------------------------
 
 export interface IDbClient {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -49,7 +31,7 @@ export interface IDbPool {
 // ---------------------------------------------------------------------------
 
 // Bump this whenever the pool implementation changes to bust the HMR cache.
-const POOL_VERSION = 'v3-pg-docker-robust';
+const POOL_VERSION = 'v4-pg-only';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -71,8 +53,6 @@ const READ_ONLY_QUERY_RE = /^\s*SELECT\b/i;
 const MAX_QUERY_RETRIES = 2;
 const RETRY_DELAY_MS = 250;
 const POOL_IDLE_TIMEOUT_MS = 10_000;
-const POOL_MAX_LIFETIME_SECONDS = 45;
-const POOL_MAX_USES = 7_500;
 
 export type QueryRetryOptions = {
   allowWriteRetry?: boolean;
@@ -82,30 +62,12 @@ function createPool(): IDbPool {
   const opts = getDatabaseConnectionOptions();
   const provider = getDatabaseProvider();
 
-  if (provider === 'docker') {
-    // Local Docker PostgreSQL – use the native pg.Pool (plain TCP).
-    // @neondatabase/serverless connects via WebSocket even in Node mode which
-    // causes "ErrorEvent { type: 'error' }" failures against a plain Postgres
-    // server that has no WebSocket proxy in front of it.
-    const pool = new PgPool({
-      connectionString: opts.connectionString,
-      ssl: false,
-      keepAlive: true,
-      connectionTimeoutMillis: 10_000,
-      idleTimeoutMillis: POOL_IDLE_TIMEOUT_MS,
-    });
-    pool.on('error', (err: Error) => console.error('Postgres pool error:', err));
-    return pool as unknown as IDbPool;
-  }
-
-  // Neon serverless (production) – WebSocket-based Pool.
-  const pool = new NeonPool({
-    ...opts,
+  const pool = new PgPool({
+    connectionString: opts.connectionString,
+    ssl: provider === 'docker' ? false : opts.ssl,
     keepAlive: true,
     connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: POOL_IDLE_TIMEOUT_MS,
-    maxLifetimeSeconds: POOL_MAX_LIFETIME_SECONDS,
-    maxUses: POOL_MAX_USES,
   });
   pool.on('error', (err: Error) => console.error('Postgres pool error:', err));
   return pool as unknown as IDbPool;
