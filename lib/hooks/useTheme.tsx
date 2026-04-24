@@ -11,30 +11,21 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'dark',
+  theme: 'light',
   toggleTheme: () => {},
   setTheme: () => {},
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('dark');
-
-  useEffect(() => {
-    const stored = localStorage.getItem('novarquiz-theme') as Theme | null;
-    if (stored) {
-      setThemeState(stored);
-    } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
-      setThemeState('light');
-    }
-  }, []);
+  const [theme, setThemeState] = useState<Theme>('light');
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('novarquiz-theme', theme);
   }, [theme]);
 
-  const toggleTheme = () => setThemeState((t) => (t === 'dark' ? 'light' : 'dark'));
-  const setTheme = (t: Theme) => setThemeState(t);
+  const toggleTheme = () => setThemeState('light');
+  const setTheme: ThemeContextType['setTheme'] = () => setThemeState('light');
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>

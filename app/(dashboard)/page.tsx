@@ -1,39 +1,81 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { createTeamRoom, resolveJoinToken, trackUserSession, watchUserSessions, type UserSessionEntry } from '@/lib/firebase/rtdb';
-import { useToast } from '@/components/ui/Toast';
-import { useTranslation } from 'react-i18next';
-import '@/lib/i18n';
-import { motion, AnimatePresence } from 'motion/react';
-import type { Quiz } from '@/lib/types';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/hooks/useAuth";
+import {
+  createTeamRoom,
+  resolveJoinToken,
+  trackUserSession,
+  watchUserSessions,
+  type UserSessionEntry,
+} from "@/lib/firebase/rtdb";
+import { useToast } from "@/components/ui/Toast";
+import { useTranslation } from "react-i18next";
+import "@/lib/i18n";
+import { motion, AnimatePresence } from "motion/react";
+import type { Quiz } from "@/lib/types";
+import ProfileAvatar from "@/components/ui/ProfileAvatar";
 
 type ParsedJoinInput =
-  | { type: 'token'; token: string }
-  | { type: 'team'; sessionId: string; roomId: string; pin: string }
+  | { type: "token"; token: string }
+  | { type: "team"; sessionId: string; roomId: string; pin: string }
   | null;
 
-// Parse a raw token string or a pasted invite URL.
-// Handles:
-//   /join/<token>                             → lobby join via token
-//   /play/<sessionId>/team/<roomId>?pin=<pin> → team room direct join
 function parseJoinInput(input: string): ParsedJoinInput {
   const trimmed = input.trim();
   if (!trimmed) return null;
   try {
-    const u = new URL(trimmed);
-    const teamMatch = u.pathname.match(/\/play\/([^/]+)\/team\/([^/?#]+)/);
+    const url = new URL(trimmed);
+    const teamMatch = url.pathname.match(/\/play\/([^/]+)\/team\/([^/?#]+)/);
     if (teamMatch) {
-      const pin = u.searchParams.get('pin') ?? '';
-      return { type: 'team', sessionId: teamMatch[1], roomId: teamMatch[2], pin };
+      const pin = url.searchParams.get("pin") ?? "";
+      return {
+        type: "team",
+        sessionId: teamMatch[1],
+        roomId: teamMatch[2],
+        pin,
+      };
     }
-    const joinMatch = u.pathname.match(/\/join\/([^/?#]+)/);
-    if (joinMatch) return { type: 'token', token: joinMatch[1] };
-  } catch { /* not a URL */ }
-  if (/^[A-Za-z0-9_-]{6,}$/.test(trimmed)) return { type: 'token', token: trimmed };
+    const joinMatch = url.pathname.match(/\/join\/([^/?#]+)/);
+    if (joinMatch) {
+      return { type: "token", token: joinMatch[1] };
+    }
+  } catch {
+    // ignored: raw token input
+  }
+  if (/^[A-Za-z0-9_-]{6,}$/.test(trimmed))
+    return { type: "token", token: trimmed };
   return null;
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  accent,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  accent: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="nq-card rounded-[28px] p-5"
+    >
+      <div className="mb-4 flex items-center justify-between">
+        <span className="text-4xl">{icon}</span>
+        <div className={`h-3 w-24 rounded-full ${accent}`} />
+      </div>
+      <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#5D7EA1]">
+        {label}
+      </p>
+      <p className="mt-2 text-3xl font-bold text-[#0460A9]">{value}</p>
+    </motion.div>
+  );
 }
 
 function LiveSessionsWidget() {
@@ -50,44 +92,68 @@ function LiveSessionsWidget() {
   if (list.length === 0) return null;
 
   const resume = (entry: UserSessionEntry) => {
-    if (entry.mode === 'team' && entry.roomId) {
+    if (entry.mode === "team" && entry.roomId) {
       router.push(`/play/${entry.sessionId}/team/${entry.roomId}`);
-    } else {
-      router.push(`/play/${entry.sessionId}/lobby`);
+      return;
     }
+    if (entry.mode === "solo") {
+      router.push(`/play/${entry.sessionId}/question`);
+      return;
+    }
+    router.push(`/play/${entry.sessionId}/lobby`);
   };
 
   return (
-    <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-cyan-500/5 p-5">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Live sessions</h3>
-        <span className="text-xs text-gray-400">· {list.length} active</span>
+    <section className="space-y-4">
+      <div className="flex items-center gap-3">
+        <span className="text-xl">⚡</span>
+        <div>
+          <h2 className="text-xl font-semibold text-[#16324F]">
+            Pick up where you left off
+          </h2>
+          <p className="text-sm text-[#5D7EA1]">
+            Active rooms and live sessions linked to this account.
+          </p>
+        </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {list.map((entry, i) => {
-          const id = entry.roomId ? `${entry.sessionId}__${entry.roomId}` : entry.sessionId;
+      <div className="grid gap-4 md:grid-cols-2">
+        {list.map((entry, index) => {
+          const id = entry.roomId
+            ? `${entry.sessionId}__${entry.roomId}`
+            : entry.sessionId;
+          const modeLabel =
+            entry.mode === "team"
+              ? "PARTY room"
+              : entry.mode === "solo"
+                ? "SOLO run"
+                : "Lobby";
+          const icon =
+            entry.mode === "team" ? "🎉" : entry.mode === "solo" ? "🚀" : "👥";
           return (
             <motion.button
               key={id}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
+              transition={{ delay: index * 0.05 }}
               onClick={() => resume(entry)}
-              className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-emerald-500/30 p-3 text-left transition-all"
+              className="nq-card-soft flex items-center gap-4 rounded-[28px] p-5 text-left transition hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(17,87,145,0.18)]"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
-                <span className="text-lg">{entry.mode === 'team' ? '👥' : '🎮'}</span>
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br from-[#92BFFF] to-[#0460A9] text-2xl text-white shadow-lg shadow-[#0460A9]/20">
+                {icon}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-medium truncate">{entry.sessionName}</p>
-                <p className="text-xs text-gray-400 capitalize">{entry.mode === 'team' ? 'Team room' : 'Public lobby'} · Resume →</p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-base font-semibold text-[#16324F]">
+                  {entry.sessionName}
+                </p>
+                <p className="mt-1 text-sm text-[#5D7EA1]">
+                  {modeLabel} · Resume now
+                </p>
               </div>
             </motion.button>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -95,70 +161,87 @@ function JoinByCodeCard() {
   const router = useRouter();
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
 
   const handleJoin = async () => {
     const parsed = parseJoinInput(code);
     if (!parsed) {
-      showToast('Enter a valid invite code or link', 'error');
+      showToast("Enter a valid invite code or link", "error");
       return;
     }
+
     if (!user) {
-      if (parsed.type === 'token') {
+      if (parsed.type === "token") {
         router.push(`/sign-in?next=/join/${parsed.token}`);
       } else {
-        router.push(`/sign-in?next=/play/${parsed.sessionId}/team/${parsed.roomId}?pin=${parsed.pin}`);
+        router.push(
+          `/sign-in?next=/play/${parsed.sessionId}/team/${parsed.roomId}?pin=${parsed.pin}`,
+        );
       }
       return;
     }
+
     setBusy(true);
-    if (parsed.type === 'team') {
-      router.push(`/play/${parsed.sessionId}/team/${parsed.roomId}?pin=${parsed.pin}`);
+    if (parsed.type === "team") {
+      router.push(
+        `/play/${parsed.sessionId}/team/${parsed.roomId}?pin=${parsed.pin}`,
+      );
       return;
     }
+
     try {
       const sessionId = await resolveJoinToken(parsed.token);
       if (!sessionId) {
-        showToast('That invite link has expired. Ask the host for a new one.', 'error');
+        showToast(
+          "That invite link has expired. Ask the host for a new one.",
+          "error",
+        );
         setBusy(false);
         return;
       }
-    } catch { /* swallow — let /join/{token} handle it */ }
+    } catch {
+      // let the join page re-check
+    }
+
     router.push(`/join/${parsed.token}`);
   };
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-indigo-600/10 to-purple-600/10 p-5">
-      <div className="flex items-center gap-3 mb-3">
-        <span className="text-xl">🎟️</span>
+    <section className="nq-card-dark rounded-[30px] p-6">
+      <div className="mb-5 flex items-center gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F04D95]/20 text-xl">
+          🎟️
+        </div>
         <div>
-          <p className="text-white font-semibold">Have an invite?</p>
-          <p className="text-xs text-gray-400">Paste a join code or link from the host</p>
+          <h2 className="nq-on-dark text-xl font-semibold">Have an invite?</h2>
+          <p className="nq-on-dark-muted text-sm">
+            Paste a join code or invite URL from the host.
+          </p>
         </div>
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <input
           type="text"
           value={code}
-          onChange={e => setCode(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && !busy && handleJoin()}
+          onChange={(event) => setCode(event.target.value)}
+          onKeyDown={(event) => event.key === "Enter" && !busy && handleJoin()}
           placeholder="Code or invite link"
-          className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-white text-sm focus:border-indigo-500 focus:outline-none placeholder:text-gray-500"
+          className="nq-on-dark min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 outline-none placeholder:text-[#DDEBFF] focus:border-[#92BFFF] focus:bg-white/[0.14]"
         />
         <button
           onClick={handleJoin}
           disabled={busy || !code.trim()}
-          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:from-indigo-500 hover:to-purple-500 transition-all"
+          className="rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-[#111827] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {busy ? '…' : 'Join'}
+          {busy ? "Joining…" : "Join"}
         </button>
       </div>
-    </div>
+    </section>
   );
 }
 
-function SoloOrTeamModal({
+function SoloOrPartyModal({
   session,
   onClose,
 }: {
@@ -168,19 +251,19 @@ function SoloOrTeamModal({
   const router = useRouter();
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [creatingTeam, setCreatingTeam] = useState(false);
+  const [creatingParty, setCreatingParty] = useState(false);
 
   const handleSolo = () => {
     onClose();
     router.push(`/play/${session.id}`);
   };
 
-  const handleTeam = async () => {
+  const handleParty = async () => {
     if (!user) {
-      showToast('Please sign in to host a team room', 'error');
+      showToast("Please sign in to host a party room", "error");
       return;
     }
-    setCreatingTeam(true);
+    setCreatingParty(true);
     try {
       const { roomId } = await createTeamRoom(session.id, {
         uid: user.uid,
@@ -190,16 +273,19 @@ function SoloOrTeamModal({
       await trackUserSession(user.uid, {
         sessionId: session.id,
         sessionName: session.name,
-        mode: 'team',
+        mode: "team",
         roomId,
         joinedAt: Date.now(),
       });
       onClose();
       router.push(`/play/${session.id}/team/${roomId}`);
-    } catch (err) {
-      console.error('createTeamRoom failed:', err);
-      showToast(`Could not create team room: ${(err as Error).message || 'unknown error'}`, 'error');
-      setCreatingTeam(false);
+    } catch (error) {
+      console.error("createTeamRoom failed:", error);
+      showToast(
+        `Could not create party room: ${(error as Error).message || "unknown error"}`,
+        "error",
+      );
+      setCreatingParty(false);
     }
   };
 
@@ -208,55 +294,66 @@ function SoloOrTeamModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-[#08122A]/45 p-4 backdrop-blur-md md:items-center"
       onClick={onClose}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: 16 }}
-        className="w-full max-w-sm rounded-2xl border border-white/10 bg-gray-900 p-6"
-        onClick={e => e.stopPropagation()}
+        initial={{ opacity: 0, y: 24, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 24, scale: 0.98 }}
+        transition={{ type: "spring", stiffness: 220, damping: 22 }}
+        className="nq-card w-full max-w-xl rounded-[34px] p-6 md:p-7"
+        onClick={(event) => event.stopPropagation()}
       >
-        <div className="mb-5">
-          <h2 className="text-lg font-bold text-white mb-1">{session.name}</h2>
-          <p className="text-gray-400 text-sm">How do you want to play?</p>
+        <div className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#5D7EA1]">
+            Choose Play Mode
+          </p>
+          <h2 className="mt-2 text-2xl font-bold text-[#16324F]">
+            {session.name}
+          </h2>
+          {session.description && (
+            <p className="mt-2 text-sm text-[#5D7EA1]">{session.description}</p>
+          )}
         </div>
 
-        <div className="space-y-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <button
             onClick={handleSolo}
-            className="w-full flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-indigo-600/15 hover:border-indigo-500/40 transition-all text-left group"
+            className="rounded-[28px] border border-[#0460A9]/12 bg-white px-5 py-6 text-left shadow-[0_18px_42px_rgba(17,87,145,0.1)] transition hover:-translate-y-1"
           >
-            <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center text-2xl flex-shrink-0 group-hover:bg-indigo-500/30 transition-colors">
-              🎮
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[20px] bg-gradient-to-br from-[#92BFFF] to-[#0460A9] text-2xl text-white">
+              🚀
             </div>
-            <div>
-              <p className="text-white font-semibold">Solo</p>
-              <p className="text-gray-400 text-sm">Play by yourself at your own pace</p>
-            </div>
+            <p className="text-lg font-bold text-[#16324F]">SOLO</p>
+            <p className="mt-2 text-sm text-[#5D7EA1]">
+              Jump straight into the quiz and start answering immediately.
+            </p>
           </button>
 
           <button
-            onClick={handleTeam}
-            disabled={creatingTeam}
-            className="w-full flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-purple-600/15 hover:border-purple-500/40 transition-all text-left group disabled:opacity-60 disabled:cursor-not-allowed"
+            onClick={handleParty}
+            disabled={creatingParty}
+            className="nq-card-dark rounded-[28px] px-5 py-6 text-left text-white transition hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-2xl flex-shrink-0 group-hover:bg-purple-500/30 transition-colors">
-              {creatingTeam ? (
-                <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-              ) : '👥'}
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[20px] bg-white/12 text-2xl">
+              {creatingParty ? (
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                "🎉"
+              )}
             </div>
-            <div>
-              <p className="text-white font-semibold">Team</p>
-              <p className="text-gray-400 text-sm">Host a private room — invite friends with PIN</p>
-            </div>
+            <p className="text-lg font-bold">PARTY</p>
+            <p className="mt-2 text-sm text-[#B8C7EA]">
+              Open a waiting lobby, invite friends, then start together as the
+              host.
+            </p>
           </button>
         </div>
 
         <button
           onClick={onClose}
-          className="mt-4 w-full py-2 rounded-xl border border-white/10 text-gray-400 text-sm hover:text-white hover:border-white/20 transition-colors"
+          className="mt-5 w-full rounded-2xl border border-[#0460A9]/12 bg-white/60 px-4 py-3 text-sm font-semibold text-[#16324F] transition hover:bg-white"
         >
           Cancel
         </button>
@@ -265,7 +362,12 @@ function SoloOrTeamModal({
   );
 }
 
-type UserStats = { total_played: number; avg_score: number; best_streak: number };
+type UserStats = {
+  total_played: number;
+  avg_score: number;
+  best_score: number;
+  best_streak: number;
+};
 
 export default function DashboardPage() {
   const { t } = useTranslation();
@@ -276,100 +378,201 @@ export default function DashboardPage() {
   const [userStats, setUserStats] = useState<UserStats | null>(null);
 
   useEffect(() => {
-    fetch('/api/questions/sessions').then(r => r.ok ? r.json() : []).then(setSessions).catch(() => {}).finally(() => setLoading(false));
+    fetch("/api/questions/sessions")
+      .then((response) => (response.ok ? response.json() : []))
+      .then(setSessions)
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
     if (!user || user.isAnonymous) return;
     fetch(`/api/play/me/history?uid=${encodeURIComponent(user.uid)}`)
-      .then(r => r.ok ? r.json() : [])
+      .then((response) => (response.ok ? response.json() : []))
       .then((history: Array<{ total_score: number; streak: number }>) => {
         if (!history.length) return;
         setUserStats({
           total_played: history.length,
-          avg_score: Math.round(history.reduce((s, h) => s + h.total_score, 0) / history.length),
-          best_streak: Math.max(...history.map(h => h.streak)),
+          avg_score: Math.round(
+            history.reduce((sum, item) => sum + item.total_score, 0) /
+              history.length,
+          ),
+          best_score: Math.max(...history.map((item) => item.total_score)),
+          best_streak: Math.max(...history.map((item) => item.streak)),
         });
       })
       .catch(() => {});
   }, [user]);
 
-  return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-white">{t('dashboard.welcome')}, {user?.displayName || 'Player'}! 👋</h1>
-        <p className="text-gray-400 mt-1">Ready to test your knowledge?</p>
-      </div>
+  const profileHandle = user?.displayName
+    ? `@${user.displayName.toLowerCase().replace(/\s+/g, ".")}`
+    : user?.email
+      ? `@${user.email.split("@")[0]}`
+      : "@player";
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          { label: t('dashboard.total_played'), value: userStats ? String(userStats.total_played) : '—', icon: '🎮', color: 'from-indigo-600 to-purple-600' },
-          { label: t('dashboard.avg_score'), value: userStats ? `${userStats.avg_score} pts` : '—', icon: '📊', color: 'from-emerald-600 to-cyan-600' },
-          { label: t('dashboard.best_streak'), value: userStats ? String(userStats.best_streak) : '—', icon: '🔥', color: 'from-orange-600 to-red-600' },
-        ].map((stat, idx) => (
-          <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}
-            className="rounded-2xl border border-white/5 bg-white/5 p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-2xl">{stat.icon}</span>
-              <div className={`w-10 h-1 rounded-full bg-gradient-to-r ${stat.color}`} />
+  return (
+    <div className="mx-auto max-w-6xl space-y-6 md:space-y-7">
+      <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="nq-card-blue relative overflow-hidden rounded-[32px] p-5 text-white md:p-6"
+        >
+          <div className="absolute inset-y-0 right-[-36px] top-[14px] w-48 rounded-full border border-white/10 bg-white/[0.08]" />
+          <div className="absolute inset-y-0 right-[18px] top-[-20px] w-36 rounded-full border border-white/10 bg-white/10" />
+          <div className="relative flex items-center gap-4">
+            <ProfileAvatar
+              displayName={user?.displayName}
+              photoURL={user?.photoURL}
+              size={84}
+              ringClassName="ring-4 ring-[#0E173A]/35 shadow-xl shadow-[#113D7A]/35"
+            />
+            <div className="min-w-0">
+              <h1 className="truncate text-2xl font-bold md:text-3xl">
+                {user?.displayName || "Player"}
+              </h1>
+              <p className="mt-1 truncate text-base text-white/80">
+                {profileHandle}
+              </p>
             </div>
-            <p className="text-2xl font-bold text-white">{stat.value}</p>
-            <p className="text-sm text-gray-400 mt-1">{stat.label}</p>
-          </motion.div>
-        ))}
-      </div>
+          </div>
+        </motion.div>
+
+        <div className="nq-card rounded-[32px] p-5 md:p-6">
+          <div className="mb-4 flex items-center gap-3">
+            <span className="text-2xl">📊</span>
+            <div>
+              <h2 className="text-xl font-semibold text-[#16324F]">
+                Stat Summary
+              </h2>
+              <p className="text-sm text-[#5D7EA1]">
+                Your latest quiz momentum at a glance.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[24px] bg-white/72 p-4">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#5D7EA1]">
+                Best Score
+              </p>
+              <p className="mt-2 text-3xl font-bold text-[#0460A9]">
+                {userStats?.best_score?.toLocaleString() ?? "—"}
+              </p>
+            </div>
+            <div className="rounded-[24px] bg-white/72 p-4">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#5D7EA1]">
+                Best Streak
+              </p>
+              <p className="mt-2 text-3xl font-bold text-[#0460A9]">
+                {userStats?.best_streak ?? "—"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <StatCard
+          icon="🎯"
+          label={t("dashboard.total_played")}
+          value={userStats ? String(userStats.total_played) : "—"}
+          accent="bg-gradient-to-r from-[#0460A9] to-[#92BFFF]"
+        />
+        <StatCard
+          icon="📈"
+          label={t("dashboard.avg_score")}
+          value={userStats ? `${userStats.avg_score}` : "—"}
+          accent="bg-gradient-to-r from-[#055A9E] to-[#4E93E6]"
+        />
+        <StatCard
+          icon="🧠"
+          label={t("dashboard.available_quizzes")}
+          value={String(sessions.length || 0)}
+          accent="bg-gradient-to-r from-[#6C42D8] to-[#92BFFF]"
+        />
+      </section>
 
       <LiveSessionsWidget />
 
       <JoinByCodeCard />
 
-      <div>
-        <h2 className="text-xl font-semibold text-white mb-4">{t('dashboard.available_quizzes')}</h2>
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <span className="nq-on-dark text-xl">🧩</span>
+          <div>
+            <h2 className="nq-on-dark text-2xl font-semibold">
+              {t("dashboard.available_quizzes")}
+            </h2>
+          </div>
+        </div>
+
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => <div key={i} className="rounded-2xl border border-white/5 bg-white/5 p-5 animate-pulse"><div className="h-4 bg-white/10 rounded mb-3 w-3/4" /><div className="h-3 bg-white/5 rounded w-full" /></div>)}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {[1, 2, 3].map((key) => (
+              <div
+                key={key}
+                className="nq-card-dark animate-pulse rounded-[30px] p-5"
+              >
+                <div className="mb-4 h-5 w-3/4 rounded-full bg-white/10" />
+                <div className="mb-2 h-3 w-full rounded-full bg-white/10" />
+                <div className="h-3 w-2/3 rounded-full bg-white/10" />
+              </div>
+            ))}
           </div>
         ) : sessions.length === 0 ? (
-          <div className="rounded-2xl border border-white/5 bg-white/5 p-10 text-center">
-            <p className="text-gray-400 text-lg">🎯 {t('dashboard.no_quizzes')}</p>
+          <div className="nq-card rounded-[32px] p-10 text-center">
+            <p className="text-lg font-semibold text-[#16324F]">
+              🎯 {t("dashboard.no_quizzes")}
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sessions.map((s, idx) => (
-              <motion.div
-                key={s.id}
-                initial={{ opacity: 0, y: 20 }}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {sessions.map((session, index) => (
+              <motion.button
+                key={session.id}
+                initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                onClick={() => setSelectedSession(s)}
-                className="rounded-2xl border border-white/5 bg-white/5 hover:bg-white/10 hover:border-indigo-500/30 transition-all duration-300 cursor-pointer group overflow-hidden"
+                transition={{ delay: index * 0.04 }}
+                onClick={() => setSelectedSession(session)}
+                className="nq-card-dark group overflow-hidden rounded-[30px] p-0 text-left transition hover:-translate-y-1"
               >
-                {s.cover_image_url && (
-                  <div className="h-36 overflow-hidden">
-                    <img src={s.cover_image_url} alt={s.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                {session.cover_image_url && (
+                  <div className="h-44 overflow-hidden">
+                    <img
+                      src={session.cover_image_url}
+                      alt={session.name}
+                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                    />
                   </div>
                 )}
                 <div className="p-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-white group-hover:text-indigo-400 transition-colors">{s.name}</h3>
-                    <span className="px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-400 text-xs font-medium flex-shrink-0 ml-2">{s.question_count} Q</span>
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <h3 className="nq-on-dark line-clamp-2 text-xl font-bold">
+                      {session.name}
+                    </h3>
+                    <span className="rounded-full bg-[#7B8BFF]/30 px-2.5 py-1 text-xs font-semibold text-[#C7D5FF]">
+                      {session.question_count} Q
+                    </span>
                   </div>
-                  {s.description && <p className="text-sm text-gray-400 mb-3 line-clamp-2">{s.description}</p>}
-                  <div className="flex items-center gap-3 text-xs text-gray-500">
+                  {session.description && (
+                    <p className="nq-on-dark-muted line-clamp-2 text-sm">
+                      {session.description}
+                    </p>
+                  )}
+                  <div className="nq-on-dark-soft mt-4 flex flex-wrap items-center gap-3 text-xs">
                     <span>⏱ Count-up from 0</span>
-                    <span>•</span>
-                    <span className="group-hover:text-indigo-400 transition-colors">{t('dashboard.join_quiz')} →</span>
+                    <span>🎮 {t("dashboard.join_quiz")}</span>
                   </div>
                 </div>
-              </motion.div>
+              </motion.button>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
       <AnimatePresence>
         {selectedSession && (
-          <SoloOrTeamModal
+          <SoloOrPartyModal
             session={selectedSession}
             onClose={() => setSelectedSession(null)}
           />

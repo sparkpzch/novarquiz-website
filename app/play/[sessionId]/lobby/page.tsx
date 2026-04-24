@@ -6,26 +6,31 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { watchRoom, leaveWaitingRoom, type SessionRoom } from '@/lib/firebase/rtdb';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Quiz } from '@/lib/types';
+import ProfileAvatar from '@/components/ui/ProfileAvatar';
 
-function PlayerAvatar({ displayName, photoURL, size = 16 }: { displayName: string; photoURL: string | null; size?: number }) {
-  const [imgError, setImgError] = useState(false);
-  const sizeClass = `w-${size} h-${size}`;
-
-  if (photoURL && !imgError) {
-    return (
-      <img
-        src={photoURL}
-        alt={displayName}
-        className={`${sizeClass} rounded-full object-cover`}
-        onError={() => setImgError(true)}
-      />
-    );
-  }
+function PlayerChip({
+  displayName,
+  photoURL,
+  highlighted,
+  crowned,
+}: {
+  displayName: string;
+  photoURL: string | null;
+  highlighted?: boolean;
+  crowned?: boolean;
+}) {
   return (
-    <div className={`${sizeClass} rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold flex-shrink-0`}
-      style={{ fontSize: size * 2.5 }}>
-      {displayName?.[0]?.toUpperCase() || '?'}
-    </div>
+    <motion.div
+      initial={{ opacity: 0, scale: 0.88 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="flex flex-col items-center gap-2"
+    >
+      <div className={`relative rounded-full ${highlighted ? 'ring-4 ring-[#92BFFF]' : ''}`}>
+        <ProfileAvatar displayName={displayName} photoURL={photoURL} size={64} />
+        {crowned && <span className="absolute -right-1 -top-2 text-lg">👑</span>}
+      </div>
+      <p className="max-w-[88px] truncate text-center text-sm font-semibold text-[#16324F]">{displayName}</p>
+    </motion.div>
   );
 }
 
@@ -39,8 +44,8 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
 
   useEffect(() => {
     fetch(`/api/questions/sessions/${sessionId}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(s => { if (s) setSession(s); });
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => { if (data) setSession(data); });
   }, [sessionId]);
 
   useEffect(() => {
@@ -51,149 +56,120 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
       }
     });
     return unsubscribe;
-  }, [sessionId, router]);
+  }, [router, sessionId]);
 
-  // Warn on browser close/refresh
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
-  // Clean up player slot on unmount
   useEffect(() => {
-    return () => { if (user) leaveWaitingRoom(sessionId, user.uid); };
+    return () => {
+      if (user) leaveWaitingRoom(sessionId, user.uid);
+    };
   }, [sessionId, user]);
 
   const handleLeave = useCallback(async () => {
     if (user) await leaveWaitingRoom(sessionId, user.uid);
     router.push('/');
-  }, [sessionId, user, router]);
+  }, [router, sessionId, user]);
 
   if (loading || !user) return null;
 
   const players = Object.entries(room?.players ?? {});
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-      {/* Background orbs */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/3 right-1/3 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-      </div>
-
-      {/* Leave confirmation modal */}
-      <AnimatePresence>
-        {showLeaveConfirm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 16 }}
-              className="w-full max-w-sm rounded-2xl border border-white/10 bg-gray-900 p-6 text-center"
-            >
-              <div className="text-4xl mb-3">🚪</div>
-              <h2 className="text-lg font-bold text-white mb-1">Leave the waiting room?</h2>
-              <p className="text-gray-400 text-sm mb-6">You'll be removed from the lobby and miss the game when it starts.</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowLeaveConfirm(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-white/10 text-white text-sm font-medium hover:bg-white/5 transition-colors"
+    <div className="nq-sky min-h-screen">
+      <div className="nq-content flex min-h-screen items-center justify-center p-4">
+        <div className="w-full max-w-3xl space-y-4">
+          <AnimatePresence>
+            {showLeaveConfirm && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex items-center justify-center bg-[#08122A]/45 p-4 backdrop-blur-md"
+              >
+                <motion.div
+                  initial={{ opacity: 0, y: 18, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 18, scale: 0.98 }}
+                  className="nq-card w-full max-w-sm rounded-[30px] p-6 text-center"
                 >
-                  Stay
-                </button>
-                <button
-                  onClick={handleLeave}
-                  className="flex-1 py-2.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium hover:bg-red-500/30 transition-colors"
-                >
-                  Leave
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="relative w-full max-w-2xl">
-        {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-medium mb-3">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live lobby
-              </div>
-              <h1 className="text-3xl font-bold text-white">{session?.name || '…'}</h1>
-              <p className="text-gray-400 text-sm mt-1">
-                {players.length} player{players.length !== 1 ? 's' : ''} in lobby
-              </p>
-            </div>
-            <button
-              onClick={() => setShowLeaveConfirm(true)}
-              className="mt-1 px-3 py-1.5 rounded-xl border border-white/10 text-gray-400 text-sm hover:text-white hover:border-white/20 transition-colors"
-            >
-              Leave
-            </button>
-          </div>
-        </motion.div>
-
-        {/* Kahoot-style player grid */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-6 mb-4 min-h-[200px]"
-        >
-          {players.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-32 text-gray-500">
-              <span className="text-3xl mb-2">👥</span>
-              <p className="text-sm">Waiting for players to join…</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-4">
-              <AnimatePresence>
-                {players.map(([uid, player], i) => {
-                  const isMe = uid === user.uid;
-                  const isThisLeader = uid === room?.leaderId;
-
-                  return (
-                    <motion.div
-                      key={uid}
-                      initial={{ opacity: 0, scale: 0.5 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.5 }}
-                      transition={{ delay: i * 0.04, type: 'spring', stiffness: 300, damping: 20 }}
-                      className="flex flex-col items-center gap-1.5"
+                  <div className="text-4xl">🚪</div>
+                  <h2 className="mt-3 text-xl font-bold text-[#16324F]">Leave this lobby?</h2>
+                  <p className="mt-2 text-sm text-[#5D7EA1]">You&apos;ll be removed before the host starts the game.</p>
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      onClick={() => setShowLeaveConfirm(false)}
+                      className="flex-1 rounded-2xl border border-[#0460A9]/12 bg-white px-4 py-3 text-sm font-semibold text-[#16324F]"
                     >
-                      <div className={`relative rounded-full ${isMe ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-transparent' : ''}`}>
-                        <PlayerAvatar displayName={player.displayName} photoURL={player.photoURL} size={14} />
-                        {isThisLeader && (
-                          <span className="absolute -top-1 -right-1 text-sm" title="Leader">👑</span>
-                        )}
-                      </div>
-                      <span className="text-white text-xs font-medium text-center leading-tight max-w-full truncate px-1">
-                        {isMe ? 'You' : player.displayName}
-                      </span>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            </div>
-          )}
-        </motion.div>
+                      Stay
+                    </button>
+                    <button
+                      onClick={handleLeave}
+                      className="flex-1 rounded-2xl bg-[#0E173A] px-4 py-3 text-sm font-semibold text-white"
+                    >
+                      Leave
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* Players wait for the host (admin observer) to start the game from the admin lobby */}
-        <div className="flex items-center justify-center gap-3 text-gray-500 text-sm">
-          <div className="flex gap-1">
-            {[0, 1, 2].map(i => (
-              <div key={i} className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-            ))}
-          </div>
-          <span>Waiting for the host to start the game…</span>
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="nq-card rounded-[34px] p-6 md:p-7">
+            <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#5D7EA1]">Waiting Lobby</p>
+                <h1 className="mt-2 text-3xl font-bold text-[#16324F]">{session?.name || 'Loading…'}</h1>
+                <p className="mt-2 text-sm text-[#5D7EA1]">{players.length} player{players.length !== 1 ? 's' : ''} joined. The host will move everyone into the quiz when ready.</p>
+              </div>
+              <button
+                onClick={() => setShowLeaveConfirm(true)}
+                className="rounded-2xl border border-[#0460A9]/12 bg-white px-4 py-3 text-sm font-semibold text-[#16324F]"
+              >
+                Leave
+              </button>
+            </div>
+
+            <div className="mt-6 rounded-[28px] bg-white/70 p-5">
+              {players.length === 0 ? (
+                <div className="flex min-h-40 flex-col items-center justify-center text-center">
+                  <div className="text-4xl">👥</div>
+                  <p className="mt-3 text-base font-semibold text-[#16324F]">Waiting for players to join…</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
+                  {players.map(([uid, player]) => (
+                    <PlayerChip
+                      key={uid}
+                      displayName={uid === user.uid ? 'You' : player.displayName}
+                      photoURL={player.photoURL}
+                      highlighted={uid === user.uid}
+                      crowned={uid === room?.leaderId}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex items-center justify-center gap-3 rounded-[22px] bg-[#0E173A] px-4 py-3 text-sm text-white">
+              <div className="flex gap-1">
+                {[0, 1, 2].map((index) => (
+                  <div
+                    key={index}
+                    className="h-2.5 w-2.5 animate-bounce rounded-full bg-[#92BFFF]"
+                    style={{ animationDelay: `${index * 0.12}s` }}
+                  />
+                ))}
+              </div>
+              <span>Waiting for the host to start the quiz…</span>
+            </div>
+          </motion.div>
         </div>
       </div>
     </div>
