@@ -5,11 +5,11 @@ import {
   type QueryResult,
   type QueryResultRow,
 } from '@neondatabase/serverless';
-import ws from 'ws';
 import { setDefaultResultOrder } from 'dns';
+import { configureNeonForNodeRuntime, getDatabaseConnectionOptions } from './config';
 
 setDefaultResultOrder('ipv4first');
-neonConfig.webSocketConstructor = ws;
+configureNeonForNodeRuntime(neonConfig);
 
 declare global {
   var __novarquizPool: Pool | undefined;
@@ -37,8 +37,7 @@ type QueryRetryOptions = {
 
 function createPool() {
   const nextPool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL?.includes('neon.tech') ? { rejectUnauthorized: false } : false,
+    ...getDatabaseConnectionOptions(),
     keepAlive: true,
     connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: POOL_IDLE_TIMEOUT_MS,

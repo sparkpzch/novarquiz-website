@@ -10,39 +10,88 @@ Install the required Node packages:
 yarn install
 ```
 
-## 2. Environment Variables
+## 2. Choose a Database Target
 
-Create a `.env` or `.env.local` file in the root directory. You can copy the contents from `.env.local.example` if it exists.
+Use one env file per provider and switch with commands instead of editing code.
 
-Ensure you provide values for:
+### Docker / local PostgreSQL
 
-- **Neon Database connection**: `DATABASE_URL` (Make sure to include `?uselibpqcompat=true&sslmode=require&channel_binding=require` to avoid SSL warnings)
-- **Firebase Client SDK**: All `NEXT_PUBLIC_FIREBASE_*` variables.
-- **Firebase Admin SDK**: `FIREBASE_SERVICE_ACCOUNT_KEY`
-
-Example database connection string:
+1. Copy `.env.local.example` to `.env.local`
+2. Fill in Firebase and session values
+3. Keep:
 
 ```env
-DATABASE_URL="postgresql://[user]:[password]@[neon_hostname]/[dbname]?uselibpqcompat=true&sslmode=require&channel_binding=require"
+DB_PROVIDER=docker
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/novarquiz_db
 ```
 
-## 3. Database Initialization
+### Neon PostgreSQL
 
-You need to initialize the tables in your PostgreSQL (Neon) database.
+1. Copy `.env.neon.example` to `.env.neon`
+2. Fill in Firebase and session values
+3. Use a Neon connection string such as:
 
-Execute the SQL schema files located in `db/migrations/` against your Neon database using your preferred database client (e.g., pgAdmin, DBeaver, or the Neon console's SQL Editor).
+```env
+DB_PROVIDER=neon
+DATABASE_URL=postgresql://[user]:[password]@[neon_hostname]/[dbname]?sslmode=require&channel_binding=require
+```
 
-Run them in this order:
+## 3. Initialize the Database
 
-1. `db/migrations/init.sql`
-2. `db/migrations/002_private_sessions.sql`
+The canonical base schema is `db/migrations/005_somchai_refac.sql`.
+
+### Docker / local PostgreSQL
+
+Start PostgreSQL with Docker Compose:
+
+```bash
+yarn db:up
+```
+
+On first startup, the Postgres container automatically bootstraps the database from `005_somchai_refac.sql`.
+
+If you need to rebuild the local database from scratch, remove the Docker volume and start again:
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+### Neon PostgreSQL
+
+Apply the provider-safe bootstrap script against Neon:
+
+```bash
+yarn migrate:005:neon
+```
+
+For future forward-only SQL migrations after `005`, use:
+
+```bash
+yarn migrate:neon
+```
 
 ## 4. Run Development Server
 
-Start the Next.js development server:
+Use the command that matches your database target:
+
+### Docker / local PostgreSQL
 
 ```bash
-yarn dev
+yarn dev:docker
+```
+
+### Neon PostgreSQL
+
+```bash
+yarn dev:neon
 ```
 
 Visit `http://localhost:3000` to view the application.
+
+## 5. Recommended Switching Workflow
+
+- Keep `.env.local` for Docker-backed local development.
+- Keep `.env.neon` for Neon.
+- Switch providers by running provider-specific commands such as `yarn dev:docker`, `yarn dev:neon`, `yarn migrate`, and `yarn migrate:neon`.
+- Do not scatter provider checks in app code; use `DB_PROVIDER` and `DATABASE_URL` only.
