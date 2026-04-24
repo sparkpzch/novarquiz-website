@@ -176,7 +176,7 @@ function JoinByCodeCard() {
         router.push(`/sign-in?next=/join/${parsed.token}`);
       } else {
         router.push(
-          `/sign-in?next=/play/${parsed.sessionId}/team/${parsed.roomId}?pin=${parsed.pin}`,
+          `/sign-in?next=${encodeURIComponent(`/play/${parsed.sessionId}/team/${parsed.roomId}?pin=${parsed.pin}`)}`,
         );
       }
       return;
@@ -232,7 +232,7 @@ function JoinByCodeCard() {
         <button
           onClick={handleJoin}
           disabled={busy || !code.trim()}
-          className="rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-[#111827] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-[#111827]! transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? "Joining…" : "Join"}
         </button>
