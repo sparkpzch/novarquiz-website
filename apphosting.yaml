@@ -15,10 +15,8 @@ env:
     secret: DATABASE_URL
   - variable: SESSION_SECRET
     secret: SESSION_SECRET
-  - variable: FIREBASE_STORAGE_URL
-    secret: FIREBASE_STORAGE_URL
-  - variable: FIREBASE_STORAGE_PROFILE_FOLDER
-    secret: FIREBASE_STORAGE_PROFILE_FOLDER
+  - variable: DB_PROVIDER
+    value: neon
 
   # Firebase client config (public — safe to hardcode)
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
