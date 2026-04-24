@@ -114,7 +114,7 @@ export async function deleteUserData(uid: string) {
 export async function getQuestionsBySession(sessionId: string) {
   const result = await pool.query(
     `SELECT q.*, 
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.points) ORDER BY c.label) as choices
+      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.score_impact) ORDER BY c.label) as choices
      FROM questions q
      LEFT JOIN choices c ON c.question_id = q.id
      WHERE q.session_id = $1
@@ -128,7 +128,7 @@ export async function getQuestionsBySession(sessionId: string) {
 export async function getQuestionById(questionId: string) {
   const result = await pool.query(
     `SELECT q.*, 
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.points) ORDER BY c.label) as choices
+      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.score_impact) ORDER BY c.label) as choices
      FROM questions q
      LEFT JOIN choices c ON c.question_id = q.id
      WHERE q.id = $1
@@ -141,7 +141,7 @@ export async function getQuestionById(questionId: string) {
 export async function getEntryQuestion(sessionId: string) {
   const result = await pool.query(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.points) ORDER BY c.label) as choices
+      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.score_impact) ORDER BY c.label) as choices
      FROM questions q
      JOIN question_sessions qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
@@ -216,7 +216,7 @@ export async function upsertChoices(questionId: string, choices: Array<{ label: 
   await pool.query('DELETE FROM choices WHERE question_id = $1', [questionId]);
   for (const choice of choices) {
     await pool.query(
-      `INSERT INTO choices (question_id, label, choice_text, points) VALUES ($1, $2, $3, $4)`,
+      `INSERT INTO choices (question_id, label, choice_text, score_impact) VALUES ($1, $2, $3, $4)`,
       [questionId, choice.label, choice.choice_text, Number.isFinite(choice.points) ? Math.trunc(choice.points) : 0]
     );
   }
@@ -245,7 +245,7 @@ export async function saveConnections(sessionId: string, connections: Array<{ fr
 export async function getNextQuestion(fromQuestionId: string, choiceLabel: string) {
   const result = await pool.query(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.points) ORDER BY c.label) as choices
+      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.score_impact) ORDER BY c.label) as choices
      FROM question_connections qc
      JOIN questions q ON q.id = qc.to_question_id
      JOIN question_sessions qs ON qs.id = q.session_id
@@ -272,13 +272,13 @@ export async function saveUserAnswer(data: {
   // Look up the canonical points for the chosen choice — never trust the
   // client to send its own score. Falls back to 0 if the row is missing.
   const choiceResult = await pool.query(
-    `SELECT points FROM choices WHERE question_id = $1 AND label = $2`,
+    `SELECT score_impact FROM choices WHERE question_id = $1 AND label = $2`,
     [data.question_id, data.chosen_label],
   );
-  const points = (choiceResult.rows[0]?.points as number | undefined) ?? 0;
+  const points = (choiceResult.rows[0]?.score_impact as number | undefined) ?? 0;
 
   const result = await pool.query(
-    `INSERT INTO user_answers (session_id, user_id, question_id, chosen_label, time_taken_ms, points_earned)
+    `INSERT INTO user_answers (session_id, user_id, question_id, chosen_label, time_taken_ms, utility_score)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
     [data.session_id, data.user_id, data.question_id, data.chosen_label, data.time_taken_ms, points]
   );
@@ -296,9 +296,9 @@ export async function completePlaySession(data: {
 }) {
   const agg = await pool.query(
     `SELECT
-       COALESCE(SUM(points_earned), 0)::int            AS total_score,
-       COALESCE(SUM(CASE WHEN points_earned > 0 THEN 1 ELSE 0 END), 0)::int AS positive_count,
-       COALESCE(SUM(CASE WHEN points_earned <= 0 THEN 1 ELSE 0 END), 0)::int AS nonpositive_count,
+       COALESCE(SUM(utility_score), 0)::int            AS total_score,
+       COALESCE(SUM(CASE WHEN utility_score > 0 THEN 1 ELSE 0 END), 0)::int AS positive_count,
+       COALESCE(SUM(CASE WHEN utility_score <= 0 THEN 1 ELSE 0 END), 0)::int AS nonpositive_count,
        COALESCE(SUM(time_taken_ms), 0)::int            AS total_time_ms
      FROM user_answers
      WHERE session_id = $1 AND user_id = $2`,
@@ -310,14 +310,14 @@ export async function completePlaySession(data: {
   // Computed in-app rather than SQL because the window-function version is
   // less readable than this two-pass loop and the row count per user is tiny.
   const ordered = await pool.query(
-    `SELECT points_earned FROM user_answers
+    `SELECT utility_score FROM user_answers
      WHERE session_id = $1 AND user_id = $2
      ORDER BY answered_at ASC`,
     [data.session_id, data.user_id],
   );
   let streak = 0, best = 0;
   for (const r of ordered.rows) {
-    if ((r.points_earned as number) > 0) { streak += 1; if (streak > best) best = streak; }
+    if ((r.utility_score as number) > 0) { streak += 1; if (streak > best) best = streak; }
     else streak = 0;
   }
 
