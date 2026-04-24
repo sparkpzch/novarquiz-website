@@ -50,12 +50,13 @@ export async function createSession(data: {
   is_private?: boolean;
   is_published?: boolean;
   created_by: string;
+  quiz_id?: string;
 }) {
   const pin = String(Math.floor(100000 + Math.random() * 900000));
   const result = await pool.query(
-    `INSERT INTO question_sessions (name, description, cover_image_url, timer_seconds, created_by, is_private, is_published, pin_code)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-    [data.name, data.description || null, data.cover_image_url || null, data.timer_seconds ?? null, data.created_by, data.is_private ?? false, data.is_published ?? false, pin]
+    `INSERT INTO question_sessions (name, description, cover_image_url, timer_seconds, created_by, is_private, is_published, pin_code, quiz_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [data.name, data.description || null, data.cover_image_url || null, data.timer_seconds ?? null, data.created_by, data.is_private ?? false, data.is_published ?? false, pin, data.quiz_id || null]
   );
   return result.rows[0];
 }
@@ -68,6 +69,7 @@ export async function updateSession(sessionId: string, data: Partial<{
   is_published: boolean;
   is_private: boolean;
   pin_code: string;
+  quiz_id: string | null;
 }>) {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -90,6 +92,77 @@ export async function updateSession(sessionId: string, data: Partial<{
 
 export async function deleteSession(sessionId: string) {
   await pool.query('DELETE FROM question_sessions WHERE id = $1', [sessionId]);
+}
+
+export async function duplicateQuizOrSession(sourceId: string, createdBy: string, isQuizDuplicate: boolean) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Get original session
+    const { rows: qsRows } = await client.query('SELECT * FROM question_sessions WHERE id = $1', [sourceId]);
+    if (qsRows.length === 0) throw new Error('Source session not found');
+    const orig = qsRows[0];
+
+    // Determine new properties
+    const newName = isQuizDuplicate ? `${orig.name} (Copy)` : orig.name;
+    const newQuizId = isQuizDuplicate ? null : (orig.quiz_id || orig.id);
+    const pin = String(Math.floor(100000 + Math.random() * 900000));
+
+    // 2. Duplicate question_sessions record
+    const { rows: newQsRows } = await client.query(
+      `INSERT INTO question_sessions (name, description, cover_image_url, timer_seconds, created_by, is_private, is_published, pin_code, quiz_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [newName, orig.description, orig.cover_image_url, orig.timer_seconds, createdBy, orig.is_private, false, pin, newQuizId]
+    );
+    const newSession = newQsRows[0];
+
+    // 3. Get all questions
+    const { rows: qRows } = await client.query('SELECT * FROM questions WHERE session_id = $1', [sourceId]);
+    const questionIdMap: Record<string, string> = {};
+
+    for (const q of qRows) {
+      const { rows: newQRows } = await client.query(
+        `INSERT INTO questions (session_id, question_order, question_text, media_type, media_url, timer_override, is_entry_point, node_x, node_y, node_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+        [newSession.id, q.question_order, q.question_text, q.media_type, q.media_url, q.timer_override, q.is_entry_point, q.node_x, q.node_y, q.node_type]
+      );
+      const newQId = newQRows[0].id;
+      questionIdMap[q.id] = newQId;
+
+      // 4. Copy choices for this question
+      const { rows: cRows } = await client.query('SELECT * FROM choices WHERE question_id = $1', [q.id]);
+      for (const c of cRows) {
+        await client.query(
+          `INSERT INTO choices (question_id, label, choice_text, score_impact, explanation)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [newQId, c.label, c.choice_text, c.score_impact, c.explanation]
+        );
+      }
+    }
+
+    // 5. Re-map Connections
+    const { rows: connRows } = await client.query('SELECT * FROM question_connections WHERE session_id = $1', [sourceId]);
+    for (const conn of connRows) {
+      const newFrom = questionIdMap[conn.from_question_id];
+      const newTo = questionIdMap[conn.to_question_id];
+      if (newFrom && newTo) {
+        await client.query(
+          `INSERT INTO question_connections (session_id, from_question_id, from_choice_label, to_question_id, connection_type)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [newSession.id, newFrom, conn.from_choice_label, newTo, conn.connection_type]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    return newSession;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // Removes every trace of a Firebase user from analytics-bearing tables.

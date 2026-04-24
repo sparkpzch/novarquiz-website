@@ -258,14 +258,16 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
               {c.choice_text || `Choice ${c.label}`}
             </span>
             {/* Score impact badge — uses score_impact; falls back to legacy points */}
-            {(() => { const s = c.score_impact ?? c.points ?? 0; return s !== 0 && (
-              <span style={{
-                color: s > 0 ? '#34d399' : '#fb7185',
-                fontSize: 10, fontWeight: 700,
-              }}>
-                {s > 0 ? `+${s}` : s}
-              </span>
-            ); })()}
+            {(() => {
+              const s = c.score_impact ?? c.points ?? 0; return s !== 0 && (
+                <span style={{
+                  color: s > 0 ? '#34d399' : '#fb7185',
+                  fontSize: 10, fontWeight: 700,
+                }}>
+                  {s > 0 ? `+${s}` : s}
+                </span>
+              );
+            })()}
           </div>
         );
       })}
