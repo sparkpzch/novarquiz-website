@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { watchRoom, leaveWaitingRoom, type SessionRoom } from '@/lib/firebase/rtdb';
 import { motion, AnimatePresence } from 'motion/react';
-import type { QuestionSession } from '@/lib/types';
+import type { Quiz } from '@/lib/types';
 
 function PlayerAvatar({ displayName, photoURL, size = 16 }: { displayName: string; photoURL: string | null; size?: number }) {
   const [imgError, setImgError] = useState(false);
@@ -34,7 +34,7 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
   const { user, loading } = useAuth();
   const router = useRouter();
   const [room, setRoom] = useState<SessionRoom | null>(null);
-  const [session, setSession] = useState<QuestionSession | null>(null);
+  const [session, setSession] = useState<Quiz | null>(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   useEffect(() => {

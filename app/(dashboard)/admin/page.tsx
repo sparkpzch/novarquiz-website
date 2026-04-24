@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion, AnimatePresence } from 'motion/react';
-import type { QuestionSession } from '@/lib/types';
+import type { Quiz } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 import { watchSessionRooms, type PlayerScore, type SessionRoom } from '@/lib/firebase/rtdb';
 
@@ -29,7 +29,7 @@ interface AdminStats {
 }
 
 type LiveSession = {
-  session: QuestionSession;
+  session: Quiz;
   room: SessionRoom;
   liveAt: number;
 };
@@ -65,7 +65,7 @@ export default function AdminDashboardPage() {
 
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [fetchingStats, setFetchingStats] = useState(true);
-  const [allData, setAllData] = useState<QuestionSession[]>([]);
+  const [allData, setAllData] = useState<Quiz[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [rooms, setRooms] = useState<Record<string, SessionRoom>>({});
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);

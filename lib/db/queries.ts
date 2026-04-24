@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import pool, { queryWithRetry } from './postgres';
 
-// ===================== Question Sessions =====================
+// ===================== Quizzes =====================
 
 export async function getAllSessions() {
   const result = await queryWithRetry(
@@ -9,7 +9,7 @@ export async function getAllSessions() {
       (SELECT COUNT(*) FROM questions q WHERE q.session_id = qs.id)::int AS question_count,
       (SELECT COUNT(*) FROM leaderboard_entries le WHERE le.session_id = qs.id)::int AS play_count,
       (SELECT COALESCE(ROUND(AVG(le.total_score)), 0) FROM leaderboard_entries le WHERE le.session_id = qs.id)::int AS avg_score
-     FROM question_sessions qs
+     FROM quizzes qs
      ORDER BY qs.created_at DESC`
   );
   return result.rows;
@@ -19,7 +19,7 @@ export async function getPublishedSessions() {
   const result = await queryWithRetry(
     `SELECT qs.*, 
       (SELECT COUNT(*) FROM questions q WHERE q.session_id = qs.id) as question_count
-     FROM question_sessions qs 
+     FROM quizzes qs 
      WHERE qs.is_published = TRUE
      ORDER BY qs.created_at DESC`
   );
@@ -28,7 +28,7 @@ export async function getPublishedSessions() {
 
 export async function getSessionById(sessionId: string) {
   const result = await queryWithRetry(
-    'SELECT * FROM question_sessions WHERE id = $1',
+    'SELECT * FROM quizzes WHERE id = $1',
     [sessionId]
   );
   return result.rows[0] || null;
@@ -47,7 +47,7 @@ export async function createSession(data: {
 }) {
   const sessionId = data.id ?? randomUUID();
   const result = await queryWithRetry(
-    `INSERT INTO question_sessions (id, name, description, cover_image_url, timer_seconds, created_by, is_published)
+    `INSERT INTO quizzes (id, name, description, cover_image_url, timer_seconds, created_by, is_published)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (id) DO UPDATE SET
        name = EXCLUDED.name,
@@ -83,7 +83,7 @@ export async function updateSession(sessionId: string, data: Partial<{
   values.push(sessionId);
 
   const result = await queryWithRetry(
-    `UPDATE question_sessions SET ${fields.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
+    `UPDATE quizzes SET ${fields.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
     values,
     { allowWriteRetry: true }
   );
@@ -91,7 +91,7 @@ export async function updateSession(sessionId: string, data: Partial<{
 }
 
 export async function deleteSession(sessionId: string) {
-  await pool.query('DELETE FROM question_sessions WHERE id = $1', [sessionId]);
+  await pool.query('DELETE FROM quizzes WHERE id = $1', [sessionId]);
 }
 
 export async function duplicateQuizOrSession(sourceId: string, createdBy: string, isQuizDuplicate: boolean) {
@@ -100,16 +100,16 @@ export async function duplicateQuizOrSession(sourceId: string, createdBy: string
     await client.query('BEGIN');
 
     // 1. Get original session
-    const { rows: qsRows } = await client.query('SELECT * FROM question_sessions WHERE id = $1', [sourceId]);
+    const { rows: qsRows } = await client.query('SELECT * FROM quizzes WHERE id = $1', [sourceId]);
     if (qsRows.length === 0) throw new Error('Source session not found');
     const orig = qsRows[0];
 
     // Determine new properties
     const newName = isQuizDuplicate ? `${orig.name} (Copy)` : orig.name;
 
-    // 2. Duplicate question_sessions record
+    // 2. Duplicate quizzes record
     const { rows: newQsRows } = await client.query(
-      `INSERT INTO question_sessions (name, description, cover_image_url, timer_seconds, created_by, is_published)
+      `INSERT INTO quizzes (name, description, cover_image_url, timer_seconds, created_by, is_published)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
       [newName, orig.description, orig.cover_image_url, orig.timer_seconds, createdBy, false]
     );
@@ -169,7 +169,7 @@ export async function deleteUserData(uid: string) {
   try {
     await client.query('BEGIN');
     await client.query('DELETE FROM user_answers WHERE user_id = $1', [uid]);
-    await client.query('DELETE FROM play_sessions WHERE user_id = $1', [uid]);
+    await client.query('DELETE FROM sessions WHERE user_id = $1', [uid]);
     await client.query('DELETE FROM leaderboard_entries WHERE user_id = $1', [uid]);
     await client.query('COMMIT');
   } catch (err) {
@@ -214,7 +214,7 @@ export async function getEntryQuestion(sessionId: string) {
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
       json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
      FROM questions q
-     JOIN question_sessions qs ON qs.id = q.session_id
+     JOIN quizzes qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
      WHERE q.session_id = $1 AND q.is_entry_point = TRUE
      GROUP BY q.id, qs.timer_seconds`,
@@ -366,7 +366,7 @@ export async function getNextQuestion(fromQuestionId: string, choiceLabel: strin
       json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
      FROM question_connections qc
      JOIN questions q ON q.id = qc.to_question_id
-     JOIN question_sessions qs ON qs.id = q.session_id
+     JOIN quizzes qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
      WHERE qc.from_question_id = $1 AND qc.from_choice_label = $2
      GROUP BY q.id, qs.timer_seconds`,
@@ -464,7 +464,7 @@ export async function completePlaySession(data: {
   // Mark the play_session finished so the dashboard live widget can stop
   // showing it as in-progress.
   await pool.query(
-    `UPDATE play_sessions
+    `UPDATE sessions
      SET finished_at = NOW(), current_score = $3
      WHERE session_id = $1 AND user_id = $2 AND finished_at IS NULL`,
     [data.session_id, data.user_id, row.total_score],
@@ -493,7 +493,7 @@ export async function getUserHistory(userId: string) {
        )::int + 1                          AS rank,
        (SELECT COUNT(*) FROM leaderboard_entries WHERE session_id = le.session_id)::int AS total_players
      FROM leaderboard_entries le
-     JOIN question_sessions qs ON qs.id = le.session_id
+     JOIN quizzes qs ON qs.id = le.session_id
      WHERE le.user_id = $1
      ORDER BY le.completed_at DESC`,
     [userId],
@@ -501,12 +501,12 @@ export async function getUserHistory(userId: string) {
   return result.rows;
 }
 
-// ===================== Play Sessions =====================
+// ===================== Sessions =====================
 
 export async function getOrCreatePlaySession(sessionId: string, userId: string) {
   // Try to get existing
   let result = await pool.query(
-    'SELECT * FROM play_sessions WHERE session_id = $1 AND user_id = $2',
+    'SELECT * FROM sessions WHERE session_id = $1 AND user_id = $2',
     [sessionId, userId]
   );
   if (result.rows[0]) return result.rows[0];
@@ -514,7 +514,7 @@ export async function getOrCreatePlaySession(sessionId: string, userId: string) 
   // Get entry question
   const entry = await getEntryQuestion(sessionId);
   result = await pool.query(
-    `INSERT INTO play_sessions (session_id, user_id, current_question_id) VALUES ($1, $2, $3) RETURNING *`,
+    `INSERT INTO sessions (session_id, user_id, current_question_id) VALUES ($1, $2, $3) RETURNING *`,
     [sessionId, userId, entry?.id || null]
   );
   return result.rows[0];
@@ -538,7 +538,7 @@ export async function updatePlaySession(playSessionId: string, data: Partial<{
   values.push(playSessionId);
 
   await pool.query(
-    `UPDATE play_sessions SET ${fields.join(', ')} WHERE id = $${paramIdx}`,
+    `UPDATE sessions SET ${fields.join(', ')} WHERE id = $${paramIdx}`,
     values
   );
 }

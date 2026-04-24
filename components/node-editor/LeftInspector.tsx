@@ -319,7 +319,7 @@ export function LeftInspector({
           </FieldLabel>
           <textarea
             rows={3}
-            value={draft.question_text}
+            value={draft.question_text ?? ''}
             onChange={e => patch({ question_text: e.target.value })}
             ref={el => {
               if (el) {
@@ -405,7 +405,7 @@ export function LeftInspector({
                       }}>{c.label}</span>
                       <textarea
                         rows={2}
-                        value={c.choice_text}
+                        value={c.choice_text ?? ''}
                         onChange={e => updateChoice({ choice_text: e.target.value })}
                         ref={el => {
                           if (el) {

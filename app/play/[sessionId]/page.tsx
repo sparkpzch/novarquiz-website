@@ -7,14 +7,14 @@ import Button from '@/components/ui/Button';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion } from 'motion/react';
-import type { QuestionSession } from '@/lib/types';
+import type { Quiz } from '@/lib/types';
 
 export default function PlayLobbyPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = use(params);
   const { t } = useTranslation();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [session, setSession] = useState<QuestionSession | null>(null);
+  const [session, setSession] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

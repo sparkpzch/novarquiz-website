@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion } from 'motion/react';
-import type { LeaderboardEntry, QuestionSession } from '@/lib/types';
+import type { LeaderboardEntry, Quiz } from '@/lib/types';
 
 type UserHistoryRow = {
   session_id: string;
@@ -30,7 +30,7 @@ export default function HistoryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>(searchParams.get('session') ? 'session' : 'mine');
-  const [sessions, setSessions] = useState<QuestionSession[]>([]);
+  const [sessions, setSessions] = useState<Quiz[]>([]);
   const [selectedSession, setSelectedSession] = useState(searchParams.get('session') || '');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [mine, setMine] = useState<UserHistoryRow[] | null>(null);

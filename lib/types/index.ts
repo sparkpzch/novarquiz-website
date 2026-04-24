@@ -1,6 +1,6 @@
 // ===================== Database Types =====================
 
-export interface QuestionSession {
+export interface Quiz {
   id: string;
   name: string;
   description: string | null;
@@ -81,7 +81,7 @@ export interface LeaderboardEntry {
   completed_at: string;
 }
 
-export interface PlaySession {
+export interface Session {
   id: string;
   session_id: string;
   user_id: string;

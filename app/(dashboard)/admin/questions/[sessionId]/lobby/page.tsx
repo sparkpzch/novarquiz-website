@@ -7,7 +7,7 @@ import { useToast } from '@/components/ui/Toast';
 import { reopenLobby, startRoom, watchRoom, openLobby, closeLobby, type SessionRoom } from '@/lib/firebase/rtdb';
 import { trackEvent } from '@/lib/firebase/analytics';
 import { motion, AnimatePresence } from 'motion/react';
-import type { QuestionSession } from '@/lib/types';
+import type { Quiz } from '@/lib/types';
 
 function PlayerAvatar({ displayName, photoURL }: { displayName: string; photoURL: string | null }) {
   const [imgError, setImgError] = useState(false);
@@ -41,7 +41,7 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
   const router = useRouter();
   const { showToast } = useToast();
 
-  const [session, setSession] = useState<QuestionSession | null>(null);
+  const [session, setSession] = useState<Quiz | null>(null);
   const [room, setRoom] = useState<SessionRoom | null>(null);
   const [starting, setStarting] = useState(false);
   const [copied, setCopied] = useState(false);

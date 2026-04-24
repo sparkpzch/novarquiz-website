@@ -18,7 +18,7 @@ import type { NormalNodeData } from "@/components/node-editor/NormalNode";
 import type {
   Question,
   QuestionConnection,
-  QuestionSession,
+  Quiz,
 } from "@/lib/types";
 
 // ─── Data-mapping helpers ─────────────────────────────────────────────────────

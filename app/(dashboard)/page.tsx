@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion, AnimatePresence } from 'motion/react';
-import type { QuestionSession } from '@/lib/types';
+import type { Quiz } from '@/lib/types';
 
 type ParsedJoinInput =
   | { type: 'token'; token: string }
@@ -162,7 +162,7 @@ function SoloOrTeamModal({
   session,
   onClose,
 }: {
-  session: QuestionSession;
+  session: Quiz;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -270,9 +270,9 @@ type UserStats = { total_played: number; avg_score: number; best_streak: number 
 export default function DashboardPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const [sessions, setSessions] = useState<QuestionSession[]>([]);
+  const [sessions, setSessions] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSession, setSelectedSession] = useState<QuestionSession | null>(null);
+  const [selectedSession, setSelectedSession] = useState<Quiz | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
 
   useEffect(() => {

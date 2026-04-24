@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     adminAuth.listUsers(1000),
     queryWithRetry(`
       SELECT
-        (SELECT COUNT(*) FROM question_sessions WHERE is_published = TRUE)::int AS active_sessions,
+        (SELECT COUNT(*) FROM quizzes WHERE is_published = TRUE)::int AS active_sessions,
         (SELECT COUNT(*) FROM questions)::int AS questions_created,
         (SELECT COALESCE(ROUND(AVG(total_score)), 0) FROM leaderboard_entries)::int AS avg_score
     `),
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       SELECT
         EXTRACT(MONTH FROM started_at)::int AS month,
         COUNT(*)::int AS count
-      FROM play_sessions
+      FROM sessions
       WHERE started_at >= NOW() - INTERVAL '12 months'
       GROUP BY month
       ORDER BY month
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
         le.correct_count,
         le.completed_at
       FROM leaderboard_entries le
-      JOIN question_sessions qs ON qs.id = le.session_id
+      JOIN quizzes qs ON qs.id = le.session_id
       ORDER BY le.completed_at DESC NULLS LAST
       LIMIT 10
     `),

@@ -37,7 +37,7 @@ async function hasBaseSchema() {
       SELECT 1
       FROM information_schema.tables
       WHERE table_schema = 'public'
-        AND table_name = 'question_sessions'
+        AND table_name IN ('question_sessions', 'quizzes')
     ) AS "exists"
   `);
 
