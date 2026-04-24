@@ -443,7 +443,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const completedRef = useRef(false);
   const scoreRef = useRef(score);
   const userRef = useRef(user);
-  const explanationTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const explanationTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     fetch(`/api/questions/sessions/${sessionId}`)
