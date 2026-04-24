@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -42,18 +42,13 @@ export default function AdminDashboardPage() {
   const [allData, setAllData] = useState<QuestionSession[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'sessions' | 'quizzes'>(
-    (searchParams.get('tab') as 'dashboard' | 'sessions' | 'quizzes') || 'dashboard'
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'sessions'>(
+    (searchParams.get('tab') as 'dashboard' | 'sessions') || 'dashboard'
   );
-  const filterQuizId = searchParams.get('filterQuizId');
 
   useEffect(() => {
-    const tab = searchParams.get('tab') as 'dashboard' | 'sessions' | 'quizzes';
-    if (tab) {
-      setActiveTab(tab);
-    } else {
-      setActiveTab('dashboard');
-    }
+    const tab = searchParams.get('tab') as 'dashboard' | 'sessions';
+    setActiveTab(tab === 'sessions' ? 'sessions' : 'dashboard');
   }, [searchParams]);
 
   useEffect(() => {
@@ -82,14 +77,7 @@ export default function AdminDashboardPage() {
     fetchData();
   }, [isAdmin]);
 
-  const quizzes = useMemo(() => allData.filter(s => !s.quiz_id), [allData]);
-  const sessions = useMemo(() => {
-    let list = allData.filter(s => !!s.quiz_id);
-    if (filterQuizId) {
-      list = list.filter(s => s.quiz_id === filterQuizId);
-    }
-    return list;
-  }, [allData, filterQuizId]);
+  const sessions = allData;
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this item? This action cannot be undone.')) return;
@@ -131,12 +119,6 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const copyLink = (pin: string) => {
-    const url = `${window.location.origin}/join?pin=${pin}`;
-    navigator.clipboard.writeText(url);
-    alert('Link copied to clipboard!');
-  };
-
   if (authLoading || !isAdmin) return null;
 
   // Render variables for Dashboard
@@ -161,10 +143,10 @@ export default function AdminDashboardPage() {
           <h1 className="text-3xl font-bold text-white">Admin Command Center</h1>
           <p className="text-gray-400 mt-1">Manage your platform, Quiz Library, and active Game Sessions.</p>
         </div>
-        {activeTab !== 'dashboard' && (
+        {activeTab === 'sessions' && (
           <Link href="/admin/questions/create">
             <Button icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>}>
-              {activeTab === 'sessions' ? 'Create New Session' : 'Create New Quiz'}
+              Create New Session
             </Button>
           </Link>
         )}
@@ -270,91 +252,36 @@ export default function AdminDashboardPage() {
           </motion.div>
         )}
 
-        {activeTab === 'quizzes' && (
-          <motion.div key="quizzes" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {loadingData ? (
-              [1,2,3].map(i => <div key={i} className="rounded-2xl border border-white/5 bg-white/5 p-6 animate-pulse h-48"/>)
-            ) : quizzes.length === 0 ? (
-              <div className="col-span-full rounded-2xl border border-white/5 bg-white/5 p-10 text-center">
-                <p className="text-gray-400">No quizzes in the library. Create your first one!</p>
-              </div>
-            ) : quizzes.map(q => (
-              <div key={q.id} className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden flex flex-col group hover:border-indigo-500/50 transition-colors">
-                <div className="p-6 flex-1">
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-xl font-bold text-white group-hover:text-indigo-400 transition-colors">{q.name}</h3>
-                    {!q.is_published && <span className="bg-amber-500/20 text-amber-300 text-xs px-2 py-1 rounded font-medium border border-amber-500/20">Draft</span>}
-                  </div>
-                  <p className="text-sm text-gray-400 mb-4 line-clamp-2">{q.description || 'No description provided.'}</p>
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
-                    <span className="flex items-center gap-1">❓ {q.question_count || 0} Nodes</span>
-                    <span className="flex items-center gap-1">⏱️ {q.timer_seconds}s</span>
-                  </div>
-                </div>
-                <div className="bg-black/20 p-4 border-t border-white/5 flex flex-wrap gap-2">
-                  <Button variant="primary" size="sm" className="flex-1 min-w-[120px]" onClick={() => router.push(`/admin/questions/${q.id}/edit`)}>
-                    Manage Nodes
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={async () => { await handleDuplicate(q.id, false); router.push(`/admin?tab=sessions&filterQuizId=${q.id}`); }}>
-                    Create Session
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDuplicate(q.id, true)}>
-                    Duplicate
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => router.push(`/admin?tab=sessions&filterQuizId=${q.id}`)} title="Find Related Sessions">
-                    Sessions
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300 hover:bg-red-400/10" onClick={() => handleDelete(q.id)}>
-                    Delete
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </motion.div>
-        )}
-
         {activeTab === 'sessions' && (
           <motion.div key="sessions" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {loadingData ? (
               [1,2,3].map(i => <div key={i} className="rounded-2xl border border-white/5 bg-white/5 p-6 animate-pulse h-48"/>)
             ) : sessions.length === 0 ? (
               <div className="col-span-full rounded-2xl border border-white/5 bg-white/5 p-10 text-center">
-                <p className="text-gray-400">No active sessions found. Duplicate a quiz to start a session!</p>
+                <p className="text-gray-400">No sessions yet. Create your first one!</p>
               </div>
             ) : sessions.map(s => (
               <div key={s.id} className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden flex flex-col group hover:border-emerald-500/50 transition-colors">
+                {s.cover_image_url && (
+                  <div className="h-32 overflow-hidden">
+                    <img src={s.cover_image_url} alt={s.name} className="w-full h-full object-cover" />
+                  </div>
+                )}
                 <div className="p-6 flex-1">
                   <div className="flex justify-between items-start mb-4">
                     <h3 className="text-xl font-bold text-white group-hover:text-emerald-400 transition-colors">{s.name}</h3>
-                    <button 
+                    <button
                       onClick={() => handleToggleStatus(s.id, s.is_published)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${s.is_published ? 'bg-emerald-500' : 'bg-gray-600'}`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${s.is_published ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
                   </div>
-                  
-                  <div className="bg-black/30 rounded-lg p-4 mb-4 border border-white/5">
-                    <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Invitation PIN</div>
-                    <div className="flex items-center justify-between">
-                      <span className={`text-2xl font-mono font-bold tracking-widest ${s.is_published ? 'text-emerald-400' : 'text-gray-500'}`}>
-                        {s.is_published ? s.pin_code : '******'}
-                      </span>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        disabled={!s.is_published}
-                        onClick={() => copyLink(s.pin_code)}
-                        className={s.is_published ? 'text-indigo-400 hover:text-indigo-300' : 'opacity-50'}
-                      >
-                        Copy Link
-                      </Button>
-                    </div>
-                  </div>
-                  
+                  <p className="text-sm text-gray-400 mb-4 line-clamp-2">{s.description || 'No description.'}</p>
                   <div className="flex items-center gap-4 text-xs text-gray-500">
-                    <span className="flex items-center gap-1">👥 {s.play_count || 0} Players</span>
-                    <span className="flex items-center gap-1">📈 {s.avg_score || 0} Avg Pts</span>
+                    <span>❓ {s.question_count || 0} nodes</span>
+                    <span>👥 {s.play_count || 0} players</span>
+                    <span>📈 {s.avg_score || 0} avg pts</span>
                   </div>
                 </div>
                 <div className="bg-black/20 p-4 border-t border-white/5 flex flex-wrap gap-2">

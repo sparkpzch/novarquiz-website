@@ -9,6 +9,7 @@
     "lint": "eslint",
     "set-admin": "npx tsx scripts/set-admin.ts",
     "migrate": "npx tsx --env-file=.env.local scripts/migrate.ts",
+    "migrate:005": "npx tsx --env-file=.env.local scripts/migrate-005.ts",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down"
   },

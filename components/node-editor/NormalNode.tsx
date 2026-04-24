@@ -10,8 +10,6 @@ export type NormalNodeData = {
   choices: Array<{
     label: string;
     choice_text: string;
-    /** @deprecated use score_impact */
-    points?: number;
     score_impact: number;
     explanation: string;
   }>;
@@ -31,7 +29,7 @@ const CHOICE_CFG = {
 const H_HEADER = 36;
 const H_TEXT = 52;
 const H_CHOICE = 32;
-const H_MEDIA = 22; // height of media indicator row when present
+const H_MEDIA = 80; // height of media thumbnail when present
 
 export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as NormalNodeData;
@@ -215,16 +213,17 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
         {d.question_text || 'Double-click to edit…'}
       </div>
 
-      {/* Media indicator */}
+      {/* Media thumbnail */}
       {d.media_url && (
-        <div style={{
-          background: '#0d0d20',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          padding: '4px 10px',
-          fontSize: 10,
-          color: '#6b7280',
-        }}>
-          {d.media_type === 'video' ? '🎬 Video attached' : '🖼 Image attached'}
+        <div style={{ height: H_MEDIA, overflow: 'hidden', borderBottom: '1px solid rgba(255,255,255,0.06)', position: 'relative', background: '#0d0d20' }}>
+          {d.media_type === 'video' ? (
+            <video src={d.media_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
+          ) : (
+            <img src={d.media_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          )}
+          <span style={{ position: 'absolute', bottom: 3, right: 5, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
+            {d.media_type === 'video' ? '🎬' : '🖼'}
+          </span>
         </div>
       )}
 
@@ -257,9 +256,8 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
             }}>
               {c.choice_text || `Choice ${c.label}`}
             </span>
-            {/* Score impact badge — uses score_impact; falls back to legacy points */}
             {(() => {
-              const s = c.score_impact ?? c.points ?? 0; return s !== 0 && (
+              const s = c.score_impact ?? 0; return s !== 0 && (
                 <span style={{
                   color: s > 0 ? '#34d399' : '#fb7185',
                   fontSize: 10, fontWeight: 700,

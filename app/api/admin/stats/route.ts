@@ -48,8 +48,8 @@ export async function GET(request: NextRequest) {
     `),
     pool.query(`
       SELECT
-        COUNT(*) FILTER (WHERE is_correct = TRUE)::int AS correct,
-        COUNT(*) FILTER (WHERE is_correct = FALSE)::int AS incorrect
+        COUNT(*) FILTER (WHERE utility_score > 0)::int AS correct,
+        COUNT(*) FILTER (WHERE utility_score <= 0)::int AS incorrect
       FROM user_answers
     `),
     pool.query(`

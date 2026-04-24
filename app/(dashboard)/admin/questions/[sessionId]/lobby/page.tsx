@@ -44,7 +44,7 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
     if (!loading && !isAdmin) router.push('/');
   }, [loading, isAdmin, router]);
 
-  // Fetch session metadata (includes share_token, pin_code)
+  // Fetch session metadata
   useEffect(() => {
     fetch(`/api/questions/sessions/${sessionId}`)
       .then(r => r.ok ? r.json() : null)
@@ -114,15 +114,13 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
 
       {/* Access info */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* PIN */}
+        {/* Join token (RTDB-based) */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-          <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-2">Join PIN</p>
-          <p className="text-4xl font-mono font-bold text-white tracking-[0.25em]">
-            {session?.pin_code ?? '······'}
+          <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-2">Join Token</p>
+          <p className="text-sm font-mono font-bold text-white truncate">
+            {shareLink ? shareLink.split('/join/')[1]?.split('?')[0] ?? '—' : '—'}
           </p>
-          <p className="text-xs text-gray-500 mt-2">
-            {session?.is_private ? '🔒 Private — PIN required to join' : '🌐 Public — PIN optional'}
-          </p>
+          <p className="text-xs text-gray-500 mt-2">🌐 Public — share the link below to invite players</p>
         </div>
 
         {/* Share link */}

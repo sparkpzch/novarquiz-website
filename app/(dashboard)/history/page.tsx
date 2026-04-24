@@ -62,7 +62,7 @@ export default function HistoryPage() {
   const myEntry = entries.find(e => e.user_id === user?.uid);
   const myRank = entries.findIndex(e => e.user_id === user?.uid) + 1;
 
-  const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3;
+  const podiumOrder = [top3[1], top3[0], top3[2]];
   const podiumHeights = ['h-24', 'h-32', 'h-20'];
   const podiumColors = ['from-gray-400 to-gray-300', 'from-amber-400 to-yellow-300', 'from-amber-700 to-amber-600'];
   const medals = ['🥈', '🥇', '🥉'];

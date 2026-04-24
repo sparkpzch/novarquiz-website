@@ -131,7 +131,6 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
               <h1 className="text-3xl font-bold text-white">{session?.name || '…'}</h1>
               <p className="text-gray-400 text-sm mt-1">
                 {players.length} player{players.length !== 1 ? 's' : ''} in lobby
-                {session?.is_private && <span className="ml-2 text-amber-400">· Private</span>}
               </p>
             </div>
             <button
@@ -159,9 +158,7 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
               <AnimatePresence>
                 {players.map(([uid, player], i) => {
                   const isMe = uid === user.uid;
-                  const isThisLeader = session?.is_private
-                    ? uid === session.created_by
-                    : uid === room?.leaderId;
+                  const isThisLeader = uid === room?.leaderId;
 
                   return (
                     <motion.div

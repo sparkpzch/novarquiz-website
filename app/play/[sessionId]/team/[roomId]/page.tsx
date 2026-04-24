@@ -99,9 +99,13 @@ export default function TeamLobbyPage({
         return;
       }
       if (data && user) {
-        // Determine phase: host → directly to lobby; existing player → lobby; stranger → join
+        const isHost = data.hostId === user.uid;
         const inRoom = !!data.players?.[user.uid];
-        setPhase(inRoom ? 'lobby' : 'join');
+        if (isHost && !inRoom && data.status === 'waiting') {
+          // Host reconnecting — auto-rejoin using the room's own PIN
+          joinTeamRoom(roomId, data.pin, user).catch(() => {});
+        }
+        setPhase(isHost || inRoom ? 'lobby' : 'join');
       } else if (data === null) {
         // Room doesn't exist
         router.push('/');

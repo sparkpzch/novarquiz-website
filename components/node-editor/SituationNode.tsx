@@ -33,7 +33,7 @@ export const SituationNode = memo(({ id, data, selected }: NodeProps) => {
     } catch { /* non-fatal */ }
   }, [id, updateNodeData]);
 
-  const totalH = H_HEADER + 52 + (d.media_url ? 24 : 0) + 28;
+  const totalH = H_HEADER + 52 + (d.media_url ? 80 : 0) + 28;
 
   return (
     <div
@@ -125,16 +125,17 @@ export const SituationNode = memo(({ id, data, selected }: NodeProps) => {
         {d.question_text || 'Double-click to edit…'}
       </div>
 
-      {/* Media indicator */}
+      {/* Media thumbnail */}
       {d.media_url && (
-        <div style={{
-          background: '#0d0d20',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          padding: '4px 10px',
-          fontSize: 10,
-          color: '#6b7280',
-        }}>
-          {d.media_type === 'video' ? '🎬 Video' : '🖼 Image'}
+        <div style={{ height: 80, overflow: 'hidden', borderBottom: '1px solid rgba(255,255,255,0.06)', position: 'relative', background: '#0d0d20' }}>
+          {d.media_type === 'video' ? (
+            <video src={d.media_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
+          ) : (
+            <img src={d.media_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          )}
+          <span style={{ position: 'absolute', bottom: 3, right: 5, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
+            {d.media_type === 'video' ? '🎬' : '🖼'}
+          </span>
         </div>
       )}
 

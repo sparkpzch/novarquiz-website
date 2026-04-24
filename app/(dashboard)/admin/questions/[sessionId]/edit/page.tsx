@@ -74,10 +74,6 @@ export default function EditQuestionPage({ params }: { params: Promise<{ session
   const [sessionName, setSessionName] = useState('');
   const [description, setDescription] = useState('');
   const [timerSeconds, setTimerSeconds] = useState<number | null>(30);
-  const [isPrivate, setIsPrivate] = useState(false);
-  const [pinCode, setPinCode] = useState('');
-  const [shareToken, setShareToken] = useState('');
-  const [linkCopied, setLinkCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(true);
 
@@ -97,9 +93,6 @@ export default function EditQuestionPage({ params }: { params: Promise<{ session
         setSessionName(session.name);
         setDescription(session.description ?? '');
         setTimerSeconds(session.timer_seconds ?? null);
-        setIsPrivate(session.is_private ?? false);
-        setPinCode(session.pin_code ?? '');
-        setShareToken(session.share_token ?? '');
       }
       setNodes(toFlowNodes(graph.questions ?? []));
       setEdges(toFlowEdges(graph.connections ?? []));
@@ -118,7 +111,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ session
       const sesRes = await fetch(`/api/questions/sessions/${sessionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: sessionName, description, timer_seconds: timerSeconds, is_published: publish, is_private: isPrivate }),
+        body: JSON.stringify({ name: sessionName, description, timer_seconds: timerSeconds, is_published: publish }),
       });
       if (!sesRes.ok) throw new Error((await sesRes.json()).error);
 
@@ -211,40 +204,6 @@ export default function EditQuestionPage({ params }: { params: Promise<{ session
 
       {/* Session settings bar */}
       <div className="flex flex-wrap items-center gap-3 flex-shrink-0 px-1">
-        {/* Private toggle */}
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <div
-            onClick={() => setIsPrivate(v => !v)}
-            className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${isPrivate ? 'bg-indigo-600' : 'bg-white/10'}`}
-          >
-            <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${isPrivate ? 'translate-x-4' : 'translate-x-0'}`} />
-          </div>
-          <span className="text-sm text-gray-300">Private</span>
-        </label>
-
-        {/* PIN display */}
-        {pinCode && (
-          <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-white/5 border border-white/10">
-            <span className="text-xs text-gray-500">PIN</span>
-            <span className="font-mono text-sm font-bold text-white tracking-widest">{pinCode}</span>
-          </div>
-        )}
-
-        {/* Share link */}
-        {shareToken && (
-          <button
-            onClick={async () => {
-              await navigator.clipboard.writeText(`${window.location.origin}/join/${shareToken}`);
-              setLinkCopied(true);
-              setTimeout(() => setLinkCopied(false), 2000);
-            }}
-            className="flex items-center gap-2 px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-sm text-gray-300 hover:bg-white/10 transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-            {linkCopied ? 'Copied!' : 'Copy Join Link'}
-          </button>
-        )}
-
         {/* Open Lobby */}
         <button
           onClick={() => router.push(`/admin/questions/${sessionId}/lobby`)}

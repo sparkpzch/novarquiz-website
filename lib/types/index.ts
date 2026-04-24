@@ -7,13 +7,9 @@ export interface QuestionSession {
   cover_image_url: string | null;
   timer_seconds: number | null;
   is_published: boolean;
-  is_private: boolean;
-  pin_code: string;
-  share_token: string;
   created_by: string;
   created_at: string;
   updated_at: string;
-  quiz_id?: string | null;
   question_count?: number;
   play_count?: number;
   avg_score?: number;
@@ -42,9 +38,10 @@ export interface Choice {
   id: string;
   label: 'A' | 'B' | 'C' | 'D';
   choice_text: string;
-  // Signed points awarded when this choice is picked. Final score = sum of
-  // points across all picked choices. Default 0, negative allowed.
-  points: number;
+  score_impact: number;
+  explanation: string;
+  /** @deprecated use score_impact */
+  points?: number;
 }
 
 export interface QuestionConnection {

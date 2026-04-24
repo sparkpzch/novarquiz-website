@@ -13,7 +13,6 @@ type SessionInfo = {
   id: string;
   name: string;
   description: string | null;
-  is_private: boolean;
 };
 
 export default function JoinPage({ params }: { params: Promise<{ token: string }> }) {
@@ -23,9 +22,8 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
 
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [fetchError, setFetchError] = useState('');
-  const [pin, setPin] = useState('');
-  const [pinError, setPinError] = useState('');
   const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState('');
   const [guestName, setGuestName] = useState('');
 
   // Sign in anonymously if there's no existing session.
@@ -56,7 +54,7 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
           return;
         }
         const data = await res.json();
-        if (!cancelled) setSession({ id: data.id, name: data.name, description: data.description, is_private: data.is_private });
+        if (!cancelled) setSession({ id: data.id, name: data.name, description: data.description });
       } catch {
         if (!cancelled) setFetchError('Failed to load session');
       }
@@ -67,34 +65,17 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
   const handleJoin = async () => {
     if (!session || !user) return;
     setJoining(true);
-    setPinError('');
+    setJoinError('');
 
-    trackEvent('session_join_attempted', { session_id: session.id, is_private: session.is_private });
+    trackEvent('session_join_attempted', { session_id: session.id });
 
     try {
-      // Apply guest display name before joining so the lobby shows it correctly.
       if (user.isAnonymous && guestName.trim()) {
         await updateProfile(user, { displayName: guestName.trim() });
       }
 
-      if (session.is_private) {
-        const res = await fetch(`/api/questions/sessions/${session.id}/verify-pin`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin }),
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          setPinError(data.error || 'Incorrect PIN');
-          setJoining(false);
-          return;
-        }
-      }
-
       await joinWaitingRoom(session.id, user);
-      if (!session.is_private) {
-        await claimLeaderIfEmpty(session.id, user.uid);
-      }
+      await claimLeaderIfEmpty(session.id, user.uid);
       await trackUserSession(user.uid, {
         sessionId: session.id,
         sessionName: session.name,
@@ -105,7 +86,7 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
       router.push(`/play/${session.id}/lobby`);
     } catch (err) {
       console.error('Join failed:', err);
-      setPinError(`Could not join: ${(err as Error).message || 'unknown error'}`);
+      setJoinError(`Could not join: ${(err as Error).message || 'unknown error'}`);
       setJoining(false);
     }
   };
@@ -172,36 +153,15 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
               </div>
             )}
 
-            {session.is_private && (
-              <div className="mb-6">
-                <label className="text-sm font-medium text-gray-300 block mb-2">
-                  🔐 Enter PIN to join
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={pin}
-                  onChange={e => { setPin(e.target.value.replace(/\D/g, '')); setPinError(''); }}
-                  onKeyDown={e => e.key === 'Enter' && handleJoin()}
-                  placeholder="000000"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white text-center text-2xl font-mono tracking-[0.5em] focus:border-indigo-500 focus:outline-none placeholder:text-gray-600"
-                />
-                {pinError && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-red-400 text-sm mt-2 text-center"
-                  >
-                    {pinError}
-                  </motion.p>
-                )}
-              </div>
+            {joinError && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 text-sm mb-4 text-center">
+                {joinError}
+              </motion.p>
             )}
 
             <button
               onClick={handleJoin}
-              disabled={joining || (session.is_private && pin.length !== 6)}
+              disabled={joining}
               className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold text-base disabled:opacity-50 disabled:cursor-not-allowed hover:from-indigo-500 hover:to-purple-500 transition-all"
             >
               {joining ? (

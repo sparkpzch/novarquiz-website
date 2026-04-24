@@ -372,7 +372,7 @@ export function LeftInspector({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 6 }}>
               {(nd.choices ?? []).map((c, idx) => {
                 const color = CHOICE_COLORS[c.label] ?? '#6366f1';
-                const score = c.score_impact ?? c.points ?? 0;
+                const score = c.score_impact ?? 0;
 
                 const updateChoice = (patch: Partial<typeof c>) => {
                   const choices = [...(nd.choices ?? [])];
