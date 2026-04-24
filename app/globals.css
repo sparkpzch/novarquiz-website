@@ -170,6 +170,83 @@ body {
   box-shadow: 0 14px 36px rgba(17, 87, 145, 0.12);
 }
 
+.nq-admin-panel {
+  --nq-admin-title: #16324f;
+  --nq-admin-body: #294867;
+  --nq-admin-muted: #456786;
+  --nq-admin-soft: #587693;
+  --nq-admin-border: rgba(4, 96, 169, 0.18);
+  --nq-admin-surface: rgba(255, 255, 255, 0.8);
+  --nq-admin-surface-strong: rgba(255, 255, 255, 0.9);
+}
+
+.nq-admin-panel .bg-white\/5,
+.nq-admin-panel .bg-white\/\[0\.03\],
+.nq-admin-panel .bg-white\/\[0\.04\] {
+  background-color: var(--nq-admin-surface) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
+}
+
+.nq-admin-panel .bg-black\/20,
+.nq-admin-panel .bg-black\/50 {
+  background-color: rgba(255, 255, 255, 0.72) !important;
+}
+
+.nq-admin-panel .rounded-2xl.bg-white\/5,
+.nq-admin-panel .rounded-3xl.bg-white\/\[0\.03\] {
+  backdrop-filter: blur(18px);
+}
+
+.nq-admin-panel .border-white\/5,
+.nq-admin-panel .border-white\/10 {
+  border-color: var(--nq-admin-border) !important;
+}
+
+.nq-admin-panel :not(button).text-white {
+  color: var(--nq-admin-title) !important;
+}
+
+.nq-admin-panel .text-gray-300 {
+  color: var(--nq-admin-body) !important;
+}
+
+.nq-admin-panel .text-gray-400 {
+  color: var(--nq-admin-body) !important;
+}
+
+.nq-admin-panel .text-gray-500 {
+  color: var(--nq-admin-muted) !important;
+}
+
+.nq-admin-panel .text-gray-600 {
+  color: var(--nq-admin-soft) !important;
+}
+
+.nq-admin-panel button.text-white,
+.nq-admin-panel button.text-white svg,
+.nq-admin-panel button.text-white span {
+  color: #f8fbff !important;
+}
+
+.nq-admin-panel .hover\:text-white:hover {
+  color: var(--nq-admin-title) !important;
+}
+
+.nq-admin-panel .hover\:bg-white\/5:hover,
+.nq-admin-panel .hover\:bg-white\/\[0\.08\]:hover {
+  background-color: var(--nq-admin-surface-strong) !important;
+}
+
+.nq-admin-panel .hover\:bg-white\/\[0\.92\]:hover {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.nq-admin-panel .bg-linear-to-r,
+.nq-admin-panel .bg-linear-to-t,
+.nq-admin-panel .bg-linear-to-br {
+  color: inherit;
+}
+
 /* React Flow Controls dark theme */
 .react-flow__controls-button {
   background: #1a1a3a !important;
