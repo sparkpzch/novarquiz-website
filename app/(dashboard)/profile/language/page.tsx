@@ -49,10 +49,11 @@ function CheckMark({ active }: { active: boolean }) {
 
 export default function LanguagePage() {
   const router = useRouter();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const handleSelect = async (language: "en" | "th") => {
     await i18n.changeLanguage(language);
+    window.localStorage.setItem("novarquiz-language", language);
   };
 
   return (
@@ -64,7 +65,7 @@ export default function LanguagePage() {
         animate={{ opacity: 1, y: 0 }}
         className="nq-card rounded-[28px] px-6 py-5"
       >
-        <h1 className="text-[1.7rem] font-semibold text-[#202A3F]">Language</h1>
+        <h1 className="text-[1.7rem] font-semibold text-[#202A3F]">{t("profile.language")}</h1>
 
         <div className="mt-5 space-y-6">
           <button
@@ -74,7 +75,7 @@ export default function LanguagePage() {
           >
             <div className="flex items-center gap-4">
               <span className="text-[2rem]">🇬🇧</span>
-              <span className="text-xl font-medium text-[#202A3F]">English</span>
+              <span className="text-xl font-medium text-[#202A3F]">{t("language.english")}</span>
             </div>
             <CheckMark active={i18n.language === "en"} />
           </button>
@@ -86,7 +87,7 @@ export default function LanguagePage() {
           >
             <div className="flex items-center gap-4">
               <span className="text-[2rem]">🇹🇭</span>
-              <span className="text-xl font-medium text-[#202A3F]">Thai</span>
+              <span className="text-xl font-medium text-[#202A3F]">{t("language.thai")}</span>
             </div>
             <CheckMark active={i18n.language === "th"} />
           </button>
@@ -94,7 +95,7 @@ export default function LanguagePage() {
       </motion.section>
 
       <p className="text-center text-[1.05rem] font-medium text-[#6A7485]">
-        Select your preferred app language.
+        {t("language.description")}
       </p>
     </div>
   );

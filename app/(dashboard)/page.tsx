@@ -511,7 +511,7 @@ export default function DashboardPage() {
             {[1, 2, 3].map((key) => (
               <div
                 key={key}
-                className="nq-card-dark animate-pulse rounded-[30px] p-5"
+                className="nq-card-dark animate-pulse rounded-[30px] p-7"
               >
                 <div className="mb-4 h-5 w-3/4 rounded-full bg-white/10" />
                 <div className="mb-2 h-3 w-full rounded-full bg-white/10" />
@@ -534,10 +534,10 @@ export default function DashboardPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.04 }}
                 onClick={() => setSelectedSession(session)}
-                className="nq-card-dark group overflow-hidden rounded-[30px] p-0 text-left transition hover:-translate-y-1"
+                className="nq-card-dark group min-h-[272px] overflow-hidden rounded-[30px] p-0 text-left transition hover:-translate-y-1"
               >
                 {session.cover_image_url && (
-                  <div className="h-44 overflow-hidden">
+                  <div className="h-52 overflow-hidden">
                     <img
                       src={session.cover_image_url}
                       alt={session.name}
@@ -545,21 +545,21 @@ export default function DashboardPage() {
                     />
                   </div>
                 )}
-                <div className="p-5">
-                  <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="p-7">
+                  <div className="mb-4 flex items-start justify-between gap-4">
                     <h3 className="nq-on-dark line-clamp-2 text-xl font-bold">
                       {session.name}
                     </h3>
-                    <span className="rounded-full bg-[#7B8BFF]/30 px-2.5 py-1 text-xs font-semibold text-[#C7D5FF]">
+                    <span className="shrink-0 whitespace-nowrap rounded-full bg-[#7B8BFF]/30 px-3 py-1 text-xs font-semibold text-[#F3F7FF]">
                       {session.question_count} Q
                     </span>
                   </div>
                   {session.description && (
-                    <p className="nq-on-dark-muted line-clamp-2 text-sm">
+                    <p className="nq-on-dark-muted line-clamp-4 text-sm leading-7">
                       {session.description}
                     </p>
                   )}
-                  <div className="nq-on-dark-soft mt-4 flex flex-wrap items-center gap-3 text-xs">
+                  <div className="nq-on-dark-soft mt-6 flex flex-wrap items-center gap-4 text-sm">
                     <span>⏱ Count-up from 0</span>
                     <span>🎮 {t("dashboard.join_quiz")}</span>
                   </div>

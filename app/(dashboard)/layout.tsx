@@ -2,6 +2,7 @@
 
 import { ReactNode, Suspense, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
@@ -114,17 +115,21 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
       <div className="nq-content flex min-h-screen">
         <aside className="hidden w-[292px] shrink-0 p-6 xl:block">
           <div className="nq-card flex h-full flex-col rounded-[32px] p-6">
-            <Link href="/" className="flex items-center gap-4 rounded-3xl px-2 py-1">
-              <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-gradient-to-br from-[#92BFFF] via-[#4E93E6] to-[#0460A9] text-2xl text-white shadow-lg shadow-[#0460A9]/25">
-                N
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#5D7EA1]">NovarQuiz</p>
-                <p className="text-lg font-semibold text-[#16324F]">Player Dashboard</p>
-              </div>
+            <Link href="/" className="flex justify-center rounded-3xl px-2 py-1">
+              <Image
+                src="/image/icon/novartis-logo-transparent.png"
+                alt="Novartis logo"
+                width={160}
+                height={64}
+                className="h-16 w-auto object-contain"
+                priority
+              />
             </Link>
 
-            <div className="mt-7 rounded-[28px] bg-white/55 p-4">
+            <Link
+              href="/profile"
+              className="mt-7 block rounded-[28px] bg-white/55 p-4 transition hover:bg-white/70"
+            >
               <div className="flex items-center gap-4">
                 <ProfileAvatar
                   displayName={user.displayName}
@@ -137,7 +142,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
                   <p className="truncate text-sm text-[#5D7EA1]">{user.email}</p>
                 </div>
               </div>
-            </div>
+            </Link>
 
             <nav className="mt-8 space-y-2">
               {mobileNavItems.map((item) => {
@@ -148,7 +153,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
                     href={item.href}
                     className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
                       active
-                        ? 'bg-[#0460A9] text-white shadow-lg shadow-[#0460A9]/20'
+                        ? 'bg-[#0460A9] text-[#F8FBFF] shadow-lg shadow-[#0460A9]/20'
                         : 'text-[#4D6F93] hover:bg-white/60 hover:text-[#16324F]'
                     }`}
                   >
@@ -173,7 +178,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
                         href={item.href}
                         className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
                           active
-                            ? 'bg-[#70A2F9] text-white shadow-lg shadow-[#0460A9]/20'
+                            ? 'bg-[#0460A9] text-[#F8FBFF] shadow-lg shadow-[#0460A9]/20'
                             : 'bg-white/45 text-[#4D6F93] hover:bg-white/70 hover:text-[#16324F]'
                         }`}
                       >

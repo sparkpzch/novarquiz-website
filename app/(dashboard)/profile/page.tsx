@@ -192,12 +192,14 @@ function Toggle({
 function GeneralRow({
   icon,
   label,
+  description,
   trailing,
   href,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
+  description?: string;
   trailing?: React.ReactNode;
   href?: string;
   onClick?: () => void;
@@ -208,7 +210,12 @@ function GeneralRow({
         {icon}
       </div>
       <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-        <span className="text-[1.05rem] font-medium text-[#202A3F]">{label}</span>
+        <div className="min-w-0">
+          <p className="text-[1.05rem] font-medium text-[#202A3F]">{label}</p>
+          {description && (
+            <p className="mt-0.5 text-xs text-[#8FA3BD]">{description}</p>
+          )}
+        </div>
         <div className="flex items-center gap-2">{trailing}</div>
       </div>
     </div>
@@ -310,6 +317,7 @@ export default function ProfilePage() {
   };
 
   const handleLogout = async () => {
+    await fetch("/api/auth/session", { method: "DELETE" });
     await signOut(auth);
     window.location.href = "/sign-in";
   };
@@ -354,13 +362,13 @@ export default function ProfilePage() {
           <div className="mt-5 grid grid-cols-2 gap-3">
             <div className="rounded-[18px] bg-white/14 px-4 py-3 text-center">
               <p className="text-2xl font-bold">{userStats.bestStreak || 0}</p>
-              <p className="text-sm text-white/80">Best Streak</p>
+              <p className="text-sm text-white/80">{t("dashboard.best_streak")}</p>
             </div>
             <div className="rounded-[18px] bg-white/14 px-4 py-3 text-center">
               <p className="text-2xl font-bold">
                 {(userStats.bestScore || 0).toLocaleString()}
               </p>
-              <p className="text-sm text-white/80">Best Score</p>
+              <p className="text-sm text-white/80">{t("profile.best_score")}</p>
             </div>
           </div>
 
@@ -370,7 +378,7 @@ export default function ProfilePage() {
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-[18px] bg-white px-4 py-3 text-lg font-semibold text-[#70A2F9] shadow-[0_12px_28px_rgba(17,87,145,0.18)]"
           >
             <EditIcon />
-            <span>Edit Profile</span>
+            <span>{t("profile.edit_profile")}</span>
           </button>
         </div>
 
@@ -389,23 +397,23 @@ export default function ProfilePage() {
         transition={{ delay: 0.05 }}
         className="nq-card rounded-[30px] p-6"
       >
-        <h2 className="mb-5 text-2xl font-semibold text-[#202A3F]">General</h2>
+        <h2 className="mb-5 text-2xl font-semibold text-[#202A3F]">{t("profile.general")}</h2>
         <div className="space-y-5">
           <GeneralRow
             icon={<LockIcon />}
-            label="Change password"
+            label={t("profile.change_password")}
             href="/profile/change-password"
             trailing={<ChevronRight />}
           />
 
           <GeneralRow
             icon={<BellIcon />}
-            label="Language"
+            label={t("profile.language")}
             href="/profile/language"
             trailing={
               <>
                 <span className="text-sm text-[#6D7D95]">
-                  {i18n.language === "en" ? "English" : "Thai"}
+                  {i18n.language === "en" ? t("language.english") : t("language.thai")}
                 </span>
                 <ChevronRight />
               </>
@@ -414,13 +422,14 @@ export default function ProfilePage() {
 
           <GeneralRow
             icon={<MoonIcon />}
-            label="Dark mode"
+            label={t("profile.dark_mode")}
+            description={t("profile.maintenance")}
             trailing={<Toggle enabled={theme === "dark"} disabled />}
           />
 
           <GeneralRow
             icon={<SoundIcon />}
-            label="Sound"
+            label={t("profile.sound")}
             trailing={
               <Toggle enabled={soundEnabled} onToggle={handleSoundToggle} />
             }
@@ -428,7 +437,7 @@ export default function ProfilePage() {
 
           <GeneralRow
             icon={<ShieldIcon />}
-            label="Terms of Service & Privacy Policy"
+            label={t("profile.terms_privacy")}
             onClick={() => setTermsModal(true)}
             trailing={<ChevronRight />}
           />
@@ -449,14 +458,14 @@ export default function ProfilePage() {
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
             <LogoutIcon />
           </div>
-          <span className="text-[1.05rem] font-medium text-[#E85C5C]">Log Out</span>
+          <span className="text-[1.05rem] font-medium text-[#E85C5C]">{t("nav.logout")}</span>
         </button>
       </motion.section>
 
       <Modal
         isOpen={termsModal}
         onClose={() => setTermsModal(false)}
-        title="Terms of Service & Privacy Policy"
+        title={t("profile.terms_privacy")}
         size="lg"
       >
         <div className="max-h-[65vh] overflow-y-auto pr-1">
@@ -484,7 +493,7 @@ export default function ProfilePage() {
       <Modal
         isOpen={editModal}
         onClose={() => setEditModal(false)}
-        title="Edit Profile"
+        title={t("profile.edit_profile")}
       >
         <div className="flex flex-col items-center gap-5">
           <div className="relative">
@@ -502,23 +511,23 @@ export default function ProfilePage() {
               <EditIcon />
             </button>
           </div>
-          {uploading && <p className="text-sm text-[#6D7D95]">Uploading photo...</p>}
+          {uploading && <p className="text-sm text-[#6D7D95]">{t("profile.uploading_photo")}</p>}
           <div className="w-full">
-            <label className="mb-1 block text-sm font-medium text-[#202A3F]">Display Name</label>
+            <label className="mb-1 block text-sm font-medium text-[#202A3F]">{t("profile.display_name")}</label>
             <input
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               className="w-full rounded-[14px] border border-[#D9E1EE] bg-[#F3F8FF] px-4 py-3 text-[#202A3F] outline-none focus:border-[#3A66C1]"
-              placeholder="Your name"
+              placeholder={t("profile.your_name")}
             />
           </div>
           <div className="flex w-full gap-3">
             <Button variant="secondary" onClick={() => setEditModal(false)} className="flex-1">
-              Cancel
+              {t("profile.cancel")}
             </Button>
             <Button onClick={handleSaveProfile} disabled={saving} className="flex-1">
-              {saving ? "Saving..." : "Save"}
+              {saving ? t("profile.saving") : t("profile.save")}
             </Button>
           </div>
         </div>

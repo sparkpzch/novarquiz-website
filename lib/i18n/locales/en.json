@@ -33,6 +33,7 @@
     "title": "Profile",
     "account_info": "Account Information",
     "edit_profile": "Edit Profile",
+    "general": "General",
     "website_config": "Website Configuration",
     "theme": "Theme",
     "dark_mode": "Dark Mode",
@@ -48,7 +49,20 @@
     "delete_account": "Delete Account",
     "delete_confirm": "Are you sure? This action cannot be undone.",
     "save": "Save Changes",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "best_score": "Best Score",
+    "sound": "Sound",
+    "terms_privacy": "Terms of Service & Privacy Policy",
+    "maintenance": "On Maintenence",
+    "uploading_photo": "Uploading photo...",
+    "display_name": "Display Name",
+    "your_name": "Your name",
+    "saving": "Saving..."
+  },
+  "language": {
+    "english": "English",
+    "thai": "Thai",
+    "description": "Select your preferred app language."
   },
   "dashboard": {
     "welcome": "Welcome back",

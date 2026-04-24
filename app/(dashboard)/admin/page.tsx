@@ -1156,13 +1156,13 @@ function AdminDashboardContent() {
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              className="grid grid-cols-1 xl:grid-cols-2 gap-6"
             >
               {loadingData ? (
                 [1, 2, 3].map((i) => (
                   <div
                     key={i}
-                    className="rounded-2xl border border-white/5 bg-white/5 p-6 animate-pulse h-48"
+                    className="rounded-2xl border border-white/5 bg-white/5 p-6 animate-pulse h-64"
                   />
                 ))
               ) : sessions.length === 0 ? (
@@ -1175,14 +1175,14 @@ function AdminDashboardContent() {
                 sessions.map((s) => (
                   <div
                     key={s.id}
-                    className={`rounded-2xl border overflow-hidden flex flex-col group transition-colors ${
+                    className={`min-h-[360px] rounded-2xl border overflow-hidden flex flex-col group transition-colors ${
                       currentLive?.session.id === s.id
                         ? "border-[#0460A9]/35 bg-linear-to-br from-white/95 via-[#EAF5FF]/92 to-[#D7EAFF]/90 shadow-[0_18px_40px_rgba(4,96,169,0.16)]"
                         : "border-white/10 bg-white/5 shadow-[0_14px_32px_rgba(17,87,145,0.08)] hover:border-[#0460A9]/35 hover:bg-white/[0.92]"
                     }`}
                   >
                     {s.cover_image_url && (
-                      <div className="h-32 overflow-hidden">
+                      <div className="h-40 overflow-hidden">
                         <img
                           src={s.cover_image_url}
                           alt={s.name}
@@ -1190,10 +1190,10 @@ function AdminDashboardContent() {
                         />
                       </div>
                     )}
-                    <div className="p-6 flex-1">
+                    <div className="flex flex-1 flex-col p-7">
                       <div className="flex justify-between items-start mb-4">
-                        <div className="min-w-0">
-                          <h3 className="text-xl font-bold text-white group-hover:text-[#055A9E] transition-colors truncate">
+                        <div className="min-w-0 flex-1 pr-2">
+                          <h3 className="text-xl font-bold text-white group-hover:text-[#055A9E] transition-colors line-clamp-2">
                             {s.name}
                           </h3>
                           {currentLive?.session.id === s.id && (
@@ -1220,20 +1220,20 @@ function AdminDashboardContent() {
                           </button>
                         </div>
                       </div>
-                      <p className="text-sm text-gray-400 mb-4 line-clamp-2">
+                      <p className="mb-5 text-sm leading-6 text-gray-400 line-clamp-4">
                         {s.description || "No description."}
                       </p>
-                      <div className="flex items-center gap-4 text-xs font-medium text-gray-500">
+                      <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-medium text-gray-500">
                         <span>❓ {s.question_count || 0} nodes</span>
                         <span>👥 {s.play_count || 0} players</span>
                         <span>📈 {s.avg_score || 0} avg pts</span>
                       </div>
                     </div>
-                    <div className="bg-black/20 p-4 border-t border-white/5 flex flex-wrap gap-2">
+                    <div className="bg-black/20 p-5 border-t border-white/5 flex items-center gap-2">
                       <Button
                         variant="primary"
                         size="sm"
-                        className="flex-1"
+                        className="flex-1 whitespace-nowrap"
                         onClick={() =>
                           router.push(`/admin/questions/${s.id}/lobby`)
                         }
@@ -1245,6 +1245,7 @@ function AdminDashboardContent() {
                       <Button
                         variant="secondary"
                         size="sm"
+                        className="whitespace-nowrap"
                         onClick={() =>
                           router.push(`/admin/questions/${s.id}/edit`)
                         }
@@ -1254,6 +1255,7 @@ function AdminDashboardContent() {
                       <Button
                         variant="ghost"
                         size="sm"
+                        className="whitespace-nowrap"
                         onClick={() => handleDuplicate(s.id, false)}
                       >
                         Duplicate
