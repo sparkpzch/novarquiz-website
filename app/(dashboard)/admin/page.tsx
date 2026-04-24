@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -56,7 +56,7 @@ function getLatestActivity(room: SessionRoom) {
   return Math.max(0, ...playerJoins, ...scoreUpdates);
 }
 
-export default function AdminDashboardPage() {
+function AdminDashboardContent() {
   const { t } = useTranslation();
   const { user, isAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -548,5 +548,13 @@ export default function AdminDashboardPage() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function AdminDashboardPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[40vh]" />}>
+      <AdminDashboardContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
@@ -24,7 +24,7 @@ type UserHistoryRow = {
 
 type Tab = 'session' | 'mine';
 
-export default function HistoryPage() {
+function HistoryPageContent() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
@@ -216,5 +216,13 @@ export default function HistoryPage() {
       </>
       )}
     </div>
+  );
+}
+
+export default function HistoryPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[40vh]" />}>
+      <HistoryPageContent />
+    </Suspense>
   );
 }

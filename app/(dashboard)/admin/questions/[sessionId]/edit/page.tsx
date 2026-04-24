@@ -118,7 +118,7 @@ export default function EditQuestionPage({
     ])
       .then(
         ([session, graph]: [
-          QuestionSession | null,
+          Quiz | null,
           { questions: Question[]; connections: QuestionConnection[] },
         ]) => {
           if (session) {

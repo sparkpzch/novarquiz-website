@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +8,7 @@ import '@/lib/i18n';
 import { motion } from 'motion/react';
 import type { LeaderboardEntry, Quiz } from '@/lib/types';
 
-export default function LeaderboardPage() {
+function LeaderboardPageContent() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const searchParams = useSearchParams();
@@ -121,5 +121,13 @@ export default function LeaderboardPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function LeaderboardPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[40vh]" />}>
+      <LeaderboardPageContent />
+    </Suspense>
   );
 }
