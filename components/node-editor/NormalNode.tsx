@@ -26,6 +26,11 @@ const CHOICE_CFG = {
   D: { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
 } as const;
 
+const QUESTION_NODE_ACCENT = '#70A2F9';
+const QUESTION_NODE_ACCENT_SOFT = '#92BFFF';
+const QUESTION_NODE_HEADER_BG = 'rgba(112,162,249,0.2)';
+const QUESTION_NODE_SURFACE_GLOW = 'rgba(112,162,249,0.18)';
+
 const H_HEADER = 36;
 const H_TEXT = 52;
 const H_CHOICE = 32;
@@ -85,22 +90,24 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
       style={{
         width: 248,
         borderRadius: 12,
-        border: `2px solid ${dragOver ? '#6366f1' : selected ? '#6366f1' : 'rgba(255,255,255,0.12)'}`,
+        border: `2px solid ${dragOver ? QUESTION_NODE_ACCENT : selected ? QUESTION_NODE_ACCENT : 'rgba(112,162,249,0.24)'}`,
+        background: 'rgba(251,253,255,0.96)',
         boxShadow: dragOver
-          ? '0 0 0 4px rgba(99,102,241,0.4), 0 8px 32px rgba(0,0,0,0.6)'
+          ? '0 0 0 4px rgba(112,162,249,0.4), 0 8px 32px rgba(0,0,0,0.6)'
           : selected
-            ? '0 0 0 3px rgba(99,102,241,0.25), 0 8px 32px rgba(0,0,0,0.6)'
-            : '0 4px 24px rgba(0,0,0,0.5)',
+            ? '0 0 0 3px rgba(112,162,249,0.24), 0 8px 32px rgba(0,0,0,0.6)'
+            : '0 16px 32px rgba(82,114,164,0.18)',
         position: 'relative',
+        overflow: 'hidden',
       }}>
       {dragOver && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 20, borderRadius: 10,
-          background: 'rgba(99,102,241,0.18)',
+          background: QUESTION_NODE_SURFACE_GLOW,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           pointerEvents: 'none',
         }}>
-          <span style={{ color: '#a5b4fc', fontSize: 11, fontWeight: 700 }}>Drop media here</span>
+          <span style={{ color: '#dbeafe', fontSize: 11, fontWeight: 700 }}>Drop media here</span>
         </div>
       )}
 
@@ -113,9 +120,9 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
           top: H_HEADER / 2,
           width: 12,
           height: 12,
-          background: '#6366f1',
-          border: '2px solid #818cf8',
-          boxShadow: selected ? '0 0 0 3px rgba(99,102,241,0.3), 0 0 10px rgba(99,102,241,0.5)' : 'none',
+          background: QUESTION_NODE_ACCENT,
+          border: `2px solid ${QUESTION_NODE_ACCENT_SOFT}`,
+          boxShadow: selected ? '0 0 0 3px rgba(112,162,249,0.3), 0 0 10px rgba(112,162,249,0.5)' : 'none',
           transition: 'box-shadow 0.15s',
         }}
       />
@@ -164,9 +171,9 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
       {/* Header */}
       <div style={{
         height: H_HEADER,
-        background: 'rgba(99,102,241,0.18)',
+        background: QUESTION_NODE_HEADER_BG,
         borderRadius: '10px 10px 0 0',
-        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        borderBottom: '1px solid rgba(146,191,255,0.2)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -175,7 +182,7 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 11 }}>❓</span>
-          <span style={{ color: '#a5b4fc', fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          <span style={{ color: '#dbeafe', fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
             Question
           </span>
           {d.is_entry_point && (
@@ -197,9 +204,9 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
       <div style={{
         height: H_TEXT,
         padding: '8px 10px',
-        background: '#0d0d20',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        color: d.question_text ? '#e2e8f0' : '#4b5563',
+        background: 'rgba(247,251,255,0.96)',
+        borderBottom: '1px solid rgba(112,162,249,0.12)',
+        color: d.question_text ? '#223a63' : '#8aa1c3',
         fontSize: 12,
         lineHeight: '1.5',
         overflow: 'hidden',
@@ -212,7 +219,7 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
 
       {/* Media thumbnail */}
       {d.media_url && (
-        <div style={{ height: H_MEDIA, overflow: 'hidden', borderBottom: '1px solid rgba(255,255,255,0.06)', position: 'relative', background: '#0d0d20' }}>
+        <div style={{ height: H_MEDIA, overflow: 'hidden', borderBottom: '1px solid rgba(112,162,249,0.12)', position: 'relative', background: 'rgba(247,251,255,0.96)' }}>
           {d.media_type === 'video' ? (
             <video src={d.media_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
           ) : (
@@ -247,7 +254,7 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
             }}>{c.label}</span>
             <span style={{
               flex: 1,
-              color: c.choice_text ? '#d1d5db' : '#4b5563',
+              color: c.choice_text ? '#35527e' : '#8aa1c3',
               fontSize: 11,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>

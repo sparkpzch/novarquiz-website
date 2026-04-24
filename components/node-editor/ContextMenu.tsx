@@ -17,7 +17,7 @@ interface ContextMenuProps {
 }
 
 const Divider = () => (
-  <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+  <div style={{ height: 1, background: 'rgba(112,162,249,0.16)', margin: '4px 0' }} />
 );
 
 const MenuItem = ({
@@ -33,14 +33,15 @@ const MenuItem = ({
       padding: '7px 12px',
       background: 'none',
       border: 'none',
-      color: danger ? '#f87171' : '#e2e8f0',
+      color: danger ? '#c2415b' : '#223a63',
       fontSize: 13,
+      fontWeight: 600,
       cursor: 'pointer',
       borderRadius: 6,
       transition: 'background 0.1s',
       textAlign: 'left',
     }}
-    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = danger ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.08)'; }}
+    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = danger ? 'rgba(244,63,94,0.1)' : 'rgba(112,162,249,0.12)'; }}
     onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
   >
     <span style={{ fontSize: 14, width: 18, textAlign: 'center' }}>{icon}</span>
@@ -75,10 +76,11 @@ export function ContextMenu({
         left: x,
         top: y,
         zIndex: 1000,
-        background: '#13132b',
-        border: '1px solid rgba(255,255,255,0.12)',
+        background: 'linear-gradient(180deg, rgba(246,250,255,0.98) 0%, rgba(232,240,255,0.96) 100%)',
+        border: '1px solid rgba(112,162,249,0.2)',
         borderRadius: 10,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
+        boxShadow: '0 16px 32px rgba(82,114,164,0.2)',
+        backdropFilter: 'blur(18px)',
         padding: '6px',
         minWidth: 180,
         userSelect: 'none',
@@ -87,7 +89,7 @@ export function ContextMenu({
     >
       {mode === 'canvas' ? (
         <>
-          <div style={{ padding: '4px 12px 6px', fontSize: 10, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+          <div style={{ padding: '4px 12px 6px', fontSize: 10, color: '#5f7699', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800 }}>
             Add Node
           </div>
           <MenuItem icon="❓" label="Question Node" onClick={() => { onAddNormal(); onClose(); }} />

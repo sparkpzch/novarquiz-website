@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import pool, { queryWithRetry } from './postgres';
 
 // ===================== Quizzes =====================
@@ -34,6 +34,10 @@ export async function getSessionById(sessionId: string) {
   return result.rows[0] || null;
 }
 
+function generatePinCode() {
+  return randomInt(0, 1_000_000).toString().padStart(6, '0');
+}
+
 // Removed: getSessionByShareToken — share tokens now live in Firebase RTDB (joinTokens/{token})
 
 export async function createSession(data: {
@@ -46,9 +50,11 @@ export async function createSession(data: {
   created_by: string;
 }) {
   const sessionId = data.id ?? randomUUID();
+  const pinCode = generatePinCode();
+  const shareToken = randomUUID();
   const result = await queryWithRetry(
-    `INSERT INTO quizzes (id, name, description, cover_image_url, timer_seconds, created_by, is_published)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO quizzes (id, name, description, cover_image_url, timer_seconds, created_by, is_published, is_private, pin_code, share_token)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (id) DO UPDATE SET
        name = EXCLUDED.name,
        description = EXCLUDED.description,
@@ -57,7 +63,18 @@ export async function createSession(data: {
        is_published = EXCLUDED.is_published,
        updated_at = NOW()
      RETURNING *`,
-    [sessionId, data.name, data.description || null, data.cover_image_url || null, data.timer_seconds ?? null, data.created_by, data.is_published ?? false],
+    [
+      sessionId,
+      data.name,
+      data.description || null,
+      data.cover_image_url || null,
+      data.timer_seconds ?? null,
+      data.created_by,
+      data.is_published ?? false,
+      false,
+      pinCode,
+      shareToken,
+    ],
     { allowWriteRetry: true }
   );
   return result.rows[0];
@@ -108,10 +125,12 @@ export async function duplicateQuizOrSession(sourceId: string, createdBy: string
     const newName = isQuizDuplicate ? `${orig.name} (Copy)` : orig.name;
 
     // 2. Duplicate quizzes record
+    const pinCode = generatePinCode();
+    const shareToken = randomUUID();
     const { rows: newQsRows } = await client.query(
-      `INSERT INTO quizzes (name, description, cover_image_url, timer_seconds, created_by, is_published)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [newName, orig.description, orig.cover_image_url, orig.timer_seconds, createdBy, false]
+      `INSERT INTO quizzes (name, description, cover_image_url, timer_seconds, created_by, is_published, is_private, pin_code, share_token)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [newName, orig.description, orig.cover_image_url, orig.timer_seconds, createdBy, false, false, pinCode, shareToken]
     );
     const newSession = newQsRows[0];
 
