@@ -50,12 +50,13 @@ export async function createSession(data: {
   is_private?: boolean;
   is_published?: boolean;
   created_by: string;
+  quiz_id?: string;
 }) {
   const pin = String(Math.floor(100000 + Math.random() * 900000));
   const result = await pool.query(
-    `INSERT INTO question_sessions (name, description, cover_image_url, timer_seconds, created_by, is_private, is_published, pin_code)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-    [data.name, data.description || null, data.cover_image_url || null, data.timer_seconds ?? null, data.created_by, data.is_private ?? false, data.is_published ?? false, pin]
+    `INSERT INTO question_sessions (name, description, cover_image_url, timer_seconds, created_by, is_private, is_published, pin_code, quiz_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [data.name, data.description || null, data.cover_image_url || null, data.timer_seconds ?? null, data.created_by, data.is_private ?? false, data.is_published ?? false, pin, data.quiz_id || null]
   );
   return result.rows[0];
 }
@@ -68,6 +69,7 @@ export async function updateSession(sessionId: string, data: Partial<{
   is_published: boolean;
   is_private: boolean;
   pin_code: string;
+  quiz_id: string | null;
 }>) {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -92,6 +94,77 @@ export async function deleteSession(sessionId: string) {
   await pool.query('DELETE FROM question_sessions WHERE id = $1', [sessionId]);
 }
 
+export async function duplicateQuizOrSession(sourceId: string, createdBy: string, isQuizDuplicate: boolean) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Get original session
+    const { rows: qsRows } = await client.query('SELECT * FROM question_sessions WHERE id = $1', [sourceId]);
+    if (qsRows.length === 0) throw new Error('Source session not found');
+    const orig = qsRows[0];
+
+    // Determine new properties
+    const newName = isQuizDuplicate ? `${orig.name} (Copy)` : orig.name;
+    const newQuizId = isQuizDuplicate ? null : (orig.quiz_id || orig.id);
+    const pin = String(Math.floor(100000 + Math.random() * 900000));
+
+    // 2. Duplicate question_sessions record
+    const { rows: newQsRows } = await client.query(
+      `INSERT INTO question_sessions (name, description, cover_image_url, timer_seconds, created_by, is_private, is_published, pin_code, quiz_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [newName, orig.description, orig.cover_image_url, orig.timer_seconds, createdBy, orig.is_private, false, pin, newQuizId]
+    );
+    const newSession = newQsRows[0];
+
+    // 3. Get all questions
+    const { rows: qRows } = await client.query('SELECT * FROM questions WHERE session_id = $1', [sourceId]);
+    const questionIdMap: Record<string, string> = {};
+
+    for (const q of qRows) {
+      const { rows: newQRows } = await client.query(
+        `INSERT INTO questions (session_id, question_order, question_text, media_type, media_url, timer_override, is_entry_point, node_x, node_y, node_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+        [newSession.id, q.question_order, q.question_text, q.media_type, q.media_url, q.timer_override, q.is_entry_point, q.node_x, q.node_y, q.node_type]
+      );
+      const newQId = newQRows[0].id;
+      questionIdMap[q.id] = newQId;
+
+      // 4. Copy choices for this question
+      const { rows: cRows } = await client.query('SELECT * FROM choices WHERE question_id = $1', [q.id]);
+      for (const c of cRows) {
+        await client.query(
+          `INSERT INTO choices (question_id, label, choice_text, score_impact, explanation)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [newQId, c.label, c.choice_text, c.score_impact, c.explanation]
+        );
+      }
+    }
+
+    // 5. Re-map Connections
+    const { rows: connRows } = await client.query('SELECT * FROM question_connections WHERE session_id = $1', [sourceId]);
+    for (const conn of connRows) {
+      const newFrom = questionIdMap[conn.from_question_id];
+      const newTo = questionIdMap[conn.to_question_id];
+      if (newFrom && newTo) {
+        await client.query(
+          `INSERT INTO question_connections (session_id, from_question_id, from_choice_label, to_question_id, connection_type)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [newSession.id, newFrom, conn.from_choice_label, newTo, conn.connection_type]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    return newSession;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 // Removes every trace of a Firebase user from analytics-bearing tables.
 export async function deleteUserData(uid: string) {
   const client = await pool.connect();
@@ -114,7 +187,7 @@ export async function deleteUserData(uid: string) {
 export async function getQuestionsBySession(sessionId: string) {
   const result = await pool.query(
     `SELECT q.*, 
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.points) ORDER BY c.label) as choices
+      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.score_impact) ORDER BY c.label) as choices
      FROM questions q
      LEFT JOIN choices c ON c.question_id = q.id
      WHERE q.session_id = $1
@@ -128,7 +201,7 @@ export async function getQuestionsBySession(sessionId: string) {
 export async function getQuestionById(questionId: string) {
   const result = await pool.query(
     `SELECT q.*, 
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.points) ORDER BY c.label) as choices
+      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.score_impact) ORDER BY c.label) as choices
      FROM questions q
      LEFT JOIN choices c ON c.question_id = q.id
      WHERE q.id = $1
@@ -141,7 +214,7 @@ export async function getQuestionById(questionId: string) {
 export async function getEntryQuestion(sessionId: string) {
   const result = await pool.query(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.points) ORDER BY c.label) as choices
+      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.score_impact) ORDER BY c.label) as choices
      FROM questions q
      JOIN question_sessions qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
@@ -216,7 +289,7 @@ export async function upsertChoices(questionId: string, choices: Array<{ label: 
   await pool.query('DELETE FROM choices WHERE question_id = $1', [questionId]);
   for (const choice of choices) {
     await pool.query(
-      `INSERT INTO choices (question_id, label, choice_text, points) VALUES ($1, $2, $3, $4)`,
+      `INSERT INTO choices (question_id, label, choice_text, score_impact) VALUES ($1, $2, $3, $4)`,
       [questionId, choice.label, choice.choice_text, Number.isFinite(choice.points) ? Math.trunc(choice.points) : 0]
     );
   }
@@ -245,7 +318,7 @@ export async function saveConnections(sessionId: string, connections: Array<{ fr
 export async function getNextQuestion(fromQuestionId: string, choiceLabel: string) {
   const result = await pool.query(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.points) ORDER BY c.label) as choices
+      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'points', c.score_impact) ORDER BY c.label) as choices
      FROM question_connections qc
      JOIN questions q ON q.id = qc.to_question_id
      JOIN question_sessions qs ON qs.id = q.session_id
@@ -272,13 +345,13 @@ export async function saveUserAnswer(data: {
   // Look up the canonical points for the chosen choice — never trust the
   // client to send its own score. Falls back to 0 if the row is missing.
   const choiceResult = await pool.query(
-    `SELECT points FROM choices WHERE question_id = $1 AND label = $2`,
+    `SELECT score_impact FROM choices WHERE question_id = $1 AND label = $2`,
     [data.question_id, data.chosen_label],
   );
-  const points = (choiceResult.rows[0]?.points as number | undefined) ?? 0;
+  const points = (choiceResult.rows[0]?.score_impact as number | undefined) ?? 0;
 
   const result = await pool.query(
-    `INSERT INTO user_answers (session_id, user_id, question_id, chosen_label, time_taken_ms, points_earned)
+    `INSERT INTO user_answers (session_id, user_id, question_id, chosen_label, time_taken_ms, utility_score)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
     [data.session_id, data.user_id, data.question_id, data.chosen_label, data.time_taken_ms, points]
   );
@@ -296,9 +369,9 @@ export async function completePlaySession(data: {
 }) {
   const agg = await pool.query(
     `SELECT
-       COALESCE(SUM(points_earned), 0)::int            AS total_score,
-       COALESCE(SUM(CASE WHEN points_earned > 0 THEN 1 ELSE 0 END), 0)::int AS positive_count,
-       COALESCE(SUM(CASE WHEN points_earned <= 0 THEN 1 ELSE 0 END), 0)::int AS nonpositive_count,
+       COALESCE(SUM(utility_score), 0)::int            AS total_score,
+       COALESCE(SUM(CASE WHEN utility_score > 0 THEN 1 ELSE 0 END), 0)::int AS positive_count,
+       COALESCE(SUM(CASE WHEN utility_score <= 0 THEN 1 ELSE 0 END), 0)::int AS nonpositive_count,
        COALESCE(SUM(time_taken_ms), 0)::int            AS total_time_ms
      FROM user_answers
      WHERE session_id = $1 AND user_id = $2`,
@@ -310,14 +383,14 @@ export async function completePlaySession(data: {
   // Computed in-app rather than SQL because the window-function version is
   // less readable than this two-pass loop and the row count per user is tiny.
   const ordered = await pool.query(
-    `SELECT points_earned FROM user_answers
+    `SELECT utility_score FROM user_answers
      WHERE session_id = $1 AND user_id = $2
      ORDER BY answered_at ASC`,
     [data.session_id, data.user_id],
   );
   let streak = 0, best = 0;
   for (const r of ordered.rows) {
-    if ((r.points_earned as number) > 0) { streak += 1; if (streak > best) best = streak; }
+    if ((r.utility_score as number) > 0) { streak += 1; if (streak > best) best = streak; }
     else streak = 0;
   }
 

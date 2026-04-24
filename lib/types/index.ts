@@ -13,6 +13,7 @@ export interface QuestionSession {
   created_by: string;
   created_at: string;
   updated_at: string;
+  quiz_id?: string | null;
   question_count?: number;
   play_count?: number;
   avg_score?: number;
