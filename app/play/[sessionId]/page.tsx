@@ -48,7 +48,7 @@ export default function PlayLobbyPage({ params }: { params: Promise<{ sessionId:
         {session.description && <p className="text-gray-400">{session.description}</p>}
         <div className="flex items-center justify-center gap-6 text-sm text-gray-400">
           <span>📝 {session.question_count || '?'} {t('play.questions_count')}</span>
-          <span>⏱ {session.timer_seconds} {t('play.time_per_question')}</span>
+          <span>⏱ Count-up timer from 0</span>
         </div>
         <h2 className="text-xl text-white">{t('play.ready')}</h2>
         <Button onClick={handleStart} size="lg" className="w-full text-lg">{t('play.start')} 🚀</Button>

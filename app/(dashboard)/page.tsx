@@ -356,7 +356,7 @@ export default function DashboardPage() {
                   </div>
                   {s.description && <p className="text-sm text-gray-400 mb-3 line-clamp-2">{s.description}</p>}
                   <div className="flex items-center gap-3 text-xs text-gray-500">
-                    <span>⏱ {s.timer_seconds}s</span>
+                    <span>⏱ Count-up from 0</span>
                     <span>•</span>
                     <span className="group-hover:text-indigo-400 transition-colors">{t('dashboard.join_quiz')} →</span>
                   </div>

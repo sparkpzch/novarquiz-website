@@ -57,7 +57,7 @@ export default function ObservePage({ params }: { params: Promise<{ sessionId: s
     setEnding(true);
     try {
       await endRoom(sessionId);
-      router.push('/admin/questions');
+      router.push('/admin?tab=session-manager');
     } catch { setEnding(false); }
   };
 

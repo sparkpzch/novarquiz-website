@@ -28,7 +28,6 @@ export default function CreateQuestionPage() {
 
   const [sessionName, setSessionName] = useState("");
   const [description, setDescription] = useState("");
-  const [timerSeconds, setTimerSeconds] = useState(30);
   const [saving, setSaving] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>([]);
@@ -59,7 +58,7 @@ export default function CreateQuestionPage() {
         body: JSON.stringify({
           name: sessionName,
           description,
-          timer_seconds: timerSeconds,
+          timer_seconds: null,
           is_published: publish,
           created_by: user?.uid,
         }),
@@ -89,7 +88,7 @@ export default function CreateQuestionPage() {
 
         if (isNormal) {
           const nd = d as NormalNodeData;
-          body.timer_override = nd.timer_override;
+          body.timer_override = null;
           body.choices = nd.choices;
         }
 
@@ -123,7 +122,7 @@ export default function CreateQuestionPage() {
       if (!graphRes.ok) throw new Error(await getErrorMessage(graphRes));
 
       showToast(publish ? "Session published!" : "Draft saved!", "success");
-      router.push("/admin?tab=sessions");
+      router.push("/admin?tab=question-manager");
     } catch (err) {
       showToast(`Save failed: ${(err as Error).message}`, "error");
     } finally {
@@ -141,7 +140,7 @@ export default function CreateQuestionPage() {
       }}
     >
       {/* Session metadata */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-shrink-0">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-shrink-0">
         <Input
           label="Session Name"
           value={sessionName}
@@ -153,14 +152,6 @@ export default function CreateQuestionPage() {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Optional"
-        />
-        <Input
-          label="Default Timer (seconds)"
-          type="number"
-          value={timerSeconds}
-          onChange={(e) => setTimerSeconds(Number(e.target.value))}
-          min={5}
-          max={120}
         />
       </div>
 

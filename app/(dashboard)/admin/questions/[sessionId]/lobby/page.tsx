@@ -28,6 +28,13 @@ function PlayerAvatar({ displayName, photoURL }: { displayName: string; photoURL
   );
 }
 
+function formatJoinTime(timestamp: number) {
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function HostLobbyPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = use(params);
   const { user, isAdmin, loading } = useAuth();
@@ -161,7 +168,7 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-medium truncate">{player.displayName}</p>
                   <p className="text-gray-500 text-xs">
-                    Joined {Math.round((Date.now() - player.joinedAt) / 1000)}s ago
+                    Joined at {formatJoinTime(player.joinedAt)}
                   </p>
                 </div>
                 <div className="w-2 h-2 rounded-full bg-emerald-400" title="Online" />

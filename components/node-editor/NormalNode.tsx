@@ -191,9 +191,6 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
             }}>START</span>
           )}
         </div>
-        {d.timer_override && (
-          <span style={{ color: '#fbbf24', fontSize: 10 }}>⏱ {d.timer_override}s</span>
-        )}
       </div>
 
       {/* Question text */}

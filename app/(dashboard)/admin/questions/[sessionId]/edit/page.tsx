@@ -97,7 +97,6 @@ export default function EditQuestionPage({
 
   const [sessionName, setSessionName] = useState("");
   const [description, setDescription] = useState("");
-  const [timerSeconds, setTimerSeconds] = useState<number | null>(30);
   const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(true);
 
@@ -125,7 +124,6 @@ export default function EditQuestionPage({
           if (session) {
             setSessionName(session.name);
             setDescription(session.description ?? "");
-            setTimerSeconds(session.timer_seconds ?? null);
           }
           setNodes(toFlowNodes(graph.questions ?? []));
           setEdges(toFlowEdges(graph.connections ?? []));
@@ -156,7 +154,7 @@ export default function EditQuestionPage({
         body: JSON.stringify({
           name: sessionName,
           description,
-          timer_seconds: timerSeconds,
+          timer_seconds: null,
           is_published: publish,
         }),
       });
@@ -189,7 +187,7 @@ export default function EditQuestionPage({
         };
         if (isNormal) {
           const nd = d as NormalNodeData;
-          body.timer_override = nd.timer_override;
+          body.timer_override = null;
           body.choices = nd.choices;
         }
 
@@ -220,7 +218,7 @@ export default function EditQuestionPage({
       if (!graphRes.ok) throw new Error(await getErrorMessage(graphRes));
 
       showToast(publish ? "Session published!" : "Draft saved!", "success");
-      router.push("/admin?tab=sessions");
+      router.push("/admin?tab=question-manager");
     } catch (err) {
       showToast(`Save failed: ${(err as Error).message}`, "error");
     } finally {
@@ -238,7 +236,7 @@ export default function EditQuestionPage({
       }}
     >
       {/* Session metadata */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-shrink-0">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-shrink-0">
         <Input
           label="Session Name"
           value={sessionName}
@@ -251,36 +249,6 @@ export default function EditQuestionPage({
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Optional"
         />
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            Default Timer
-          </label>
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1.5 cursor-pointer select-none">
-              <div
-                onClick={() => setTimerSeconds((v) => (v === null ? 30 : null))}
-                className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${timerSeconds === null ? "bg-white/10" : "bg-indigo-600"}`}
-              >
-                <div
-                  className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${timerSeconds === null ? "translate-x-0" : "translate-x-4"}`}
-                />
-              </div>
-              <span className="text-sm text-gray-400">
-                {timerSeconds === null ? "No timer" : "Timed"}
-              </span>
-            </label>
-            {timerSeconds !== null && (
-              <Input
-                type="number"
-                value={timerSeconds}
-                onChange={(e) => setTimerSeconds(Number(e.target.value))}
-                min={5}
-                max={120}
-                placeholder="30"
-              />
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Session settings bar */}

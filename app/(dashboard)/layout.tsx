@@ -21,7 +21,8 @@ const navItems: NavItem[] = [
 const adminItems: NavItem[] = [
   { href: '#', label: 'nav.admin', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', exact: true, isHeader: true },
   { href: '/admin?tab=dashboard', label: 'Dashboard', icon: 'M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z', isSubItem: true },
-  { href: '/admin?tab=sessions', label: 'Session Management', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', isSubItem: true },
+  { href: '/admin?tab=session-manager', label: 'Session Manager', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', isSubItem: true },
+  { href: '/admin?tab=question-manager', label: 'Question Manager', icon: 'M12 6v.01M8 12h8m-8 4h5m5-8a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h12z', isSubItem: true },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -102,7 +103,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               );
             }
 
-            const isActive = item.href.includes('?') 
+            const isActive = item.href.includes('?')
               ? pathname === item.href.split('?')[0] && searchParams.get('tab') === new URLSearchParams(item.href.split('?')[1]).get('tab')
               : pathname === item.href || (!item.exact && item.href !== '/' && pathname.startsWith(item.href));
 

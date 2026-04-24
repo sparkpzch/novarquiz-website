@@ -194,6 +194,7 @@ export function LeftInspector({
   // Sync draft whenever selected node changes
   useEffect(() => {
     if (selectedNode) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDraft(structuredClone(selectedNode.data));
     } else {
       setDraft(null);
@@ -502,31 +503,6 @@ export function LeftInspector({
               })}
             </div>
 
-            {/* ── Timer override ── */}
-            <Divider />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <FieldLabel>Timer Override</FieldLabel>
-              {nd.timer_override !== null ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <input
-                    type="number" min={5} max={300}
-                    value={nd.timer_override}
-                    onChange={e => patch({ timer_override: Number(e.target.value) })}
-                    style={{ ...inputStyle, width: 52, textAlign: 'center', padding: '3px 6px' }}
-                  />
-                  <span style={{ color: '#6b7280', fontSize: 10 }}>s</span>
-                  <button
-                    onClick={() => patch({ timer_override: null })}
-                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12 }}
-                  >✕</button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => patch({ timer_override: 30 })}
-                  style={ghostBtnStyle}
-                >+ Set</button>
-              )}
-            </div>
           </>
         )}
 
