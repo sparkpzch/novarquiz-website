@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion } from 'motion/react';
 import type { LeaderboardEntry, Quiz } from '@/lib/types';
+import ProfileAvatar from '@/components/ui/ProfileAvatar';
 
 function LeaderboardPageContent() {
   const { t } = useTranslation();
@@ -15,109 +16,158 @@ function LeaderboardPageContent() {
   const [sessions, setSessions] = useState<Quiz[]>([]);
   const [selectedSession, setSelectedSession] = useState(searchParams.get('session') || '');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(Boolean(searchParams.get('session')));
 
   useEffect(() => {
-    fetch('/api/questions/sessions').then(r => r.ok ? r.json() : []).then(setSessions).catch(() => {});
+    fetch('/api/questions/sessions')
+      .then((response) => (response.ok ? response.json() : []))
+      .then(setSessions)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     if (!selectedSession) return;
-    setLoading(true);
-    fetch(`/api/play/${selectedSession}/leaderboard`).then(r => r.ok ? r.json() : []).then(setEntries).catch(() => {}).finally(() => setLoading(false));
+    fetch(`/api/play/${selectedSession}/leaderboard`)
+      .then((response) => (response.ok ? response.json() : []))
+      .then(setEntries)
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [selectedSession]);
 
-  const top3 = entries.slice(0, 3);
-  const rest = entries.slice(3);
-  const myEntry = entries.find(e => e.user_id === user?.uid);
-  const myRank = entries.findIndex(e => e.user_id === user?.uid) + 1;
-
-  const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3;
-  const podiumHeights = ['h-24', 'h-32', 'h-20'];
-  const podiumColors = ['from-gray-400 to-gray-300', 'from-amber-400 to-yellow-300', 'from-amber-700 to-amber-600'];
-  const medals = ['🥈', '🥇', '🥉'];
+  const sortedEntries = [...entries].sort((a, b) => {
+    if (b.total_score !== a.total_score) return b.total_score - a.total_score;
+    if (a.total_time_ms !== b.total_time_ms) return a.total_time_ms - b.total_time_ms;
+    return a.user_display_name.localeCompare(b.user_display_name);
+  });
+  const myEntry = sortedEntries.find((entry) => entry.user_id === user?.uid);
+  const myRank = sortedEntries.findIndex((entry) => entry.user_id === user?.uid) + 1;
+  const topThree = sortedEntries.slice(0, 3);
+  const podium =
+    topThree.length === 1
+      ? [{ entry: topThree[0], rank: 1, height: 'h-36', featured: true }]
+      : topThree.length === 2
+        ? [
+            { entry: topThree[0], rank: 1, height: 'h-36', featured: true },
+            { entry: topThree[1], rank: 2, height: 'h-28', featured: false },
+          ]
+        : [
+            { entry: topThree[1], rank: 2, height: 'h-28', featured: false },
+            { entry: topThree[0], rank: 1, height: 'h-36', featured: true },
+            { entry: topThree[2], rank: 3, height: 'h-24', featured: false },
+          ];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <h1 className="text-3xl font-bold text-white">{t('leaderboard.title')}</h1>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <section className="nq-card rounded-[34px] p-6 md:p-7">
+        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#5D7EA1]">Leaderboard</p>
+            <h1 className="mt-2 text-3xl font-bold text-[#16324F]">{t('leaderboard.title')}</h1>
+            <p className="mt-2 text-sm text-[#5D7EA1]">Browse any finished session and compare scores across all players.</p>
+          </div>
 
-      <select value={selectedSession} onChange={e => setSelectedSession(e.target.value)}
-        className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-indigo-500 focus:outline-none">
-        <option value="" className="bg-gray-900">{t('leaderboard.select_session')}</option>
-        {sessions.map(s => <option key={s.id} value={s.id} className="bg-gray-900">{s.name}</option>)}
-      </select>
+          <div className="w-full md:max-w-sm">
+            <label className="mb-2 block text-sm font-semibold text-[#16324F]">{t('leaderboard.select_session')}</label>
+            <select
+              value={selectedSession}
+              onChange={(event) => {
+                setLoading(Boolean(event.target.value));
+                setSelectedSession(event.target.value);
+              }}
+              className="w-full rounded-[24px] border border-[#0460A9]/12 bg-white px-4 py-3 text-[#16324F] outline-none"
+            >
+              <option value="">{t('leaderboard.select_session')}</option>
+              {sessions.map((session) => (
+                <option key={session.id} value={session.id}>
+                  {session.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </section>
 
       {!selectedSession ? (
-        <div className="rounded-2xl border border-white/5 bg-white/5 p-10 text-center">
-          <p className="text-gray-400">Select a quiz session to view the leaderboard</p>
+        <div className="nq-card rounded-[34px] p-10 text-center">
+          <p className="text-lg font-semibold text-[#16324F]">Select a quiz session to view the leaderboard.</p>
         </div>
       ) : loading ? (
-        <div className="flex justify-center py-10"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"/></div>
+        <div className="flex justify-center py-14">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#0460A9] border-t-transparent" />
+        </div>
       ) : entries.length === 0 ? (
-        <div className="rounded-2xl border border-white/5 bg-white/5 p-10 text-center">
-          <p className="text-gray-400">No entries yet for this session</p>
+        <div className="nq-card rounded-[34px] p-10 text-center">
+          <p className="text-lg font-semibold text-[#16324F]">No entries yet for this session.</p>
         </div>
       ) : (
         <>
-          {/* Podium */}
-          {top3.length >= 1 && (
-            <div className="flex items-end justify-center gap-4 pt-8 pb-4">
-              {podiumOrder.map((entry, idx) => entry && (
-                <motion.div key={entry.user_id} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.2 }}
-                  className="flex flex-col items-center">
-                  <span className="text-3xl mb-2">{medals[idx]}</span>
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg mb-2 border-2 border-white/20">
-                    {entry.user_display_name?.[0]?.toUpperCase() || '?'}
-                  </div>
-                  <p className="text-white font-semibold text-sm mb-1">{entry.user_display_name}</p>
-                  <p className="text-indigo-400 font-bold">{entry.total_score}</p>
-                  <div className={`${podiumHeights[idx]} w-24 rounded-t-xl bg-gradient-to-t ${podiumColors[idx]} mt-2 flex items-start justify-center pt-2`}>
-                    <span className="text-white/80 font-bold">{idx === 1 ? '1' : idx === 0 ? '2' : '3'}</span>
-                  </div>
-                </motion.div>
-              ))}
+          <section className="nq-card rounded-[34px] p-6 md:p-8">
+            <div className="flex flex-col items-center justify-center gap-6 md:flex-row md:items-end">
+              {podium.map(({ entry, rank, height, featured }, index) => {
+                return (
+                  <motion.div
+                    key={entry.user_id}
+                    initial={{ opacity: 0, y: 18 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.08 }}
+                    className="flex flex-col items-center"
+                  >
+                    <ProfileAvatar
+                      displayName={entry.user_display_name}
+                      photoURL={entry.user_photo_url}
+                      size={featured ? 96 : 78}
+                      ringClassName="ring-4 ring-[#DDF0FF] shadow-[0_16px_28px_rgba(17,87,145,0.14)]"
+                    />
+                    <div className="mt-3 text-center">
+                      <p className="max-w-[140px] truncate text-xl font-bold text-[#16324F]">{entry.user_display_name}</p>
+                      <p className="text-lg text-[#0460A9]">{entry.total_score} pts</p>
+                    </div>
+                    <div className={`mt-4 flex w-24 items-start justify-center rounded-t-[26px] bg-gradient-to-b from-[#DDF0FF] to-[#8EC0FF] pt-3 text-2xl font-bold text-[#16324F] ${height}`}>
+                      {rank}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
-          )}
+          </section>
 
-          {/* Your result */}
           {myEntry && (
-            <div className="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-lg font-bold text-indigo-400">#{myRank}</span>
-                <span className="text-white font-semibold">{t('leaderboard.your_result')}</span>
+            <section className="rounded-[28px] bg-[#C9F258] px-5 py-4 text-[#16324F] shadow-[0_18px_34px_rgba(17,87,145,0.12)]">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <span className="text-lg font-semibold">#{myRank}</span>
+                  <ProfileAvatar displayName={myEntry.user_display_name} photoURL={myEntry.user_photo_url} size={42} />
+                  <span className="text-lg font-semibold">{t('leaderboard.your_result')}</span>
+                </div>
+                <span className="text-lg font-semibold">{myEntry.total_score} pts</span>
               </div>
-              <span className="text-xl font-bold text-white">{myEntry.total_score} pts</span>
-            </div>
+            </section>
           )}
 
-          {/* Full table */}
-          <div className="rounded-2xl border border-white/5 bg-white/5 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead><tr className="text-gray-500 border-b border-white/5">
-                <th className="text-left py-3 px-4">{t('leaderboard.rank')}</th>
-                <th className="text-left py-3 px-4">{t('leaderboard.player')}</th>
-                <th className="text-right py-3 px-4">{t('leaderboard.score')}</th>
-                <th className="text-right py-3 px-4 hidden sm:table-cell">{t('leaderboard.correct')}</th>
-                <th className="text-right py-3 px-4 hidden sm:table-cell">{t('leaderboard.streak')}</th>
-              </tr></thead>
-              <tbody>
-                {entries.map((entry, idx) => (
-                  <tr key={entry.user_id} className={`border-b border-white/5 ${entry.user_id === user?.uid ? 'bg-indigo-500/5' : ''}`}>
-                    <td className="py-3 px-4 text-gray-400 font-medium">{idx + 1}</td>
-                    <td className="py-3 px-4 flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
-                        {entry.user_display_name?.[0]?.toUpperCase() || '?'}
-                      </div>
-                      <span className="text-white">{entry.user_display_name}</span>
-                    </td>
-                    <td className="py-3 px-4 text-right text-white font-semibold">{entry.total_score}</td>
-                    <td className="py-3 px-4 text-right text-emerald-400 hidden sm:table-cell">{entry.correct_count}/{entry.correct_count + entry.incorrect_count}</td>
-                    <td className="py-3 px-4 text-right text-orange-400 hidden sm:table-cell">🔥 {entry.streak}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <section className="rounded-[34px] bg-[#EEF6E4]/80 p-4 md:p-5">
+            <div className="space-y-3">
+              {sortedEntries.slice(3).map((entry, index) => {
+                const rank = index + 4;
+                const isMe = entry.user_id === user?.uid;
+                return (
+                  <div
+                    key={entry.user_id}
+                    className={`flex items-center gap-4 rounded-[22px] px-4 py-3 ${isMe ? 'bg-[#C9F258] text-[#16324F]' : 'bg-white text-[#16324F]'}`}
+                  >
+                    <span className="w-6 text-center text-lg font-semibold">{rank}</span>
+                    <ProfileAvatar displayName={entry.user_display_name} photoURL={entry.user_photo_url} size={40} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-lg font-semibold">{isMe ? 'You' : entry.user_display_name}</p>
+                      <p className="text-sm text-[#5D7EA1]">
+                        {entry.correct_count}/{entry.correct_count + entry.incorrect_count} correct · 🔥 {entry.streak}
+                      </p>
+                    </div>
+                    <span className="text-lg font-semibold">{entry.total_score} pts</span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
         </>
       )}
     </div>

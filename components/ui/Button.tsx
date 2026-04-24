@@ -24,10 +24,10 @@ export default function Button({
   const base = 'inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
 
   const variants = {
-    primary: 'text-white shadow-md active:opacity-90 focus:ring-blue-400',
-    secondary: 'bg-gray-50 md:bg-white/10 text-gray-800 md:text-white border border-gray-200 md:border-white/20 hover:bg-gray-100 md:hover:bg-white/20 focus:ring-gray-200 md:focus:ring-white/50',
+    primary: 'nq-on-dark shadow-md active:opacity-90 focus:ring-blue-400',
+    secondary: 'bg-white text-[#192246] border border-[#0460A9]/14 hover:bg-[#F3F8FF] hover:border-[#70A2F9]/40 focus:ring-[#92BFFF] shadow-sm',
     danger: 'bg-gradient-to-r from-red-600 to-rose-600 text-white hover:from-red-700 hover:to-rose-700 focus:ring-red-500 shadow-lg shadow-red-500/25',
-    ghost: 'text-gray-300 hover:text-white hover:bg-white/10 focus:ring-white/30',
+    ghost: 'text-[#5D7EA1] hover:text-[#192246] hover:bg-white/70 focus:ring-[#92BFFF]',
   };
 
   const sizes = {
@@ -38,7 +38,12 @@ export default function Button({
 
   // Primary gets blue gradient via inline style so it works reliably on mobile too
   const primaryStyle: CSSProperties = variant === 'primary'
-    ? { background: 'linear-gradient(135deg, #4f82e8 0%, #3b5fd4 100%)', ...style }
+    ? {
+        background: 'linear-gradient(135deg, #4f82e8 0%, #3b5fd4 100%)',
+        color: '#ffffff',
+        WebkitTextFillColor: '#ffffff',
+        ...style,
+      }
     : (style ?? {});
 
   return (

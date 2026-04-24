@@ -68,6 +68,11 @@ export const CHOICE_COLORS: Record<string, string> = {
   A: '#ef4444', B: '#3b82f6', C: '#22c55e', D: '#f59e0b', continue: '#8b5cf6',
 };
 
+const QUESTION_NODE_ACCENT = '#70A2F9';
+const EDITOR_CANVAS_BG = 'linear-gradient(180deg, rgba(241,247,255,0.96) 0%, rgba(226,238,255,0.92) 100%)';
+const EDITOR_PANEL_BG = 'rgba(236,244,255,0.86)';
+const EDITOR_PANEL_BORDER = 'rgba(112,162,249,0.22)';
+
 const nodeTypes: NodeTypes = {
   normalNode: NormalNode,
   situationNode: SituationNode,
@@ -110,7 +115,7 @@ export const toolbarBtnStyle = (color: string): React.CSSProperties => ({
   display: 'flex', alignItems: 'center', gap: 6,
   padding: '6px 12px',
   background: `${color}22`, border: `1px solid ${color}44`,
-  borderRadius: 8, color: '#e2e8f0', fontSize: 12, fontWeight: 600,
+  borderRadius: 8, color: '#223a63', fontSize: 12, fontWeight: 700,
   cursor: 'pointer', transition: 'background 0.15s',
 });
 
@@ -150,7 +155,7 @@ export function EditorCanvas({
 
   const handleConnectionChange = useCallback((choiceLabel: string, toQuestionId: string | null) => {
     if (!inspectedNode) return;
-    const color = CHOICE_COLORS[choiceLabel] ?? '#6366f1';
+    const color = CHOICE_COLORS[choiceLabel] ?? QUESTION_NODE_ACCENT;
     setEdges(es => {
       const filtered = es.filter(e => !(e.source === inspectedNode.id && e.sourceHandle === choiceLabel));
       if (!toQuestionId) return filtered;
@@ -219,7 +224,7 @@ export function EditorCanvas({
       });
       return;
     }
-    const color = CHOICE_COLORS[params.sourceHandle ?? ''] ?? '#6366f1';
+    const color = CHOICE_COLORS[params.sourceHandle ?? ''] ?? QUESTION_NODE_ACCENT;
     setEdges(es => addEdge({
       ...params,
       style: { stroke: color, strokeWidth: 2 },
@@ -290,7 +295,7 @@ export function EditorCanvas({
           }
           .react-flow__handle.connecting {
             transform: scale(1.5) !important;
-            box-shadow: 0 0 0 4px rgba(99,102,241,0.4), 0 0 16px rgba(99,102,241,0.7) !important;
+            box-shadow: 0 0 0 4px rgba(112,162,249,0.4), 0 0 16px rgba(112,162,249,0.7) !important;
           }
           .react-flow__handle.valid {
             transform: scale(1.7) !important;
@@ -318,22 +323,34 @@ export function EditorCanvas({
           snapToGrid snapGrid={[16, 16]}
           fitView fitViewOptions={{ padding: 0.2 }}
           defaultEdgeOptions={{ type: 'default', animated: false }}
-          style={{ background: '#08080f' }}
+          style={{ background: EDITOR_CANVAS_BG }}
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} color="rgba(255,255,255,0.06)" gap={24} size={1.5} />
+          <Background variant={BackgroundVariant.Dots} color="rgba(112,162,249,0.18)" gap={24} size={1.5} />
           <Controls
-            style={{ background: '#13132b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}
+            style={{
+              background: EDITOR_PANEL_BG,
+              border: `1px solid ${EDITOR_PANEL_BORDER}`,
+              borderRadius: 10,
+              boxShadow: '0 12px 28px rgba(101,137,195,0.18)',
+              backdropFilter: 'blur(18px)',
+            }}
             showInteractive={false}
           />
           <MiniMap
-            style={{ background: '#0d0d20', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}
-            nodeColor="#6366f1" maskColor="rgba(8,8,15,0.7)"
+            style={{
+              background: 'rgba(224,236,255,0.88)',
+              border: `1px solid ${EDITOR_PANEL_BORDER}`,
+              borderRadius: 10,
+              boxShadow: '0 12px 28px rgba(101,137,195,0.18)',
+              backdropFilter: 'blur(18px)',
+            }}
+            nodeColor={QUESTION_NODE_ACCENT} maskColor="rgba(8,8,15,0.7)"
           />
 
           {/* Toolbar */}
           <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button onClick={() => addNode('normalNode', { x: 80 + nodes.length * 30, y: 80 + nodes.length * 20 })} style={toolbarBtnStyle('#6366f1')} title="Add Question Node">
+            <button onClick={() => addNode('normalNode', { x: 80 + nodes.length * 30, y: 80 + nodes.length * 20 })} style={toolbarBtnStyle(QUESTION_NODE_ACCENT)} title="Add Question Node">
               <span style={{ fontSize: 14 }}>❓</span> Question Node
             </button>
             <button onClick={() => addNode('situationNode', { x: 80 + nodes.length * 30, y: 80 + nodes.length * 20 })} style={toolbarBtnStyle('#8b5cf6')} title="Add Situation Node">
@@ -342,23 +359,23 @@ export function EditorCanvas({
             <button onClick={() => addNode('endNode', { x: 80 + nodes.length * 30, y: 80 + nodes.length * 20 })} style={toolbarBtnStyle('#f43f5e')} title="Add End Node">
               <span style={{ fontSize: 14 }}>🏁</span> End Node
             </button>
-            <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.1)' }} />
-            <span style={{ fontSize: 11, color: '#6b7280' }}>Right-click canvas · Del to remove</span>
+            <div style={{ width: 1, height: 24, background: 'rgba(112,162,249,0.2)' }} />
+            <span style={{ fontSize: 11, color: '#35527e', fontWeight: 600 }}>Right-click canvas · Del to remove</span>
           </div>
 
           {/* Save buttons */}
           <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, display: 'flex', gap: 8 }}>
             <Button variant="secondary" onClick={() => onSave(false)} loading={saving} size="sm">Save Draft</Button>
-            <Button onClick={() => onSave(true)} loading={saving} size="sm">Publish</Button>
+            <Button onClick={() => onSave(true)} loading={saving} size="sm" style={{ color: '#ffffff', textShadow: '0 1px 1px rgba(0,0,0,0.12)' }}>Publish</Button>
           </div>
 
           {/* Empty state */}
           {nodes.length === 0 && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 5 }}>
-              <div style={{ textAlign: 'center', color: '#374151', maxWidth: 320 }}>
+              <div style={{ textAlign: 'center', color: '#4e6b96', maxWidth: 320 }}>
                 <div style={{ fontSize: 48, marginBottom: 12 }}>🕸</div>
-                <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Empty canvas</p>
-                <p style={{ fontSize: 13, lineHeight: 1.6 }}>Right-click anywhere or use the toolbar above to add nodes.</p>
+                <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, color: '#35527e' }}>Empty canvas</p>
+                <p style={{ fontSize: 13, lineHeight: 1.6, color: '#4e6b96', fontWeight: 500 }}>Right-click anywhere or use the toolbar above to add nodes.</p>
               </div>
             </div>
           )}

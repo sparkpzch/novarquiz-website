@@ -75,10 +75,10 @@ function isNormalData(type: NodeType, data: NodeData): data is NormalNodeData {
 function FieldLabel({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
     <div style={{ marginBottom: 4 }}>
-      <span style={{ fontSize: 10, fontWeight: 700, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: '#35527e', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
         {children}
       </span>
-      {hint && <span style={{ fontSize: 9, color: '#4b5563', marginLeft: 5 }}>{hint}</span>}
+      {hint && <span style={{ fontSize: 9, color: '#6b7f9e', marginLeft: 5 }}>{hint}</span>}
     </div>
   );
 }
@@ -129,6 +129,7 @@ export function LeftInspector({
 
   const handleFileUpload = (file: File) => {
     if (!file || !selectedNode) return;
+    const targetNodeId = selectedNode.id;
     const isVideo = file.type.startsWith('video/');
     const isImage = file.type.startsWith('image/');
     if (!isVideo && !isImage) return;
@@ -148,12 +149,13 @@ export function LeftInspector({
       () => setUploading(false),
       async () => {
         const url = await getDownloadURL(task.snapshot.ref);
+        let nextDraft: NodeData | null = null;
         setDraft(d => {
           if (!d) return d;
-          const next = { ...d, media_type: mediaType, media_url: url } as NodeData;
-          onChange(selectedNode.id, next);
-          return next;
+          nextDraft = { ...d, media_type: mediaType, media_url: url } as NodeData;
+          return nextDraft;
         });
+        if (nextDraft) onChange(targetNodeId, nextDraft);
         setUploading(false);
       },
     );
@@ -236,7 +238,7 @@ export function LeftInspector({
   const nd = isNormal ? draft as NormalNodeData : null;
 
   const iconLabel = isNormal ? '❓ Question Node' : isEnd ? '🏁 End Node' : '🎬 Situation Node';
-  const iconColor = isNormal ? '#a5b4fc' : isEnd ? '#fb7185' : '#c084fc';
+  const iconColor = isNormal ? '#bfdbfe' : isEnd ? '#fb7185' : '#c084fc';
 
   // ── Render: inspector ──────────────────────────────────────────────────────
   return (
@@ -246,7 +248,7 @@ export function LeftInspector({
         <div style={{ fontSize: 11, fontWeight: 800, color: iconColor, letterSpacing: '0.05em', marginBottom: 2 }}>
           {iconLabel}
         </div>
-        <div style={{ fontSize: 9, color: '#4b5563', fontFamily: 'monospace' }}>
+        <div style={{ fontSize: 9, color: '#5f7699', fontFamily: 'monospace' }}>
           id: {selectedNode.id.slice(0, 16)}…
         </div>
       </div>
@@ -270,8 +272,8 @@ export function LeftInspector({
               onClick={() => fileInputRef.current?.click()}
               style={{
                 width: '100%', padding: '24px 0', borderRadius: 8, marginTop: 6,
-                border: '1px dashed rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.02)',
-                color: '#6b7280', fontSize: 11, cursor: 'pointer', transition: 'all 0.2s'
+                border: '1px dashed rgba(112,162,249,0.24)', background: 'rgba(255,255,255,0.55)',
+                color: '#35527e', fontSize: 11, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s'
               }}
             >
               + Upload Image or Video
@@ -279,12 +281,12 @@ export function LeftInspector({
           )}
 
           {uploading && (
-            <div style={{ padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', marginTop: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#a5b4fc', marginBottom: 6 }}>
+            <div style={{ padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(112,162,249,0.18)', marginTop: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#35527e', marginBottom: 6, fontWeight: 600 }}>
                 <span>Uploading…</span><span>{uploadProgress}%</span>
               </div>
-              <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${uploadProgress}%`, background: '#6366f1', transition: 'width 0.2s' }} />
+              <div style={{ height: 4, background: 'rgba(112,162,249,0.12)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${uploadProgress}%`, background: '#4f82e8', transition: 'width 0.2s' }} />
               </div>
             </div>
           )}
@@ -349,7 +351,7 @@ export function LeftInspector({
                 aria-checked={draft.is_entry_point}
                 style={{
                   width: 34, height: 18, borderRadius: 9, cursor: 'pointer',
-                  background: draft.is_entry_point ? '#10b981' : 'rgba(255,255,255,0.12)',
+                  background: draft.is_entry_point ? '#10b981' : 'rgba(112,162,249,0.18)',
                   display: 'flex', alignItems: 'center', padding: '0 2px',
                   transition: 'background 0.2s',
                 }}
@@ -426,7 +428,7 @@ export function LeftInspector({
 
                     {/* Score impact */}
                     <div style={{ marginBottom: 6 }}>
-                      <div style={{ fontSize: 9, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                      <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                         Utility Score
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
@@ -457,7 +459,7 @@ export function LeftInspector({
 
                     {/* Explanation */}
                     <div style={{ marginBottom: 6 }}>
-                      <div style={{ fontSize: 9, color: '#6b7280', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                      <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                         Explanation / Feedback
                       </div>
                       <textarea
@@ -482,7 +484,7 @@ export function LeftInspector({
 
                     {/* Routing */}
                     <div>
-                      <div style={{ fontSize: 9, color: '#6b7280', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                      <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                         Routes to →
                       </div>
                       <select
@@ -509,15 +511,15 @@ export function LeftInspector({
       </div>
 
       {/* Footer — Save button */}
-      <div style={{ padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+      <div style={{ padding: '10px 14px', borderTop: '1px solid rgba(112,162,249,0.16)', flexShrink: 0 }}>
         <button
           id="inspector-save-btn"
           onClick={handleSave}
           style={{
             width: '100%', padding: '8px 0',
             borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: savedFlash ? 'rgba(52,211,153,0.3)' : 'rgba(99,102,241,0.35)',
-            color: savedFlash ? '#34d399' : '#a5b4fc',
+            background: savedFlash ? 'rgba(52,211,153,0.24)' : 'rgba(79,130,232,0.18)',
+            color: savedFlash ? '#047857' : '#223a63',
             fontSize: 11, fontWeight: 700,
             transition: 'background 0.2s, color 0.2s',
             letterSpacing: '0.05em',
@@ -552,8 +554,10 @@ const panelStyle: React.CSSProperties = {
   height: '100%',
   display: 'flex',
   flexDirection: 'column',
-  background: 'rgba(8,8,20,0.98)',
-  borderRight: '1px solid rgba(255,255,255,0.09)',
+  background: 'linear-gradient(180deg, rgba(242,247,255,0.94) 0%, rgba(232,240,255,0.92) 100%)',
+  borderRight: '1px solid rgba(112,162,249,0.2)',
+  boxShadow: 'inset -1px 0 0 rgba(255,255,255,0.35)',
+  backdropFilter: 'blur(18px)',
   overflow: 'hidden',
 };
 
@@ -568,11 +572,11 @@ const emptyStateStyle: React.CSSProperties = {
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(255,255,255,0.8)',
+  border: '1px solid rgba(112,162,249,0.18)',
   borderRadius: 6,
   padding: '5px 8px',
-  color: '#e2e8f0',
+  color: '#223a63',
   fontSize: 11,
   outline: 'none',
   boxSizing: 'border-box',
@@ -592,10 +596,10 @@ const selectStyle: React.CSSProperties = {
 };
 
 const ghostBtnStyle: React.CSSProperties = {
-  background: 'rgba(99,102,241,0.15)',
-  border: '1px solid rgba(99,102,241,0.3)',
+  background: 'rgba(112,162,249,0.14)',
+  border: '1px solid rgba(112,162,249,0.26)',
   borderRadius: 5,
-  color: '#a5b4fc',
+  color: '#4e78b8',
   cursor: 'pointer',
   fontSize: 10,
   padding: '3px 10px',

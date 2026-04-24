@@ -6,80 +6,519 @@ import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion, AnimatePresence } from 'motion/react';
-import type { Question, LeaderboardEntry } from '@/lib/types';
+import type { Choice, LeaderboardEntry, Question, Quiz } from '@/lib/types';
 import { updateScore, watchScores, untrackAllUserSessionsFor, type PlayerScore } from '@/lib/firebase/rtdb';
 import { trackEvent } from '@/lib/firebase/analytics';
+import ProfileAvatar from '@/components/ui/ProfileAvatar';
 
-const CHOICE_COLORS = { A: 'from-red-600 to-red-500', B: 'from-blue-600 to-blue-500', C: 'from-emerald-600 to-emerald-500', D: 'from-amber-600 to-amber-500' };
-const CHOICE_HOVERS = { A: 'hover:from-red-500 hover:to-red-400', B: 'hover:from-blue-500 hover:to-blue-400', C: 'hover:from-emerald-500 hover:to-emerald-400', D: 'hover:from-amber-500 hover:to-amber-400' };
+
+const IMPACT_THEME = {
+  positive: {
+    border: 'border-[#1AC86D]',
+    fill: 'bg-[#1AC86D]',
+    text: 'text-[#11985A]',
+    badge: 'bg-[#E9FFF4] text-[#11985A]',
+  },
+  negative: {
+    border: 'border-[#FF4D4F]',
+    fill: 'bg-[#FF4D4F]',
+    text: 'text-[#D63A3D]',
+    badge: 'bg-[#FFF0F0] text-[#D63A3D]',
+  },
+  neutral: {
+    border: 'border-[#FFB020]',
+    fill: 'bg-[#FFB020]',
+    text: 'text-[#B57200]',
+    badge: 'bg-[#FFF7E9] text-[#B57200]',
+  },
+} as const;
+
+function getImpactTone(scoreImpact: number) {
+  if (scoreImpact > 0) return IMPACT_THEME.positive;
+  if (scoreImpact < 0) return IMPACT_THEME.negative;
+  return IMPACT_THEME.neutral;
+}
+
+function formatImpact(scoreImpact: number) {
+  if (scoreImpact > 0) return `+${scoreImpact}`;
+  if (scoreImpact < 0) return `${scoreImpact}`;
+  return '0';
+}
+
+function formatPlayerName(name: string, isMe: boolean) {
+  return isMe ? 'You' : name;
+}
+
+function QuizHeader({
+  elapsed,
+  score,
+  streak,
+  userName,
+  photoURL,
+  lastDelta,
+  totalPlayers,
+  topScores,
+  currentUserId,
+}: {
+  elapsed: number;
+  score: number;
+  streak: number;
+  userName?: string | null;
+  photoURL?: string | null;
+  lastDelta: number | null;
+  totalPlayers: number;
+  topScores: Array<PlayerScore & { uid: string }>;
+  currentUserId?: string;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="nq-card-dark rounded-[28px] px-4 py-3 text-white shadow-[0_24px_56px_rgba(7,16,43,0.34)] md:px-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="rounded-[20px] border border-white/10 bg-white/[0.06] px-4 py-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[#8DA8D0]">Time</p>
+            <p className="mt-1 text-3xl font-bold leading-none tabular-nums">{elapsed}</p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <ProfileAvatar
+              displayName={userName}
+              photoURL={photoURL}
+              size={44}
+              ringClassName="ring-2 ring-[#92BFFF]/70"
+            />
+            <div className="rounded-[20px] border border-white/10 bg-white/[0.06] px-4 py-2.5 text-right">
+              <p className="text-sm text-[#B8C7EA]">
+                <span className="font-bold text-white tabular-nums">{score}</span> Score
+              </p>
+              <AnimatePresence>
+                {lastDelta !== null && (
+                  <motion.p
+                    key={`delta-${score}-${lastDelta}`}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    className={`text-xs font-semibold ${lastDelta >= 0 ? 'text-[#92FFBF]' : 'text-[#FFB6B8]'}`}
+                  >
+                    {lastDelta >= 0 ? `+${lastDelta}` : lastDelta}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {(topScores.length > 1 || streak > 1) && (
+        <div className="nq-card-dark rounded-[22px] px-4 py-3 text-white shadow-[0_18px_44px_rgba(7,16,43,0.3)]">
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#92BFFF]">🏆 Live Leaderboard</p>
+            <span className="text-sm text-[#8DA8D0]">{totalPlayers} players</span>
+            {streak > 1 && <span className="rounded-full bg-[#FFB020]/18 px-3 py-1 text-xs font-semibold text-[#FFD48A]">🔥 Streak {streak}</span>}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[#D9E7FF]">
+            {topScores.map((player, index) => (
+              <span key={player.uid} className={player.uid === currentUserId ? 'font-semibold text-white' : ''}>
+                #{index + 1} {formatPlayerName(player.displayName, player.uid === currentUserId)} {player.score}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuestionVisual({
+  question,
+  totalQuestions,
+}: {
+  question: Question;
+  totalQuestions?: number;
+}) {
+  return (
+    <>
+      <div className="overflow-hidden rounded-[28px] border border-[#0460A9]/12 bg-gradient-to-b from-[#7B6CB7] via-[#C77A9C] to-[#E28F7A] shadow-[0_18px_36px_rgba(17,87,145,0.12)]">
+        {question.media_url ? (
+          question.media_type === 'video' ? (
+            <video
+              src={question.media_url}
+              controls
+              className="h-[200px] w-full object-cover md:h-[260px]"
+            />
+          ) : (
+            <img
+              src={question.media_url}
+              alt="Question media"
+              className="h-[200px] w-full object-cover md:h-[260px]"
+            />
+          )
+        ) : (
+          <div className="relative h-[200px] w-full md:h-[260px]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.65)_1px,transparent_1.5px)] bg-[length:18px_18px] opacity-70" />
+            <div className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent_0%,rgba(44,34,102,0.22)_10%,#9C5F80_50%,#6E4C7E_80%,#4C4E89_100%)]" />
+            <div className="absolute bottom-0 left-0 right-0 h-20 bg-[radial-gradient(circle_at_10%_100%,#5A5A9F_0,transparent_34%),radial-gradient(circle_at_35%_100%,#754985_0,transparent_35%),radial-gradient(circle_at_70%_100%,#5B4E99_0,transparent_34%),radial-gradient(circle_at_95%_100%,#724885_0,transparent_35%)]" />
+            <div className="absolute right-10 top-8 h-4 w-4 rounded-full border border-[#FFF2D6] bg-[#FFF1BF]/90 shadow-[0_0_18px_rgba(255,241,191,0.55)]" />
+          </div>
+        )}
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-[#7A8EA7]">
+          Question {question.question_order + 1}
+          {typeof totalQuestions === 'number' && totalQuestions > 0 ? `/${totalQuestions}` : ''}
+        </p>
+        <h1 className="mt-2 text-[1.8rem] font-bold leading-tight text-[#1B2530] md:text-[2.1rem]">
+          {question.question_text}
+        </h1>
+      </div>
+    </>
+  );
+}
+
+function ChoiceButton({
+  choice,
+  disabled,
+  onSelect,
+}: {
+  choice: Choice;
+  disabled: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <motion.button
+      whileHover={!disabled ? { y: -2 } : undefined}
+      whileTap={!disabled ? { scale: 0.99 } : undefined}
+      onClick={onSelect}
+      disabled={disabled}
+      className="nq-answer-shadow w-full rounded-[22px] border border-[#DCE7F5] bg-white px-5 py-4 text-left transition hover:border-[#92BFFF] hover:shadow-[0_18px_34px_rgba(17,87,145,0.12)] disabled:cursor-not-allowed"
+    >
+      <span className="text-lg font-semibold text-[#202832]">{choice.choice_text}</span>
+    </motion.button>
+  );
+}
+
+function ResultChoice({
+  choice,
+  selected,
+  maxImpact,
+}: {
+  choice: Choice;
+  selected: boolean;
+  maxImpact: number;
+}) {
+  const tone = getImpactTone(choice.score_impact);
+  const fillWidth = Math.max(14, (Math.abs(choice.score_impact) / maxImpact) * 100);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`relative overflow-hidden rounded-[22px] border bg-white px-5 py-4 ${tone.border} ${selected ? 'shadow-[0_18px_36px_rgba(17,87,145,0.16)]' : 'shadow-[0_12px_28px_rgba(17,87,145,0.08)]'}`}
+    >
+      <div className="absolute inset-x-0 top-0 h-1.5 bg-[#EEF3F8]">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${fillWidth}%` }}
+          transition={{ duration: 0.55, ease: 'easeOut' }}
+          className={`h-full ${tone.fill}`}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-lg font-semibold text-[#202832]">{choice.choice_text}</p>
+        <span className={`rounded-full px-3 py-1 text-sm font-semibold ${tone.badge}`}>
+          {formatImpact(choice.score_impact)}
+        </span>
+      </div>
+    </motion.div>
+  );
+}
+
+function FinishedLeaderboard({
+  score,
+  leaderboard,
+  userId,
+  router,
+  sessionId,
+}: {
+  score: number;
+  leaderboard: LeaderboardEntry[] | null;
+  userId?: string;
+  router: ReturnType<typeof useRouter>;
+  sessionId: string;
+}) {
+  const board = leaderboard ?? [];
+  const sortedBoard = [...board].sort((a, b) => {
+    if (b.total_score !== a.total_score) return b.total_score - a.total_score;
+    if (a.total_time_ms !== b.total_time_ms) return a.total_time_ms - b.total_time_ms;
+    return a.user_display_name.localeCompare(b.user_display_name);
+  });
+  const myRankIdx = userId ? sortedBoard.findIndex((entry) => entry.user_id === userId) : -1;
+  const myEntry = myRankIdx >= 0 ? sortedBoard[myRankIdx] : null;
+  const myRank = myRankIdx >= 0 ? myRankIdx + 1 : null;
+  const topThree = sortedBoard.slice(0, 3);
+  const podium =
+    topThree.length === 1
+      ? [{ entry: topThree[0], rank: 1, height: 'h-36', featured: true }]
+      : topThree.length === 2
+        ? [
+            { entry: topThree[0], rank: 1, height: 'h-36', featured: true },
+            { entry: topThree[1], rank: 2, height: 'h-28', featured: false },
+          ]
+        : [
+            { entry: topThree[1], rank: 2, height: 'h-28', featured: false },
+            { entry: topThree[0], rank: 1, height: 'h-36', featured: true },
+            { entry: topThree[2], rank: 3, height: 'h-24', featured: false },
+          ];
+
+  return (
+    <div className="nq-sky min-h-screen">
+      <div className="nq-content flex min-h-screen items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="nq-card w-full max-w-3xl rounded-[36px] p-6 md:p-8"
+        >
+          <div className="text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#5D7EA1]">Leaderboard</p>
+            <h1 className="mt-2 text-3xl font-bold text-[#16324F]">Quiz complete</h1>
+            <p className="mt-3 text-[#5D7EA1]">Final score: <span className="font-bold text-[#0460A9]">{score}</span></p>
+          </div>
+
+          {leaderboard === null ? (
+            <div className="mt-8 flex flex-col items-center gap-4 py-12">
+              <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#0460A9] border-t-transparent" />
+              <p className="text-sm font-medium text-[#5D7EA1]">Loading leaderboard…</p>
+            </div>
+          ) : (
+            <>
+              {podium.length > 0 && (
+                <div className="mt-8 flex items-end justify-center gap-4">
+                  {podium.map(({ entry, rank, height, featured }) => {
+                    return (
+                      <div key={entry.user_id} className="flex flex-col items-center">
+                        <ProfileAvatar
+                          displayName={entry.user_display_name}
+                          photoURL={entry.user_photo_url}
+                          size={featured ? 92 : 78}
+                          ringClassName="ring-4 ring-[#DDF0FF] shadow-[0_16px_28px_rgba(17,87,145,0.14)]"
+                        />
+                        <div className="mt-3 text-center">
+                          <p className="max-w-[130px] truncate text-xl font-bold text-[#16324F]">{entry.user_display_name}</p>
+                          <p className="text-lg text-[#0460A9]">{entry.total_score} pts</p>
+                        </div>
+                        <div className={`mt-4 flex w-24 items-start justify-center rounded-t-[26px] bg-gradient-to-b from-[#DDF0FF] to-[#8EC0FF] pt-3 text-2xl font-bold text-[#16324F] ${height}`}>
+                          {rank}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="mt-8 rounded-[28px] bg-[#EEF6E4]/80 p-4 md:p-5">
+                <div className="space-y-3">
+                  {sortedBoard.slice(3, 10).map((entry, index) => {
+                    const rank = index + 4;
+                    const isMe = entry.user_id === userId;
+                    return (
+                      <div
+                        key={entry.user_id}
+                        className={`flex items-center gap-4 rounded-[22px] px-4 py-3 ${isMe ? 'bg-[#C9F258] text-[#16324F]' : 'bg-white text-[#16324F]'}`}
+                      >
+                        <span className="w-5 text-center text-lg font-semibold">{rank}</span>
+                        <ProfileAvatar displayName={entry.user_display_name} photoURL={entry.user_photo_url} size={38} />
+                        <p className="flex-1 truncate text-lg font-semibold">{isMe ? 'You' : entry.user_display_name}</p>
+                        <span className="text-lg font-semibold">{entry.total_score} pts</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {myEntry && myRankIdx >= 10 && (
+                <div className="mt-4 rounded-[22px] bg-[#C9F258] px-4 py-3 text-[#16324F]">
+                  <div className="flex items-center gap-4">
+                    <span className="w-5 text-center text-lg font-semibold">{myRank}</span>
+                    <ProfileAvatar displayName={myEntry.user_display_name} photoURL={myEntry.user_photo_url} size={38} />
+                    <p className="flex-1 truncate text-lg font-semibold">You</p>
+                    <span className="text-lg font-semibold">{myEntry.total_score} pts</span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={() => router.push(`/leaderboard?session=${sessionId}`)}
+              className="flex-1 rounded-2xl bg-[#0460A9] px-4 py-3 text-sm font-semibold !text-white"
+            >
+              Open full leaderboard
+            </button>
+            <button
+              onClick={() => router.push('/')}
+              className="flex-1 rounded-2xl border border-[#0460A9]/12 bg-white px-4 py-3 text-sm font-semibold text-[#16324F]"
+            >
+              Back home
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  );
+}
+
+function ExplanationModal({
+  selectedChoice,
+  nextLoading,
+  onContinue,
+}: {
+  selectedChoice: Choice;
+  nextLoading: boolean;
+  onContinue: () => void;
+}) {
+  const tone = getImpactTone(selectedChoice.score_impact);
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
+    >
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 16 }}
+        className="relative w-full max-w-lg space-y-4 rounded-[32px] bg-white p-6 shadow-[0_32px_64px_rgba(7,16,43,0.28)]"
+      >
+        <div className={`flex items-center gap-3 rounded-[18px] border px-4 py-3 ${tone.border}`}>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${tone.badge}`}>
+            {formatImpact(selectedChoice.score_impact)}
+          </span>
+          <p className="font-semibold text-[#202832]">{selectedChoice.choice_text}</p>
+        </div>
+
+        {selectedChoice.explanation && (
+          <>
+            <p className="mb-2 text-sm font-medium text-[#7A8EA7]">Explanation</p>
+            <div className="rounded-[20px] bg-[#F0F6FF] p-4">
+              <p className="text-base leading-relaxed text-[#202832]">{selectedChoice.explanation}</p>
+            </div>
+          </>
+        )}
+
+        <button
+          onClick={onContinue}
+          disabled={nextLoading}
+          className="w-full rounded-[24px] bg-[#0460A9] px-4 py-4 text-base font-semibold text-white shadow-[0_16px_36px_rgba(4,96,169,0.24)] disabled:opacity-60"
+        >
+          {nextLoading ? 'Loading…' : 'Next Question'}
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 export default function QuestionPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = use(params);
-  const { t } = useTranslation();
+  useTranslation();
   const { user } = useAuth();
   const router = useRouter();
 
   const [question, setQuestion] = useState<Question | null>(null);
-  const [elapsed, setElapsed] = useState(0); // seconds since question shown — count-up
+  const [sessionMeta, setSessionMeta] = useState<Quiz | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   const [score, setScore] = useState(0);
-  const [streak, setStreak] = useState(0); // consecutive answers with points > 0
-  const [selected, setSelected] = useState<string | null>(null);
-  const [lastDelta, setLastDelta] = useState<number | null>(null); // toast: "+5" / "−2"
+  const [streak, setStreak] = useState(0);
+  const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [lastDelta, setLastDelta] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
   const [loading, setLoading] = useState(true);
   const [questionStartTime, setQuestionStartTime] = useState(0);
   const [nextLoading, setNextLoading] = useState(false);
   const [scores, setScores] = useState<Record<string, PlayerScore>>({});
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
-  // Guards POST /complete from running twice if the finished view re-mounts.
+  const [showExplanationModal, setShowExplanationModal] = useState(false);
   const completedRef = useRef(false);
+  const scoreRef = useRef(score);
+  const userRef = useRef(user);
+  const explanationTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
-  // Subscribe to live leaderboard for this session
+  useEffect(() => {
+    fetch(`/api/questions/sessions/${sessionId}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then(setSessionMeta)
+      .catch(() => {});
+  }, [sessionId]);
+
+  useEffect(() => {
+    scoreRef.current = score;
+  }, [score]);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
   useEffect(() => {
     if (!user || user.isAnonymous) return;
     return watchScores(sessionId, setScores);
   }, [sessionId, user]);
 
+  useEffect(() => {
+    return () => {
+      if (explanationTimerRef.current !== null) {
+        window.clearTimeout(explanationTimerRef.current);
+      }
+    };
+  }, []);
+
   const isSituation = question?.node_type === 'situation';
   const isEnd = question?.node_type === 'end';
+  const selectedChoice = question?.choices.find((choice) => choice.label === selectedLabel) ?? null;
 
-  const applyQuestion = useCallback((q: Question) => {
-    setQuestion(q);
+  const applyQuestion = useCallback((nextQuestion: Question) => {
+    if (explanationTimerRef.current !== null) {
+      window.clearTimeout(explanationTimerRef.current);
+      explanationTimerRef.current = null;
+    }
+
+    setQuestion(nextQuestion);
     setElapsed(0);
-    setSelected(null);
+    setSelectedLabel(null);
     setLastDelta(null);
+    setShowExplanationModal(false);
     setQuestionStartTime(typeof performance !== 'undefined' ? performance.now() : 0);
 
-    // Broadcast our current question to RTDB so admin observation can show
-    // where each player is. Skipped for guests.
-    if (user && !user.isAnonymous) {
-      const label = q.question_text?.slice(0, 40) || `Q${q.question_order + 1}`;
-      updateScore(sessionId, user, score, {
-        currentQuestionId: q.id,
-        currentQuestionLabel: label,
-      }).catch(() => { /* non-fatal */ });
+    const activeUser = userRef.current;
+    if (activeUser && !activeUser.isAnonymous) {
+      const currentLabel = nextQuestion.question_text?.slice(0, 40) || `Q${nextQuestion.question_order + 1}`;
+      updateScore(sessionId, activeUser, scoreRef.current, {
+        currentQuestionId: nextQuestion.id,
+        currentQuestionLabel: currentLabel,
+      }).catch(() => {});
     }
 
     trackEvent('question_viewed', {
       session_id: sessionId,
-      question_id: q.id,
-      node_type: q.node_type,
-      question_order: q.question_order,
+      question_id: nextQuestion.id,
+      node_type: nextQuestion.node_type,
+      question_order: nextQuestion.question_order,
     });
-  }, [sessionId, user, score]);
+  }, [sessionId]);
 
   useEffect(() => {
     let cancelled = false;
 
     void (async () => {
       try {
-        const res = await fetch(`/api/play/${sessionId}/answer?entry=true`);
-        if (!res.ok) {
+        const response = await fetch(`/api/play/${sessionId}/answer?entry=true`);
+        if (!response.ok) {
           if (!cancelled) setFinished(true);
           return;
         }
 
-        const data = await res.json();
+        const data = await response.json();
         if (!data?.id) {
           if (!cancelled) setFinished(true);
           return;
@@ -96,63 +535,79 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     return () => {
       cancelled = true;
     };
-  }, [sessionId, applyQuestion]);
+  }, [applyQuestion, sessionId]);
 
-  // Count-up timer — always starts at 0 for playable questions and records
-  // elapsed time for analytics only. It never auto-submits or times out.
   useEffect(() => {
-    if (loading || finished || selected || isSituation || isEnd) return;
-    const interval = setInterval(() => {
-      setElapsed(prev => prev + 1);
-    }, 1000);
+    if (loading || finished || selectedLabel || isSituation || isEnd) return;
+    const interval = setInterval(() => setElapsed((current) => current + 1), 1000);
     return () => clearInterval(interval);
-  }, [loading, finished, selected, isSituation, isEnd, question?.id]);
+  }, [finished, isEnd, isSituation, loading, question?.id, selectedLabel]);
 
   const goToNext = async (fromQuestionId: string, choiceLabel: string) => {
     try {
-      const res = await fetch(`/api/play/${sessionId}/answer?fromQuestionId=${fromQuestionId}&choiceLabel=${choiceLabel}`);
-      if (!res.ok) { setFinished(true); return; }
-      const next = await res.json();
-      if (!next?.id) { setFinished(true); return; }
+      const response = await fetch(`/api/play/${sessionId}/answer?fromQuestionId=${fromQuestionId}&choiceLabel=${choiceLabel}`);
+      if (!response.ok) {
+        setFinished(true);
+        return;
+      }
+      const next = await response.json();
+      if (!next?.id) {
+        setFinished(true);
+        return;
+      }
       applyQuestion(next);
-    } catch { setFinished(true); }
+    } catch {
+      setFinished(true);
+    }
   };
 
   const handleAnswer = async (label: string, answeredAt: number) => {
-    if (selected || !question || !user) return;
-    setSelected(label);
+    if (selectedLabel || !question) return;
+
+    if (explanationTimerRef.current !== null) {
+      window.clearTimeout(explanationTimerRef.current);
+    }
+
+    setSelectedLabel(label);
+    setShowExplanationModal(false);
+    explanationTimerRef.current = window.setTimeout(() => {
+      setShowExplanationModal(true);
+      explanationTimerRef.current = null;
+    }, 500);
+
     const timeTaken = Math.max(0, Math.round(answeredAt - questionStartTime));
 
-    // Server is source of truth for points — never trust client-side scoring.
     let pointsAwarded = 0;
-    try {
-      const res = await fetch(`/api/play/${sessionId}/answer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: user.uid,
-          question_id: question.id,
-          chosen_label: label,
-          time_taken_ms: timeTaken,
-          is_guest: user.isAnonymous,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        pointsAwarded = (data?.points_earned as number | undefined) ?? 0;
+    if (user) {
+      try {
+        const response = await fetch(`/api/play/${sessionId}/answer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: user.uid,
+            question_id: question.id,
+            chosen_label: label,
+            time_taken_ms: timeTaken,
+            is_guest: user.isAnonymous,
+          }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          pointsAwarded = (data?.points_earned as number | undefined) ?? 0;
+        }
+      } catch {
+        // keep offline-tolerant fallback below
       }
-    } catch { /* offline-tolerant: 0 points awarded */ }
 
-    // Guests don't get server-side scoring — fall back to the choice's
-    // local points value so their UI still updates.
-    if (user.isAnonymous) {
-      pointsAwarded = question.choices.find(c => c.label === label)?.points ?? 0;
+      if (user.isAnonymous) {
+        pointsAwarded = question.choices.find((choice) => choice.label === label)?.points ?? 0;
+      }
     }
 
     const nextScore = score + pointsAwarded;
     setScore(nextScore);
     setLastDelta(pointsAwarded);
-    setStreak(prev => pointsAwarded > 0 ? prev + 1 : 0);
+    setStreak((current) => (pointsAwarded > 0 ? current + 1 : 0));
 
     trackEvent('choice_selected', {
       session_id: sessionId,
@@ -162,40 +617,39 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       time_taken_ms: timeTaken,
     });
 
-    // Broadcast running score so other players (and admin) see live updates.
-    if (!user.isAnonymous) {
-      const label2 = question.question_text?.slice(0, 40) || `Q${question.question_order + 1}`;
+    if (user && !user.isAnonymous) {
+      const currentLabel = question.question_text?.slice(0, 40) || `Q${question.question_order + 1}`;
       updateScore(sessionId, user, nextScore, {
         currentQuestionId: question.id,
-        currentQuestionLabel: label2,
-      }).catch(() => { /* non-fatal */ });
+        currentQuestionLabel: currentLabel,
+      }).catch(() => {});
     }
-
-    // Brief pause so the player sees the +N / −N feedback, then advance.
-    await new Promise(r => setTimeout(r, 800));
-    await goToNext(question.id, label);
   };
 
-  const handleNext = async () => {
+  const handleContinue = async () => {
+    if (!question || !selectedLabel || nextLoading) return;
+    setNextLoading(true);
+    await goToNext(question.id, selectedLabel);
+    setNextLoading(false);
+  };
+
+  const handleSituationNext = async () => {
     if (!question || nextLoading) return;
     setNextLoading(true);
     await goToNext(question.id, 'continue');
     setNextLoading(false);
   };
 
-  // When the player reaches the end: aggregate their answers into
-  // leaderboard_entries (server-side) and fetch the resulting board.
   useEffect(() => {
     if (!finished || !user || completedRef.current) return;
     completedRef.current = true;
 
-    (async () => {
-      // Mark "finished" in RTDB so the admin grid can render a done badge
-      // and the dashboard live-session widget removes this entry.
+    void (async () => {
       if (!user.isAnonymous) {
-        updateScore(sessionId, user, score, { finished: true, currentQuestionId: null }).catch(() => {});
-        // Clear every live-session entry for this session (public lobby +
-        // any team-room entries) so the dashboard widget drops it.
+        updateScore(sessionId, user, score, {
+          finished: true,
+          currentQuestionId: null,
+        }).catch(() => {});
         untrackAllUserSessionsFor(user.uid, sessionId).catch(() => {});
       }
 
@@ -212,300 +666,176 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
             is_guest: user.isAnonymous,
           }),
         });
-      } catch { /* non-fatal — leaderboard fetch may still succeed */ }
+      } catch {
+        // non-fatal
+      }
 
       try {
-        const res = await fetch(`/api/play/${sessionId}/leaderboard`);
-        if (res.ok) setLeaderboard(await res.json());
-      } catch { /* fall through with null */ }
+        const response = await fetch(`/api/play/${sessionId}/leaderboard`);
+        if (response.ok) setLeaderboard(await response.json());
+      } catch {
+        // keep null
+      }
     })();
-  }, [finished, user, sessionId, score]);
+  }, [finished, score, sessionId, user]);
 
-  // ── Finished view: aggregate score + leaderboard ────────────────────────────
   if (finished) {
-    const board = leaderboard ?? [];
-    const top10 = board.slice(0, 10);
-    const myRankIdx = user ? board.findIndex(e => e.user_id === user.uid) : -1;
-    const myEntry = myRankIdx >= 0 ? board[myRankIdx] : null;
-    const myRank = myRankIdx >= 0 ? myRankIdx + 1 : null;
-
     return (
-      <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md space-y-5"
-        >
-          <div className="text-center">
-            <span className="text-5xl">🎉</span>
-            <h1 className="text-2xl font-bold text-white mt-3">{t('play.finished')}</h1>
-          </div>
-
-          {/* Personal score panel */}
-          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-indigo-600/15 to-purple-600/10 p-6 text-center">
-            <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">{t('play.score')}</p>
-            <p className="text-5xl font-bold text-white mt-2">{score}</p>
-            {myRank && (
-              <p className="text-sm text-indigo-300 mt-2">
-                Rank <span className="font-bold">#{myRank}</span> of {board.length}
-              </p>
-            )}
-          </div>
-
-          {/* Top 10 leaderboard */}
-          {leaderboard === null ? (
-            <div className="rounded-2xl border border-white/5 bg-white/5 p-6 text-center text-gray-500 text-sm">
-              <div className="w-5 h-5 mx-auto border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-2" />
-              Loading leaderboard…
-            </div>
-          ) : top10.length === 0 ? (
-            <div className="rounded-2xl border border-white/5 bg-white/5 p-6 text-center text-gray-500 text-sm">
-              You&apos;re the first to finish - share your score!
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
-              <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-white">🏆 Leaderboard</h2>
-                <span className="text-xs text-gray-500">{board.length} player{board.length !== 1 ? 's' : ''}</span>
-              </div>
-              <div className="divide-y divide-white/5 max-h-72 overflow-y-auto">
-                {top10.map((entry, idx) => {
-                  const isMe = user && entry.user_id === user.uid;
-                  const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null;
-                  return (
-                    <div
-                      key={entry.user_id}
-                      className={`flex items-center gap-3 px-4 py-2.5 ${isMe ? 'bg-indigo-500/10' : ''}`}
-                    >
-                      <span className="w-6 text-center text-sm font-bold text-gray-400">
-                        {medal ?? `#${idx + 1}`}
-                      </span>
-                      <span className={`flex-1 text-sm truncate ${isMe ? 'text-indigo-300 font-semibold' : 'text-gray-200'}`}>
-                        {isMe ? 'You' : entry.user_display_name}
-                      </span>
-                      <span className="text-white font-bold tabular-nums">{entry.total_score}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Show own row if outside top 10 */}
-              {myEntry && myRankIdx >= 10 && (
-                <div className="border-t border-white/5 px-4 py-2.5 bg-indigo-500/10 flex items-center gap-3">
-                  <span className="w-6 text-center text-sm font-bold text-indigo-300">#{myRank}</span>
-                  <span className="flex-1 text-sm text-indigo-300 font-semibold">You</span>
-                  <span className="text-white font-bold tabular-nums">{myEntry.total_score}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="flex gap-3">
-            <button onClick={() => router.push(`/history?session=${sessionId}`)} className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:from-indigo-500 hover:to-purple-500 transition-colors">
-              Full Leaderboard
-            </button>
-            <button onClick={() => router.push('/')} className="flex-1 px-4 py-3 rounded-xl bg-white/10 text-white font-semibold hover:bg-white/15 transition-colors">Home</button>
-          </div>
-        </motion.div>
-      </div>
+      <FinishedLeaderboard
+        score={score}
+        leaderboard={leaderboard}
+        userId={user?.uid}
+        router={router}
+        sessionId={sessionId}
+      />
     );
   }
 
   if (loading || !question) {
-    return <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
+    return (
+      <div className="nq-sky min-h-screen">
+        <div className="nq-content flex min-h-screen items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#0460A9] border-t-transparent" />
+        </div>
+      </div>
+    );
   }
 
-  // ── End node view ───────────────────────────────────────────────────────────
-  // Terminal node — shows optional media/message, then finalizes the session
-  // on "Finish". Players never answer an end node.
   if (isEnd) {
     return (
-      <div className="min-h-screen bg-[#0a0a1a] flex flex-col">
-        {question.media_url ? (
-          <div className="flex-1 flex items-center justify-center">
-            {question.media_type === 'video' ? (
-              <video src={question.media_url} autoPlay controls className="w-full h-full object-contain max-h-[calc(100vh-200px)]" style={{ background: '#000' }} />
-            ) : (
-              <img src={question.media_url} alt="Ending" className="w-full h-full object-contain max-h-[calc(100vh-200px)]" style={{ background: '#000' }} />
+      <div className="nq-sky min-h-screen">
+        <div className="nq-content flex min-h-screen items-center justify-center p-4">
+          <div className="nq-card w-full max-w-3xl rounded-[34px] p-6 md:p-8">
+            <QuestionVisual question={question} totalQuestions={sessionMeta?.question_count} />
+            {question.question_text && (
+              <p className="mt-6 text-lg leading-relaxed text-[#475E79]">{question.question_text}</p>
             )}
+            <button
+              onClick={() => setFinished(true)}
+              className="mt-8 w-full rounded-[24px] bg-[#0460A9] px-4 py-4 text-lg font-semibold !text-white shadow-[0_20px_42px_rgba(17,87,145,0.24)]"
+            >
+              Finish
+            </button>
           </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center max-w-lg px-6">
-              <div style={{ fontSize: 64 }}>🏁</div>
-              {question.question_text && (
-                <p className="text-white text-xl md:text-2xl mt-4 leading-relaxed">{question.question_text}</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* If there's media AND text, show the text below the media */}
-        {question.media_url && question.question_text && (
-          <div className="px-6 pb-4 text-center">
-            <p className="text-white text-lg max-w-2xl mx-auto">{question.question_text}</p>
-          </div>
-        )}
-
-        <div className="p-6 flex justify-center flex-shrink-0">
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setFinished(true)}
-            className="w-full max-w-md py-5 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 text-white text-xl font-bold shadow-xl shadow-rose-500/30 transition-all"
-          >
-            Finish 🏁
-          </motion.button>
         </div>
       </div>
     );
   }
 
-  // ── Situation node view ──────────────────────────────────────────────────────
   if (isSituation) {
     return (
-      <div className="min-h-screen bg-[#0a0a1a] flex flex-col">
-        {/* Media — takes up all available space */}
-        <div className="flex-1 flex items-center justify-center">
-          {question.media_url ? (
-            question.media_type === 'video' ? (
-              <video
-                src={question.media_url}
-                autoPlay
-                controls
-                className="w-full h-full object-contain max-h-[calc(100vh-120px)]"
-                style={{ background: '#000' }}
-              />
-            ) : (
-              <img
-                src={question.media_url}
-                alt="Scene"
-                className="w-full h-full object-contain max-h-[calc(100vh-120px)]"
-                style={{ background: '#000' }}
-              />
-            )
-          ) : (
-            <div className="text-gray-600 text-center">
-              <div style={{ fontSize: 64 }}>🎬</div>
-              <p className="mt-3">No media</p>
-            </div>
-          )}
-        </div>
+      <div className="nq-sky min-h-screen">
+        <div className="nq-content mx-auto flex min-h-screen w-full max-w-4xl flex-col justify-center gap-4 px-4 py-5">
+          <QuizHeader
+            elapsed={elapsed}
+            score={score}
+            streak={streak}
+            userName={user?.displayName}
+            photoURL={user?.photoURL}
+            lastDelta={lastDelta}
+            totalPlayers={Object.keys(scores).length}
+            topScores={Object.entries(scores).map(([uid, value]) => ({ uid, ...value })).sort((a, b) => b.score - a.score).slice(0, 5)}
+            currentUserId={user?.uid}
+          />
 
-        {/* Next button */}
-        <div className="p-6 flex justify-center flex-shrink-0">
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={handleNext}
-            disabled={nextLoading}
-            className="w-full max-w-md py-5 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xl font-bold shadow-xl shadow-indigo-500/30 disabled:opacity-60 transition-all"
-          >
-            {nextLoading ? '...' : 'Next →'}
-          </motion.button>
+          <div className="nq-card rounded-[34px] p-5 md:p-7">
+            <QuestionVisual question={question} totalQuestions={sessionMeta?.question_count} />
+            <div className="mt-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <p className="max-w-2xl text-base text-[#5D7EA1]">
+                {question.question_text || 'Continue when you are ready for the next part of the quiz.'}
+              </p>
+              <button
+                onClick={handleSituationNext}
+                disabled={nextLoading}
+                className="rounded-[22px] bg-[#0460A9] px-6 py-3 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {nextLoading ? 'Loading…' : 'Continue'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  // ── Normal question view ─────────────────────────────────────────────────────
   const topScores = Object.entries(scores)
-    .map(([uid, s]) => ({ uid, ...s }))
+    .map(([uid, value]) => ({ uid, ...value }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
 
+  const maxImpact = Math.max(...question.choices.map((choice) => Math.abs(choice.score_impact || 0)), 1);
+
   return (
-    <div className="min-h-screen bg-[#0a0a1a] flex flex-col">
-      {/* Top bar — count-up timer + score with delta toast */}
-      <div className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-3">
-          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Time</p>
-            <p className="text-lg font-bold tabular-nums text-white">{elapsed}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          {streak > 1 && <span className="px-3 py-1 rounded-lg bg-orange-500/20 text-orange-400 text-sm font-semibold">🔥 {t('play.streak')} {streak}</span>}
-          <div className="relative px-4 py-2 rounded-xl bg-white/5 border border-white/10">
-            <span className="text-white font-bold tabular-nums">{score}</span>
-            <span className="text-gray-400 text-sm ml-1">{t('play.score')}</span>
-            {/* "+N" / "−N" toast that floats up after each answer */}
-            <AnimatePresence>
-              {lastDelta !== null && lastDelta !== 0 && (
-                <motion.span
-                  key={`${question.id}-${lastDelta}`}
-                  initial={{ opacity: 0, y: 0 }}
-                  animate={{ opacity: 1, y: -22 }}
-                  exit={{ opacity: 0, y: -34 }}
-                  className={`absolute right-2 top-2 text-sm font-bold pointer-events-none ${lastDelta > 0 ? 'text-emerald-400' : 'text-rose-400'}`}
-                >
-                  {lastDelta > 0 ? `+${lastDelta}` : lastDelta}
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-      </div>
+    <div className="nq-sky min-h-screen">
+      <div className="nq-content mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-4 px-4 py-5">
+        <QuizHeader
+          elapsed={elapsed}
+          score={score}
+          streak={streak}
+          userName={user?.displayName}
+          photoURL={user?.photoURL}
+          lastDelta={lastDelta}
+          totalPlayers={Object.keys(scores).length}
+          topScores={topScores}
+          currentUserId={user?.uid}
+        />
 
-      {/* Live leaderboard — top 5 players across the session */}
-      {topScores.length > 1 && (
-        <div className="px-4 pb-2">
-          <div className="mx-auto max-w-2xl rounded-xl border border-white/10 bg-white/5 backdrop-blur px-3 py-2">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">🏆 Live Leaderboard</span>
-              <span className="text-xs text-gray-500">· {Object.keys(scores).length} players</span>
-            </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {topScores.map((s, i) => (
-                <div key={s.uid} className="flex items-center gap-1.5 text-xs">
-                  <span className="text-gray-500">#{i + 1}</span>
-                  <span className={`font-medium truncate max-w-[120px] ${s.uid === user?.uid ? 'text-indigo-300' : 'text-gray-300'}`}>
-                    {s.uid === user?.uid ? 'You' : s.displayName}
-                  </span>
-                  <span className="text-white font-bold">{s.score}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+        <div className="nq-card rounded-[34px] p-5 md:p-7">
+          <QuestionVisual question={question} totalQuestions={sessionMeta?.question_count} />
 
-      <div className="flex-1 flex flex-col items-center justify-center p-4 gap-6">
-        {/* Media */}
-        {question.media_url && (
-          <div className="w-full max-w-lg rounded-2xl overflow-hidden border border-white/10">
-            {question.media_type === 'video' ? (
-              <video src={question.media_url} controls className="w-full max-h-64 object-contain bg-black" />
-            ) : (
-              <img src={question.media_url} alt="Question media" className="w-full max-h-64 object-contain bg-black" />
+          <AnimatePresence mode="wait">
+            {!selectedLabel && (
+              <motion.div
+                key={`question-${question.id}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mt-8 space-y-3"
+              >
+                {question.choices.map((choice) => (
+                  <ChoiceButton
+                    key={choice.label}
+                    choice={choice}
+                    disabled={!!selectedLabel}
+                    onSelect={() => handleAnswer(choice.label, performance.now())}
+                  />
+                ))}
+              </motion.div>
             )}
-          </div>
-        )}
 
-        <AnimatePresence mode="wait">
-          <motion.h2 key={question.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-            className="text-xl md:text-2xl font-bold text-white text-center max-w-2xl">
-            {question.question_text}
-          </motion.h2>
-        </AnimatePresence>
+            {!!selectedLabel && (
+              <motion.div
+                key={`answer-${question.id}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mt-8 space-y-3"
+              >
+                {question.choices.map((choice) => (
+                  <ResultChoice
+                    key={choice.label}
+                    choice={choice}
+                    selected={choice.label === selectedLabel}
+                    maxImpact={maxImpact}
+                  />
+                ))}
+              </motion.div>
+            )}
 
-        {/* Choices */}
-        <div className="grid grid-cols-2 gap-3 w-full max-w-2xl">
-          {question.choices.map(choice => (
-            <motion.button key={choice.label}
-              whileHover={!selected ? { scale: 1.02 } : {}}
-              whileTap={!selected ? { scale: 0.98 } : {}}
-              disabled={!!selected}
-              onClick={(event) => handleAnswer(choice.label, event.timeStamp)}
-              className={`relative p-4 md:p-6 rounded-2xl bg-gradient-to-br ${CHOICE_COLORS[choice.label as keyof typeof CHOICE_COLORS]} ${!selected ? CHOICE_HOVERS[choice.label as keyof typeof CHOICE_HOVERS] : ''} transition-all duration-200 ${selected === choice.label ? 'ring-2 ring-white/40' : ''}`}
-            >
-              <div className="flex items-center gap-3">
-                <span className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white font-bold">{choice.label}</span>
-                <span className="text-white font-medium text-left text-sm md:text-base">{choice.choice_text}</span>
-              </div>
-            </motion.button>
-          ))}
+          </AnimatePresence>
         </div>
       </div>
+
+      <AnimatePresence>
+        {selectedChoice && showExplanationModal && (
+          <ExplanationModal
+            key="explanation-modal"
+            selectedChoice={selectedChoice}
+            nextLoading={nextLoading}
+            onContinue={handleContinue}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
