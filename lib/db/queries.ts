@@ -8,8 +8,14 @@ export async function getAllQuizzes() {
     `SELECT qs.*, 
       COALESCE(p.display_name, (SELECT user_display_name FROM leaderboard_entries le WHERE le.user_id = qs.created_by LIMIT 1)) as creator_name,
       (SELECT COUNT(*) FROM questions q WHERE q.session_id = qs.id)::int AS question_count,
-      (SELECT COUNT(*) FROM leaderboard_entries le WHERE le.session_id = qs.id)::int AS play_count,
-      (SELECT COALESCE(ROUND(AVG(le.total_score)), 0) FROM leaderboard_entries le WHERE le.session_id = qs.id)::int AS avg_score
+      (SELECT COUNT(*) 
+       FROM leaderboard_entries le 
+       JOIN sessions s ON le.session_id::text = s.id::text 
+       WHERE s.session_id::text = qs.id::text)::int AS play_count,
+      (SELECT COALESCE(ROUND(AVG(le.total_score)), 0) 
+       FROM leaderboard_entries le 
+       JOIN sessions s ON le.session_id::text = s.id::text 
+       WHERE s.session_id::text = qs.id::text)::int AS avg_score
      FROM quizzes qs
      LEFT JOIN profiles p ON qs.created_by = p.uid
      ORDER BY qs.created_at DESC`
@@ -542,7 +548,7 @@ export async function getUserHistory(userId: string) {
   const result = await queryWithRetry(
     `SELECT
        le.session_id,
-       qs.name                             AS session_name,
+       COALESCE(s.name, qs.name)           AS session_name,
        qs.description                      AS session_description,
        le.total_score,
        le.correct_count,
@@ -556,7 +562,8 @@ export async function getUserHistory(userId: string) {
        )::int + 1                          AS rank,
        (SELECT COUNT(*) FROM leaderboard_entries WHERE session_id = le.session_id)::int AS total_players
      FROM leaderboard_entries le
-     JOIN quizzes qs ON qs.id = le.session_id
+     LEFT JOIN sessions s ON le.session_id::text = s.id::text
+     LEFT JOIN quizzes qs ON (s.session_id::text = qs.id::text OR le.session_id::text = qs.id::text)
      WHERE le.user_id = $1
      ORDER BY le.completed_at DESC`,
     [userId],
@@ -677,3 +684,46 @@ export async function syncUserProfile(uid: string, displayName: string | null, p
   );
 }
 
+export async function getSessionAnalytics(sessionId: string) {
+  const session = await getSessionById(sessionId);
+  if (!session) return null;
+
+  const leaderboardResult = await pool.query(
+    `SELECT le.*, p.photo_url as profile_photo 
+     FROM leaderboard_entries le
+     LEFT JOIN profiles p ON le.user_id = p.uid
+     WHERE le.session_id = $1 
+     ORDER BY le.total_score DESC`,
+    [sessionId]
+  );
+
+  const questionsResult = await pool.query(
+    `SELECT 
+       q.id,
+       q.question_text,
+       q.question_order,
+       q.node_type,
+       (SELECT COUNT(*) FROM user_answers WHERE question_id = q.id AND session_id = $1)::int as total_responses,
+       (SELECT COALESCE(AVG(time_taken_ms), 0)::int FROM user_answers WHERE question_id = q.id AND session_id = $1) as avg_time_ms,
+       COALESCE((
+         SELECT json_agg(json_build_object(
+           'label', c.label,
+           'text', c.choice_text,
+           'is_correct', (c.score_impact > 0),
+           'count', (SELECT COUNT(*) FROM user_answers WHERE question_id = q.id AND session_id = $1 AND chosen_label = c.label)::int
+         ) ORDER BY c.label)
+         FROM choices c
+         WHERE c.question_id = q.id
+       ), '[]'::json) as choices
+     FROM questions q
+     WHERE q.session_id = (SELECT session_id FROM sessions WHERE id = $1)
+     ORDER BY q.question_order ASC`,
+    [sessionId]
+  );
+
+  return {
+    session,
+    leaderboard: leaderboardResult.rows,
+    questions: questionsResult.rows
+  };
+}

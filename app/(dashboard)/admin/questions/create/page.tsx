@@ -39,7 +39,7 @@ export default function CreateQuestionPage() {
 
   if (authLoading || !isAdmin) return null;
 
-  const handleSave = async (publish: boolean) => {
+  const handleSave = async () => {
     if (!sessionName.trim()) {
       showToast("Session name is required", "error");
       return;
@@ -59,7 +59,7 @@ export default function CreateQuestionPage() {
           name: sessionName,
           description,
           timer_seconds: null,
-          is_published: publish,
+          is_published: true,
           created_by: user?.uid,
         }),
       });
@@ -121,8 +121,8 @@ export default function CreateQuestionPage() {
       });
       if (!graphRes.ok) throw new Error(await getErrorMessage(graphRes));
 
-      showToast(publish ? "Session published!" : "Draft saved!", "success");
-      router.push("/admin?tab=question-manager");
+      showToast("Quiz saved!", "success");
+      router.push("/admin?tab=quizzes-manager");
     } catch (err) {
       showToast(`Save failed: ${(err as Error).message}`, "error");
     } finally {

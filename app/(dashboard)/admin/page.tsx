@@ -330,27 +330,6 @@ function AdminDashboardContent() {
       color: "from-[#055A9E] to-[#92BFFF]",
       sub: "Total questions",
     },
-    {
-      label: t("admin.avg_scores"),
-      value: stats ? `${stats.avgScore}pts` : "—",
-      icon: "📈",
-      color: "from-[#0460A9] via-[#055A9E] to-[#92BFFF]",
-      sub: "Per completion",
-    },
-    {
-      label: "Total Completions",
-      value: stats?.totalPlaySessions ?? "—",
-      icon: "🎮",
-      color: "from-[#055A9E] to-[#92BFFF]",
-      sub: "Finished sessions",
-    },
-    {
-      label: "Completion Rate",
-      value: stats ? `${stats.completionRate}%` : "—",
-      icon: "✅",
-      color: "from-[#0460A9] to-[#92BFFF]",
-      sub: "Finished / started",
-    },
   ];
 
   const maxActivity = stats ? Math.max(...stats.monthlyActivity, 1) : 1;
@@ -378,7 +357,7 @@ function AdminDashboardContent() {
             className="space-y-6"
           >
             {/* Stat Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {statCards.map((s) => (
                 <div
                   key={s.label}
@@ -408,10 +387,10 @@ function AdminDashboardContent() {
               ))}
             </div>
 
-            {/* Activity Chart + Answer Distribution */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Monthly Activity (spans 2 cols) */}
-              <div className="lg:col-span-2 rounded-2xl border border-white/5 bg-white/5 p-6">
+            {/* Charts Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Play Sessions Chart */}
+              <div className="rounded-2xl border border-white/5 bg-white/5 p-6">
                 <div className="flex items-center justify-between mb-5">
                   <div>
                     <h3 className="text-base font-semibold text-white">
@@ -466,195 +445,60 @@ function AdminDashboardContent() {
                 </div>
               </div>
 
-              {/* Answer Distribution */}
+              {/* User Growth Chart */}
               <div className="rounded-2xl border border-white/5 bg-white/5 p-6">
-                <div className="mb-4">
-                  <h3 className="text-base font-semibold text-white">
-                    Answer Distribution
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Correct vs incorrect across all answers
-                  </p>
-                </div>
-                <div className="flex flex-col items-center">
-                  {fetchingStats ? (
-                    <div className="w-32 h-32 rounded-full border-[18px] border-white/10 animate-pulse" />
-                  ) : (
-                    <svg viewBox="0 0 200 200" className="w-32 h-32">
-                      <circle
-                        cx="100"
-                        cy="100"
-                        r="80"
-                        fill="none"
-                        stroke="rgba(4,96,169,0.12)"
-                        strokeWidth="22"
-                      />
-                      {correctDash > 0 && (
-                        <circle
-                          cx="100"
-                          cy="100"
-                          r="80"
-                          fill="none"
-                          stroke="url(#grad1)"
-                          strokeWidth="22"
-                          strokeDasharray={`${correctDash} ${C}`}
-                          strokeLinecap="round"
-                          transform="rotate(-90 100 100)"
-                        />
-                      )}
-                      {incorrectDash > 0 && (
-                        <circle
-                          cx="100"
-                          cy="100"
-                          r="80"
-                          fill="none"
-                          stroke="url(#grad2)"
-                          strokeWidth="22"
-                          strokeDasharray={`${incorrectDash} ${C}`}
-                          strokeDashoffset={-correctDash}
-                          strokeLinecap="round"
-                          transform="rotate(-90 100 100)"
-                        />
-                      )}
-                      <defs>
-                        <linearGradient id="grad1">
-                          <stop stopColor="#055A9E" />
-                          <stop offset="0.55" stopColor="#0460A9" />
-                          <stop offset="1" stopColor="#92BFFF" />
-                        </linearGradient>
-                        <linearGradient id="grad2">
-                          <stop stopColor="#0B7F8E" />
-                          <stop offset="1" stopColor="#20B8C7" />
-                        </linearGradient>
-                      </defs>
-                      <text
-                        x="100"
-                        y="96"
-                        textAnchor="middle"
-                        fill="#16324F"
-                        fontSize="18"
-                        fontWeight="bold"
-                      >
-                        {correctPct}%
-                      </text>
-                      <text
-                        x="100"
-                        y="113"
-                        textAnchor="middle"
-                        fill="#5D7EA1"
-                        fontSize="11"
-                      >
-                        correct
-                      </text>
-                    </svg>
-                  )}
-                  <div className="mt-3 w-full space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-                        <span className="text-xs text-gray-400">Correct</span>
-                      </div>
-                      <span className="text-xs font-semibold text-white">
-                        {correctPct}%
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                        <span className="text-xs text-gray-400">Incorrect</span>
-                      </div>
-                      <span className="text-xs font-semibold text-white">
-                        {incorrectPct}%
-                      </span>
-                    </div>
-                    {stats && (
-                      <div className="mt-3 pt-3 border-t border-white/5">
-                        <p className="text-[10px] text-gray-500 mb-0.5">
-                          Avg completion time
-                        </p>
-                        <p className="text-sm font-semibold text-white">
-                          {formatDuration(stats.avgTimeMs)}
-                        </p>
-                      </div>
-                    )}
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="text-base font-semibold text-white">
+                      User Growth
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      New registrations — last 12 months
+                    </p>
                   </div>
+                  {stats && (
+                    <span className="text-xs text-gray-500 bg-white/5 px-2 py-1 rounded-lg">
+                      {stats.totalUsers} users
+                    </span>
+                  )}
                 </div>
-              </div>
-            </div>
-
-            {/* Score Histogram */}
-            <div className="rounded-2xl border border-white/5 bg-white/5 p-6">
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <h3 className="text-base font-semibold text-white">
-                    Score Distribution
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    How player total scores are spread
-                  </p>
+                <div className="h-44 flex items-end gap-1.5">
+                  {(stats?.userGrowth ?? new Array(12).fill(0)).map(
+                    (count, i) => {
+                      const maxGrowth = Math.max(...(stats?.userGrowth ?? [1]), 1);
+                      const pct = (count / maxGrowth) * 100;
+                      return (
+                        <div
+                          key={i}
+                          className="flex-1 flex flex-col items-center gap-1 h-full justify-end group"
+                        >
+                          {count > 0 && (
+                            <span className="text-[9px] text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {count}
+                            </span>
+                          )}
+                          <div
+                            title={`${MONTHS[i]}: ${count} new users`}
+                            style={{ height: `${pct || (count > 0 ? 4 : 0)}%` }}
+                            className="w-full rounded-t-lg bg-linear-to-t from-[#70A2F9] to-[#92BFFF] opacity-85 hover:opacity-100 transition-opacity cursor-default"
+                          />
+                        </div>
+                      );
+                    },
+                  )}
                 </div>
-                {stats && (
-                  <span className="text-xs text-gray-500 bg-white/5 px-2 py-1 rounded-lg">
-                    {stats.scoreHistogram.reduce((a, b) => a + b, 0)} players
-                  </span>
-                )}
-              </div>
-              {fetchingStats ? (
-                <div className="h-32 flex items-end gap-3">
-                  {[40, 60, 80, 100, 70, 30].map((h, i) => (
-                    <div
-                      key={i}
-                      className="flex-1 bg-white/10 rounded-t animate-pulse"
-                      style={{ height: `${h}%` }}
-                    />
+                <div className="flex justify-between mt-2 text-[10px] text-gray-500">
+                  {MONTHS.map((m) => (
+                    <span key={m} className="flex-1 text-center">
+                      {m}
+                    </span>
                   ))}
                 </div>
-              ) : (
-                <>
-                  <div className="h-32 flex items-end gap-3">
-                    {(stats?.scoreHistogram ?? new Array(6).fill(0)).map(
-                      (count, i) => {
-                        const pct = Math.max(
-                          (count / maxHistogram) * 100,
-                          count > 0 ? 6 : 0,
-                        );
-                        return (
-                          <div
-                            key={i}
-                            className="flex-1 flex flex-col items-center gap-1 h-full justify-end group"
-                          >
-                            {count > 0 && (
-                              <span className="text-[10px] text-gray-400">
-                                {count}
-                              </span>
-                            )}
-                            <div
-                              title={`${SCORE_BUCKETS[i]}: ${count} players`}
-                              style={{ height: `${pct}%` }}
-                              className="w-full rounded-t bg-linear-to-t from-[#055A9E] via-[#0460A9] to-[#92BFFF] opacity-85 hover:opacity-100 transition-opacity cursor-default"
-                            />
-                          </div>
-                        );
-                      },
-                    )}
-                  </div>
-                  <div className="flex mt-2">
-                    {SCORE_BUCKETS.map((label, i) => (
-                      <span
-                        key={i}
-                        className="flex-1 text-center text-[10px] text-gray-500"
-                      >
-                        {label}
-                      </span>
-                    ))}
-                  </div>
-                </>
-              )}
+              </div>
             </div>
 
-            {/* Top Quizzes + Top Players */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Top Quizzes */}
+            {/* Top Quizzes */}
+            <div className="grid grid-cols-1 gap-6">
               <div className="rounded-2xl border border-white/5 bg-white/5 p-6">
                 <div className="flex items-center justify-between mb-5">
                   <div>
@@ -716,72 +560,6 @@ function AdminDashboardContent() {
                           <p className="text-[10px] text-gray-600 mt-1">
                             {quiz.play_count} play
                             {quiz.play_count !== 1 ? "s" : ""}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Top Players */}
-              <div className="rounded-2xl border border-white/5 bg-white/5 p-6">
-                <div className="flex items-center justify-between mb-5">
-                  <div>
-                    <h3 className="text-base font-semibold text-white">
-                      Top Players
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      By best single-session score
-                    </p>
-                  </div>
-                </div>
-                {fetchingStats ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div
-                        key={i}
-                        className="h-12 bg-white/10 rounded-xl animate-pulse"
-                      />
-                    ))}
-                  </div>
-                ) : !stats?.topPlayers.length ? (
-                  <p className="text-sm text-gray-500">No players yet.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {stats.topPlayers.map((player, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5"
-                      >
-                        <span className="text-sm w-7 text-center shrink-0">
-                          {i === 0 ? (
-                            "🥇"
-                          ) : i === 1 ? (
-                            "🥈"
-                          ) : i === 2 ? (
-                            "🥉"
-                          ) : (
-                            <span className="text-xs font-bold text-gray-600">
-                              #{i + 1}
-                            </span>
-                          )}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white truncate">
-                            {player.user_display_name}
-                          </p>
-                          <p className="text-[10px] text-gray-500">
-                            {player.total_sessions} session
-                            {player.total_sessions !== 1 ? "s" : ""}
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-bold text-rose-400">
-                            {player.best_score}
-                          </p>
-                          <p className="text-[10px] text-gray-500">
-                            {player.avg_score} avg
                           </p>
                         </div>
                       </div>

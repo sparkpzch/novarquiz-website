@@ -49,16 +49,19 @@ function HistoryPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>(searchParams.get('session') ? 'session' : 'mine');
-  const [sessions, setSessions] = useState<Quiz[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedSession, setSelectedSession] = useState(searchParams.get('session') || '');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [mine, setMine] = useState<UserHistoryRow[] | null>(null);
   const [loading, setLoading] = useState(Boolean(searchParams.get('session')));
 
   useEffect(() => {
-    fetch('/api/questions/sessions')
+    fetch('/api/sessions')
       .then((response) => (response.ok ? response.json() : []))
-      .then(setSessions)
+      .then((data) => {
+        // Filter to show sessions that have actually been played or are archive-ready
+        setSessions(data.filter((s: any) => s.status !== 'closed'));
+      })
       .catch(() => {});
   }, []);
 
@@ -208,9 +211,9 @@ function HistoryPageContent() {
                   className="w-full rounded-[22px] border border-[#0460A9]/12 bg-white/85 px-4 py-3 text-[#16324F] outline-none transition focus:border-[#0460A9]/40"
                 >
                   <option value="">{t('leaderboard.select_session')}</option>
-                  {sessions.map((session) => (
+                  {sessions.map((session: any) => (
                     <option key={session.id} value={session.id}>
-                      {session.name}
+                      {session.name || session.quiz_name} ({new Date(session.started_at).toLocaleDateString()})
                     </option>
                   ))}
                 </select>

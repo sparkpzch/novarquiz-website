@@ -55,8 +55,8 @@ export interface EditorCanvasProps {
   setEdges: React.Dispatch<React.SetStateAction<AppEdge[]>>;
   onNodesChange: any;
   onEdgesChange: any;
-  /** Called when the Save Draft / Publish buttons are clicked */
-  onSave: (publish: boolean) => void;
+  /** Called when the Save button is clicked */
+  onSave: () => void;
   saving: boolean;
   /** Real session UUID (edit page) or 'draft' (create page) */
   sessionId?: string;
@@ -363,10 +363,9 @@ export function EditorCanvas({
             <span style={{ fontSize: 11, color: '#35527e', fontWeight: 600 }}>Right-click canvas · Del to remove</span>
           </div>
 
-          {/* Save buttons */}
-          <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, display: 'flex', gap: 8 }}>
-            <Button variant="secondary" onClick={() => onSave(false)} loading={saving} size="sm">Save Draft</Button>
-            <Button onClick={() => onSave(true)} loading={saving} size="sm" style={{ color: '#ffffff', textShadow: '0 1px 1px rgba(0,0,0,0.12)' }}>Publish</Button>
+          {/* Save button */}
+          <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+            <Button onClick={onSave} loading={saving} size="sm" style={{ color: '#ffffff', textShadow: '0 1px 1px rgba(0,0,0,0.12)' }}>Save</Button>
           </div>
 
           {/* Empty state */}

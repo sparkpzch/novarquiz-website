@@ -298,6 +298,14 @@ export default function QuizzesManager({
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="text-blue-400 hover:text-blue-300"
+                      onClick={() => router.push(`/admin/sessions/${s.id}/analytics`)}
+                    >
+                      Analytics
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="text-red-400 hover:text-red-300"
                       disabled={loadingIds[s.id]}
                       onClick={() => setConfirmModal({

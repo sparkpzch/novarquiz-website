@@ -66,16 +66,16 @@ export async function GET(request: NextRequest) {
       SELECT
         qs.id,
         qs.name,
-        COUNT(le.user_id)::int AS play_count,
+        COUNT(DISTINCT le.id)::int AS play_count,
         COALESCE(ROUND(AVG(le.total_score)), 0)::int AS avg_score,
         CASE
-          WHEN COUNT(s.id) > 0
-          THEN LEAST(ROUND(COUNT(le.user_id)::numeric / COUNT(s.id)::numeric * 100), 100)::int
+          WHEN COUNT(DISTINCT s.id) > 0
+          THEN LEAST(ROUND(COUNT(DISTINCT le.id)::numeric / COUNT(DISTINCT s.id)::numeric * 100), 100)::int
           ELSE 0
         END AS completion_rate
       FROM quizzes qs
-      LEFT JOIN leaderboard_entries le ON le.session_id = qs.id AND le.completed_at IS NOT NULL
-      LEFT JOIN sessions s ON s.session_id = qs.id
+      LEFT JOIN sessions s ON s.session_id::text = qs.id::text
+      LEFT JOIN leaderboard_entries le ON (le.session_id::text = s.id::text OR le.session_id::text = qs.id::text) AND le.completed_at IS NOT NULL
       GROUP BY qs.id, qs.name
       ORDER BY play_count DESC, qs.name ASC
       LIMIT 6
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
     queryWithRetry(`
       SELECT
         le.user_display_name,
-        qs.name AS session_name,
+        COALESCE(s.name, qs.name) AS session_name,
         le.total_score,
         le.correct_count,
         le.incorrect_count,
@@ -119,7 +119,8 @@ export async function GET(request: NextRequest) {
         le.total_time_ms,
         le.completed_at
       FROM leaderboard_entries le
-      JOIN quizzes qs ON qs.id = le.session_id
+      LEFT JOIN sessions s ON le.session_id::text = s.id::text
+      LEFT JOIN quizzes qs ON (s.session_id::text = qs.id::text OR le.session_id::text = qs.id::text)
       ORDER BY le.completed_at DESC NULLS LAST
       LIMIT 25
     `),
@@ -170,8 +171,24 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const userGrowthData: number[] = new Array(12).fill(0);
+  if (usersResult.status === 'fulfilled') {
+    const now = new Date();
+    usersResult.value.users.forEach((u) => {
+      const created = new Date(u.metadata.creationTime);
+      const diffMonths =
+        (now.getFullYear() - created.getFullYear()) * 12 + (now.getMonth() - created.getMonth());
+      if (diffMonths >= 0 && diffMonths < 12) {
+        // Find the index (0-11) for this month relative to the calendar
+        const monthIndex = created.getMonth(); // 0-11
+        userGrowthData[monthIndex]++;
+      }
+    });
+  }
+
   return NextResponse.json({
     totalUsers: usersResult.status === 'fulfilled' ? usersResult.value.users.length : 0,
+    userGrowth: userGrowthData,
     activeSessions: stats.active_sessions,
     questionsCreated: stats.questions_created,
     avgScore: stats.avg_score,
