@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
-import { AnimatePresence, motion } from 'motion/react';
+import { LayoutGroup, motion } from 'motion/react';
 import type { LeaderboardEntry, Quiz, Session } from '@/lib/types';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 
@@ -48,22 +48,29 @@ function HistoryPageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<Tab>(searchParams.get('session') ? 'session' : 'mine');
+  const viewParam = searchParams.get('view');
+  const sessionParam = searchParams.get('session') || '';
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [selectedSession, setSelectedSession] = useState(searchParams.get('session') || '');
+  const [selectedSession, setSelectedSession] = useState(sessionParam);
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [mine, setMine] = useState<UserHistoryRow[] | null>(null);
-  const [loading, setLoading] = useState(Boolean(searchParams.get('session')));
+  const [loading, setLoading] = useState(Boolean(sessionParam));
+  const tab: Tab = sessionParam || viewParam === 'session' ? 'session' : 'mine';
 
   useEffect(() => {
     fetch('/api/sessions')
       .then((response) => (response.ok ? response.json() : []))
-      .then((data) => {
-        // Filter to show sessions that have actually been played or are archive-ready
-        setSessions(data.filter((s: any) => s.status !== 'closed'));
-      })
+      .then(setSessions)
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    setSelectedSession(sessionParam);
+    setLoading(Boolean(sessionParam));
+    if (!sessionParam) {
+      setEntries([]);
+    }
+  }, [sessionParam]);
 
   useEffect(() => {
     if (!selectedSession) return;
@@ -116,13 +123,12 @@ function HistoryPageContent() {
     sortedEntries.length ? Math.max(...sortedEntries.map((entry) => entry.total_score)) : 0;
 
   const switchTab = (nextTab: Tab) => {
-    setTab(nextTab);
     if (nextTab === 'mine') {
       setSelectedSession('');
       router.replace('/history');
       return;
     }
-    router.replace(selectedSession ? `/history?session=${selectedSession}` : '/history');
+    router.replace(selectedSession ? `/history?session=${selectedSession}` : '/history?view=session');
   };
 
   return (
@@ -170,29 +176,33 @@ function HistoryPageContent() {
 
       <section className="nq-card rounded-[30px] p-4 md:p-5">
         <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start lg:gap-6">
-          <div className="relative inline-flex rounded-[24px] bg-[#EAF5FF] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-            {(['mine', 'session'] as Tab[]).map((item) => {
-              const active = tab === item;
-              return (
-                <button
-                  key={item}
-                  onClick={() => switchTab(item)}
-                  className={`relative z-10 rounded-[20px] px-5 py-2.5 text-sm font-semibold transition-colors ${
-                    active ? 'text-white' : 'text-[#456786]'
-                  }`}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="history-tab-pill"
-                      className="absolute inset-0 rounded-[20px] bg-linear-to-r from-[#055A9E] via-[#0460A9] to-[#92BFFF]"
-                      transition={{ type: 'spring', stiffness: 360, damping: 34 }}
-                    />
-                  )}
-                  <span className="relative z-10">{item === 'mine' ? 'My attempts' : 'By session'}</span>
-                </button>
-              );
-            })}
-          </div>
+          <LayoutGroup id="history-tabs">
+            <div className="relative inline-flex rounded-[93px] border border-[#0460A9]/12 bg-white/88 p-1.5 shadow-[0_18px_45px_rgba(17,87,145,0.12)] backdrop-blur-xl">
+              {(['mine', 'session'] as Tab[]).map((item) => {
+                const active = tab === item;
+                return (
+                  <button
+                    key={item}
+                    onClick={() => switchTab(item)}
+                    className={`relative z-10 min-w-[170px] rounded-[93px] px-6 py-3 text-sm font-semibold transition-colors ${
+                      active ? 'text-white' : 'text-[#5D7EA1]'
+                    }`}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="history-tab-pill"
+                        className="absolute inset-0 rounded-[93px] border border-[#70A2F9]/15 bg-[#70A2F9] shadow-[0_12px_24px_rgba(17,87,145,0.24)]"
+                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                      />
+                    )}
+                    <span className={`relative z-10 ${active ? 'nq-on-dark' : ''}`}>
+                      {item === 'mine' ? 'My attempts' : 'By session'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </LayoutGroup>
 
           <div className="w-full lg:ml-auto lg:max-w-xl lg:min-h-[84px]">
             {tab === 'session' ? (
@@ -206,7 +216,7 @@ function HistoryPageContent() {
                     const nextSession = event.target.value;
                     setLoading(Boolean(nextSession));
                     setSelectedSession(nextSession);
-                    router.replace(nextSession ? `/history?session=${nextSession}` : '/history');
+                    router.replace(nextSession ? `/history?session=${nextSession}` : '/history?view=session');
                   }}
                   className="w-full rounded-[22px] border border-[#0460A9]/12 bg-white/85 px-4 py-3 text-[#16324F] outline-none transition focus:border-[#0460A9]/40"
                 >
@@ -228,16 +238,8 @@ function HistoryPageContent() {
         </div>
       </section>
 
-      <AnimatePresence mode="wait" initial={false}>
-        {tab === 'mine' ? (
-          <motion.div
-            key="mine-tab"
-            initial={{ opacity: 0, y: 18, filter: 'blur(6px)' }}
-            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            exit={{ opacity: 0, y: -14, filter: 'blur(4px)' }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="space-y-4"
-          >
+      {tab === 'mine' ? (
+        <div className="space-y-4">
             {!user ? (
               <div className="nq-card rounded-[34px] p-10 text-center">
                 <p className="text-lg font-semibold text-[#16324F]">Sign in to see your attempts.</p>
@@ -255,15 +257,11 @@ function HistoryPageContent() {
             ) : (
               <div className="space-y-4">
                 {mine.map((row, index) => (
-                  <motion.button
+                  <button
                     key={`${row.session_id}-${row.completed_at ?? index}`}
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.04 }}
                     onClick={() => {
                       setLoading(true);
                       setSelectedSession(row.session_id);
-                      setTab('session');
                       router.replace(`/history?session=${row.session_id}`);
                     }}
                     className="nq-card-soft w-full rounded-[30px] p-5 text-left transition hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(17,87,145,0.18)]"
@@ -311,20 +309,13 @@ function HistoryPageContent() {
                       <p className="text-sm text-[#5D7EA1]">Completion time: {formatDuration(row.total_time_ms)}</p>
                       <span className="text-sm font-semibold text-[#0460A9]">Open session history</span>
                     </div>
-                  </motion.button>
+                  </button>
                 ))}
               </div>
             )}
-          </motion.div>
-        ) : (
-          <motion.div
-            key="session-tab"
-            initial={{ opacity: 0, y: 18, filter: 'blur(6px)' }}
-            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            exit={{ opacity: 0, y: -14, filter: 'blur(4px)' }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="space-y-6"
-          >
+        </div>
+      ) : (
+        <div className="space-y-6">
             {!selectedSession ? (
               <div className="nq-card rounded-[34px] p-10 text-center">
                 <p className="text-lg font-semibold text-[#16324F]">Select a quiz session to view history.</p>
@@ -359,15 +350,12 @@ function HistoryPageContent() {
                       </div>
                     </div>
 
-                    <div className="mt-8 flex flex-col items-center justify-center gap-6 md:flex-row md:items-end">
+                    <div className="mt-8 flex items-end justify-center gap-4">
                       {podium.map(({ entry, rank, height, surface, featured }, index) => {
                         return (
-                          <motion.div
+                          <div
                             key={entry.user_id}
-                            initial={{ opacity: 0, y: 18 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.08 }}
-                            className="flex flex-col items-center"
+                            className="flex w-24 flex-col items-center"
                           >
                             <div className="mb-3 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-[#5D7EA1]">
                               #{rank}
@@ -375,27 +363,27 @@ function HistoryPageContent() {
                             <ProfileAvatar
                               displayName={entry.user_display_name}
                               photoURL={entry.user_photo_url}
-                              size={featured ? 88 : 72}
+                              size={featured ? 68 : 56}
                               ringClassName="ring-4 ring-[#DDF0FF] shadow-[0_16px_28px_rgba(17,87,145,0.14)]"
                             />
-                            <p className="mt-3 max-w-[156px] truncate text-center text-base font-bold text-[#16324F]">
+                            <p className="mt-3 w-full truncate text-center text-xs font-bold text-[#16324F]">
                               {entry.user_display_name}
                             </p>
-                            <p className="mt-1 text-sm font-semibold text-[#0460A9]">{entry.total_score} pts</p>
-                            <div className={`mt-4 flex w-28 items-start justify-center rounded-t-[28px] bg-linear-to-b ${surface} pt-4 text-xl font-bold ${featured ? 'text-white' : 'text-[#16324F]'} ${height}`}>
+                            <p className="mt-1 text-xs font-semibold text-[#0460A9]">{entry.total_score} pts</p>
+                            <div className={`mt-4 flex w-24 items-start justify-center rounded-t-[28px] bg-linear-to-b ${surface} pt-4 text-xl font-bold ${featured ? 'nq-on-dark' : 'text-[#16324F]'} ${height}`}>
                               {rank}
                             </div>
-                          </motion.div>
+                          </div>
                         );
                       })}
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <section className="nq-card-blue rounded-[30px] p-5 text-white">
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/75">Top score</p>
-                      <p className="mt-3 text-3xl font-bold">{sessionBestScore}</p>
-                      <p className="mt-2 text-sm text-white/80">
+                    <section className="nq-card-blue rounded-[30px] p-5">
+                      <p className="nq-on-dark-soft text-xs font-semibold uppercase tracking-[0.22em]">Top score</p>
+                      <p className="nq-on-dark mt-3 text-3xl font-bold">{sessionBestScore}</p>
+                      <p className="nq-on-dark-muted mt-2 text-sm">
                         Leading score in this finished session.
                       </p>
                     </section>
@@ -506,9 +494,8 @@ function HistoryPageContent() {
                 </section>
               </>
             )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }

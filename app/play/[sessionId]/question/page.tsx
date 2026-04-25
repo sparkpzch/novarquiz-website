@@ -240,7 +240,37 @@ function FinishedLeaderboard({
   router: ReturnType<typeof useRouter>;
   sessionId: string;
 }) {
-  const board = leaderboard ?? [];
+  const [liveScores, setLiveScores] = useState<Record<string, PlayerScore>>({});
+
+  useEffect(() => {
+    return watchScores(sessionId, setLiveScores);
+  }, [sessionId]);
+
+  const dbUserIds = new Set((leaderboard ?? []).map((e) => e.user_id));
+  const mergedEntries: LeaderboardEntry[] = leaderboard === null ? [] : [
+    ...leaderboard.map((entry) => {
+      const live = liveScores[entry.user_id];
+      return live ? { ...entry, total_score: live.score } : entry;
+    }),
+    ...Object.entries(liveScores)
+      .filter(([uid]) => !dbUserIds.has(uid))
+      .map(([uid, live]): LeaderboardEntry => ({
+        id: uid,
+        session_id: sessionId,
+        user_id: uid,
+        user_display_name: live.displayName,
+        user_photo_url: live.photoURL ?? null,
+        total_score: live.score,
+        correct_count: 0,
+        incorrect_count: 0,
+        unanswered_count: 0,
+        streak: 0,
+        total_time_ms: 0,
+        completed_at: '',
+      })),
+  ];
+
+  const board = leaderboard === null ? [] : mergedEntries;
   const sortedBoard = [...board].sort((a, b) => {
     if (b.total_score !== a.total_score) return b.total_score - a.total_score;
     if (a.total_time_ms !== b.total_time_ms) return a.total_time_ms - b.total_time_ms;
@@ -280,16 +310,16 @@ function FinishedLeaderboard({
                 <div className="mt-8 flex items-end justify-center gap-4">
                   {podium.map(({ entry, rank, height, featured }) => {
                     return (
-                      <div key={entry.user_id} className="flex flex-col items-center">
+                      <div key={entry.user_id} className="flex w-24 flex-col items-center">
                         <ProfileAvatar
                           displayName={entry.user_display_name}
                           photoURL={entry.user_photo_url}
-                          size={featured ? 92 : 78}
+                          size={featured ? 72 : 60}
                           ringClassName="ring-4 ring-[#DDF0FF] shadow-[0_16px_28px_rgba(17,87,145,0.14)]"
                         />
-                        <div className="mt-3 text-center">
-                          <p className="max-w-[130px] truncate text-xl font-bold text-[#16324F]">{entry.user_display_name}</p>
-                          <p className="text-lg text-[#0460A9]">{entry.total_score} pts</p>
+                        <div className="mt-3 w-full text-center">
+                          <p className="truncate text-sm font-bold text-[#16324F]">{entry.user_display_name}</p>
+                          <p className="text-xs text-[#0460A9]">{entry.total_score} pts</p>
                         </div>
                         <div className={`mt-4 flex w-24 items-start justify-center rounded-t-[26px] bg-gradient-to-b from-[#DDF0FF] to-[#8EC0FF] pt-3 text-2xl font-bold text-[#16324F] ${height}`}>
                           {rank}
@@ -335,7 +365,7 @@ function FinishedLeaderboard({
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <button
-              onClick={() => router.push(`/leaderboard?session=${sessionId}`)}
+              onClick={() => router.push(`/history?session=${sessionId}`)}
               className="flex-1 rounded-2xl bg-[#0460A9] px-4 py-3 text-sm font-semibold text-white!"
             >
               Open full leaderboard
