@@ -122,6 +122,31 @@ export function watchRoom(
   return () => off(roomRef, 'value', handler);
 }
 
+// Watches only the session status field — use this for players who only need to
+// know when the game starts/ends, not the full room state (players, scores, etc.)
+export function watchRoomStatus(
+  sessionId: string,
+  callback: (status: RoomStatus | null) => void,
+): () => void {
+  const statusRef = ref(rtdb, `sessions/${sessionId}/status`);
+  const handler = (snap: DataSnapshot) => callback(snap.val() as RoomStatus | null);
+  onValue(statusRef, handler);
+  return () => off(statusRef, 'value', handler);
+}
+
+// Watches only the players map — use this for the lobby player grid so each
+// player doesn't receive scores or other session-level data they don't need.
+export function watchRoomPlayers(
+  sessionId: string,
+  callback: (players: Record<string, WaitingPlayer>) => void,
+): () => void {
+  const playersRef = ref(rtdb, `sessions/${sessionId}/players`);
+  const handler = (snap: DataSnapshot) =>
+    callback((snap.val() as Record<string, WaitingPlayer>) ?? {});
+  onValue(playersRef, handler);
+  return () => off(playersRef, 'value', handler);
+}
+
 export function watchSessionRooms(
   callback: (rooms: Record<string, SessionRoom>) => void,
 ): () => void {

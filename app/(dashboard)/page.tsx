@@ -419,7 +419,7 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="nq-card-blue relative overflow-hidden rounded-[32px] p-5 text-white md:p-6"
+          className="nq-card-blue relative overflow-hidden rounded-[32px] p-5 text-white! md:p-6"
         >
           <div className="absolute inset-y-0 right-[-36px] top-[14px] w-48 rounded-full border border-white/10 bg-white/[0.08]" />
           <div className="absolute inset-y-0 right-[18px] top-[-20px] w-36 rounded-full border border-white/10 bg-white/10" />
@@ -434,7 +434,7 @@ export default function DashboardPage() {
               <h1 className="truncate text-2xl font-bold md:text-3xl">
                 {user?.displayName || "Player"}
               </h1>
-              <p className="mt-1 truncate text-base text-white/80">
+              <p className="mt-1 truncate text-base text-white/80!">
                 {profileHandle}
               </p>
             </div>

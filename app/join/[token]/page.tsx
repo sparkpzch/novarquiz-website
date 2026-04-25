@@ -141,7 +141,7 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-angular-700 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -150,8 +150,8 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       {/* Background orbs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-angular-700/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-angular-300/15 rounded-full blur-3xl" />
       </div>
 
       <motion.div
@@ -167,13 +167,13 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
           </div>
         ) : !session ? (
           <div className="flex justify-center">
-            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-angular-700 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-8">
             {/* Header */}
             <div className="text-center mb-8">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-angular-700 to-angular-500 flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">🎮</span>
               </div>
               <h1 className="text-2xl font-bold text-white mb-1">{session.name}</h1>
@@ -194,7 +194,7 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
                   onChange={e => setGuestName(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleJoin()}
                   placeholder="Guest"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-indigo-500 focus:outline-none placeholder:text-gray-600"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-angular-700 focus:outline-none placeholder:text-gray-600"
                 />
               </div>
             )}
@@ -208,7 +208,7 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
             <button
               onClick={handleJoin}
               disabled={joining}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold text-base disabled:opacity-50 disabled:cursor-not-allowed hover:from-indigo-500 hover:to-purple-500 transition-all"
+              className="w-full py-3 rounded-xl bg-linear-to-r from-angular-700 to-angular-500 text-white! font-semibold text-base disabled:opacity-50 disabled:cursor-not-allowed hover:from-angular-500 hover:to-angular-700 transition-all"
             >
               {joining ? (
                 <span className="flex items-center justify-center gap-2">
@@ -223,7 +223,7 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
             <p className="text-center text-xs text-gray-500 mt-4">
               {user.isAnonymous
                 ? 'Playing as guest — progress won\'t be saved'
-                : <>Joining as <span className="text-gray-300">{user.displayName || user.email}</span></>}
+                : <>Joining as <span className="text-angular-300">{user.displayName || user.email}</span></>}
             </p>
           </div>
         )}

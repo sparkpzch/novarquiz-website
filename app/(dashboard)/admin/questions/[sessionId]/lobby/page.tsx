@@ -22,7 +22,7 @@ function PlayerAvatar({ displayName, photoURL }: { displayName: string; photoURL
     );
   }
   return (
-    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold flex-shrink-0">
+    <div className="w-9 h-9 rounded-full bg-linear-to-br from-angular-700 to-angular-500 flex items-center justify-center text-white font-bold flex-shrink-0">
       {displayName?.[0]?.toUpperCase() || '?'}
     </div>
   );

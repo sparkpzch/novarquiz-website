@@ -3,7 +3,7 @@
 import { use, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { watchRoom, leaveWaitingRoom, type SessionRoom } from '@/lib/firebase/rtdb';
+import { watchRoomStatus, watchRoomPlayers, leaveWaitingRoom, type WaitingPlayer } from '@/lib/firebase/rtdb';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Quiz } from '@/lib/types';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
@@ -12,12 +12,10 @@ function PlayerChip({
   displayName,
   photoURL,
   highlighted,
-  crowned,
 }: {
   displayName: string;
   photoURL: string | null;
   highlighted?: boolean;
-  crowned?: boolean;
 }) {
   return (
     <motion.div
@@ -27,7 +25,6 @@ function PlayerChip({
     >
       <div className={`relative rounded-full ${highlighted ? 'ring-4 ring-[#92BFFF]' : ''}`}>
         <ProfileAvatar displayName={displayName} photoURL={photoURL} size={64} />
-        {crowned && <span className="absolute -right-1 -top-2 text-lg">👑</span>}
       </div>
       <p className="nq-on-dark max-w-[88px] truncate text-center text-sm font-semibold">{displayName}</p>
     </motion.div>
@@ -38,7 +35,7 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
   const { sessionId } = use(params);
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [room, setRoom] = useState<SessionRoom | null>(null);
+  const [players, setPlayers] = useState<Record<string, WaitingPlayer>>({});
   const [session, setSession] = useState<Quiz | null>(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
@@ -48,15 +45,17 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
       .then((data) => { if (data) setSession(data); });
   }, [sessionId]);
 
+  // Only watch status for navigation — players don't need the full room object
   useEffect(() => {
-    const unsubscribe = watchRoom(sessionId, (data) => {
-      setRoom(data);
-      if (data?.status === 'started') {
-        router.push(`/play/${sessionId}/question`);
-      }
+    return watchRoomStatus(sessionId, (status) => {
+      if (status === 'started') router.push(`/play/${sessionId}/question`);
     });
-    return unsubscribe;
   }, [router, sessionId]);
+
+  // Separate scoped listener for the player grid
+  useEffect(() => {
+    return watchRoomPlayers(sessionId, setPlayers);
+  }, [sessionId]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -79,7 +78,7 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
 
   if (loading || !user) return null;
 
-  const players = Object.entries(room?.players ?? {});
+  const playerEntries = Object.entries(players);
 
   return (
     <div className="min-h-screen bg-linear-to-br from-[#03305A] via-[#0460A9] to-[#055A9E]">
@@ -138,7 +137,7 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
           >
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
               <p className="text-sm text-[#BCD7FF]">
-                <span className="font-bold text-[#F8FBFF]">{players.length}</span> player{players.length !== 1 ? 's' : ''} joined
+                <span className="font-bold text-[#F8FBFF]">{playerEntries.length}</span> player{playerEntries.length !== 1 ? 's' : ''} joined
                 {' '}· The host will start the quiz when ready.
               </p>
               <button
@@ -150,7 +149,7 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
             </div>
 
             <div className="rounded-[28px] border border-[#92BFFF]/18 bg-[#0B2C57]/36 p-5">
-              {players.length === 0 ? (
+              {playerEntries.length === 0 ? (
                 <div className="flex min-h-40 flex-col items-center justify-center text-center">
                   <div className="text-4xl">👥</div>
                   <p className="mt-3 text-base font-semibold text-[#F8FBFF]">Waiting for players to join…</p>
@@ -158,13 +157,12 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
-                  {players.map(([uid, player]) => (
+                  {playerEntries.map(([uid, player]) => (
                     <PlayerChip
                       key={uid}
                       displayName={uid === user.uid ? 'You' : player.displayName}
                       photoURL={player.photoURL}
                       highlighted={uid === user.uid}
-                      crowned={uid === room?.leaderId}
                     />
                   ))}
                 </div>
