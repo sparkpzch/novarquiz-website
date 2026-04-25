@@ -5,7 +5,7 @@ import { useToast } from "@/components/ui/Toast";
 import type { Quiz, Session } from "@/lib/types";
 import type { SessionRoom } from "@/lib/firebase/rtdb";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { openLobby, closeLobby, reopenLobby, startRoom } from "@/lib/firebase/rtdb";
+import { openLobby, closeLobby, reopenLobby, startRoom, removeRoom } from "@/lib/firebase/rtdb";
 
 interface QuizzesManagerProps {
   allData: Quiz[];
@@ -132,7 +132,7 @@ export default function QuizzesManager({
   const handleArchiveSession = async (sessionId: string) => {
     setItemLoading(sessionId, true);
     try {
-      await closeLobby(sessionId);
+      await removeRoom(sessionId);
       await fetch(`/api/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -176,6 +176,7 @@ export default function QuizzesManager({
           if (confirmModal.type === "quiz") {
             await onDeleteQuiz(confirmModal.id);
           } else {
+            await removeRoom(confirmModal.id);
             await onDeleteSession(confirmModal.id);
           }
           showToast("Deleted successfully.", "success");

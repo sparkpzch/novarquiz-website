@@ -216,6 +216,14 @@ export async function closeLobby(sessionId: string): Promise<void> {
   await set(ref(rtdb, `sessions/${sessionId}/joinToken`), null);
 }
 
+// Completely removes a session's data from RTDB.
+export async function removeRoom(sessionId: string): Promise<void> {
+  // 1. Clear any associated join token
+  await closeLobby(sessionId);
+  // 2. Remove the session data itself
+  await set(ref(rtdb, `sessions/${sessionId}`), null);
+}
+
 // Resolves a join token to a session id. Returns null if the token doesn't exist
 // (i.e. the lobby was never opened or was closed).
 export async function resolveJoinToken(token: string): Promise<string | null> {
