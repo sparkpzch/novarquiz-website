@@ -1,27 +1,28 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion } from 'motion/react';
-import type { LeaderboardEntry, Quiz } from '@/lib/types';
+import type { LeaderboardEntry, Session } from '@/lib/types';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 import { watchScores, type PlayerScore } from '@/lib/firebase/rtdb';
 
 function LeaderboardPageContent() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const [sessions, setSessions] = useState<Quiz[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedSession, setSelectedSession] = useState(searchParams.get('session') || '');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(Boolean(searchParams.get('session')));
   const [liveScores, setLiveScores] = useState<Record<string, PlayerScore>>({});
 
   useEffect(() => {
-    fetch('/api/questions/sessions')
+    fetch('/api/sessions')
       .then((response) => (response.ok ? response.json() : []))
       .then(setSessions)
       .catch(() => {});
@@ -76,6 +77,7 @@ function LeaderboardPageContent() {
   const myEntry = sortedEntries.find((entry) => entry.user_id === user?.uid);
   const myRank = sortedEntries.findIndex((entry) => entry.user_id === user?.uid) + 1;
   const topThree = sortedEntries.slice(0, 3);
+  const selectedSessionMeta = sessions.find((session) => session.id === selectedSession);
   const podium =
     topThree.length === 1
       ? [{ entry: topThree[0], rank: 1, height: 'h-36', featured: true }]
@@ -101,19 +103,21 @@ function LeaderboardPageContent() {
           </div>
 
           <div className="w-full md:max-w-sm">
-            <label className="mb-2 block text-sm font-semibold text-[#16324F]">{t('leaderboard.select_session')}</label>
+                <label className="mb-2 block text-sm font-semibold text-[#16324F]">{t('leaderboard.select_session')}</label>
             <select
               value={selectedSession}
               onChange={(event) => {
-                setLoading(Boolean(event.target.value));
-                setSelectedSession(event.target.value);
+                const nextSession = event.target.value;
+                setLoading(Boolean(nextSession));
+                setSelectedSession(nextSession);
+                router.replace(nextSession ? `/leaderboard?session=${nextSession}` : '/leaderboard');
               }}
               className="w-full rounded-[24px] border border-[#0460A9]/12 bg-white px-4 py-3 text-[#16324F] outline-none"
             >
               <option value="">{t('leaderboard.select_session')}</option>
               {sessions.map((session) => (
                 <option key={session.id} value={session.id}>
-                  {session.name}
+                  {session.name} ({new Date(session.started_at).toLocaleDateString()})
                 </option>
               ))}
             </select>
@@ -136,7 +140,15 @@ function LeaderboardPageContent() {
       ) : (
         <>
           <section className="nq-card rounded-[34px] p-6 md:p-8">
-            <div className="flex flex-col items-center justify-center gap-6 md:flex-row md:items-end">
+            {selectedSessionMeta && (
+              <div className="mb-6 border-b border-[#0460A9]/10 pb-4">
+                <h2 className="text-2xl font-bold text-[#16324F]">{selectedSessionMeta.name}</h2>
+                <p className="mt-2 text-sm text-[#5D7EA1]">
+                  {selectedSessionMeta.description || 'Browse the finished standings for this session.'}
+                </p>
+              </div>
+            )}
+            <div className="flex items-end justify-center gap-4">
               {podium.map(({ entry, rank, height, featured }, index) => {
                 return (
                   <motion.div
@@ -144,16 +156,16 @@ function LeaderboardPageContent() {
                     initial={{ opacity: 0, y: 18 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.08 }}
-                    className="flex flex-col items-center"
+                    className="flex w-24 flex-col items-center"
                   >
                     <ProfileAvatar
                       displayName={entry.user_display_name}
                       photoURL={entry.user_photo_url}
-                      size={featured ? 96 : 78}
+                      size={featured ? 72 : 60}
                       ringClassName="ring-4 ring-[#DDF0FF] shadow-[0_16px_28px_rgba(17,87,145,0.14)]"
                     />
-                    <div className="mt-3 text-center">
-                      <p className="max-w-[140px] truncate text-xl font-bold text-[#16324F]">{entry.user_display_name}</p>
+                    <div className="mt-3 w-full text-center">
+                      <p className="truncate text-sm font-bold text-[#16324F]">{entry.user_display_name}</p>
                       <p className="text-lg text-[#0460A9]">{entry.total_score} pts</p>
                     </div>
                     <div className={`mt-4 flex w-24 items-start justify-center rounded-t-[26px] bg-gradient-to-b from-[#DDF0FF] to-[#8EC0FF] pt-3 text-2xl font-bold text-[#16324F] ${height}`}>

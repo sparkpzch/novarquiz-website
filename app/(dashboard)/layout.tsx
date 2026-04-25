@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, Suspense, useEffect } from 'react';
+import { ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -65,12 +65,34 @@ function Icon({ path, active = false }: { path: string; active?: boolean }) {
   );
 }
 
+function matchesNavItem(
+  href: string,
+  pathname: string,
+  searchParams: ReadonlyURLSearchParams,
+  exact = false,
+) {
+  if (href.includes('?')) {
+    const [basePath, query] = href.split('?');
+    const targetTab = new URLSearchParams(query).get('tab');
+    return pathname === basePath && searchParams.get('tab') === targetTab;
+  }
+
+  return pathname === href || (!exact && href !== '/' && pathname.startsWith(href));
+}
+
 function DashboardLayoutContent({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user, loading, isAdmin } = useAuth();
+  const mobileNavContainerRef = useRef<HTMLDivElement | null>(null);
+  const mobileNavRefs = useRef<Array<HTMLAnchorElement | null>>([]);
+  const [mobilePillStyle, setMobilePillStyle] = useState<{ x: number; width: number; opacity: number }>({
+    x: 0,
+    width: 0,
+    opacity: 0,
+  });
   const isProfileDetail =
     pathname === "/profile/change-password" || pathname === "/profile/language";
 
@@ -79,6 +101,55 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
       router.push('/sign-in');
     }
   }, [user, loading, router]);
+
+  const isActive = useCallback(
+    (href: string, exact = false) => matchesNavItem(href, pathname, searchParams, exact),
+    [pathname, searchParams],
+  );
+
+  useLayoutEffect(() => {
+    if (loading || !user) {
+      return;
+    }
+
+    const activeIndex = mobileNavItems.findIndex((item) => isActive(item.href, item.exact));
+    const activeEl = activeIndex >= 0 ? mobileNavRefs.current[activeIndex] : null;
+    const containerEl = mobileNavContainerRef.current;
+
+    if (!activeEl || !containerEl) {
+      setMobilePillStyle((prev) => ({ ...prev, opacity: 0 }));
+      return;
+    }
+
+    const updatePill = () => {
+      const activeRect = activeEl.getBoundingClientRect();
+      const containerRect = containerEl.getBoundingClientRect();
+
+      setMobilePillStyle({
+        x: activeRect.left - containerRect.left,
+        width: activeRect.width,
+        opacity: 1,
+      });
+    };
+
+    updatePill();
+
+    const resizeObserver = new ResizeObserver(updatePill);
+    resizeObserver.observe(activeEl);
+    resizeObserver.observe(containerEl);
+    window.addEventListener('resize', updatePill);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updatePill);
+    };
+  }, [isActive, loading, user]);
+
+  const handleSignOut = async () => {
+    await fetch('/api/auth/session', { method: 'DELETE' });
+    await signOut(auth);
+    router.push('/sign-in');
+  };
 
   if (loading || !user) {
     return (
@@ -89,21 +160,6 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
       </div>
     );
   }
-
-  const handleSignOut = async () => {
-    await fetch('/api/auth/session', { method: 'DELETE' });
-    await signOut(auth);
-    router.push('/sign-in');
-  };
-
-  const isActive = (href: string, exact = false) => {
-    if (href.includes('?')) {
-      const [basePath, query] = href.split('?');
-      const targetTab = new URLSearchParams(query).get('tab');
-      return pathname === basePath && searchParams.get('tab') === targetTab;
-    }
-    return pathname === href || (!exact && href !== '/' && pathname.startsWith(href));
-  };
 
   return (
     <div className="nq-sky min-h-screen">
@@ -230,7 +286,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
           )}
 
           <main className={`${isProfileDetail ? "px-4 pb-8 pt-8 md:px-6 xl:px-8" : "nq-bottom-safe px-4 pb-8 md:px-6 xl:px-8"} flex-1`}>
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            <motion.div key={pathname} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
               {children}
             </motion.div>
           </main>
@@ -238,28 +294,31 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
       </div>
 
       {!isProfileDetail && (
-      <nav className="fixed inset-x-0 bottom-0 z-40 block px-4 pb-[calc(0.95rem+env(safe-area-inset-bottom))] pt-3 xl:hidden">
-        <div className="mx-auto flex h-[60px] w-full max-w-[370px] items-center justify-between gap-1.5 rounded-[93px] border border-[#0460A9]/12 bg-white/88 px-2 py-1.5 shadow-[0_18px_45px_rgba(17,87,145,0.18)] backdrop-blur-xl">
-          {mobileNavItems.map((item) => {
+      <nav className="fixed inset-x-0 bottom-0 z-40 block px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 xl:hidden">
+        <div ref={mobileNavContainerRef} className="relative mx-auto flex h-[60px] w-[370px] max-w-full items-center rounded-[999px] border border-white/80 bg-white/96 p-2 shadow-[0_18px_40px_rgba(70,112,165,0.2)] backdrop-blur-xl">
+          <motion.span
+            aria-hidden="true"
+            animate={mobilePillStyle}
+            transition={{ type: "spring", stiffness: 420, damping: 34 }}
+            className="absolute inset-y-1.5 left-0 rounded-[999px] border-2 border-[#BFD9FF] bg-[#BFD9FF] shadow-[0_8px_18px_rgba(14,99,216,0.2)]"
+          />
+          {mobileNavItems.map((item, index) => {
             const active = isActive(item.href, item.exact);
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-[93px] px-2 py-2 text-[11px] font-semibold leading-none transition-all ${
-                  active ? 'text-white' : 'text-[#5D7EA1]'
-                }`}
-              >
-                {active && (
-                  <motion.span
-                    layoutId="mobile-nav-pill"
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                    className="absolute inset-0 rounded-[93px] border border-[#70A2F9]/15 bg-[#70A2F9] shadow-[0_12px_24px_rgba(17,87,145,0.24)]"
-                  />
-                )}
-                <Icon path={item.icon} active={active} />
-                <span className="relative z-10">{t(item.label)}</span>
-              </Link>
+              <div key={item.href} className="relative z-10 flex h-full flex-1 items-center justify-center">
+                <Link
+                  href={item.href}
+                  ref={(el) => {
+                    mobileNavRefs.current[index] = el;
+                  }}
+                  className={`inline-flex min-w-[98px] flex-col items-center justify-center gap-0.5 rounded-[999px] px-4 py-1 text-[13px] font-semibold leading-none transition-colors ${
+                    active ? 'text-[#234C8F]' : 'text-[#8B8B8B]'
+                  }`}
+                >
+                  <Icon path={item.icon} active={active} />
+                  <span>{t(item.label)}</span>
+                </Link>
+              </div>
             );
           })}
         </div>
