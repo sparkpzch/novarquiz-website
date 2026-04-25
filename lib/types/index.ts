@@ -86,6 +86,7 @@ export interface Session {
   id: string;
   session_id: string;
   name?: string;
+  description?: string | null;
   user_id: string;
   current_question_id: string | null;
   current_score: number;
