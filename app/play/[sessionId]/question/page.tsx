@@ -137,9 +137,9 @@ function QuestionVisual({
 }) {
   return (
     <>
-      <div className="overflow-hidden rounded-[28px] border border-[#0460A9]/12 bg-gradient-to-b from-[#7B6CB7] via-[#C77A9C] to-[#E28F7A] shadow-[0_18px_36px_rgba(17,87,145,0.12)]">
-        {question.media_url ? (
-          question.media_type === 'video' ? (
+      {question.media_url && (
+        <div className="relative overflow-hidden rounded-[28px] shadow-[0_18px_36px_rgba(17,87,145,0.12)]">
+          {question.media_type === 'video' ? (
             <video
               src={question.media_url}
               controls
@@ -151,16 +151,10 @@ function QuestionVisual({
               alt="Question media"
               className="h-[200px] w-full object-cover md:h-[260px]"
             />
-          )
-        ) : (
-          <div className="relative h-[200px] w-full md:h-[260px]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.65)_1px,transparent_1.5px)] bg-[length:18px_18px] opacity-70" />
-            <div className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent_0%,rgba(44,34,102,0.22)_10%,#9C5F80_50%,#6E4C7E_80%,#4C4E89_100%)]" />
-            <div className="absolute bottom-0 left-0 right-0 h-20 bg-[radial-gradient(circle_at_10%_100%,#5A5A9F_0,transparent_34%),radial-gradient(circle_at_35%_100%,#754985_0,transparent_35%),radial-gradient(circle_at_70%_100%,#5B4E99_0,transparent_34%),radial-gradient(circle_at_95%_100%,#724885_0,transparent_35%)]" />
-            <div className="absolute right-10 top-8 h-4 w-4 rounded-full border border-[#FFF2D6] bg-[#FFF1BF]/90 shadow-[0_0_18px_rgba(255,241,191,0.55)]" />
-          </div>
-        )}
-      </div>
+          )}
+          <div className="absolute inset-x-0 bottom-0 h-20 bg-linear-to-t from-black/50 to-transparent" />
+        </div>
+      )}
 
       <div>
         <p className="text-sm font-medium text-[#7A8EA7]">
@@ -192,7 +186,7 @@ function ChoiceButton({
       disabled={disabled}
       className="nq-answer-shadow w-full rounded-[22px] border border-[#DCE7F5] bg-white px-5 py-4 text-left transition hover:border-[#92BFFF] hover:shadow-[0_18px_34px_rgba(17,87,145,0.12)] disabled:cursor-not-allowed"
     >
-      <span className="text-lg font-semibold text-[#202832]">{choice.choice_text}</span>
+      <span className="text-base font-semibold text-[#202832] text-wrap-balance">{choice.choice_text}</span>
     </motion.button>
   );
 }
@@ -224,7 +218,7 @@ function ResultChoice({
         />
       </div>
       <div className="flex items-center justify-between gap-4">
-        <p className="text-lg font-semibold text-[#202832]">{choice.choice_text}</p>
+        <p className="text-base font-semibold text-[#202832] text-wrap-balance">{choice.choice_text}</p>
         <span className={`rounded-full px-3 py-1 text-sm font-semibold ${tone.badge}`}>
           {formatImpact(choice.score_impact)}
         </span>
@@ -342,7 +336,7 @@ function FinishedLeaderboard({
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <button
               onClick={() => router.push(`/leaderboard?session=${sessionId}`)}
-              className="flex-1 rounded-2xl bg-[#0460A9] px-4 py-3 text-sm font-semibold !text-white"
+              className="flex-1 rounded-2xl bg-[#0460A9] px-4 py-3 text-sm font-semibold text-white!"
             >
               Open full leaderboard
             </button>
@@ -402,7 +396,7 @@ function ExplanationModal({
         <button
           onClick={onContinue}
           disabled={nextLoading}
-          className="w-full rounded-[24px] bg-[#0460A9] px-4 py-4 text-base font-semibold text-white shadow-[0_16px_36px_rgba(4,96,169,0.24)] disabled:opacity-60"
+          className="w-full rounded-[24px] bg-[#0460A9] px-4 py-4 text-base font-semibold text-white! shadow-[0_16px_36px_rgba(4,96,169,0.24)] disabled:opacity-60"
         >
           {nextLoading ? 'Loading…' : 'Next Question'}
         </button>
@@ -591,7 +585,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       }
 
       if (user.isAnonymous) {
-        pointsAwarded = question.choices.find((choice) => choice.label === label)?.points ?? 0;
+        pointsAwarded = question.choices.find((choice) => choice.label === label)?.score_impact ?? 0;
       }
     }
 
@@ -703,7 +697,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
             )}
             <button
               onClick={() => setFinished(true)}
-              className="mt-8 w-full rounded-[24px] bg-[#0460A9] px-4 py-4 text-lg font-semibold !text-white shadow-[0_20px_42px_rgba(17,87,145,0.24)]"
+              className="mt-8 w-full rounded-[24px] bg-[#0460A9] px-4 py-4 text-lg font-semibold text-white! shadow-[0_20px_42px_rgba(17,87,145,0.24)]"
             >
               Finish
             </button>
@@ -738,7 +732,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
               <button
                 onClick={handleSituationNext}
                 disabled={nextLoading}
-                className="rounded-[22px] bg-[#0460A9] px-6 py-3 text-sm font-semibold text-white disabled:opacity-60"
+                className="rounded-[22px] bg-[#0460A9] px-6 py-3 text-sm font-semibold text-white! disabled:opacity-60"
               >
                 {nextLoading ? 'Loading…' : 'Continue'}
               </button>
