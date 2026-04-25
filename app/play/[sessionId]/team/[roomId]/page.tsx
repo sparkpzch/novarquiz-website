@@ -1,7 +1,7 @@
 'use client';
 
-import { use, useEffect, useState, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, use, useEffect, useState, useCallback, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import {
   watchTeamRoom,
@@ -41,7 +41,7 @@ function PartyMember({
   );
 }
 
-export default function TeamLobbyPage({
+function TeamLobbyPageContent({
   params,
 }: {
   params: Promise<{ sessionId: string; roomId: string }>;
@@ -49,9 +49,8 @@ export default function TeamLobbyPage({
   const { sessionId, roomId } = use(params);
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const initialPin = typeof window === 'undefined'
-    ? ''
-    : (new URLSearchParams(window.location.search).get('pin') ?? '').replace(/\D/g, '').slice(0, 6);
+  const searchParams = useSearchParams();
+  const initialPin = (searchParams.get('pin') ?? '').replace(/\D/g, '').slice(0, 6);
   const inviteNextPath = initialPin
     ? `/play/${sessionId}/team/${roomId}?pin=${initialPin}`
     : `/play/${sessionId}/team/${roomId}`;
@@ -370,5 +369,19 @@ export default function TeamLobbyPage({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TeamLobbyPage(props: { params: Promise<{ sessionId: string; roomId: string }> }) {
+  return (
+    <Suspense fallback={
+      <div className="nq-sky min-h-screen">
+        <div className="nq-content flex min-h-screen items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#0460A9] border-t-transparent" />
+        </div>
+      </div>
+    }>
+      <TeamLobbyPageContent {...props} />
+    </Suspense>
   );
 }

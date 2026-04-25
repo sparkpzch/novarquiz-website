@@ -30,7 +30,7 @@ function SignInForm() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Session creation failed');
-    router.push(nextUrl ?? (data.isAdmin ? '/admin' : '/'));
+    router.push(nextUrl ?? '/');
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
