@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { completePlaySession } from '@/lib/db/queries';
+import { completeSession } from '@/lib/db/queries';
 
 // Called by the play page when the player reaches the end of their path
 // (or runs out of time on the last question). Aggregates user_answers into
@@ -11,7 +11,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     if (body.is_guest) return NextResponse.json({ is_guest: true });
     if (!body.user_id) return NextResponse.json({ error: 'user_id required' }, { status: 400 });
 
-    const result = await completePlaySession({
+    const result = await completeSession({
       session_id: sessionId,
       user_id: body.user_id,
       user_display_name: body.user_display_name || 'Anonymous',

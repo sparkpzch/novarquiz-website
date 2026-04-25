@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSessionById } from '@/lib/db/queries';
+import { getSessionByToken } from '@/lib/db/queries';
 
 // Join tokens are now resolved via Firebase RTDB (resolveJoinToken).
 // The client resolves the token to a sessionId client-side, then fetches
@@ -10,11 +10,16 @@ export async function GET(
 ) {
   const { token } = await params;
   try {
-    const session = await getSessionById(token);
+    const session = await getSessionByToken(token);
     if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    if (!session.is_published) return NextResponse.json({ error: 'Session is not published yet' }, { status: 403 });
-    return NextResponse.json(session);
-  } catch {
+    return NextResponse.json({
+      id: session.id, // This is the instance ID
+      name: session.quiz_name,
+      description: session.quiz_description,
+      is_private: session.is_private
+    });
+  } catch (error) {
+    console.error('Join API error:', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

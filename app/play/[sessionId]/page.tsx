@@ -17,7 +17,7 @@ export default function PlayLobbyPage({ params }: { params: Promise<{ sessionId:
   const [status, setStatus] = useState<'loading' | 'starting' | 'error'>('loading');
 
   useEffect(() => {
-    fetch(`/api/questions/sessions/${sessionId}`)
+    fetch(`/api/sessions/${sessionId}`)
       .then((response) => (response.ok ? response.json() : null))
       .then(setSession)
       .finally(() => setStatus('starting'));

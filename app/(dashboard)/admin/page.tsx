@@ -10,6 +10,7 @@ import "@/lib/i18n";
 import { motion, AnimatePresence } from "motion/react";
 import type { Quiz } from "@/lib/types";
 import { useToast } from "@/components/ui/Toast";
+import QuizzesManager from "./QuizzesManager";
 import {
   watchSessionRooms,
   endRoom,
@@ -60,7 +61,7 @@ type LiveSession = {
   liveAt: number;
 };
 
-type AdminTab = "dashboard" | "session-manager" | "question-manager";
+type AdminTab = "dashboard" | "quizzes-manager";
 
 const MONTHS = [
   "Jan",
@@ -85,14 +86,9 @@ const ADMIN_TABS: Array<{ id: AdminTab; label: string; description: string }> =
       description: "Platform analytics and recent activity",
     },
     {
-      id: "session-manager",
-      label: "Session Manager",
-      description: "Control the current live quiz session",
-    },
-    {
-      id: "question-manager",
-      label: "Question Manager",
-      description: "Create quizzes and manage lobbies",
+      id: "quizzes-manager",
+      label: "Quizzes Manager",
+      description: "Manage your quiz library and active sessions",
     },
   ];
 
@@ -140,15 +136,15 @@ function AdminDashboardContent() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [fetchingStats, setFetchingStats] = useState(true);
   const [allData, setAllData] = useState<Quiz[]>([]);
+  const [allSessions, setAllSessions] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [rooms, setRooms] = useState<Record<string, SessionRoom>>({});
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
 
   const tabParam = searchParams.get("tab") as AdminTab | null;
   const activeTab: AdminTab =
-    tabParam === "session-manager" ||
-    tabParam === "question-manager" ||
-    tabParam === "dashboard"
+    tabParam === "quizzes-manager" ||
+      tabParam === "dashboard"
       ? tabParam
       : "dashboard";
 
@@ -157,10 +153,15 @@ function AdminDashboardContent() {
   }, [authLoading, isAdmin, router]);
 
   const fetchData = () => {
-    fetch("/api/questions/sessions?all=true")
-      .then((r) => (r.ok ? r.json() : []))
-      .then(setAllData)
-      .catch(() => {})
+    Promise.all([
+      fetch("/api/questions/sessions?all=true").then((r) => (r.ok ? r.json() : [])),
+      fetch("/api/sessions").then((r) => (r.ok ? r.json() : []))
+    ])
+      .then(([quizzes, sessionsData]) => {
+        setAllData(quizzes);
+        setAllSessions(sessionsData);
+      })
+      .catch(() => { })
       .finally(() => setLoadingData(false));
   };
 
@@ -169,7 +170,7 @@ function AdminDashboardContent() {
     fetch("/api/admin/stats")
       .then((r) => (r.ok ? r.json() : null))
       .then(setStats)
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setFetchingStats(false));
     fetchData();
   }, [isAdmin]);
@@ -198,10 +199,14 @@ function AdminDashboardContent() {
   const currentLive = liveSessions[0] ?? null;
   const sessions = allData;
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this item? This action cannot be undone.")) return;
+  const handleDeleteQuiz = async (id: string) => {
     await fetch(`/api/questions/sessions/${id}`, { method: "DELETE" });
     setAllData((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const handleDeleteSession = async (id: string) => {
+    await fetch(`/api/sessions/${id}`, { method: "DELETE" });
+    setAllSessions((prev) => prev.filter((s) => s.id !== id));
   };
 
   const handleDuplicate = async (id: string, isQuizDuplicate: boolean) => {
@@ -216,6 +221,29 @@ function AdminDashboardContent() {
       if (res.ok) fetchData();
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  const handleCreateSession = async (quizId: string, isPrivate: boolean) => {
+    if (!user) return;
+    setLoadingData(true);
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quizId, userId: user.uid, isPrivate }),
+      });
+      if (res.ok) {
+        fetchData();
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to create session");
+      }
+    } catch (err) {
+      console.error(err);
+      throw err;
     } finally {
       setLoadingData(false);
     }
@@ -338,93 +366,6 @@ function AdminDashboardContent() {
 
   return (
     <div className="nq-admin-panel max-w-6xl mx-auto space-y-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white">
-            Admin Command Center
-          </h1>
-          <p className="text-gray-400 mt-1">
-            Analytics on Dashboard · live control in Session Manager · quiz
-            management in Question Manager.
-          </p>
-        </div>
-        {activeTab === "question-manager" && (
-          <Link href="/admin/questions/create">
-            <Button
-              icon={
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-              }
-            >
-              Create Quiz
-            </Button>
-          </Link>
-        )}
-      </div>
-
-      <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-2 shadow-[0_18px_40px_rgba(17,87,145,0.08)]">
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-          {ADMIN_TABS.map((tab, index) => (
-            <motion.div
-              key={tab.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.28, delay: index * 0.05 }}
-              whileHover={{ y: -2, scale: 1.01 }}
-              whileTap={{ scale: 0.995 }}
-            >
-              <Link
-                href={`/admin?tab=${tab.id}`}
-                className={`relative block overflow-hidden rounded-2xl px-4 py-3 transition-all duration-300 ${
-                  activeTab === tab.id
-                    ? "text-[#F8FBFF] shadow-[0_16px_32px_rgba(4,96,169,0.22)]"
-                    : "text-gray-400 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                {activeTab === tab.id && (
-                  <motion.span
-                    layoutId="admin-tab-active-pill"
-                    className="absolute inset-0 rounded-2xl bg-linear-to-r from-[#055A9E] via-[#0460A9] to-[#92BFFF]"
-                    transition={{
-                      type: "spring",
-                      stiffness: 340,
-                      damping: 32,
-                    }}
-                  />
-                )}
-                <p
-                  className={`relative z-10 font-semibold tracking-[0.01em] ${
-                    activeTab === tab.id ? "text-[#F8FBFF]" : ""
-                  }`}
-                >
-                  {tab.label}
-                </p>
-                <p
-                  className={`relative z-10 mt-1 text-xs ${
-                    activeTab === tab.id
-                      ? "text-[rgba(248,251,255,0.92)]"
-                      : "text-inherit/85"
-                  }`}
-                >
-                  {tab.description}
-                </p>
-              </Link>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
       <AnimatePresence mode="wait" initial={false}>
         {/* ── DASHBOARD TAB ── */}
         {activeTab === "dashboard" && (
@@ -492,9 +433,9 @@ function AdminDashboardContent() {
                       const pct =
                         maxActivity > 0
                           ? Math.max(
-                              (count / maxActivity) * 100,
-                              count > 0 ? 4 : 0,
-                            )
+                            (count / maxActivity) * 100,
+                            count > 0 ? 4 : 0,
+                          )
                           : 0;
                       return (
                         <div
@@ -753,13 +694,12 @@ function AdminDashboardContent() {
                                 {quiz.avg_score}pts
                               </span>
                               <span
-                                className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                                  quiz.completion_rate >= 70
-                                    ? "bg-emerald-500/20 text-emerald-300"
-                                    : quiz.completion_rate >= 40
-                                      ? "bg-amber-500/20 text-amber-300"
-                                      : "bg-red-500/20 text-red-300"
-                                }`}
+                                className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${quiz.completion_rate >= 70
+                                  ? "bg-emerald-500/20 text-emerald-300"
+                                  : quiz.completion_rate >= 40
+                                    ? "bg-amber-500/20 text-amber-300"
+                                    : "bg-red-500/20 text-red-300"
+                                  }`}
                               >
                                 {quiz.completion_rate}%
                               </span>
@@ -953,346 +893,25 @@ function AdminDashboardContent() {
           </motion.div>
         )}
 
-        {/* ── SESSION MANAGER TAB ── */}
-        {activeTab === "session-manager" && (
+        {/* ── QUIZZES MANAGER TAB ── */}
+        {activeTab === "quizzes-manager" && (
           <motion.div
-            key="session-manager"
+            key="quizzes-manager"
             initial={{ opacity: 0, y: 18, filter: "blur(6px)" }}
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             exit={{ opacity: 0, y: -14, filter: "blur(4px)" }}
             transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-            className="space-y-4"
           >
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <h2 className="text-2xl font-bold text-white mt-1">
-                  Current live quiz
-                </h2>
-              </div>
-              {currentLive && (
-                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
-                  {currentLive.room.status === "started"
-                    ? "Live game in progress"
-                    : "Lobby is open"}
-                </span>
-              )}
-            </div>
-
-            {!currentLive ? (
-              <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
-                <p className="text-lg font-semibold text-white">
-                  No live session right now
-                </p>
-                <p className="text-sm text-gray-400 mt-2">
-                  Open a lobby from Question Manager and it will appear here for
-                  live control.
-                </p>
-              </div>
-            ) : (
-              <div className="rounded-3xl border border-emerald-500/20 bg-linear-to-br from-emerald-500/10 via-cyan-500/6 to-transparent p-6">
-                <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-6">
-                  <div className="space-y-4 flex-1 min-w-0">
-                    <div>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <h3 className="text-2xl font-bold text-white">
-                          {currentLive.session.name}
-                        </h3>
-                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300">
-                          {currentLive.room.status === "started"
-                            ? "Started"
-                            : "Waiting room"}
-                        </span>
-                      </div>
-                      <p className="text-gray-400 mt-2">
-                        {currentLive.session.description ||
-                          "This quiz is live now. Use Session Manager to monitor and control it."}
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
-                          Players
-                        </p>
-                        <p className="text-2xl font-bold text-white mt-2">
-                          {livePlayers.length}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          In the current live session
-                        </p>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
-                          Finished
-                        </p>
-                        <p className="text-2xl font-bold text-white mt-2">
-                          {finishedCount}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          Players who reached the end
-                        </p>
-                      </div>
-                      <div className="rounded-2xl border border-[#0460A9]/40 bg-[#0460A9]/10 p-4">
-                        <p className="text-xs uppercase tracking-[0.18em] text-[#92BFFF]">
-                          Join PIN
-                        </p>
-                        <p className="text-3xl font-mono font-bold text-white mt-2 tracking-widest">
-                          {currentLive.room.joinToken
-                            ? currentLive.room.joinToken.toUpperCase().slice(0, 6)
-                            : "——"}
-                        </p>
-                        <p className="text-xs text-[#92BFFF]/70 mt-1 font-mono break-all">
-                          {currentLive.room.joinToken ?? "No token"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {livePlayers.length > 0 && (
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="flex items-center justify-between gap-3 mb-4">
-                          <p className="text-sm font-semibold text-white">
-                            Live roster
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {livePlayers.length} connected
-                          </p>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {livePlayers.slice(0, 6).map(([uid, player]) => {
-                            const score = (currentLive.room.scores ?? {})[uid];
-                            return (
-                              <div
-                                key={uid}
-                                className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3"
-                              >
-                                <div className="min-w-0">
-                                  <p className="truncate font-medium text-white">
-                                    {player.displayName}
-                                  </p>
-                                  <p className="text-xs text-gray-400">
-                                    Joined at {formatClockTime(player.joinedAt)}
-                                  </p>
-                                </div>
-                                <div className="text-right ml-3">
-                                  <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
-                                    Score
-                                  </p>
-                                  <p className="text-sm font-semibold text-emerald-300">
-                                    {score?.score ?? 0}
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="w-full xl:w-[320px] space-y-3">
-                    <div className="rounded-2xl border border-[#0460A9]/30 bg-[#0460A9]/8 p-4">
-                      <p className="text-xs uppercase tracking-[0.18em] text-[#92BFFF] mb-2">
-                        Invite link
-                      </p>
-                      <p className="break-all font-mono text-sm text-[#92BFFF]/80 leading-relaxed">
-                        {liveShareLink || "—"}
-                      </p>
-                    </div>
-                    <Button
-                      className="w-full"
-                      onClick={() =>
-                        router.push(
-                          currentLive.room.status === "started"
-                            ? `/admin/questions/${currentLive.session.id}/observe`
-                            : `/admin/questions/${currentLive.session.id}/lobby`,
-                        )
-                      }
-                    >
-                      {currentLive.room.status === "started"
-                        ? "Open Session Manager"
-                        : "Manage Live Lobby"}
-                    </Button>
-                    {currentLive.room.joinToken && (
-                      <Button
-                        variant="secondary"
-                        className="w-full"
-                        onClick={() => copyInvite(currentLive)}
-                      >
-                        {copiedSessionId === currentLive.session.id
-                          ? "Invite Copied"
-                          : "Copy Invite Link"}
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      className="w-full"
-                      onClick={() =>
-                        router.push(
-                          `/admin/questions/${currentLive.session.id}/edit`,
-                        )
-                      }
-                    >
-                      Edit Live Quiz
-                    </Button>
-                    <button
-                      onClick={handleCloseSession}
-                      className="w-full rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/20 transition-colors"
-                    >
-                      Close Session
-                    </button>
-                    {liveSessions.length > 1 && (
-                      <p className="text-xs text-amber-300">
-                        Showing the most recent live session.{" "}
-                        {liveSessions.length - 1} other session
-                        {liveSessions.length - 1 === 1 ? "" : "s"} still open in
-                        RTDB.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </motion.div>
-        )}
-
-        {/* ── QUESTION MANAGER TAB ── */}
-        {activeTab === "question-manager" && (
-          <motion.div
-            key="question-manager"
-            initial={{ opacity: 0, y: 18, filter: "blur(6px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            exit={{ opacity: 0, y: -14, filter: "blur(4px)" }}
-            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-            className="space-y-4"
-          >
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <h2 className="text-2xl font-bold text-white mt-1">
-                  Create quizzes and open lobbies
-                </h2>
-              </div>
-            </div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="grid grid-cols-1 xl:grid-cols-2 gap-6"
-            >
-              {loadingData ? (
-                [1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="rounded-2xl border border-white/5 bg-white/5 p-6 animate-pulse h-64"
-                  />
-                ))
-              ) : sessions.length === 0 ? (
-                <div className="col-span-full rounded-2xl border border-white/5 bg-white/5 p-10 text-center">
-                  <p className="text-gray-400">
-                    No quizzes yet. Create your first one!
-                  </p>
-                </div>
-              ) : (
-                sessions.map((s) => (
-                  <div
-                    key={s.id}
-                    className={`min-h-[360px] rounded-2xl border overflow-hidden flex flex-col group transition-colors ${
-                      currentLive?.session.id === s.id
-                        ? "border-[#0460A9]/35 bg-linear-to-br from-white/95 via-[#EAF5FF]/92 to-[#D7EAFF]/90 shadow-[0_18px_40px_rgba(4,96,169,0.16)]"
-                        : "border-white/10 bg-white/5 shadow-[0_14px_32px_rgba(17,87,145,0.08)] hover:border-[#0460A9]/35 hover:bg-white/[0.92]"
-                    }`}
-                  >
-                    {s.cover_image_url && (
-                      <div className="h-40 overflow-hidden">
-                        <img
-                          src={s.cover_image_url}
-                          alt={s.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                    <div className="flex flex-1 flex-col p-7">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="min-w-0 flex-1 pr-2">
-                          <h3 className="text-xl font-bold text-white group-hover:text-[#055A9E] transition-colors line-clamp-2">
-                            {s.name}
-                          </h3>
-                          {currentLive?.session.id === s.id && (
-                            <p className="text-xs font-medium text-[#0460A9] mt-1">
-                              Visible now in Session Manager
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${s.is_published ? "bg-[#0460A9]/12 text-[#055A9E]" : "bg-white/70 text-[#456786]"}`}
-                          >
-                            {s.is_published ? "Published" : "Draft"}
-                          </span>
-                          <button
-                            onClick={() =>
-                              handleToggleStatus(s.id, s.is_published)
-                            }
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${s.is_published ? "bg-emerald-500" : "bg-gray-600"}`}
-                          >
-                            <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${s.is_published ? "translate-x-6" : "translate-x-1"}`}
-                            />
-                          </button>
-                        </div>
-                      </div>
-                      <p className="mb-5 text-sm leading-6 text-gray-400 line-clamp-4">
-                        {s.description || "No description."}
-                      </p>
-                      <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-medium text-gray-500">
-                        <span>❓ {s.question_count || 0} nodes</span>
-                        <span>👥 {s.play_count || 0} players</span>
-                        <span>📈 {s.avg_score || 0} avg pts</span>
-                      </div>
-                    </div>
-                    <div className="bg-black/20 p-5 border-t border-white/5 flex items-center gap-2">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        className="flex-1 whitespace-nowrap"
-                        onClick={() =>
-                          router.push(`/admin/questions/${s.id}/lobby`)
-                        }
-                      >
-                        {currentLive?.session.id === s.id
-                          ? "Manage Lobby"
-                          : "Create Lobby"}
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="whitespace-nowrap"
-                        onClick={() =>
-                          router.push(`/admin/questions/${s.id}/edit`)
-                        }
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="whitespace-nowrap"
-                        onClick={() => handleDuplicate(s.id, false)}
-                      >
-                        Duplicate
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
-                        onClick={() => handleDelete(s.id)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </motion.div>
+            <QuizzesManager
+              allData={allData}
+              allSessions={allSessions}
+              rooms={rooms}
+              onDuplicate={handleDuplicate}
+              onCreateSession={handleCreateSession}
+              onDeleteQuiz={handleDeleteQuiz}
+              onDeleteSession={handleDeleteSession}
+              onToggleStatus={handleToggleStatus}
+            />
           </motion.div>
         )}
       </AnimatePresence>

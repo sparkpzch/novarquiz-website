@@ -3,19 +3,50 @@ import pool, { queryWithRetry } from './postgres';
 
 // ===================== Quizzes =====================
 
-export async function getAllSessions() {
+export async function getAllQuizzes() {
   const result = await queryWithRetry(
-    `SELECT qs.*,
+    `SELECT qs.*, 
+      COALESCE(p.display_name, (SELECT user_display_name FROM leaderboard_entries le WHERE le.user_id = qs.created_by LIMIT 1)) as creator_name,
       (SELECT COUNT(*) FROM questions q WHERE q.session_id = qs.id)::int AS question_count,
       (SELECT COUNT(*) FROM leaderboard_entries le WHERE le.session_id = qs.id)::int AS play_count,
       (SELECT COALESCE(ROUND(AVG(le.total_score)), 0) FROM leaderboard_entries le WHERE le.session_id = qs.id)::int AS avg_score
      FROM quizzes qs
+     LEFT JOIN profiles p ON qs.created_by = p.uid
      ORDER BY qs.created_at DESC`
   );
   return result.rows;
 }
 
-export async function getPublishedSessions() {
+export async function getAllSessions() {
+  const result = await queryWithRetry(
+    `SELECT s.*, 
+      q.name as quiz_name, 
+      q.name as name,
+      q.description as description,
+      q.cover_image_url as cover_image_url,
+      COALESCE(p.display_name, (SELECT user_display_name FROM leaderboard_entries le WHERE le.user_id = s.user_id LIMIT 1)) as user_name,
+      (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count
+     FROM sessions s
+     JOIN quizzes q ON s.session_id = q.id
+     LEFT JOIN profiles p ON s.user_id = p.uid
+     ORDER BY s.started_at DESC`
+  );
+  return result.rows;
+}
+
+export async function getSessionByToken(token: string) {
+  const result = await queryWithRetry(
+    `SELECT s.*, q.name as quiz_name, q.description as quiz_description
+     FROM sessions s
+     JOIN quizzes q ON s.session_id = q.id
+     WHERE s.pin_code = $1 OR s.id::text = $2
+     LIMIT 1`,
+    [token, token]
+  );
+  return result.rows[0];
+}
+
+export async function getPublishedQuizzes() {
   const result = await queryWithRetry(
     `SELECT qs.*, 
       (SELECT COUNT(*) FROM questions q WHERE q.session_id = qs.id) as question_count
@@ -26,7 +57,7 @@ export async function getPublishedSessions() {
   return result.rows;
 }
 
-export async function getSessionById(sessionId: string) {
+export async function getQuizById(sessionId: string) {
   const result = await queryWithRetry(
     'SELECT * FROM quizzes WHERE id = $1',
     [sessionId]
@@ -40,7 +71,7 @@ function generatePinCode() {
 
 // Removed: getSessionByShareToken — share tokens now live in Firebase RTDB (joinTokens/{token})
 
-export async function createSession(data: {
+export async function createQuiz(data: {
   id?: string;
   name: string;
   description?: string;
@@ -49,12 +80,10 @@ export async function createSession(data: {
   is_published?: boolean;
   created_by: string;
 }) {
-  const sessionId = data.id ?? randomUUID();
-  const pinCode = generatePinCode();
-  const shareToken = randomUUID();
+  const quizId = data.id ?? randomUUID();
   const result = await queryWithRetry(
-    `INSERT INTO quizzes (id, name, description, cover_image_url, timer_seconds, created_by, is_published, is_private, pin_code, share_token)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    `INSERT INTO quizzes (id, name, description, cover_image_url, timer_seconds, created_by, is_published)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (id) DO UPDATE SET
        name = EXCLUDED.name,
        description = EXCLUDED.description,
@@ -64,23 +93,20 @@ export async function createSession(data: {
        updated_at = NOW()
      RETURNING *`,
     [
-      sessionId,
+      quizId,
       data.name,
       data.description || null,
       data.cover_image_url || null,
       data.timer_seconds ?? null,
       data.created_by,
       data.is_published ?? false,
-      false,
-      pinCode,
-      shareToken,
     ],
     { allowWriteRetry: true }
   );
   return result.rows[0];
 }
 
-export async function updateSession(sessionId: string, data: Partial<{
+export async function updateQuiz(sessionId: string, data: Partial<{
   name: string;
   description: string;
   cover_image_url: string;
@@ -107,11 +133,28 @@ export async function updateSession(sessionId: string, data: Partial<{
   return result.rows[0];
 }
 
-export async function deleteSession(sessionId: string) {
-  await pool.query('DELETE FROM quizzes WHERE id = $1', [sessionId]);
+export async function deleteQuiz(id: string) {
+  await pool.query('DELETE FROM quizzes WHERE id = $1', [id]);
 }
 
-export async function duplicateQuizOrSession(sourceId: string, createdBy: string, isQuizDuplicate: boolean) {
+export async function createSession(quizId: string, userId: string, isPrivate: boolean = true) {
+  const entry = await getEntryQuestion(quizId);
+  const pinCode = generatePinCode();
+
+  const result = await queryWithRetry(
+    `INSERT INTO sessions (session_id, user_id, current_question_id, pin_code, is_private)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [quizId, userId, entry?.id || null, pinCode, isPrivate],
+    { allowWriteRetry: true }
+  );
+  return result.rows[0];
+}
+
+export async function deleteSession(id: string) {
+  await pool.query('DELETE FROM sessions WHERE id = $1', [id]);
+}
+
+export async function duplicateQuiz(sourceId: string, createdBy: string, isQuizDuplicate: boolean) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -125,12 +168,10 @@ export async function duplicateQuizOrSession(sourceId: string, createdBy: string
     const newName = isQuizDuplicate ? `${orig.name} (Copy)` : orig.name;
 
     // 2. Duplicate quizzes record
-    const pinCode = generatePinCode();
-    const shareToken = randomUUID();
     const { rows: newQsRows } = await client.query(
-      `INSERT INTO quizzes (name, description, cover_image_url, timer_seconds, created_by, is_published, is_private, pin_code, share_token)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [newName, orig.description, orig.cover_image_url, orig.timer_seconds, createdBy, false, false, pinCode, shareToken]
+      `INSERT INTO quizzes (name, description, cover_image_url, timer_seconds, created_by, is_published)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [newName, orig.description, orig.cover_image_url, orig.timer_seconds, createdBy, false]
     );
     const newSession = newQsRows[0];
 
@@ -201,7 +242,7 @@ export async function deleteUserData(uid: string) {
 
 // ===================== Questions =====================
 
-export async function getQuestionsBySession(sessionId: string) {
+export async function getQuestionsByQuiz(sessionId: string) {
   const result = await queryWithRetry(
     `SELECT q.*, 
       json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
@@ -228,16 +269,17 @@ export async function getQuestionById(questionId: string) {
   return result.rows[0] || null;
 }
 
-export async function getEntryQuestion(sessionId: string) {
+export async function getEntryQuestion(id: string) {
   const result = await queryWithRetry(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
       json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
      FROM questions q
      JOIN quizzes qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
-     WHERE q.session_id = $1 AND q.is_entry_point = TRUE
+     WHERE (q.session_id = $1 OR q.session_id = (SELECT session_id FROM sessions WHERE id = $1)) 
+       AND q.is_entry_point = TRUE
      GROUP BY q.id, qs.timer_seconds`,
-    [sessionId]
+    [id]
   );
   return result.rows[0] || null;
 }
@@ -311,7 +353,7 @@ export async function deleteQuestion(questionId: string) {
   await pool.query('DELETE FROM questions WHERE id = $1', [questionId]);
 }
 
-export async function deleteQuestionsBySession(sessionId: string) {
+export async function deleteQuestionsByQuiz(sessionId: string) {
   await queryWithRetry('DELETE FROM questions WHERE session_id = $1', [sessionId], {
     allowWriteRetry: true,
   });
@@ -354,7 +396,7 @@ export async function upsertChoices(questionId: string, choices: Array<{
 
 // ===================== Connections =====================
 
-export async function getConnectionsBySession(sessionId: string) {
+export async function getConnectionsByQuiz(sessionId: string) {
   const result = await queryWithRetry(
     'SELECT * FROM question_connections WHERE session_id = $1',
     [sessionId]
@@ -406,8 +448,7 @@ export async function saveUserAnswer(data: {
   chosen_label: string;
   time_taken_ms: number;
 }): Promise<{ id: string; points_earned: number }> {
-  // Look up the canonical points for the chosen choice — never trust the
-  // client to send its own score. Falls back to 0 if the row is missing.
+  // Look up the canonical points for the chosen choice
   const choiceResult = await pool.query(
     `SELECT score_impact FROM choices WHERE question_id = $1 AND label = $2`,
     [data.question_id, data.chosen_label],
@@ -425,7 +466,7 @@ export async function saveUserAnswer(data: {
 // Aggregates a player's user_answers into a single leaderboard_entries row.
 // Called when a player reaches the end of their path (or runs out of time).
 // Idempotent — re-running for the same user just refreshes the snapshot.
-export async function completePlaySession(data: {
+export async function completeSession(data: {
   session_id: string;
   user_id: string;
   user_display_name: string;
@@ -522,24 +563,26 @@ export async function getUserHistory(userId: string) {
 
 // ===================== Sessions =====================
 
-export async function getOrCreatePlaySession(sessionId: string, userId: string) {
+export async function getOrCreateSession(quizId: string, userId: string, isPrivate: boolean = true) {
   // Try to get existing
   let result = await pool.query(
     'SELECT * FROM sessions WHERE session_id = $1 AND user_id = $2',
-    [sessionId, userId]
+    [quizId, userId]
   );
   if (result.rows[0]) return result.rows[0];
 
   // Get entry question
-  const entry = await getEntryQuestion(sessionId);
+  const entry = await getEntryQuestion(quizId);
+  const pinCode = generatePinCode();
+
   result = await pool.query(
-    `INSERT INTO sessions (session_id, user_id, current_question_id) VALUES ($1, $2, $3) RETURNING *`,
-    [sessionId, userId, entry?.id || null]
+    `INSERT INTO sessions (session_id, user_id, current_question_id, pin_code, is_private) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [quizId, userId, entry?.id || null, pinCode, isPrivate]
   );
   return result.rows[0];
 }
 
-export async function updatePlaySession(playSessionId: string, data: Partial<{
+export async function updateSession(playSessionId: string, data: Partial<{
   current_question_id: string;
   current_score: number;
   current_streak: number;
@@ -594,3 +637,27 @@ export async function upsertLeaderboardEntry(data: {
   );
   return result.rows[0];
 }
+
+export async function getSessionById(id: string) {
+  const result = await queryWithRetry(
+    `SELECT s.*, q.name as quiz_name, q.description as quiz_description
+     FROM sessions s
+     JOIN quizzes q ON s.session_id = q.id
+     WHERE s.id = $1`,
+    [id]
+  );
+  return result.rows[0];
+}
+
+export async function syncUserProfile(uid: string, displayName: string | null, photoURL: string | null) {
+  await pool.query(
+    `INSERT INTO profiles (uid, display_name, photo_url, last_seen)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (uid) DO UPDATE SET
+       display_name = EXCLUDED.display_name,
+       photo_url = EXCLUDED.photo_url,
+       last_seen = NOW()`,
+    [uid, displayName, photoURL]
+  );
+}
+

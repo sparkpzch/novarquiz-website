@@ -40,7 +40,7 @@ export default function ObservePage({ params }: { params: Promise<{ sessionId: s
   }, [loading, isAdmin, router]);
 
   useEffect(() => {
-    fetch(`/api/questions/sessions/${sessionId}`).then(r => r.ok ? r.json() : null).then(setSession);
+    fetch(`/api/sessions/${sessionId}`).then(r => r.ok ? r.json() : null).then(setSession);
   }, [sessionId]);
 
   useEffect(() => {

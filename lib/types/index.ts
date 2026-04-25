@@ -13,6 +13,7 @@ export interface Quiz {
   question_count?: number;
   play_count?: number;
   avg_score?: number;
+  creator_name?: string;
 }
 
 export interface Question {
@@ -90,6 +91,10 @@ export interface Session {
   current_streak: number;
   started_at: string;
   finished_at: string | null;
+  is_private: boolean;
+  pin_code: string | null;
+  share_token: string | null;
+  user_name?: string;
 }
 
 // ===================== Firebase / Auth Types =====================

@@ -45,14 +45,9 @@ const desktopAdminItems: NavItem[] = [
     icon: 'M5 12h5V5H5v7Zm0 7h5v-5H5v5Zm7 0h7V12h-7v7Zm0-14v5h7V5h-7Z',
   },
   {
-    href: '/admin?tab=session-manager',
-    label: 'Session Manager',
-    icon: 'M12 4a8 8 0 1 0 8 8h-8V4Zm1 0v7h7',
-  },
-  {
-    href: '/admin?tab=question-manager',
-    label: 'Question Manager',
-    icon: 'M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2 4h6m-6 4h6m-6 4h3',
+    href: '/admin?tab=quizzes-manager',
+    label: 'Quizzes Manager',
+    icon: 'M3.75 3h16.5M3.75 7.5h16.5M3.75 12h16.5M3.75 16.5h16.5M3.75 21h16.5',
   },
 ];
 

@@ -43,7 +43,7 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/questions/sessions/${sessionId}`)
+    fetch(`/api/sessions/${sessionId}`)
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => { if (data) setSession(data); });
   }, [sessionId]);

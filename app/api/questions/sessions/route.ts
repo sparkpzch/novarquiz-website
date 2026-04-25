@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
 import {
-  getAllSessions,
-  getPublishedSessions,
-  createSession,
+  getAllQuizzes,
+  getPublishedQuizzes,
+  createQuiz,
 } from "@/lib/db/queries";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const sessions =
+    const quizzes =
       searchParams.get("all") === "true"
-        ? await getAllSessions()
-        : await getPublishedSessions();
-    return NextResponse.json(sessions);
+        ? await getAllQuizzes()
+        : await getPublishedQuizzes();
+    return NextResponse.json(quizzes);
   } catch (error) {
-    console.error("Failed to load question sessions:", error);
+    console.error("Failed to load quizzes:", error);
     return NextResponse.json([], { status: 500 });
   }
 }
@@ -22,8 +22,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const session = await createSession(body);
-    return NextResponse.json(session, { status: 201 });
+    const quiz = await createQuiz(body);
+    return NextResponse.json(quiz, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createQuestion, upsertChoices, getQuestionsBySession, saveConnections, getConnectionsBySession, deleteQuestionsBySession } from '@/lib/db/queries';
+import { createQuestion, upsertChoices, getQuestionsByQuiz, saveConnections, getConnectionsByQuiz, deleteQuestionsByQuiz } from '@/lib/db/queries';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
   try {
-    const questions = await getQuestionsBySession(sessionId);
-    const connections = await getConnectionsBySession(sessionId);
+    const questions = await getQuestionsByQuiz(sessionId);
+    const connections = await getConnectionsByQuiz(sessionId);
     return NextResponse.json({ questions, connections });
   } catch (err) {
     console.error(`Failed to load graph for session ${sessionId}:`, err);
@@ -30,7 +30,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
 export async function DELETE(_request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
   try {
-    await deleteQuestionsBySession(sessionId);
+    await deleteQuestionsByQuiz(sessionId);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

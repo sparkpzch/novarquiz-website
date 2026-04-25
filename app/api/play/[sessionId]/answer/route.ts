@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreatePlaySession } from '@/lib/db/queries';
+import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession } from '@/lib/db/queries';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
@@ -41,7 +41,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     if (body.action === 'start') {
       // Guests skip play_session persistence — no analytics trail.
       if (body.is_guest) return NextResponse.json({ is_guest: true });
-      const playSession = await getOrCreatePlaySession(sessionId, body.user_id);
+      const playSession = await getOrCreateSession(sessionId, body.user_id);
       return NextResponse.json(playSession);
     }
 

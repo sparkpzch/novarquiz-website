@@ -372,15 +372,18 @@ type UserStats = {
 export default function DashboardPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const [sessions, setSessions] = useState<Quiz[]>([]);
+  const router = useRouter();
+  const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSession, setSelectedSession] = useState<Quiz | null>(null);
+  const [selectedSession, setSelectedSession] = useState<any | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
 
   useEffect(() => {
-    fetch("/api/questions/sessions")
+    fetch("/api/sessions")
       .then((response) => (response.ok ? response.json() : []))
-      .then(setSessions)
+      .then((data) => {
+        setSessions(data.filter((s: any) => s.is_private === false));
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -486,7 +489,7 @@ export default function DashboardPage() {
         />
         <StatCard
           icon="🧠"
-          label={t("dashboard.available_quizzes")}
+          label="Available Games"
           value={String(sessions.length || 0)}
           accent="bg-gradient-to-r from-[#6C42D8] to-[#92BFFF]"
         />
@@ -501,7 +504,7 @@ export default function DashboardPage() {
           <span className="nq-on-dark text-xl">🧩</span>
           <div>
             <h2 className="nq-on-dark text-2xl font-semibold">
-              {t("dashboard.available_quizzes")}
+              Available Games
             </h2>
           </div>
         </div>
@@ -522,7 +525,7 @@ export default function DashboardPage() {
         ) : sessions.length === 0 ? (
           <div className="nq-card rounded-[32px] p-10 text-center">
             <p className="text-lg font-semibold text-[#16324F]">
-              🎯 {t("dashboard.no_quizzes")}
+              🎯 No available games right now
             </p>
           </div>
         ) : (
@@ -533,7 +536,7 @@ export default function DashboardPage() {
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.04 }}
-                onClick={() => setSelectedSession(session)}
+                onClick={() => router.push(`/join/${session.pin_code || session.share_token}`)}
                 className="nq-card-dark group min-h-[272px] overflow-hidden rounded-[30px] p-0 text-left transition hover:-translate-y-1"
               >
                 {session.cover_image_url && (
@@ -560,8 +563,8 @@ export default function DashboardPage() {
                     </p>
                   )}
                   <div className="nq-on-dark-soft mt-6 flex flex-wrap items-center gap-4 text-sm">
-                    <span>⏱ Count-up from 0</span>
-                    <span>🎮 {t("dashboard.join_quiz")}</span>
+                    <span>🎮 Join Lobby</span>
+                    {session.pin_code && <span>PIN: {session.pin_code}</span>}
                   </div>
                 </div>
               </motion.button>
@@ -569,15 +572,6 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
-
-      <AnimatePresence>
-        {selectedSession && (
-          <SoloOrPartyModal
-            session={selectedSession}
-            onClose={() => setSelectedSession(null)}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }

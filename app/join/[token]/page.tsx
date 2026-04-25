@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { signInAnonymously, updateProfile } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { joinWaitingRoom, claimLeaderIfEmpty, resolveJoinToken, trackUserSession } from '@/lib/firebase/rtdb';
+import { joinWaitingRoom, claimLeaderIfEmpty, resolveJoinToken, trackUserSession, getRoom } from '@/lib/firebase/rtdb';
 import { trackEvent } from '@/lib/firebase/analytics';
 import { motion } from 'motion/react';
 
@@ -13,6 +13,7 @@ type SessionInfo = {
   id: string;
   name: string;
   description: string | null;
+  is_private?: boolean;
 };
 
 export default function JoinPage({ params }: { params: Promise<{ token: string }> }) {
@@ -36,25 +37,47 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
     }
   }, [authLoading, user]);
 
-  // Resolve join token → sessionId via RTDB, then fetch session info.
+  // Resolve join token → sessionId via RTDB or DB, then fetch session info.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     (async () => {
       try {
-        const sessionId = await resolveJoinToken(token);
+        // 1. Try Firebase RTDB resolution
+        const sessionIdFromRtdb = await resolveJoinToken(token);
         if (cancelled) return;
-        if (!sessionId) {
+
+        if (sessionIdFromRtdb) {
+          const res = await fetch(`/api/sessions/${sessionIdFromRtdb}`);
+          if (!res.ok) {
+            setFetchError('Session not found');
+            return;
+          }
+          const data = await res.json();
+          if (!cancelled) setSession({ 
+            id: data.id, 
+            name: data.quiz_name || data.name, 
+            description: data.quiz_description || data.description,
+            is_private: data.is_private 
+          });
+          return;
+        }
+
+        // 2. Fallback: Try PostgreSQL resolution (for pin_code or share_token)
+        const res = await fetch(`/api/join/${token}`);
+        if (cancelled) return;
+
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) setSession({ 
+            id: data.id, 
+            name: data.name, 
+            description: data.description,
+            is_private: data.is_private
+          });
+        } else {
           setFetchError('This invite link is no longer valid. Ask the host for a new one.');
-          return;
         }
-        const res = await fetch(`/api/questions/sessions/${sessionId}`);
-        if (!res.ok) {
-          setFetchError('Session not found');
-          return;
-        }
-        const data = await res.json();
-        if (!cancelled) setSession({ id: data.id, name: data.name, description: data.description });
       } catch {
         if (!cancelled) setFetchError('Failed to load session');
       }
@@ -83,7 +106,14 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
         joinedAt: Date.now(),
       });
       trackEvent('session_join_succeeded', { session_id: session.id });
-      router.push(`/play/${session.id}/lobby`);
+      
+      // If it's a public session and it's already started, skip lobby
+      const room = await getRoom(session.id);
+      if (!session.is_private && room?.status === 'started') {
+        router.push(`/play/${session.id}/question`);
+      } else {
+        router.push(`/play/${session.id}/lobby`);
+      }
     } catch (err) {
       console.error('Join failed:', err);
       setJoinError(`Could not join: ${(err as Error).message || 'unknown error'}`);

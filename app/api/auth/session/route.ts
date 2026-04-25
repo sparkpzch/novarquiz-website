@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebase/admin';
 import { SignJWT } from 'jose';
 import { cookies } from 'next/headers';
+import { syncUserProfile } from '@/lib/db/queries';
 
 const COOKIE_NAME = 'session';
 const DEFAULT_MAX_AGE = 60 * 60 * 24 * 5;   // 5 days — session-scoped default
@@ -21,6 +22,10 @@ export async function POST(request: NextRequest) {
     }
 
     const decoded = await adminAuth.verifyIdToken(idToken);
+    
+    // Sync profile to Postgres
+    await syncUserProfile(decoded.uid, decoded.name || null, decoded.picture || null);
+
     const isAdmin = !!decoded.admin;
     const maxAge = rememberMe ? REMEMBER_MAX_AGE : DEFAULT_MAX_AGE;
 

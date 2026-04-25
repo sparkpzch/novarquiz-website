@@ -250,25 +250,16 @@ function FinishedLeaderboard({
   const sortedBoard = [...board].sort((a, b) => {
     if (b.total_score !== a.total_score) return b.total_score - a.total_score;
     if (a.total_time_ms !== b.total_time_ms) return a.total_time_ms - b.total_time_ms;
-    return a.user_display_name.localeCompare(b.user_display_name);
+    return (a.user_display_name || '').localeCompare(b.user_display_name || '');
   });
   const myRankIdx = userId ? sortedBoard.findIndex((entry) => entry.user_id === userId) : -1;
   const myEntry = myRankIdx >= 0 ? sortedBoard[myRankIdx] : null;
   const myRank = myRankIdx >= 0 ? myRankIdx + 1 : null;
   const topThree = sortedBoard.slice(0, 3);
-  const podium =
-    topThree.length === 1
-      ? [{ entry: topThree[0], rank: 1, height: 'h-36', featured: true }]
-      : topThree.length === 2
-        ? [
-            { entry: topThree[0], rank: 1, height: 'h-36', featured: true },
-            { entry: topThree[1], rank: 2, height: 'h-28', featured: false },
-          ]
-        : [
-            { entry: topThree[1], rank: 2, height: 'h-28', featured: false },
-            { entry: topThree[0], rank: 1, height: 'h-36', featured: true },
-            { entry: topThree[2], rank: 3, height: 'h-24', featured: false },
-          ];
+  const podium = [];
+  if (topThree.length >= 2) podium.push({ entry: topThree[1], rank: 2, height: 'h-28', featured: false });
+  if (topThree.length >= 1) podium.push({ entry: topThree[0], rank: 1, height: 'h-36', featured: true });
+  if (topThree.length >= 3) podium.push({ entry: topThree[2], rank: 3, height: 'h-24', featured: false });
 
   return (
     <div className="nq-sky min-h-screen">
@@ -446,7 +437,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const explanationTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    fetch(`/api/questions/sessions/${sessionId}`)
+    fetch(`/api/sessions/${sessionId}`)
       .then((response) => (response.ok ? response.json() : null))
       .then(setSessionMeta)
       .catch(() => {});

@@ -53,7 +53,7 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
 
   // Fetch session metadata
   useEffect(() => {
-    fetch(`/api/questions/sessions/${sessionId}`)
+    fetch(`/api/sessions/${sessionId}`)
       .then(r => r.ok ? r.json() : null)
       .then(s => setSession(s));
   }, [sessionId]);

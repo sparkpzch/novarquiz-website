@@ -41,6 +41,11 @@ export type TeamRoom = {
   players?: Record<string, WaitingPlayer>;
 };
 
+export async function getRoom(sessionId: string): Promise<SessionRoom | null> {
+  const snap = await get(ref(rtdb, `sessions/${sessionId}`));
+  return snap.val() as SessionRoom | null;
+}
+
 // ─── Host operations ─────────────────────────────────────────────────────────
 
 // Legacy: preserved for callers that just want to ensure a room exists in 'waiting'
