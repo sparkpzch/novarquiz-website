@@ -211,7 +211,7 @@ export default function QuizzesManager({
           <div className="space-y-4">
             {sessions.map(s => {
               const room = rooms[s.id];
-              const status = room?.status || s.status || "closed";
+              const status = (room?.status || s.status || "closed") as 'waiting' | 'started' | 'ended' | 'closed' | 'opened' | 'archived';
               const isJoinOpen = status === "waiting" || status === "started" || status === "opened";
               const effectiveStatus = status === "waiting" ? "opened" : status;
               const playerCount = room?.players ? Object.keys(room.players).length : 0;
@@ -492,7 +492,7 @@ export default function QuizzesManager({
                   variant={confirmModal.action === 'delete' ? 'danger' : 'primary'}
                   className={confirmModal.action === 'archive' ? 'bg-amber-500 hover:bg-amber-600 border-amber-500' : ''}
                   type="submit"
-                  disabled={isSubmitting || (confirmModal.name && confirmModal.confirmName !== confirmModal.name)}
+                  disabled={isSubmitting || (!!confirmModal.name && confirmModal.confirmName !== confirmModal.name)}
                 >
                   {isSubmitting ? "Processing..." : `Confirm ${confirmModal.action.charAt(0).toUpperCase() + confirmModal.action.slice(1)}`}
                 </Button>

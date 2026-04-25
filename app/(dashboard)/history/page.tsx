@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { AnimatePresence, motion } from 'motion/react';
-import type { LeaderboardEntry, Quiz } from '@/lib/types';
+import type { LeaderboardEntry, Quiz, Session } from '@/lib/types';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 
 type UserHistoryRow = {

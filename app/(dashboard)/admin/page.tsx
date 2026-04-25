@@ -28,6 +28,7 @@ interface AdminStats {
   completionRate: number;
   avgTimeMs: number;
   monthlyActivity: number[];
+  userGrowth?: number[];
   scoreDistribution: { correct: number; incorrect: number };
   scoreHistogram: number[];
   topQuizzes: Array<{
