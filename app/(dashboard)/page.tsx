@@ -536,7 +536,7 @@ export default function DashboardPage() {
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.04 }}
-                onClick={() => router.push(`/join/${session.pin_code || session.share_token}`)}
+                onClick={() => router.push(`/join/${session.pin_code || session.id}`)}
                 className="nq-card-dark group min-h-[272px] overflow-hidden rounded-[30px] p-0 text-left transition hover:-translate-y-1"
               >
                 {session.cover_image_url && (

@@ -31,6 +31,7 @@ export async function getAllSessions() {
       COALESCE(s.name, q.name) as name,
       q.description as description,
       q.cover_image_url as cover_image_url,
+      q.share_token as share_token,
       COALESCE(p.display_name, (SELECT user_display_name FROM leaderboard_entries le WHERE le.user_id = s.user_id LIMIT 1)) as user_name,
       (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count
      FROM sessions s

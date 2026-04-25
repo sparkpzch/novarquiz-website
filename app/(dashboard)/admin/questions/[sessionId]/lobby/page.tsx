@@ -94,7 +94,7 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
       await closeLobby(sessionId);
       trackEvent('session_started', { session_id: sessionId, player_count: players.length });
       showToast('Game started!', 'success');
-      router.push(`/admin/questions/${sessionId}/observe`);
+      router.push('/admin?tab=session-manager');
     } catch {
       showToast('Failed to start game', 'error');
       setStarting(false);

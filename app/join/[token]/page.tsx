@@ -54,6 +54,14 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
             return;
           }
           const data = await res.json();
+
+          // 1.5 Check if the session is joinable in RTDB
+          const room = await getRoom(sessionIdFromRtdb);
+          if (room?.status === 'ended' || (data.is_private && room?.status === 'started')) {
+            setFetchError('This invite link is no longer valid. Ask the host for a new one.');
+            return;
+          }
+
           if (!cancelled) setSession({ 
             id: data.id, 
             name: data.quiz_name || data.name, 
@@ -69,6 +77,14 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
 
         if (res.ok) {
           const data = await res.json();
+          
+          // Check if the session is joinable in RTDB
+          const room = await getRoom(data.id);
+          if (room?.status === 'ended' || (data.is_private && room?.status === 'started')) {
+            setFetchError('This invite link is no longer valid. Ask the host for a new one.');
+            return;
+          }
+
           if (!cancelled) setSession({ 
             id: data.id, 
             name: data.name, 

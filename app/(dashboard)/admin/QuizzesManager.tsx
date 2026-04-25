@@ -268,15 +268,15 @@ export default function QuizzesManager({
                   <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-white/5">
                     {(isJoinOpen || status === 'closed') && (
                       <Button
-                        variant={isJoinOpen ? "primary" : "secondary"}
+                        variant={isJoinOpen && effectiveStatus !== 'started' ? "primary" : "secondary"}
                         size="sm"
-                        disabled={loadingIds[s.id]}
+                        disabled={loadingIds[s.id] || (isJoinOpen && effectiveStatus === 'started')}
                         onClick={() => isJoinOpen
-                          ? router.push(`/admin/questions/${s.id}/${effectiveStatus === 'opened' && s.is_private ? 'lobby' : 'observe'}`)
+                          ? router.push(`/admin/questions/${s.id}/lobby`)
                           : handleToggleJoin(s.id, s.is_private)
                         }
                       >
-                        {loadingIds[s.id] ? "Loading..." : (isJoinOpen ? (effectiveStatus === 'opened' ? "Manage Lobby" : "Observe Live") : (s.is_private ? "Open Lobby" : "Start Session"))}
+                        {loadingIds[s.id] ? "Loading..." : (isJoinOpen ? (effectiveStatus === 'opened' ? "Manage Lobby" : "In Progress") : (s.is_private ? "Open Lobby" : "Start Session"))}
                       </Button>
                     )}
                     {isJoinOpen && (
