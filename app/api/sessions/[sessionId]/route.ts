@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deleteSession, getSessionById } from '@/lib/db/queries';
+import { deleteSession, getSessionById, updateSession } from '@/lib/db/queries';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
@@ -13,6 +13,25 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ses
   }
 }
 
+export async function PATCH(request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
+  const { sessionId } = await params;
+  try {
+    const data = await request.json();
+    
+    // Support both legacy 'pin' key and direct DB field names
+    const updateData: any = { ...data };
+    if ('pin' in data) {
+      updateData.pin_code = data.pin;
+      delete updateData.pin;
+    }
+    
+    await updateSession(sessionId, updateData);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error(`Failed to update session ${sessionId}:`, err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;

@@ -382,9 +382,9 @@ export default function DashboardPage() {
     fetch("/api/sessions")
       .then((response) => (response.ok ? response.json() : []))
       .then((data) => {
-        setSessions(data.filter((s: any) => s.is_private === false));
+        setSessions(data.filter((s: any) => s.is_private === false && (s.status === 'opened' || s.status === 'started')));
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
@@ -398,13 +398,13 @@ export default function DashboardPage() {
           total_played: history.length,
           avg_score: Math.round(
             history.reduce((sum, item) => sum + item.total_score, 0) /
-              history.length,
+            history.length,
           ),
           best_score: Math.max(...history.map((item) => item.total_score)),
           best_streak: Math.max(...history.map((item) => item.streak)),
         });
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [user]);
 
   const profileHandle = user?.displayName

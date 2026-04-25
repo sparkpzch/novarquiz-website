@@ -14,13 +14,13 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { quizId, userId, isPrivate } = body;
+    const { quizId, userId, isPrivate, name } = body;
 
     if (!quizId || !userId) {
       return NextResponse.json({ error: "quizId and userId are required" }, { status: 400 });
     }
 
-    const session = await createSession(quizId, userId, isPrivate);
+    const session = await createSession(quizId, userId, isPrivate, name);
     return NextResponse.json(session, { status: 201 });
   } catch (error) {
     console.error("Failed to create session:", error);

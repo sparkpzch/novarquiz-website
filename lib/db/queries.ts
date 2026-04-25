@@ -21,7 +21,8 @@ export async function getAllSessions() {
   const result = await queryWithRetry(
     `SELECT s.*, 
       q.name as quiz_name, 
-      q.name as name,
+      s.name as raw_session_name,
+      COALESCE(s.name, q.name) as name,
       q.description as description,
       q.cover_image_url as cover_image_url,
       COALESCE(p.display_name, (SELECT user_display_name FROM leaderboard_entries le WHERE le.user_id = s.user_id LIMIT 1)) as user_name,
@@ -36,7 +37,10 @@ export async function getAllSessions() {
 
 export async function getSessionByToken(token: string) {
   const result = await queryWithRetry(
-    `SELECT s.*, q.name as quiz_name, q.description as quiz_description
+    `SELECT s.*, 
+       q.name as quiz_name, 
+       COALESCE(s.name, q.name) as name,
+       q.description as quiz_description
      FROM sessions s
      JOIN quizzes q ON s.session_id = q.id
      WHERE s.pin_code = $1 OR s.id::text = $2
@@ -137,14 +141,13 @@ export async function deleteQuiz(id: string) {
   await pool.query('DELETE FROM quizzes WHERE id = $1', [id]);
 }
 
-export async function createSession(quizId: string, userId: string, isPrivate: boolean = true) {
+export async function createSession(quizId: string, userId: string, isPrivate: boolean = true, name?: string) {
   const entry = await getEntryQuestion(quizId);
-  const pinCode = generatePinCode();
 
   const result = await queryWithRetry(
-    `INSERT INTO sessions (session_id, user_id, current_question_id, pin_code, is_private)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [quizId, userId, entry?.id || null, pinCode, isPrivate],
+    `INSERT INTO sessions (session_id, user_id, current_question_id, pin_code, is_private, name, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [quizId, userId, entry?.id || null, null, isPrivate, name || null, 'closed'],
     { allowWriteRetry: true }
   );
   return result.rows[0];
@@ -563,7 +566,7 @@ export async function getUserHistory(userId: string) {
 
 // ===================== Sessions =====================
 
-export async function getOrCreateSession(quizId: string, userId: string, isPrivate: boolean = true) {
+export async function getOrCreateSession(quizId: string, userId: string, isPrivate: boolean = true, name?: string) {
   // Try to get existing
   let result = await pool.query(
     'SELECT * FROM sessions WHERE session_id = $1 AND user_id = $2',
@@ -573,13 +576,20 @@ export async function getOrCreateSession(quizId: string, userId: string, isPriva
 
   // Get entry question
   const entry = await getEntryQuestion(quizId);
-  const pinCode = generatePinCode();
 
   result = await pool.query(
-    `INSERT INTO sessions (session_id, user_id, current_question_id, pin_code, is_private) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [quizId, userId, entry?.id || null, pinCode, isPrivate]
+    `INSERT INTO sessions (session_id, user_id, current_question_id, pin_code, is_private, name, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [quizId, userId, entry?.id || null, null, isPrivate, name || null, 'closed']
   );
   return result.rows[0];
+}
+
+export async function updateSessionPin(id: string, pin: string | null) {
+  await queryWithRetry(
+    'UPDATE sessions SET pin_code = $1 WHERE id = $2',
+    [pin, id],
+    { allowWriteRetry: true }
+  );
 }
 
 export async function updateSession(playSessionId: string, data: Partial<{
@@ -587,6 +597,9 @@ export async function updateSession(playSessionId: string, data: Partial<{
   current_score: number;
   current_streak: number;
   finished_at: string;
+  status: 'closed' | 'opened' | 'started' | 'archived';
+  pin_code: string | null;
+  name: string | null;
 }>) {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -640,7 +653,10 @@ export async function upsertLeaderboardEntry(data: {
 
 export async function getSessionById(id: string) {
   const result = await queryWithRetry(
-    `SELECT s.*, q.name as quiz_name, q.description as quiz_description
+    `SELECT s.*, 
+       q.name as quiz_name, 
+       COALESCE(s.name, q.name) as name,
+       q.description as quiz_description
      FROM sessions s
      JOIN quizzes q ON s.session_id = q.id
      WHERE s.id = $1`,

@@ -85,6 +85,7 @@ export interface LeaderboardEntry {
 export interface Session {
   id: string;
   session_id: string;
+  name?: string;
   user_id: string;
   current_question_id: string | null;
   current_score: number;
@@ -95,6 +96,7 @@ export interface Session {
   pin_code: string | null;
   share_token: string | null;
   user_name?: string;
+  status: 'closed' | 'opened' | 'started' | 'archived';
 }
 
 // ===================== Firebase / Auth Types =====================

@@ -226,14 +226,14 @@ function AdminDashboardContent() {
     }
   };
 
-  const handleCreateSession = async (quizId: string, isPrivate: boolean) => {
+  const handleCreateSession = async (quizId: string, isPrivate: boolean, name?: string) => {
     if (!user) return;
     setLoadingData(true);
     try {
       const res = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quizId, userId: user.uid, isPrivate }),
+        body: JSON.stringify({ quizId, userId: user.uid, isPrivate, name }),
       });
       if (res.ok) {
         fetchData();
@@ -911,6 +911,7 @@ function AdminDashboardContent() {
               onDeleteQuiz={handleDeleteQuiz}
               onDeleteSession={handleDeleteSession}
               onToggleStatus={handleToggleStatus}
+              onRefresh={fetchData}
             />
           </motion.div>
         )}

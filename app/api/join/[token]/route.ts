@@ -14,7 +14,7 @@ export async function GET(
     if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     return NextResponse.json({
       id: session.id, // This is the instance ID
-      name: session.quiz_name,
+      name: session.name,
       description: session.quiz_description,
       is_private: session.is_private
     });
