@@ -3,7 +3,7 @@
 import { ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams, ReadonlyURLSearchParams } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import { useAuth } from '@/lib/hooks/useAuth';
