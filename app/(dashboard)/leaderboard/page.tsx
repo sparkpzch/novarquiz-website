@@ -8,6 +8,7 @@ import '@/lib/i18n';
 import { motion } from 'motion/react';
 import type { LeaderboardEntry, Quiz } from '@/lib/types';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
+import { watchScores, type PlayerScore } from '@/lib/firebase/rtdb';
 
 function LeaderboardPageContent() {
   const { t } = useTranslation();
@@ -17,6 +18,7 @@ function LeaderboardPageContent() {
   const [selectedSession, setSelectedSession] = useState(searchParams.get('session') || '');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(Boolean(searchParams.get('session')));
+  const [liveScores, setLiveScores] = useState<Record<string, PlayerScore>>({});
 
   useEffect(() => {
     fetch('/api/questions/sessions')
@@ -34,7 +36,39 @@ function LeaderboardPageContent() {
       .finally(() => setLoading(false));
   }, [selectedSession]);
 
-  const sortedEntries = [...entries].sort((a, b) => {
+  useEffect(() => {
+    if (!selectedSession) {
+      setLiveScores({});
+      return;
+    }
+    return watchScores(selectedSession, setLiveScores);
+  }, [selectedSession]);
+
+  const dbUserIds = new Set(entries.map((e) => e.user_id));
+  const mergedEntries: LeaderboardEntry[] = [
+    ...entries.map((entry) => {
+      const live = liveScores[entry.user_id];
+      return live ? { ...entry, total_score: live.score } : entry;
+    }),
+    ...Object.entries(liveScores)
+      .filter(([uid]) => !dbUserIds.has(uid))
+      .map(([uid, live]): LeaderboardEntry => ({
+        id: uid,
+        session_id: selectedSession,
+        user_id: uid,
+        user_display_name: live.displayName,
+        user_photo_url: live.photoURL ?? null,
+        total_score: live.score,
+        correct_count: 0,
+        incorrect_count: 0,
+        unanswered_count: 0,
+        streak: 0,
+        total_time_ms: 0,
+        completed_at: '',
+      })),
+  ];
+
+  const sortedEntries = [...mergedEntries].sort((a, b) => {
     if (b.total_score !== a.total_score) return b.total_score - a.total_score;
     if (a.total_time_ms !== b.total_time_ms) return a.total_time_ms - b.total_time_ms;
     return a.user_display_name.localeCompare(b.user_display_name);
@@ -95,7 +129,7 @@ function LeaderboardPageContent() {
         <div className="flex justify-center py-14">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#0460A9] border-t-transparent" />
         </div>
-      ) : entries.length === 0 ? (
+      ) : mergedEntries.length === 0 ? (
         <div className="nq-card rounded-[34px] p-10 text-center">
           <p className="text-lg font-semibold text-[#16324F]">No entries yet for this session.</p>
         </div>

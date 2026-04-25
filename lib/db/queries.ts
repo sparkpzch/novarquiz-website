@@ -487,8 +487,12 @@ export async function completeSession(data: {
        COALESCE(SUM(CASE WHEN utility_score > 0 THEN 1 ELSE 0 END), 0)::int AS positive_count,
        COALESCE(SUM(CASE WHEN utility_score <= 0 THEN 1 ELSE 0 END), 0)::int AS nonpositive_count,
        COALESCE(SUM(time_taken_ms), 0)::int            AS total_time_ms
-     FROM user_answers
-     WHERE session_id = $1 AND user_id = $2`,
+     FROM (
+       SELECT DISTINCT ON (question_id) utility_score, time_taken_ms
+       FROM user_answers
+       WHERE session_id = $1 AND user_id = $2
+       ORDER BY question_id, answered_at DESC
+     ) latest_answers`,
     [data.session_id, data.user_id],
   );
   const row = agg.rows[0] ?? { total_score: 0, positive_count: 0, nonpositive_count: 0, total_time_ms: 0 };
@@ -497,8 +501,12 @@ export async function completeSession(data: {
   // Computed in-app rather than SQL because the window-function version is
   // less readable than this two-pass loop and the row count per user is tiny.
   const ordered = await pool.query(
-    `SELECT utility_score FROM user_answers
-     WHERE session_id = $1 AND user_id = $2
+    `SELECT utility_score FROM (
+       SELECT DISTINCT ON (question_id) utility_score, answered_at
+       FROM user_answers
+       WHERE session_id = $1 AND user_id = $2
+       ORDER BY question_id, answered_at DESC
+     ) latest_answers
      ORDER BY answered_at ASC`,
     [data.session_id, data.user_id],
   );
