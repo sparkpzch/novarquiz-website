@@ -108,8 +108,8 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   return (
     <div className="nq-sky min-h-screen">
       <div className="nq-content flex min-h-screen">
-        <aside className="hidden w-[292px] shrink-0 p-6 xl:block">
-          <div className="nq-card flex h-full flex-col rounded-[32px] p-6">
+        <aside className="sticky top-0 h-screen hidden w-[310px] shrink-0 p-5 xl:block">
+          <div className="nq-card flex h-full flex-col rounded-[32px] p-6 shadow-2xl">
             <Link href="/" className="flex justify-center rounded-3xl px-2 py-1">
               <Image
                 src="/image/icon/novartis-logo-transparent.png"
