@@ -6,6 +6,8 @@
     "profile": "โปรไฟล์",
     "leaderboard": "ลีดเดอร์บอร์ด",
     "history": "ประวัติ",
+    "stats": "สถิติ",
+    "quizzes": "แบบทดสอบ",
     "admin": "ผู้ดูแลระบบ",
     "questions": "คำถาม",
     "logout": "ออกจากระบบ",
@@ -126,5 +128,32 @@
     "streak": "สตรีค",
     "your_result": "ผลลัพธ์ของคุณ",
     "select_session": "เลือกเซสชันแบบทดสอบ"
+  },
+  "stats": {
+    "title": "สถิติ",
+    "lifetime": "ตลอดกาล",
+    "performance": "ผลงานของคุณ",
+    "score_distribution": "การกระจายคะแนน",
+    "recent_activity": "กิจกรรมล่าสุด",
+    "no_data": "ยังไม่มีข้อมูล",
+    "no_data_desc": "เล่นแบบทดสอบเพื่อดูสถิติของคุณที่นี่"
+  },
+  "quizzes": {
+    "title": "ค้นหาแบบทดสอบ",
+    "library": "คลังข้อมูล",
+    "search_placeholder": "ค้นหาแบบทดสอบตามชื่อหรือคำอธิบาย\u2026",
+    "sort": "เรียง",
+    "size": "ขนาด",
+    "sort_newest": "ใหม่ล่าสุด",
+    "sort_most_played": "เล่นมากที่สุด",
+    "sort_top_rated": "คะแนนสูงสุด",
+    "filter_all": "ทุกขนาด",
+    "filter_short": "สั้น (< 5 ข้อ)",
+    "filter_medium": "กลาง (5\u201315 ข้อ)",
+    "filter_long": "ยาว (> 15 ข้อ)",
+    "no_results": "ไม่พบแบบทดสอบ",
+    "no_results_desc": "ลองปรับการค้นหาหรือตัวกรอง",
+    "clear_filters": "ล้างตัวกรองทั้งหมด",
+    "plays": "ครั้ง"
   }
 }

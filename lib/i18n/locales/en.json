@@ -6,6 +6,8 @@
     "profile": "Profile",
     "leaderboard": "Leaderboard",
     "history": "History",
+    "stats": "Stats",
+    "quizzes": "Quizzes",
     "admin": "Admin",
     "questions": "Questions",
     "logout": "Logout",
@@ -126,5 +128,32 @@
     "streak": "Streak",
     "your_result": "Your Results",
     "select_session": "Select Quiz Session"
+  },
+  "stats": {
+    "title": "Stats",
+    "lifetime": "Lifetime",
+    "performance": "Your Performance",
+    "score_distribution": "Score Distribution",
+    "recent_activity": "Recent Activity",
+    "no_data": "No data yet",
+    "no_data_desc": "Play some quizzes to start seeing your stats here."
+  },
+  "quizzes": {
+    "title": "Browse Quizzes",
+    "library": "Library",
+    "search_placeholder": "Search quizzes by name or description\u2026",
+    "sort": "Sort",
+    "size": "Size",
+    "sort_newest": "Newest",
+    "sort_most_played": "Most Played",
+    "sort_top_rated": "Top Rated",
+    "filter_all": "All Lengths",
+    "filter_short": "Short (< 5Q)",
+    "filter_medium": "Medium (5\u201315Q)",
+    "filter_long": "Long (> 15Q)",
+    "no_results": "No quizzes found",
+    "no_results_desc": "Try adjusting your search or filters.",
+    "clear_filters": "Clear all filters",
+    "plays": "plays"
   }
 }

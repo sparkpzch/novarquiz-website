@@ -273,6 +273,15 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Hide scrollbar but keep scroll functionality */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Transition for theme changes */
 html, body {
   transition: background-color 0.3s ease, color 0.3s ease;
