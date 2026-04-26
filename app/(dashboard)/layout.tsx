@@ -9,7 +9,7 @@ import { auth } from '@/lib/firebase/config';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 
 type NavItem = {
@@ -99,6 +99,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user, loading, isAdmin } = useAuth();
+  const reduceMotion = useReducedMotion();
   const mobileNavContainerRef = useRef<HTMLDivElement | null>(null);
   const mobileNavRefs = useRef<Array<HTMLAnchorElement | null>>([]);
   const [mobilePillStyle, setMobilePillStyle] = useState<{ x: number; width: number; opacity: number }>({
@@ -232,22 +233,35 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
               {(() => {
                 const active = isActive(quizzesNavItem.href);
                 return (
-                  <Link
-                    href={quizzesNavItem.href}
-                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[#ffffff] transition-all ${
-                      active
-                        ? 'bg-gradient-to-r from-[#0460A9] to-[#55A0FF] shadow-lg shadow-[#0460A9]/25'
-                        : 'bg-gradient-to-r from-[#0460A9] to-[#3A8FE8] opacity-85 hover:opacity-100'
-                    }`}
+                  <motion.div
+                    whileTap={reduceMotion ? undefined : { scale: 0.985, y: 1 }}
+                    transition={{ type: 'spring', stiffness: 420, damping: 28 }}
                   >
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-[#ffffff]">
-                      <Icon path={quizzesNavItem.icon} active={true} />
-                    </div>
-                    <span className="font-semibold text-[#ffffff]">{t(quizzesNavItem.label)}</span>
-                    <span className="ml-auto rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-[#ffffff]">
-                      NEW
-                    </span>
-                  </Link>
+                    <Link
+                      href={quizzesNavItem.href}
+                      className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[#ffffff] transition-all ${
+                        active
+                          ? 'bg-gradient-to-r from-[#0460A9] to-[#55A0FF] shadow-lg shadow-[#0460A9]/25'
+                          : 'bg-gradient-to-r from-[#0460A9] to-[#3A8FE8] opacity-85 hover:opacity-100'
+                      }`}
+                    >
+                      <motion.div
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-[#ffffff]"
+                        whileTap={reduceMotion ? undefined : { scale: 0.92, rotate: -10 }}
+                        transition={{ type: 'spring', stiffness: 420, damping: 24 }}
+                      >
+                        <Icon path={quizzesNavItem.icon} active={true} />
+                      </motion.div>
+                      <span className="font-semibold text-[#ffffff]">{t(quizzesNavItem.label)}</span>
+                      <motion.span
+                        className="ml-auto rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-[#ffffff]"
+                        whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+                        transition={{ type: 'spring', stiffness: 420, damping: 24 }}
+                      >
+                        NEW
+                      </motion.span>
+                    </Link>
+                  </motion.div>
                 );
               })()}
 
@@ -364,35 +378,44 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
           {(() => {
             const active = isActive(quizzesNavItem.href);
             return (
-              <div className="relative z-20 flex flex-col items-center" style={{ marginBottom: '10px' }}>
+              <motion.div
+                className="relative z-20 flex flex-col items-center"
+                style={{ marginBottom: '10px' }}
+                whileTap={reduceMotion ? undefined : { scale: 0.94, y: 2 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 26 }}
+              >
                 <Link
                   href={quizzesNavItem.href}
                   className="flex flex-col items-center gap-1"
                 >
-                  <div
+                  <motion.div
                     className={`flex h-[64px] w-[64px] flex-col items-center justify-center gap-1 rounded-full shadow-lg transition-all ${
                       active
                         ? 'bg-gradient-to-br from-[#0460A9] to-[#92BFFF] shadow-[0_10px_28px_rgba(4,96,169,0.45)] scale-105'
                         : 'bg-gradient-to-br from-[#0460A9] to-[#55A0FF] shadow-[0_8px_22px_rgba(4,96,169,0.32)] hover:scale-105'
                     }`}
+                    whileTap={reduceMotion ? undefined : { scale: 0.96 }}
+                    transition={{ type: 'spring', stiffness: 420, damping: 24 }}
                   >
                     {/* Inner decorative ring */}
                     <div className="absolute h-[64px] w-[64px] rounded-full border-2 border-white/25" />
-                    <svg
+                    <motion.svg
                       className="h-5 w-5 text-[#ffffff]"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
                       strokeWidth={2}
+                      whileTap={reduceMotion ? undefined : { scale: 0.88, rotate: -12 }}
+                      transition={{ type: 'spring', stiffness: 420, damping: 22 }}
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" d={quizzesNavItem.icon} />
-                    </svg>
+                    </motion.svg>
                     <span className="text-[10px] font-bold leading-none text-[#ffffff]" style={{ textShadow: '0 1px 2px rgba(4,96,169,0.6)' }}>
                       {t(quizzesNavItem.label)}
                     </span>
-                  </div>
+                  </motion.div>
                 </Link>
-              </div>
+              </motion.div>
             );
           })()}
 
