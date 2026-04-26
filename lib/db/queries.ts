@@ -327,7 +327,7 @@ export async function duplicateQuiz(sourceIdOrSlug: string, createdBy: string, i
   }
 }
 
-// Removes every trace of a Firebase user from analytics-bearing tables.
+// Removes every trace of a Firebase user from persisted app data.
 export async function deleteUserData(uid: string) {
   const client = await pool.connect();
   try {
@@ -335,6 +335,7 @@ export async function deleteUserData(uid: string) {
     await client.query('DELETE FROM user_answers WHERE user_id = $1', [uid]);
     await client.query('DELETE FROM sessions WHERE user_id = $1', [uid]);
     await client.query('DELETE FROM leaderboard_entries WHERE user_id = $1', [uid]);
+    await client.query('DELETE FROM profiles WHERE uid = $1', [uid]);
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');

@@ -143,6 +143,24 @@ function LogoutIcon() {
   );
 }
 
+function DeleteAccountIcon() {
+  return (
+    <svg
+      className="h-5 w-5 text-[#D9485F]"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M6 7.5h12m-9.75 0V6a1.5 1.5 0 0 1 1.5-1.5h4.5a1.5 1.5 0 0 1 1.5 1.5v1.5m-8.25 0v10.125A2.625 2.625 0 0 0 10.125 20.25h3.75A2.625 2.625 0 0 0 16.5 17.625V7.5m-6 3.75v5.25m3-5.25v5.25"
+      />
+    </svg>
+  );
+}
+
 function EditIcon() {
   return (
     <svg
@@ -253,9 +271,11 @@ export default function ProfilePage() {
 
   const [editModal, setEditModal] = useState(false);
   const [termsModal, setTermsModal] = useState(false);
+  const [deleteModal, setDeleteModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(() => {
     if (typeof window === "undefined") return true;
     const stored = window.localStorage.getItem("novarquiz-sound-enabled");
@@ -322,6 +342,35 @@ export default function ProfilePage() {
     window.location.href = "/sign-in";
   };
 
+  const handleDeleteAccount = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    setDeletingAccount(true);
+    try {
+      const idToken = await currentUser.getIdToken(true);
+      const response = await fetch("/api/account", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Delete account failed");
+      }
+
+      setDeleteModal(false);
+      await signOut(auth).catch(() => {});
+      showToast("Account deleted", "success");
+      window.location.href = "/sign-in";
+    } catch {
+      showToast("Failed to delete account", "error");
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
   const handleSoundToggle = () => {
     const next = !soundEnabled;
     setSoundEnabled(next);
@@ -329,53 +378,49 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="mx-auto max-w-xl space-y-5">
-      <div className="pt-2 text-center">
-        <h1 className="text-3xl font-bold text-[#192246]">{t("profile.title")}</h1>
-      </div>
-
+    <div className="mx-auto max-w-lg space-y-5">
       <motion.section
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
-        className="nq-card-blue relative overflow-hidden rounded-[30px] p-5 text-white"
+        className="nq-card-blue relative overflow-hidden rounded-[28px] p-4 text-white"
       >
         <div className="absolute inset-y-0 right-[-18px] top-[18px] w-48 rounded-full border border-white/10 bg-white/10" />
         <div className="absolute inset-y-0 right-[32px] top-[-6px] w-32 rounded-full border border-white/10 bg-white/10" />
         <div className="relative">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3.5">
             <ProfileAvatar
               displayName={user?.displayName}
               photoURL={user?.photoURL}
-              size={68}
+              size={60}
               ringClassName="ring-2 ring-white/35 shadow-lg shadow-[#1E5FB0]/25"
             />
             <div className="min-w-0">
-              <p className="truncate text-[1.75rem] font-semibold leading-tight">
+              <p className="nq-on-dark truncate text-[1.55rem] font-semibold leading-tight">
                 {user?.displayName || "Player"}
               </p>
-              <p className="truncate text-base text-white/80">
-                @{user?.displayName?.toLowerCase().replace(/\s+/g, ".") || user?.email?.split("@")[0] || "player"}
+              <p className="nq-on-dark-muted truncate text-[15px]">
+                @{user?.email?.split("@")[0] || user?.displayName?.toLowerCase().replace(/\s+/g, ".") || "player"}
               </p>
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <div className="rounded-[18px] bg-white/14 px-4 py-3 text-center">
-              <p className="text-2xl font-bold">{userStats.bestStreak || 0}</p>
-              <p className="text-sm text-white/80">{t("dashboard.best_streak")}</p>
+          <div className="mt-4 grid grid-cols-2 gap-2.5">
+            <div className="rounded-[16px] bg-white/14 px-3.5 py-3.5 text-center">
+              <p className="nq-on-dark text-[2rem] font-bold">{userStats.bestStreak || 0}</p>
+              <p className="nq-on-dark mt-1 text-[13px] font-medium">{t("dashboard.best_streak")}</p>
             </div>
-            <div className="rounded-[18px] bg-white/14 px-4 py-3 text-center">
-              <p className="text-2xl font-bold">
+            <div className="rounded-[16px] bg-white/14 px-3.5 py-3.5 text-center">
+              <p className="nq-on-dark text-[2rem] font-bold">
                 {(userStats.bestScore || 0).toLocaleString()}
               </p>
-              <p className="text-sm text-white/80">{t("profile.best_score")}</p>
+              <p className="nq-on-dark mt-1 text-[13px] font-medium">{t("profile.best_score")}</p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={() => { setNewName(user?.displayName || ""); setEditModal(true); }}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-[18px] bg-white px-4 py-3 text-lg font-semibold text-[#70A2F9] shadow-[0_12px_28px_rgba(17,87,145,0.18)]"
+            className="mt-3.5 flex w-full items-center justify-center gap-2 rounded-[16px] bg-white px-4 py-2.5 text-base font-semibold text-[#70A2F9] shadow-[0_12px_28px_rgba(17,87,145,0.18)]"
           >
             <EditIcon />
             <span>{t("profile.edit_profile")}</span>
@@ -450,16 +495,31 @@ export default function ProfilePage() {
         transition={{ delay: 0.1 }}
         className="nq-card rounded-[30px] p-6"
       >
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex w-full items-center gap-4 py-1 transition hover:opacity-85"
-        >
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
-            <LogoutIcon />
-          </div>
-          <span className="text-[1.05rem] font-medium text-[#E85C5C]">{t("nav.logout")}</span>
-        </button>
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex w-full items-center gap-4 py-1 transition hover:opacity-85"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
+              <LogoutIcon />
+            </div>
+            <span className="text-[1.05rem] font-medium text-[#E85C5C]">{t("nav.logout")}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setDeleteModal(true)}
+            className="flex w-full items-center gap-4 py-1 transition hover:opacity-85"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-50">
+              <DeleteAccountIcon />
+            </div>
+            <span className="text-[1.05rem] font-medium text-[#D9485F]">
+              {t("profile.delete_account")}
+            </span>
+          </button>
+        </div>
       </motion.section>
 
       <Modal
@@ -528,6 +588,42 @@ export default function ProfilePage() {
             </Button>
             <Button onClick={handleSaveProfile} disabled={saving} className="flex-1">
               {saving ? t("profile.saving") : t("profile.save")}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={deleteModal}
+        onClose={() => !deletingAccount && setDeleteModal(false)}
+        title={t("profile.delete_account")}
+      >
+        <div className="space-y-5">
+          <div className="rounded-[18px] border border-[#D9485F]/14 bg-rose-50/70 px-4 py-3 text-sm text-[#6A2D38]">
+            <p className="font-semibold text-[#B43C52]">{t("profile.delete_confirm")}</p>
+            <p className="mt-2">
+              {t("profile.delete_account_description")}
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setDeleteModal(false)}
+              className="flex-1"
+              disabled={deletingAccount}
+            >
+              {t("profile.cancel")}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteAccount}
+              className="flex-1"
+              disabled={deletingAccount}
+            >
+              {deletingAccount
+                ? t("profile.deleting_account")
+                : t("profile.delete_account")}
             </Button>
           </div>
         </div>

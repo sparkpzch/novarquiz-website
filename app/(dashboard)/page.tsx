@@ -48,35 +48,6 @@ function parseJoinInput(input: string): ParsedJoinInput {
   return null;
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
-  accent,
-}: {
-  icon: string;
-  label: string;
-  value: string;
-  accent: string;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="nq-card rounded-[28px] p-5"
-    >
-      <div className="mb-4 flex items-center justify-between">
-        <span className="text-4xl">{icon}</span>
-        <div className={`h-3 w-24 rounded-full ${accent}`} />
-      </div>
-      <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#5D7EA1]">
-        {label}
-      </p>
-      <p className="mt-2 text-3xl font-bold text-[#0460A9]">{value}</p>
-    </motion.div>
-  );
-}
-
 function LiveSessionsWidget() {
   const { user } = useAuth();
   const router = useRouter();
@@ -137,7 +108,7 @@ function LiveSessionsWidget() {
               onClick={() => resume(entry)}
               className="nq-card-soft flex items-center gap-4 rounded-[28px] p-5 text-left transition hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(17,87,145,0.18)]"
             >
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br from-[#92BFFF] to-[#0460A9] text-2xl text-white shadow-lg shadow-[#0460A9]/20">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br from-[#92BFFF] to-[#70A2F9] text-2xl text-white shadow-lg shadow-[#0460A9]/16">
                 {icon}
               </div>
               <div className="min-w-0 flex-1">
@@ -193,31 +164,37 @@ function JoinByCodeCard() {
   };
 
   return (
-    <section className="nq-card-dark rounded-[30px] p-6">
-      <div className="mb-5 flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F04D95]/20 text-xl">
+    <section
+      className="nq-card relative overflow-hidden rounded-[34px] p-6"
+    >
+      <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(146,191,255,0.36),transparent_65%)]" />
+      <div className="relative z-10 mb-5 flex items-center gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#70A2F9] text-xl text-white shadow-[0_14px_28px_rgba(17,87,145,0.18)]">
           🎟️
         </div>
         <div>
-          <h2 className="nq-on-dark text-xl font-semibold">Have an invite?</h2>
-          <p className="nq-on-dark-muted text-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5D7EA1]">
+            Quick join
+          </p>
+          <h2 className="text-xl font-semibold text-[#16324F]">Have an invite?</h2>
+          <p className="text-sm text-[#5D7EA1]">
             Paste an invite link or PIN from the host.
           </p>
         </div>
       </div>
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="relative z-10 flex flex-col gap-3 sm:flex-row">
         <input
           type="text"
           value={code}
           onChange={(event) => setCode(event.target.value)}
           onKeyDown={(event) => event.key === "Enter" && !busy && handleJoin()}
           placeholder="Invite link or PIN"
-          className="nq-on-dark min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 outline-none placeholder:text-[#DDEBFF] focus:border-[#92BFFF] focus:bg-white/[0.14]"
+          className="min-w-0 flex-1 rounded-[22px] border border-[#0460A9]/12 bg-white/80 px-4 py-3 text-[#16324F] outline-none placeholder:text-[#5D7EA1]/70 focus:border-[#0460A9]/35"
         />
         <button
           onClick={handleJoin}
           disabled={busy || !code.trim()}
-          className="rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-[#111827]! transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-[22px] bg-[#70A2F9] px-6 py-3 text-sm font-bold text-[#16324F] transition hover:bg-[#5B8EE0] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? "Joining…" : "Join"}
         </button>
@@ -392,11 +369,23 @@ export default function DashboardPage() {
       .catch(() => { });
   }, [user]);
 
-  const profileHandle = user?.displayName
-    ? `@${user.displayName.toLowerCase().replace(/\s+/g, ".")}`
-    : user?.email
-      ? `@${user.email.split("@")[0]}`
-      : "@player";
+  const statItems = [
+    {
+      label: "Best Score",
+      value: userStats?.best_score?.toLocaleString() ?? "—",
+      accent: "bg-gradient-to-r from-[#0460A9] to-[#92BFFF]",
+    },
+    {
+      label: "Best Streak",
+      value: userStats?.best_streak ?? "—",
+      accent: "bg-gradient-to-r from-[#055A9E] to-[#4E93E6]",
+    },
+    {
+      label: t("dashboard.total_played"),
+      value: userStats ? String(userStats.total_played) : "—",
+      accent: "bg-gradient-to-r from-[#0460A9] to-[#92BFFF]",
+    },
+  ];
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 md:space-y-7">
@@ -404,80 +393,54 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="nq-card-blue relative overflow-hidden rounded-[32px] p-5 text-white! md:p-6"
+          className="nq-card relative overflow-hidden rounded-[30px] p-4 md:p-5"
         >
-          <div className="absolute inset-y-0 right-[-36px] top-[14px] w-48 rounded-full border border-white/10 bg-white/[0.08]" />
-          <div className="absolute inset-y-0 right-[18px] top-[-20px] w-36 rounded-full border border-white/10 bg-white/10" />
-          <div className="relative flex items-center gap-4">
+          <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(146,191,255,0.4),transparent_65%)]" />
+          <div className="absolute inset-y-0 right-[-36px] top-[14px] w-48 rounded-full border border-[#0460A9]/12 bg-[#70A2F9]/10" />
+          <div className="absolute inset-y-0 right-[18px] top-[-20px] w-36 rounded-full border border-[#0460A9]/12 bg-[#70A2F9]/12" />
+          <div className="relative flex items-center gap-3">
             <ProfileAvatar
               displayName={user?.displayName}
               photoURL={user?.photoURL}
-              size={84}
-              ringClassName="ring-4 ring-[#0E173A]/35 shadow-xl shadow-[#113D7A]/35"
+              size={72}
+              ringClassName="ring-4 ring-white/80 shadow-xl shadow-[#113D7A]/18"
             />
             <div className="min-w-0">
-              <h1 className="truncate text-2xl font-bold md:text-3xl">
+              <h1 className="truncate text-[1.9rem] font-bold text-[#16324F] md:text-[2.2rem]">
                 {user?.displayName || "Player"}
               </h1>
-              <p className="mt-1 truncate text-base text-white/80!">
-                {profileHandle}
-              </p>
             </div>
           </div>
         </motion.div>
 
-        <div className="nq-card rounded-[32px] p-5 md:p-6">
-          <div className="mb-4 flex items-center gap-3">
-            <span className="text-2xl">📊</span>
+        <div className="nq-card rounded-[30px] p-4 md:p-5">
+          <div className="mb-3 flex items-center gap-3">
+            <span className="text-xl">📊</span>
             <div>
-              <h2 className="text-xl font-semibold text-[#16324F]">
+              <h2 className="text-lg font-semibold text-[#16324F]">
                 Stat Summary
               </h2>
-              <p className="text-sm text-[#5D7EA1]">
+              <p className="text-xs text-[#5D7EA1] md:text-sm">
                 Your latest quiz momentum at a glance.
               </p>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-[24px] bg-white/72 p-4">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#5D7EA1]">
-                Best Score
-              </p>
-              <p className="mt-2 text-3xl font-bold text-[#0460A9]">
-                {userStats?.best_score?.toLocaleString() ?? "—"}
-              </p>
-            </div>
-            <div className="rounded-[24px] bg-white/72 p-4">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#5D7EA1]">
-                Best Streak
-              </p>
-              <p className="mt-2 text-3xl font-bold text-[#0460A9]">
-                {userStats?.best_streak ?? "—"}
-              </p>
-            </div>
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3">
+            {statItems.map((item) => (
+              <div
+                key={item.label}
+                className="rounded-[22px] bg-white/72 p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5D7EA1]">
+                  {item.label}
+                </p>
+                <p className="mt-2 text-2xl font-bold text-[#0460A9]">
+                  {item.value}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-3">
-        <StatCard
-          icon="🎯"
-          label={t("dashboard.total_played")}
-          value={userStats ? String(userStats.total_played) : "—"}
-          accent="bg-gradient-to-r from-[#0460A9] to-[#92BFFF]"
-        />
-        <StatCard
-          icon="📈"
-          label={t("dashboard.avg_score")}
-          value={userStats ? `${userStats.avg_score}` : "—"}
-          accent="bg-gradient-to-r from-[#055A9E] to-[#4E93E6]"
-        />
-        <StatCard
-          icon="🧠"
-          label="Available Games"
-          value={String(sessions.length || 0)}
-          accent="bg-gradient-to-r from-[#6C42D8] to-[#92BFFF]"
-        />
       </section>
 
       <LiveSessionsWidget />
@@ -485,13 +448,10 @@ export default function DashboardPage() {
       <JoinByCodeCard />
 
       <section className="space-y-4">
-        <div className="flex items-center gap-3">
-          <span className="nq-on-dark text-xl">🧩</span>
-          <div>
-            <h2 className="nq-on-dark text-2xl font-semibold">
-              Available Games
-            </h2>
-          </div>
+        <div>
+          <h2 className="text-2xl font-semibold text-[#16324F]">
+            Available Quiz
+          </h2>
         </div>
 
         {loading ? (
@@ -499,11 +459,11 @@ export default function DashboardPage() {
             {[1, 2, 3].map((key) => (
               <div
                 key={key}
-                className="nq-card-dark animate-pulse rounded-[30px] p-7"
+                className="nq-card-soft animate-pulse rounded-[30px] p-7"
               >
-                <div className="mb-4 h-5 w-3/4 rounded-full bg-white/10" />
-                <div className="mb-2 h-3 w-full rounded-full bg-white/10" />
-                <div className="h-3 w-2/3 rounded-full bg-white/10" />
+                <div className="mb-4 h-5 w-3/4 rounded-full bg-[#70A2F9]/18" />
+                <div className="mb-2 h-3 w-full rounded-full bg-[#70A2F9]/18" />
+                <div className="h-3 w-2/3 rounded-full bg-[#70A2F9]/18" />
               </div>
             ))}
           </div>
@@ -522,10 +482,10 @@ export default function DashboardPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.04 }}
                 onClick={() => router.push(`/join/${session.pin_code || session.id}`)}
-                className="nq-card-dark group min-h-[272px] overflow-hidden rounded-[30px] p-0 text-left transition hover:-translate-y-1"
+                className="group nq-card-soft flex min-h-[228px] flex-col overflow-hidden rounded-[28px] p-0 text-left transition hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(17,87,145,0.18)]"
               >
                 {session.cover_image_url && (
-                  <div className="h-52 overflow-hidden">
+                  <div className="h-40 overflow-hidden">
                     <img
                       src={session.cover_image_url}
                       alt={session.name}
@@ -533,22 +493,23 @@ export default function DashboardPage() {
                     />
                   </div>
                 )}
-                <div className="p-7">
-                  <div className="mb-4 flex items-start justify-between gap-4">
-                    <h3 className="nq-on-dark line-clamp-2 text-xl font-bold">
+                <div className="flex flex-1 flex-col p-5">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <h3 className="line-clamp-2 flex-1 text-[1.75rem] font-bold leading-tight text-[#16324F]">
                       {session.name}
                     </h3>
-                    <span className="shrink-0 whitespace-nowrap rounded-full bg-[#7B8BFF]/30 px-3 py-1 text-xs font-semibold text-[#F3F7FF]">
+                    <span className="shrink-0 whitespace-nowrap rounded-full bg-[#0460A9]/10 px-3 py-1.5 text-sm font-bold text-[#0460A9]">
                       {session.question_count} Q
                     </span>
                   </div>
                   {session.description && (
-                    <p className="nq-on-dark-muted line-clamp-4 text-sm leading-7">
+                    <p className="line-clamp-3 text-sm leading-relaxed text-[#5D7EA1]">
                       {session.description}
                     </p>
                   )}
                   <div className="nq-on-dark-soft mt-6 flex flex-wrap items-center gap-4 text-sm">
                     <span>🎮 Join Lobby</span>
+                    {session.pin_code && <span>PIN: {session.pin_code}</span>}
                   </div>
                 </div>
               </motion.button>
