@@ -35,7 +35,9 @@ export async function getAllSessions() {
       q.cover_image_url as cover_image_url,
       q.share_token as share_token,
       COALESCE(p.display_name, (SELECT user_display_name FROM leaderboard_entries le WHERE le.user_id = s.user_id LIMIT 1)) as user_name,
-      (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count
+      (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count,
+      (SELECT COUNT(*) FROM leaderboard_entries le WHERE le.session_id::text = s.id::text)::int AS play_count,
+      (SELECT COALESCE(ROUND(AVG(le.total_score)), 0) FROM leaderboard_entries le WHERE le.session_id::text = s.id::text)::int AS avg_score
      FROM sessions s
      JOIN quizzes q ON s.session_id = q.id
      LEFT JOIN profiles p ON s.user_id = p.uid
@@ -870,13 +872,15 @@ export async function getSessionAnalytics(sessionId: string) {
   const session = await getSessionById(sessionId);
   if (!session) return null;
 
+  const actualId = session.id;
+
   const leaderboardResult = await pool.query(
     `SELECT le.*, p.photo_url as profile_photo 
      FROM leaderboard_entries le
      LEFT JOIN profiles p ON le.user_id = p.uid
      WHERE le.session_id = $1 
      ORDER BY le.total_score DESC`,
-    [sessionId]
+    [actualId]
   );
 
   const questionsResult = await pool.query(
@@ -900,7 +904,7 @@ export async function getSessionAnalytics(sessionId: string) {
      FROM questions q
      WHERE q.session_id = (SELECT session_id FROM sessions WHERE id = $1)
      ORDER BY q.question_order ASC`,
-    [sessionId]
+    [actualId]
   );
 
   return {

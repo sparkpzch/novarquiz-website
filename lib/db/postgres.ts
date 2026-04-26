@@ -8,7 +8,7 @@ neonConfig.webSocketConstructor = ws;
 // Pipeline the 3 startup round-trips into 1, cutting connection overhead ~60%.
 neonConfig.pipelineConnect = 'password';
 // Reuse WebSocket connections across requests in the same process.
-neonConfig.fetchConnectionCache = true;
+
 
 setDefaultResultOrder('ipv4first');
 
