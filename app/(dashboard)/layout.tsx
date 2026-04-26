@@ -19,12 +19,18 @@ type NavItem = {
   exact?: boolean;
 };
 
+// Regular nav items (Home, Stats, History, Profile)
 const mobileNavItems: NavItem[] = [
   {
     href: '/',
     label: 'nav.home',
     icon: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
     exact: true,
+  },
+  {
+    href: '/stats',
+    label: 'nav.stats',
+    icon: 'M3 3v18h18M9 17V9m4 8v-4m4 4V5',
   },
   {
     href: '/history',
@@ -37,6 +43,13 @@ const mobileNavItems: NavItem[] = [
     icon: 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm-7 10h6c2.761 0 5 2.239 5 5H4c0-2.761 2.239-5 5-5Z',
   },
 ];
+
+// Special featured Quizzes nav item
+const quizzesNavItem: NavItem = {
+  href: '/quizzes',
+  label: 'nav.quizzes',
+  icon: 'M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25',
+};
 
 const desktopAdminItems: NavItem[] = [
   {
@@ -196,7 +209,50 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
             </Link>
 
             <nav className="mt-8 space-y-2">
-              {mobileNavItems.map((item) => {
+              {/* Home + Stats first */}
+              {mobileNavItems.slice(0, 2).map((item) => {
+                const active = isActive(item.href, item.exact);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
+                      active
+                        ? 'bg-[#0460A9] text-[#F8FBFF] shadow-lg shadow-[#0460A9]/20'
+                        : 'text-[#4D6F93] hover:bg-white/60 hover:text-[#16324F]'
+                    }`}
+                  >
+                    <Icon path={item.icon} active={active} />
+                    <span className="font-medium">{t(item.label)}</span>
+                  </Link>
+                );
+              })}
+
+              {/* Quizzes — featured gradient pill */}
+              {(() => {
+                const active = isActive(quizzesNavItem.href);
+                return (
+                  <Link
+                    href={quizzesNavItem.href}
+                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[#ffffff] transition-all ${
+                      active
+                        ? 'bg-gradient-to-r from-[#0460A9] to-[#55A0FF] shadow-lg shadow-[#0460A9]/25'
+                        : 'bg-gradient-to-r from-[#0460A9] to-[#3A8FE8] opacity-85 hover:opacity-100'
+                    }`}
+                  >
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-[#ffffff]">
+                      <Icon path={quizzesNavItem.icon} active={true} />
+                    </div>
+                    <span className="font-semibold text-[#ffffff]">{t(quizzesNavItem.label)}</span>
+                    <span className="ml-auto rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-[#ffffff]">
+                      NEW
+                    </span>
+                  </Link>
+                );
+              })()}
+
+              {/* History + Profile */}
+              {mobileNavItems.slice(2).map((item) => {
                 const active = isActive(item.href, item.exact);
                 return (
                   <Link
@@ -271,24 +327,29 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
         aria-hidden="true"
         className="pointer-events-none fixed inset-x-0 bottom-0 z-30 h-[20px] bg-[linear-gradient(180deg,rgba(196,222,255,0.24)_0%,rgba(196,222,255,0.72)_100%)] backdrop-blur-md xl:hidden"
       />
-      <nav className="fixed inset-x-0 bottom-0 z-40 block px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 xl:hidden">
-        <div ref={mobileNavContainerRef} className="relative mx-auto flex h-[60px] w-[370px] max-w-full items-center rounded-[999px] border border-white/50 bg-white/50 px-1.5 py-1 shadow-[0_18px_40px_rgba(70,112,165,0.2)] backdrop-blur-xl">
-          <motion.span
-            aria-hidden="true"
-            animate={mobilePillStyle}
-            transition={{ type: "spring", stiffness: 420, damping: 34 }}
-            className="absolute inset-y-1 left-0 rounded-[999px] border-2 border-[#92BFFF] bg-[#92BFFF] shadow-[0_8px_18px_rgba(14,99,216,0.22)]"
-          />
-          {mobileNavItems.map((item, index) => {
+      {/* Mobile bottom nav — 4 regular items + 1 special Quizzes center FAB */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 block px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 xl:hidden">
+        <div className="relative mx-auto flex max-w-[430px] items-end justify-around">
+
+          {/* Animated pill background (for 4 regular items only) */}
+          <div ref={mobileNavContainerRef} className="absolute inset-x-0 bottom-0 flex h-[60px] items-center rounded-[999px] border border-white/50 bg-white/50 shadow-[0_18px_40px_rgba(70,112,165,0.2)] backdrop-blur-xl">
+            <motion.span
+              aria-hidden="true"
+              animate={mobilePillStyle}
+              transition={{ type: "spring", stiffness: 420, damping: 34 }}
+              className="absolute inset-y-1 left-0 rounded-[999px] border-2 border-[#92BFFF] bg-[#92BFFF] shadow-[0_8px_18px_rgba(14,99,216,0.22)]"
+            />
+          </div>
+
+          {/* Left 2 items: Home, Stats */}
+          {mobileNavItems.slice(0, 2).map((item, index) => {
             const active = isActive(item.href, item.exact);
             return (
-              <div key={item.href} className="relative z-10 flex h-full flex-1">
+              <div key={item.href} className="relative z-10 flex h-[60px] flex-1 items-center justify-center">
                 <Link
                   href={item.href}
-                  ref={(el) => {
-                    mobileNavRefs.current[index] = el;
-                  }}
-                  className={`flex w-full flex-col items-center justify-center gap-0.5 rounded-[999px] px-3 text-[13px] font-semibold leading-none transition-colors ${
+                  ref={(el) => { mobileNavRefs.current[index] = el; }}
+                  className={`flex w-full flex-col items-center justify-center gap-0.5 rounded-[999px] px-2 text-[11px] font-semibold leading-none transition-colors ${
                     active ? 'text-[#234C8F]' : 'text-[#8B8B8B]'
                   }`}
                 >
@@ -298,6 +359,63 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
               </div>
             );
           })}
+
+          {/* Center: Special Quizzes FAB-style circle button */}
+          {(() => {
+            const active = isActive(quizzesNavItem.href);
+            return (
+              <div className="relative z-20 flex flex-col items-center" style={{ marginBottom: '10px' }}>
+                <Link
+                  href={quizzesNavItem.href}
+                  className="flex flex-col items-center gap-1"
+                >
+                  <div
+                    className={`flex h-[64px] w-[64px] flex-col items-center justify-center gap-1 rounded-full shadow-lg transition-all ${
+                      active
+                        ? 'bg-gradient-to-br from-[#0460A9] to-[#92BFFF] shadow-[0_10px_28px_rgba(4,96,169,0.45)] scale-105'
+                        : 'bg-gradient-to-br from-[#0460A9] to-[#55A0FF] shadow-[0_8px_22px_rgba(4,96,169,0.32)] hover:scale-105'
+                    }`}
+                  >
+                    {/* Inner decorative ring */}
+                    <div className="absolute h-[64px] w-[64px] rounded-full border-2 border-white/25" />
+                    <svg
+                      className="h-5 w-5 text-[#ffffff]"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d={quizzesNavItem.icon} />
+                    </svg>
+                    <span className="text-[10px] font-bold leading-none text-[#ffffff]" style={{ textShadow: '0 1px 2px rgba(4,96,169,0.6)' }}>
+                      {t(quizzesNavItem.label)}
+                    </span>
+                  </div>
+                </Link>
+              </div>
+            );
+          })()}
+
+          {/* Right 2 items: History, Profile */}
+          {mobileNavItems.slice(2).map((item, index) => {
+            const realIndex = index + 2;
+            const active = isActive(item.href, item.exact);
+            return (
+              <div key={item.href} className="relative z-10 flex h-[60px] flex-1 items-center justify-center">
+                <Link
+                  href={item.href}
+                  ref={(el) => { mobileNavRefs.current[realIndex] = el; }}
+                  className={`flex w-full flex-col items-center justify-center gap-0.5 rounded-[999px] px-2 text-[11px] font-semibold leading-none transition-colors ${
+                    active ? 'text-[#234C8F]' : 'text-[#8B8B8B]'
+                  }`}
+                >
+                  <Icon path={item.icon} active={active} />
+                  <span>{t(item.label)}</span>
+                </Link>
+              </div>
+            );
+          })}
+
         </div>
       </nav>
       </>

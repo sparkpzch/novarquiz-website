@@ -4,17 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import {
-  createTeamRoom,
   resolveJoinToken,
-  trackUserSession,
   watchUserSessions,
   type UserSessionEntry,
 } from "@/lib/firebase/rtdb";
 import { useToast } from "@/components/ui/Toast";
 import { useTranslation } from "react-i18next";
 import "@/lib/i18n";
-import { motion, AnimatePresence } from "motion/react";
-import type { Quiz } from "@/lib/types";
+import { motion } from "motion/react";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
 
 type ParsedJoinInput =
@@ -218,126 +215,6 @@ function JoinByCodeCard() {
   );
 }
 
-function SoloOrPartyModal({
-  session,
-  onClose,
-}: {
-  session: Quiz;
-  onClose: () => void;
-}) {
-  const router = useRouter();
-  const { user } = useAuth();
-  const { showToast } = useToast();
-  const [creatingParty, setCreatingParty] = useState(false);
-
-  const handleSolo = () => {
-    onClose();
-    router.push(`/play/${session.id}`);
-  };
-
-  const handleParty = async () => {
-    if (!user) {
-      showToast("Please sign in to host a party room", "error");
-      return;
-    }
-    setCreatingParty(true);
-    try {
-      const { roomId } = await createTeamRoom(session.id, {
-        uid: user.uid,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
-      });
-      await trackUserSession(user.uid, {
-        sessionId: session.id,
-        sessionName: session.name,
-        mode: "team",
-        roomId,
-        joinedAt: Date.now(),
-      });
-      onClose();
-      router.push(`/play/${session.id}/team/${roomId}`);
-    } catch (error) {
-      console.error("createTeamRoom failed:", error);
-      showToast(
-        `Could not create party room: ${(error as Error).message || "unknown error"}`,
-        "error",
-      );
-      setCreatingParty(false);
-    }
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-[#08122A]/45 p-4 backdrop-blur-md md:items-center"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ opacity: 0, y: 24, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 24, scale: 0.98 }}
-        transition={{ type: "spring", stiffness: 220, damping: 22 }}
-        className="nq-card w-full max-w-xl rounded-[34px] p-6 md:p-7"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#5D7EA1]">
-            Choose Play Mode
-          </p>
-          <h2 className="mt-2 text-2xl font-bold text-[#16324F]">
-            {session.name}
-          </h2>
-          {session.description && (
-            <p className="mt-2 text-sm text-[#5D7EA1]">{session.description}</p>
-          )}
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <button
-            onClick={handleSolo}
-            className="rounded-[28px] border border-[#0460A9]/12 bg-white px-5 py-6 text-left shadow-[0_18px_42px_rgba(17,87,145,0.1)] transition hover:-translate-y-1"
-          >
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[20px] bg-gradient-to-br from-[#92BFFF] to-[#0460A9] text-2xl text-white">
-              🚀
-            </div>
-            <p className="text-lg font-bold text-[#16324F]">SOLO</p>
-            <p className="mt-2 text-sm text-[#5D7EA1]">
-              Jump straight into the quiz and start answering immediately.
-            </p>
-          </button>
-
-          <button
-            onClick={handleParty}
-            disabled={creatingParty}
-            className="nq-card-dark rounded-[28px] px-5 py-6 text-left text-white transition hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[20px] bg-white/12 text-2xl">
-              {creatingParty ? (
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              ) : (
-                "🎉"
-              )}
-            </div>
-            <p className="text-lg font-bold text-white">PARTY</p>
-            <p className="mt-2 text-sm text-[#B8C7EA]">
-              Open a waiting lobby, invite friends, then start together as the
-              host.
-            </p>
-          </button>
-        </div>
-
-        <button
-          onClick={onClose}
-          className="mt-5 w-full rounded-2xl border border-[#0460A9]/12 bg-white/60 px-4 py-3 text-sm font-semibold text-[#16324F] transition hover:bg-white"
-        >
-          Cancel
-        </button>
-      </motion.div>
-    </motion.div>
-  );
-}
 
 type UserStats = {
   total_played: number;
@@ -350,20 +227,7 @@ export default function DashboardPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedSession, setSelectedSession] = useState<any | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
-
-  useEffect(() => {
-    fetch("/api/sessions")
-      .then((response) => (response.ok ? response.json() : []))
-      .then((data) => {
-        setSessions(data.filter((s: any) => s.is_private === false && (s.status === 'opened' || s.status === 'started')));
-      })
-      .catch(() => { })
-      .finally(() => setLoading(false));
-  }, []);
 
   useEffect(() => {
     if (!user || user.isAnonymous) return;
@@ -462,95 +326,6 @@ export default function DashboardPage() {
 
       <JoinByCodeCard />
 
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-2xl font-semibold text-[#16324F]">
-            Available Quiz
-          </h2>
-        </div>
-
-        {loading ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {[1, 2, 3].map((key) => (
-              <div
-                key={key}
-                className="nq-card-soft animate-pulse rounded-[30px] p-7"
-              >
-                <div className="mb-4 h-5 w-3/4 rounded-full bg-[#70A2F9]/18" />
-                <div className="mb-2 h-3 w-full rounded-full bg-[#70A2F9]/18" />
-                <div className="h-3 w-2/3 rounded-full bg-[#70A2F9]/18" />
-              </div>
-            ))}
-          </div>
-        ) : sessions.length === 0 ? (
-          <div className="nq-card rounded-[32px] p-10 text-center">
-            <p className="text-lg font-semibold text-[#16324F]">
-              🎯 No available games right now
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {sessions.map((session, index) => (
-              <motion.button
-                key={session.id}
-                initial={{ opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.04 }}
-                onClick={() => router.push(`/join/${session.pin_code || session.id}`)}
-                className="group nq-card-soft flex min-h-[228px] flex-col overflow-hidden rounded-[28px] p-0 text-left transition hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(17,87,145,0.18)]"
-              >
-                {session.cover_image_url && (
-                  <div className="h-40 overflow-hidden">
-                    <img
-                      src={session.cover_image_url}
-                      alt={session.name}
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                    />
-                  </div>
-                )}
-                <div className="flex flex-1 flex-col p-5">
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <h3 className="line-clamp-2 flex-1 text-[1.75rem] font-bold leading-tight text-[#16324F]">
-                      {session.name}
-                    </h3>
-                    <span className="shrink-0 whitespace-nowrap rounded-full bg-[#0460A9]/10 px-3 py-1.5 text-sm font-bold text-[#0460A9]">
-                      {session.question_count} Q
-                    </span>
-                  </div>
-                  {session.description && (
-                    <p className="line-clamp-3 text-sm leading-relaxed text-[#5D7EA1]">
-                      {session.description}
-                    </p>
-                  )}
-                  <div className="mt-auto flex items-end justify-between gap-3 pt-4">
-                    {session.pin_code && (
-                      <div className="rounded-full bg-white/75 px-3 py-2 text-xs text-[#5D7EA1]">
-                        PIN: {session.pin_code}
-                      </div>
-                    )}
-                    <div className="ml-auto flex items-center gap-2 text-sm font-semibold text-[#0460A9]">
-                      <span>Join Lobby</span>
-                      <svg
-                        className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 12h14m-6-6 6 6-6 6"
-                        />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </motion.button>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 }
