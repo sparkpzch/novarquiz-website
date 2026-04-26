@@ -130,6 +130,7 @@ export function LeftInspector({
   const [savedFlash, setSavedFlash] = useState(false);
   const [panelWidth, setPanelWidth] = useState(340);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [imgLoadError, setImgLoadError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const handleFileUpload = (file: File) => {
     if (!file || !selectedNode) return;
@@ -146,7 +147,7 @@ export function LeftInspector({
 
   const handleRemoveMedia = async () => {
     if (!draft || !selectedNode) return;
-
+    setImgLoadError(false);
     const next = { ...draft, media_type: null, media_url: null, media_path: null } as NodeData;
     setDraft(next);
     onChange(selectedNode.id, next);
@@ -179,6 +180,7 @@ export function LeftInspector({
     if (selectedNode) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setDraft(structuredClone(selectedNode.data));
+      setImgLoadError(false);
     } else {
       setDraft(null);
     }
@@ -236,6 +238,24 @@ export function LeftInspector({
 
       {/* Scrollable body */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+
+        {/* ── Node Name ── */}
+        <div style={{ marginBottom: 12 }}>
+          <FieldLabel hint="Shown on canvas">Node Name</FieldLabel>
+          <input
+            type="text"
+            value={draft.node_name ?? ''}
+            onChange={e => patch({ node_name: e.target.value || null })}
+            placeholder="Untitled"
+            style={{
+              width: '100%', padding: '6px 10px', borderRadius: 6, marginTop: 4,
+              border: '1px solid rgba(112,162,249,0.24)', background: 'rgba(255,255,255,0.55)',
+              color: '#223a63', fontSize: 12, outline: 'none', boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        <Divider />
 
         {/* ── Media ── */}
         <div 
@@ -296,10 +316,31 @@ export function LeftInspector({
                   Drop to replace
                 </div>
               )}
-              {draft.media_type === 'image' ? (
-                <img src={draft.media_url} alt="Media preview" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+              {draft.media_type !== 'video' ? (
+                imgLoadError ? (
+                  <div style={{
+                    width: '100%', height: 120, borderRadius: 8, marginTop: 4,
+                    background: 'rgba(112,162,249,0.06)', border: '1px dashed rgba(112,162,249,0.3)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    gap: 4, color: '#6b7280', fontSize: 11,
+                  }}>
+                    <span style={{ fontSize: 22 }}>🖼</span>
+                    <span>Cannot load preview</span>
+                    <span style={{ fontSize: 9, color: '#94a3b8', maxWidth: '80%', textAlign: 'center', wordBreak: 'break-all' }}>
+                      {draft.media_url}
+                    </span>
+                  </div>
+                ) : (
+                  <img
+                    src={draft.media_url ?? ''}
+                    alt=""
+                    onError={() => setImgLoadError(true)}
+                    onLoad={() => setImgLoadError(false)}
+                    style={{ width: '100%', borderRadius: 8, objectFit: 'cover', border: '1px solid rgba(112,162,249,0.18)', display: 'block', minHeight: 80, background: 'rgba(112,162,249,0.04)' }}
+                  />
+                )
               ) : (
-                <video src={draft.media_url} controls style={{ width: '100%', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }} />
+                <video src={draft.media_url ?? ''} controls style={{ width: '100%', borderRadius: 8, border: '1px solid rgba(112,162,249,0.18)' }} />
               )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button

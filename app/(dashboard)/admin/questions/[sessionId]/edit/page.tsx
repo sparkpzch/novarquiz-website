@@ -45,6 +45,7 @@ function toFlowNodes(questions: Question[]): AppNode[] {
   return questions.map((q) => {
     const t = nodeTypeFor(q);
     const common = {
+      node_name: q.node_name ?? null,
       question_text: q.question_text,
       media_type: q.media_type,
       media_url: q.media_url,
@@ -98,6 +99,7 @@ export default function EditQuestionPage({
 
   const [sessionName, setSessionName] = useState("");
   const [description, setDescription] = useState("");
+  const [quizId, setQuizId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(true);
 
@@ -125,6 +127,7 @@ export default function EditQuestionPage({
           if (session) {
             setSessionName(session.name);
             setDescription(session.description ?? "");
+            setQuizId(session.id);
           }
           setNodes(toFlowNodes(graph.questions ?? []));
           setEdges(toFlowEdges(graph.connections ?? []));
@@ -185,6 +188,7 @@ export default function EditQuestionPage({
           session_id: sessionId,
           question_order: i,
           question_text: d.question_text,
+          node_name: d.node_name ?? null,
           media_type: d.media_type,
           media_url: d.media_url,
           media_path: d.media_path,
@@ -318,6 +322,7 @@ export default function EditQuestionPage({
               onSave={handleSave}
               saving={saving}
               sessionId={sessionId}
+              quizId={quizId ?? undefined}
             />
           </ReactFlowProvider>
         )}

@@ -141,14 +141,14 @@ function QuestionVisual({
         <div className="relative overflow-hidden rounded-[28px] shadow-[0_18px_36px_rgba(17,87,145,0.12)]">
           {question.media_type === 'video' ? (
             <video
-              src={question.media_url}
+              src={question.media_url ?? ''}
               controls
               className="h-[200px] w-full object-cover md:h-[260px]"
             />
           ) : (
             <img
-              src={question.media_url}
-              alt="Question media"
+              src={question.media_url ?? ''}
+              alt=""
               className="h-[200px] w-full object-cover md:h-[260px]"
             />
           )}
@@ -687,9 +687,9 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
 
       try {
         const response = await fetch(`/api/play/${sessionId}/leaderboard`);
-        if (response.ok) setLeaderboard(await response.json());
+        setLeaderboard(response.ok ? await response.json() : []);
       } catch {
-        // keep null
+        setLeaderboard([]);
       }
     })();
   }, [finished, score, sessionId, user]);

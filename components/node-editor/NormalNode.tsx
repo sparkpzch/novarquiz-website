@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { Handle, Position, useNodeConnections, useReactFlow, type NodeProps } from '@xyflow/react';
 
 export type NormalNodeData = {
+  node_name: string | null;
   question_text: string;
   // score_impact: signed integer for utility scoring (positive = healthy, negative = risk/danger).
   // explanation: narrative/medical feedback shown after the player picks this choice.
@@ -35,7 +36,6 @@ const QUESTION_NODE_SURFACE_GLOW = 'rgba(112,162,249,0.18)';
 const H_HEADER = 36;
 const H_TEXT = 52;
 const H_CHOICE = 32;
-const H_MEDIA = 80; // height of media thumbnail when present
 
 export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as NormalNodeData;
@@ -52,8 +52,7 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
   );
   const allChoicesConnected = ['A', 'B', 'C', 'D'].every(l => connectedChoices.has(l));
 
-  // Top of choice area depends on whether media row is present
-  const choiceAreaTop = H_HEADER + H_TEXT + (d.media_url ? H_MEDIA : 0);
+  const choiceAreaTop = H_HEADER + H_TEXT;
 
   const choiceHandleStyle = (color: string, idx: number): React.CSSProperties => ({
     top: choiceAreaTop + idx * H_CHOICE + H_CHOICE / 2,
@@ -148,11 +147,17 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
         padding: '0 10px',
         gap: 6,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 11 }}>❓</span>
-          <span style={{ color: '#dbeafe', fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            Question
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 11, flexShrink: 0 }}>❓</span>
+          <span style={{
+            color: '#1e40af', fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {d.node_name || 'Question'}
           </span>
+          {d.media_url && (
+            <span style={{ fontSize: 9, flexShrink: 0 }}>{d.media_type === 'video' ? '🎬' : '🖼'}</span>
+          )}
           {d.is_entry_point && (
             <span style={{
               background: 'rgba(16,185,129,0.18)',
@@ -163,6 +168,7 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
               fontSize: 9,
               fontWeight: 700,
               letterSpacing: '0.05em',
+              flexShrink: 0,
             }}>START</span>
           )}
         </div>
@@ -184,20 +190,6 @@ export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
       }}>
         {d.question_text || 'Double-click to edit…'}
       </div>
-
-      {/* Media thumbnail */}
-      {d.media_url && (
-        <div style={{ height: H_MEDIA, overflow: 'hidden', borderBottom: '1px solid rgba(112,162,249,0.12)', position: 'relative', background: 'rgba(247,251,255,0.96)' }}>
-          {d.media_type === 'video' ? (
-            <video src={d.media_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
-          ) : (
-            <img src={d.media_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          )}
-          <span style={{ position: 'absolute', bottom: 3, right: 5, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
-            {d.media_type === 'video' ? '🎬' : '🖼'}
-          </span>
-        </div>
-      )}
 
       {/* Choice rows */}
       {choices.map((c, idx) => {
