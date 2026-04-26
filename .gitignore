@@ -44,11 +44,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-novartis-decisionlab-firebase-adminsdk-fbsvc-5a3233811b.json
 AGENTS.md
 CLAUDE.md
-novartis-decisionlab-firebase-adminsdk-fbsvc-55b7f9c2ef.json
-novartis-decisionlab-firebase-adminsdk-fbsvc-eecc9d3081.json
 
 # scripts folder and its contents
 /scripts
+
+# Firebase json
+novartis-decisionlab-firebase-adminsdk-fbsvc-449068ab1a.json

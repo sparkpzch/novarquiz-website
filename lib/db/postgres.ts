@@ -1,6 +1,14 @@
 import { setDefaultResultOrder } from 'dns';
 import { Pool as PgPool, type QueryResult, type QueryResultRow } from 'pg';
+import { Pool as NeonPool, neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
 import { getDatabaseConnectionOptions, getDatabaseProvider } from './config';
+
+neonConfig.webSocketConstructor = ws;
+// Pipeline the 3 startup round-trips into 1, cutting connection overhead ~60%.
+neonConfig.pipelineConnect = 'password';
+// Reuse WebSocket connections across requests in the same process.
+neonConfig.fetchConnectionCache = true;
 
 setDefaultResultOrder('ipv4first');
 
@@ -52,7 +60,7 @@ const RETRYABLE_DB_ERROR_CODES = new Set([
 const READ_ONLY_QUERY_RE = /^\s*SELECT\b/i;
 const MAX_QUERY_RETRIES = 2;
 const RETRY_DELAY_MS = 250;
-const POOL_IDLE_TIMEOUT_MS = 10_000;
+const POOL_IDLE_TIMEOUT_MS = 30_000;
 
 export type QueryRetryOptions = {
   allowWriteRetry?: boolean;
@@ -62,9 +70,19 @@ function createPool(): IDbPool {
   const opts = getDatabaseConnectionOptions();
   const provider = getDatabaseProvider();
 
+  if (provider === 'neon') {
+    const pool = new NeonPool({
+      connectionString: opts.connectionString,
+      max: 3,
+      idleTimeoutMillis: POOL_IDLE_TIMEOUT_MS,
+    });
+    pool.on('error', (err: Error) => console.error('Postgres pool error:', err));
+    return pool as unknown as IDbPool;
+  }
+
   const pool = new PgPool({
     connectionString: opts.connectionString,
-    ssl: provider === 'docker' ? false : opts.ssl,
+    ssl: false,
     keepAlive: true,
     connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: POOL_IDLE_TIMEOUT_MS,
