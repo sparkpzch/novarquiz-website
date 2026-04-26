@@ -7,6 +7,8 @@ import type { SessionRoom } from "@/lib/firebase/rtdb";
 import { SESSION_STATUS, ROOM_STATUS } from "@/lib/constants/session";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { openLobby, closeLobby, reopenLobby, startRoom, removeRoom } from "@/lib/firebase/rtdb";
+import { motion, AnimatePresence } from "motion/react";
+import InvitationModal from "@/components/InvitationModal";
 
 interface QuizzesManagerProps {
   allData: Quiz[];
@@ -57,6 +59,7 @@ export default function QuizzesManager({
     type: "quiz",
     action: "delete"
   });
+  const [qrModal, setQrModal] = useState<{ isOpen: boolean; sessionId: string; sessionName: string; joinToken: string | null; slug: string | null } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingIds, setLoadingIds] = useState<Record<string, boolean>>({});
 
@@ -96,21 +99,21 @@ export default function QuizzesManager({
         if (!user) return;
 
         await reopenLobby(sessionId, user.uid);
-        await openLobby(sessionId);
+        const token = await openLobby(sessionId);
 
         if (!isPrivate) {
           await startRoom(sessionId);
           await fetch(`/api/sessions/${sessionId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: SESSION_STATUS.STARTED }),
+            body: JSON.stringify({ status: SESSION_STATUS.STARTED, pin: token }),
           });
           showToast(`Session started!`, "success");
         } else {
           await fetch(`/api/sessions/${sessionId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: SESSION_STATUS.OPENED, pin: null }),
+            body: JSON.stringify({ status: SESSION_STATUS.OPENED, pin: token }),
           });
           showToast("Lobby opened! Share the invite link.", "success");
         }
@@ -219,15 +222,15 @@ export default function QuizzesManager({
                       <div className="flex flex-col">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="text-lg font-bold text-white leading-tight">{s.name || s.quiz_name || "Unknown Session"}</h3>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase shrink-0 ${s.is_private ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"}`}>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase shrink-0 ${s.is_private ? "bg-blue-500/20 text-blue-400 border border-blue-500/30" : "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"}`}>
                             {s.is_private ? "Private" : "Public"}
                           </span>
                           {isJoinOpen ? (
                             <span className={`flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border animate-pulse ${effectiveStatus === SESSION_STATUS.OPENED
-                                ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                                : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                                : "bg-amber-500/20 text-amber-400 border-amber-500/30"
                               }`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${effectiveStatus === SESSION_STATUS.OPENED ? "bg-blue-400" : "bg-emerald-400"}`} />
+                              <span className={`w-1.5 h-1.5 rounded-full ${effectiveStatus === SESSION_STATUS.OPENED ? "bg-emerald-400" : "bg-amber-400"}`} />
                               {effectiveStatus === SESSION_STATUS.OPENED ? "Opened" : "Started"}
                             </span>
                           ) : (
@@ -265,13 +268,42 @@ export default function QuizzesManager({
                       <Button
                         variant={isJoinOpen && effectiveStatus !== 'started' ? "primary" : "secondary"}
                         size="sm"
-                        disabled={loadingIds[s.id] || (isJoinOpen && effectiveStatus === 'started')}
-                        onClick={() => isJoinOpen
-                          ? router.push(`/admin/questions/${s.slug || s.id}/lobby`)
-                          : handleToggleJoin(s.id, s.is_private)
-                        }
+                        disabled={loadingIds[s.id]}
+                        onClick={async () => {
+                          if (isJoinOpen) {
+                            if (effectiveStatus === 'started') {
+                              let token = room?.joinToken || s.pin_code;
+                              
+                              if (!token) {
+                                try {
+                                  token = await openLobby(s.id);
+                                  // Sync to DB for future use
+                                  fetch(`/api/sessions/${s.id}`, {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ pin: token }),
+                                  });
+                                } catch (err) {
+                                  console.error("Failed to regenerate token:", err);
+                                }
+                              }
+
+                              setQrModal({
+                                isOpen: true,
+                                sessionId: s.id,
+                                sessionName: s.name || s.quiz_name || "Session",
+                                joinToken: token || null,
+                                slug: s.slug || null
+                              });
+                            } else {
+                              router.push(`/admin/questions/${s.slug || s.id}/lobby`);
+                            }
+                          } else {
+                            handleToggleJoin(s.id, s.is_private);
+                          }
+                        }}
                       >
-                        {loadingIds[s.id] ? "Loading..." : (isJoinOpen ? (effectiveStatus === SESSION_STATUS.OPENED ? "Manage Lobby" : "In Progress") : (s.is_private ? "Open Lobby" : "Start Session"))}
+                        {loadingIds[s.id] ? "Loading..." : (isJoinOpen ? (effectiveStatus === SESSION_STATUS.OPENED ? "Manage Lobby" : "Invitation") : (s.is_private ? "Open Lobby" : "Start Session"))}
                       </Button>
                     )}
                     {isJoinOpen && (
@@ -425,7 +457,7 @@ export default function QuizzesManager({
               <div className="flex flex-col gap-3 pt-2">
                 <Button
                   variant="primary"
-                  className="w-full justify-center bg-amber-500 hover:bg-amber-600 border-amber-500"
+                  className="w-full justify-center bg-blue-500 hover:bg-blue-600 border-blue-500 text-white!"
                   onClick={() => {
                     onCreateSession(createSessionModal.quizId!, true, createSessionModal.sessionName);
                     setCreateSessionModal({ isOpen: false, quizId: null, quizName: "", isPrivate: true, sessionName: "" });
@@ -436,7 +468,7 @@ export default function QuizzesManager({
                 </Button>
                 <Button
                   variant="primary"
-                  className="w-full justify-center bg-emerald-500 hover:bg-emerald-600 border-emerald-500"
+                  className="w-full justify-center bg-indigo-500 hover:bg-indigo-600 border-indigo-500 text-white!"
                   onClick={() => {
                     onCreateSession(createSessionModal.quizId!, false, createSessionModal.sessionName);
                     setCreateSessionModal({ isOpen: false, quizId: null, quizName: "", isPrivate: true, sessionName: "" });
@@ -497,6 +529,13 @@ export default function QuizzesManager({
           </div>
         </div>
       )}
+
+      <InvitationModal
+        isOpen={qrModal?.isOpen ?? false}
+        onClose={() => setQrModal(null)}
+        sessionName={qrModal?.sessionName ?? ""}
+        joinToken={qrModal?.joinToken ?? null}
+      />
     </div>
   );
 }

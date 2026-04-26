@@ -8,6 +8,8 @@ import { startRoom, watchRoom, endRoom, closeLobby, type PlayerScore, type Sessi
 import { trackEvent } from '@/lib/firebase/analytics';
 import { ROOM_STATUS, SESSION_STATUS } from '@/lib/constants/session';
 import { motion, AnimatePresence } from 'motion/react';
+import QRCode from 'react-qr-code';
+import InvitationModal from '@/components/InvitationModal';
 import type { Session } from '@/lib/types';
 
 function PlayerAvatar({ displayName, photoURL }: { displayName: string; photoURL: string | null }) {
@@ -93,6 +95,7 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
   const [starting, setStarting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [joinToken, setJoinToken] = useState<string | null>(null);
+  const [showQRModal, setShowQRModal] = useState(false);
 
   useEffect(() => {
     if (!loading && !isAdmin) router.push('/');
@@ -120,7 +123,16 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
     if (!session?.id) return;
     const unsubscribe = watchRoom(session.id, (nextRoom) => {
       setRoom(nextRoom);
-      setJoinToken(nextRoom?.joinToken ?? null);
+      if (nextRoom) {
+        if (nextRoom.joinToken) {
+          setJoinToken(nextRoom.joinToken);
+        } else {
+          // Missing token? Try to open lobby to generate one
+          openLobby(session.id);
+        }
+      } else {
+        setJoinToken(null);
+      }
     });
     return unsubscribe;
   }, [session?.id]);
@@ -330,10 +342,10 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-5">
         <div className="space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <div className="rounded-2xl border border-[#92BFFF]/20 bg-[#0460A9]/20 p-5">
               <p className="text-xs font-medium uppercase tracking-wider text-[#92BFFF] mb-2">PIN</p>
-              <p className="text-2xl font-mono font-bold text-white break-all">
+              <p className="text-2xl font-mono font-bold text-[#92BFFF] break-all">
                 {joinToken ?? 'Loading...'}
               </p>
               <p className="text-xs text-[#92BFFF]/60 mt-2">
@@ -353,6 +365,28 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
                 ) : (
                   <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> Copy Link</>
                 )}
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-[#92BFFF]/20 bg-[#0460A9]/20 p-5 flex flex-col items-center justify-between">
+              <div className="w-full">
+                <p className="text-xs font-medium uppercase tracking-wider text-[#92BFFF] mb-2 text-left">QR Code</p>
+              </div>
+              <div
+                onClick={() => setShowQRModal(true)}
+                className="bg-white p-2 rounded-lg cursor-pointer hover:scale-105 transition-transform"
+              >
+                {shareLink ? (
+                  <QRCode value={shareLink} size={80} level="M" />
+                ) : (
+                  <div className="w-20 h-20 bg-gray-200 animate-pulse rounded" />
+                )}
+              </div>
+              <button
+                onClick={() => setShowQRModal(true)}
+                className="text-[10px] text-[#92BFFF]/70 hover:text-[#92BFFF] mt-2 underline"
+              >
+                Click to expand
               </button>
             </div>
           </div>
@@ -456,9 +490,12 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
         </div>
       </div>
 
-      <p className="text-center text-xs text-[#92BFFF]/40">
-        Admin lobby stays live while players join and while the game is running.
-      </p>
+      <InvitationModal
+        isOpen={showQRModal}
+        onClose={() => setShowQRModal(false)}
+        sessionName={session?.name ?? "Session"}
+        joinToken={joinToken}
+      />
     </div>
   );
 }
