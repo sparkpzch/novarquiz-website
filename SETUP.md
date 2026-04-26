@@ -7,7 +7,7 @@ Follow these steps to get the Novarquiz website running locally.
 Install the required Node packages:
 
 ```bash
-yarn install
+bun install
 ```
 
 ## 2. Choose a Database Target
@@ -45,7 +45,7 @@ The canonical base schema is `db/migrations/005_somchai_refac.sql`.
 Start PostgreSQL with Docker Compose:
 
 ```bash
-yarn db:up
+bun run db:up
 ```
 
 On first startup, the Postgres container automatically bootstraps the database from `005_somchai_refac.sql`.
@@ -62,13 +62,13 @@ docker compose up -d
 Apply the provider-safe bootstrap script against Neon:
 
 ```bash
-yarn migrate:005:neon
+bun run migrate:005:neon
 ```
 
 For future forward-only SQL migrations after `005`, use:
 
 ```bash
-yarn migrate:neon
+bun run migrate:neon
 ```
 
 ## 4. Run Development Server
@@ -78,13 +78,13 @@ Use the command that matches your database target:
 ### Docker / local PostgreSQL
 
 ```bash
-yarn dev:docker
+bun run dev:docker
 ```
 
 ### Neon PostgreSQL
 
 ```bash
-yarn dev:neon
+bun run dev:neon
 ```
 
 Visit `http://localhost:3000` to view the application.
@@ -93,5 +93,5 @@ Visit `http://localhost:3000` to view the application.
 
 - Keep `.env.local` for Docker-backed local development.
 - Keep `.env.neon` for Neon.
-- Switch providers by running provider-specific commands such as `yarn dev:docker`, `yarn dev:neon`, `yarn migrate`, and `yarn migrate:neon`.
+- Switch providers by running provider-specific commands such as `bun run dev:docker`, `bun run dev:neon`, `bun run migrate`, and `bun run migrate:neon`.
 - Do not scatter provider checks in app code; use `DB_PROVIDER` and `DATABASE_URL` only.
