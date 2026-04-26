@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { duplicateQuiz } from '@/lib/db/queries';
 
-export async function POST(request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ quizId: string }> }) {
   try {
-    const { sessionId } = await params;
+    const { quizId } = await params;
     const body = await request.json();
     const { createdBy, isQuizDuplicate } = body;
 
@@ -11,8 +11,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       return NextResponse.json({ error: 'createdBy is required' }, { status: 400 });
     }
 
-    const newSession = await duplicateQuiz(sessionId, createdBy, !!isQuizDuplicate);
-    return NextResponse.json(newSession, { status: 201 });
+    const newQuiz = await duplicateQuiz(quizId, createdBy, !!isQuizDuplicate);
+    return NextResponse.json(newQuiz, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

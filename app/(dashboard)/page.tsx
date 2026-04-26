@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import {
   createTeamRoom,
-  resolveJoinToken,
   trackUserSession,
   watchUserSessions,
   type UserSessionEntry,
@@ -190,20 +189,6 @@ function JoinByCodeCard() {
       return;
     }
 
-    try {
-      const sessionId = await resolveJoinToken(parsed.token);
-      if (!sessionId) {
-        showToast(
-          "That invite link has expired. Ask the host for a new one.",
-          "error",
-        );
-        setBusy(false);
-        return;
-      }
-    } catch {
-      // let the join page re-check
-    }
-
     router.push(`/join/${parsed.token}`);
   };
 
@@ -216,7 +201,7 @@ function JoinByCodeCard() {
         <div>
           <h2 className="nq-on-dark text-xl font-semibold">Have an invite?</h2>
           <p className="nq-on-dark-muted text-sm">
-            Paste a join code or invite URL from the host.
+            Paste an invite link or PIN from the host.
           </p>
         </div>
       </div>
@@ -226,7 +211,7 @@ function JoinByCodeCard() {
           value={code}
           onChange={(event) => setCode(event.target.value)}
           onKeyDown={(event) => event.key === "Enter" && !busy && handleJoin()}
-          placeholder="Code or invite link"
+          placeholder="Invite link or PIN"
           className="nq-on-dark min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 outline-none placeholder:text-[#DDEBFF] focus:border-[#92BFFF] focus:bg-white/[0.14]"
         />
         <button
@@ -390,7 +375,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user || user.isAnonymous) return;
-    fetch(`/api/play/me/history?uid=${encodeURIComponent(user.uid)}`)
+    fetch(`/api/users/${user.uid}/history`)
       .then((response) => (response.ok ? response.json() : []))
       .then((history: Array<{ total_score: number; streak: number }>) => {
         if (!history.length) return;
@@ -564,7 +549,6 @@ export default function DashboardPage() {
                   )}
                   <div className="nq-on-dark-soft mt-6 flex flex-wrap items-center gap-4 text-sm">
                     <span>🎮 Join Lobby</span>
-                    {session.pin_code && <span>PIN: {session.pin_code}</span>}
                   </div>
                 </div>
               </motion.button>

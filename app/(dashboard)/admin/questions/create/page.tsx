@@ -52,7 +52,7 @@ export default function CreateQuestionPage() {
     setSaving(true);
     try {
       // 1. Create session
-      const sesRes = await fetch("/api/questions/sessions", {
+      const sesRes = await fetch("/api/quizzes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -93,7 +93,7 @@ export default function CreateQuestionPage() {
         }
 
         const qRes = await fetch(
-          `/api/questions/sessions/${session.id}/graph`,
+          `/api/quizzes/${session.id}/graph`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -114,7 +114,7 @@ export default function CreateQuestionPage() {
           to_question_id: idMap[e.target],
         }));
 
-      const graphRes = await fetch(`/api/questions/sessions/${session.id}/graph`, {
+      const graphRes = await fetch(`/api/quizzes/${session.id}/graph`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ connections }),

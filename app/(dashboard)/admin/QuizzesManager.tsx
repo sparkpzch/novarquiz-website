@@ -4,6 +4,7 @@ import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import type { Quiz, Session } from "@/lib/types";
 import type { SessionRoom } from "@/lib/firebase/rtdb";
+import { SESSION_STATUS, ROOM_STATUS } from "@/lib/constants/session";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { openLobby, closeLobby, reopenLobby, startRoom, removeRoom } from "@/lib/firebase/rtdb";
 
@@ -85,7 +86,7 @@ export default function QuizzesManager({
 
   const handleToggleJoin = async (sessionId: string, isPrivate: boolean) => {
     const room = rooms[sessionId];
-    const isOpen = room && (room.status === "waiting" || room.status === "started");
+    const isOpen = room && (room.status === ROOM_STATUS.WAITING || room.status === ROOM_STATUS.STARTED);
 
     setItemLoading(sessionId, true);
     try {
@@ -94,30 +95,24 @@ export default function QuizzesManager({
       } else {
         if (!user) return;
 
-        // Generate PIN for private session if it doesn't have one
-        let pin = null;
-        if (isPrivate) {
-          pin = Math.floor(100000 + Math.random() * 900000).toString();
-        }
-
         await reopenLobby(sessionId, user.uid);
-        const token = await openLobby(sessionId);
+        await openLobby(sessionId);
 
         if (!isPrivate) {
           await startRoom(sessionId);
           await fetch(`/api/sessions/${sessionId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: 'started' }),
+            body: JSON.stringify({ status: SESSION_STATUS.STARTED }),
           });
           showToast(`Session started!`, "success");
         } else {
           await fetch(`/api/sessions/${sessionId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: 'opened', pin }),
+            body: JSON.stringify({ status: SESSION_STATUS.OPENED, pin: null }),
           });
-          showToast(`Lobby opened! Join PIN: ${pin}`, "success");
+          showToast("Lobby opened! Share the invite link.", "success");
         }
         onRefresh();
       }
@@ -136,7 +131,7 @@ export default function QuizzesManager({
       await fetch(`/api/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: 'archived', pin: null }),
+        body: JSON.stringify({ status: SESSION_STATUS.ARCHIVED, pin: null }),
       });
       showToast("Session archived.", "success");
       onRefresh();
@@ -155,7 +150,7 @@ export default function QuizzesManager({
       await fetch(`/api/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: 'closed', pin: null }),
+        body: JSON.stringify({ status: SESSION_STATUS.CLOSED, pin: null }),
       });
       showToast("Session closed.", "success");
       onRefresh();
@@ -212,9 +207,9 @@ export default function QuizzesManager({
           <div className="space-y-4">
             {sessions.map(s => {
               const room = rooms[s.id];
-              const status = (room?.status || s.status || "closed") as 'waiting' | 'started' | 'ended' | 'closed' | 'opened' | 'archived';
-              const isJoinOpen = status === "waiting" || status === "started" || status === "opened";
-              const effectiveStatus = status === "waiting" ? "opened" : status;
+              const status = (room?.status || s.status || SESSION_STATUS.CLOSED);
+              const isJoinOpen = status === ROOM_STATUS.WAITING || status === ROOM_STATUS.STARTED || status === SESSION_STATUS.OPENED;
+              const effectiveStatus = status === ROOM_STATUS.WAITING ? SESSION_STATUS.OPENED : status;
               const playerCount = room?.players ? Object.keys(room.players).length : 0;
 
               return (
@@ -228,16 +223,16 @@ export default function QuizzesManager({
                             {s.is_private ? "Private" : "Public"}
                           </span>
                           {isJoinOpen ? (
-                            <span className={`flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border animate-pulse ${effectiveStatus === "opened"
+                            <span className={`flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border animate-pulse ${effectiveStatus === SESSION_STATUS.OPENED
                                 ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
                                 : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
                               }`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${effectiveStatus === "opened" ? "bg-blue-400" : "bg-emerald-400"}`} />
-                              {effectiveStatus === "opened" ? "Opened" : "Started"}
+                              <span className={`w-1.5 h-1.5 rounded-full ${effectiveStatus === SESSION_STATUS.OPENED ? "bg-blue-400" : "bg-emerald-400"}`} />
+                              {effectiveStatus === SESSION_STATUS.OPENED ? "Opened" : "Started"}
                             </span>
                           ) : (
-                            <span className={`flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border ${status === 'archived' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 'bg-gray-500/20 text-gray-400 border-gray-500/30'}`}>
-                              {status === 'archived' ? "Archived" : "Closed"}
+                            <span className={`flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border ${status === SESSION_STATUS.ARCHIVED ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 'bg-gray-500/20 text-gray-400 border-gray-500/30'}`}>
+                              {status === SESSION_STATUS.ARCHIVED ? "Archived" : "Closed"}
                             </span>
                           )}
                         </div>
@@ -254,7 +249,7 @@ export default function QuizzesManager({
                       ) : (
                         <div className="mt-4">
                           <p className="text-xs text-gray-500 italic">
-                            {status === 'archived' ? "This session is archived." : "This session is currently closed. Open it to allow players to join."}
+                            {status === SESSION_STATUS.ARCHIVED ? "This session is archived." : "This session is currently closed. Open it to allow players to join."}
                           </p>
                         </div>
                       )}
@@ -266,17 +261,17 @@ export default function QuizzesManager({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-white/5">
-                    {(isJoinOpen || status === 'closed') && (
+                    {(isJoinOpen || status === SESSION_STATUS.CLOSED) && (
                       <Button
                         variant={isJoinOpen && effectiveStatus !== 'started' ? "primary" : "secondary"}
                         size="sm"
                         disabled={loadingIds[s.id] || (isJoinOpen && effectiveStatus === 'started')}
                         onClick={() => isJoinOpen
-                          ? router.push(`/admin/questions/${s.id}/lobby`)
+                          ? router.push(`/admin/questions/${s.slug || s.id}/lobby`)
                           : handleToggleJoin(s.id, s.is_private)
                         }
                       >
-                        {loadingIds[s.id] ? "Loading..." : (isJoinOpen ? (effectiveStatus === 'opened' ? "Manage Lobby" : "In Progress") : (s.is_private ? "Open Lobby" : "Start Session"))}
+                        {loadingIds[s.id] ? "Loading..." : (isJoinOpen ? (effectiveStatus === SESSION_STATUS.OPENED ? "Manage Lobby" : "In Progress") : (s.is_private ? "Open Lobby" : "Start Session"))}
                       </Button>
                     )}
                     {isJoinOpen && (
@@ -284,7 +279,7 @@ export default function QuizzesManager({
                         {loadingIds[s.id] ? "Closing..." : "Close"}
                       </Button>
                     )}
-                    {status !== 'archived' && (
+                    {status !== SESSION_STATUS.ARCHIVED && (
                       <Button variant="ghost" size="sm" className="text-gray-400 hover:text-gray-300" disabled={loadingIds[s.id]} onClick={() => setConfirmModal({
                         isOpen: true,
                         id: s.id,
@@ -300,7 +295,7 @@ export default function QuizzesManager({
                       variant="ghost"
                       size="sm"
                       className="text-blue-400 hover:text-blue-300"
-                      onClick={() => router.push(`/admin/sessions/${s.id}/analytics`)}
+                      onClick={() => router.push(`/admin/sessions/${s.slug || s.id}/analytics`)}
                     >
                       Analytics
                     </Button>

@@ -74,7 +74,7 @@ function HistoryPageContent() {
 
   useEffect(() => {
     if (!selectedSession) return;
-    fetch(`/api/play/${selectedSession}/leaderboard`)
+    fetch(`/api/sessions/${selectedSession}/leaderboard`)
       .then((response) => (response.ok ? response.json() : []))
       .then(setEntries)
       .catch(() => setEntries([]))
@@ -83,7 +83,7 @@ function HistoryPageContent() {
 
   useEffect(() => {
     if (tab !== 'mine' || !user) return;
-    fetch(`/api/play/me/history?uid=${encodeURIComponent(user.uid)}`)
+    fetch(`/api/users/${user.uid}/history`)
       .then((response) => (response.ok ? response.json() : []))
       .then(setMine)
       .catch(() => setMine([]));

@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import pool, { queryWithRetry } from './postgres';
+import { SESSION_STATUS, SessionStatus } from '../constants/session';
 
 // ===================== Quizzes =====================
 
@@ -46,13 +47,20 @@ export async function getSessionByToken(token: string) {
   const result = await queryWithRetry(
     `SELECT s.*, 
        q.name as quiz_name, 
+       s.name as raw_session_name,
        COALESCE(s.name, q.name) as name,
-       q.description as quiz_description
+       q.description as description,
+       q.cover_image_url as cover_image_url,
+       q.share_token as share_token,
+       q.timer_seconds as timer_seconds,
+       (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count,
+       p.display_name as user_name
      FROM sessions s
      JOIN quizzes q ON s.session_id = q.id
-     WHERE s.pin_code = $1 OR s.id::text = $2
+     LEFT JOIN profiles p ON s.user_id = p.uid
+     WHERE s.id::text = $1 OR s.pin_code = $1
      LIMIT 1`,
-    [token, token]
+    [token]
   );
   return result.rows[0];
 }
@@ -150,11 +158,14 @@ export async function deleteQuiz(id: string) {
 
 export async function createSession(quizId: string, userId: string, isPrivate: boolean = true, name?: string) {
   const entry = await getEntryQuestion(quizId);
+  const quiz = await getQuizById(quizId);
+  const baseName = name || quiz?.name || 'session';
+  const slug = baseName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + randomUUID().substring(0, 4);
 
   const result = await queryWithRetry(
-    `INSERT INTO sessions (session_id, user_id, current_question_id, pin_code, is_private, name, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-    [quizId, userId, entry?.id || null, null, isPrivate, name || null, 'closed'],
+    `INSERT INTO sessions (session_id, user_id, current_question_id, pin_code, is_private, name, status, slug)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [quizId, userId, entry?.id || null, null, isPrivate, name || null, SESSION_STATUS.CLOSED, slug],
     { allowWriteRetry: true }
   );
   return result.rows[0];
@@ -595,7 +606,7 @@ export async function getOrCreateSession(quizId: string, userId: string, isPriva
 
   result = await pool.query(
     `INSERT INTO sessions (session_id, user_id, current_question_id, pin_code, is_private, name, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-    [quizId, userId, entry?.id || null, null, isPrivate, name || null, 'closed']
+    [quizId, userId, entry?.id || null, null, isPrivate, name || null, SESSION_STATUS.CLOSED]
   );
   return result.rows[0];
 }
@@ -613,9 +624,10 @@ export async function updateSession(playSessionId: string, data: Partial<{
   current_score: number;
   current_streak: number;
   finished_at: string;
-  status: 'closed' | 'opened' | 'started' | 'archived';
+  status: SessionStatus;
   pin_code: string | null;
   name: string | null;
+  slug: string;
 }>) {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -671,11 +683,18 @@ export async function getSessionById(id: string) {
   const result = await queryWithRetry(
     `SELECT s.*, 
        q.name as quiz_name, 
+       s.name as raw_session_name,
        COALESCE(s.name, q.name) as name,
-       q.description as quiz_description
+       q.description as description,
+       q.cover_image_url as cover_image_url,
+       q.share_token as share_token,
+       q.timer_seconds as timer_seconds,
+       (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count,
+       p.display_name as user_name
      FROM sessions s
      JOIN quizzes q ON s.session_id = q.id
-     WHERE s.id = $1`,
+     LEFT JOIN profiles p ON s.user_id = p.uid
+     WHERE s.id::text = $1 OR s.slug = $1`,
     [id]
   );
   return result.rows[0];

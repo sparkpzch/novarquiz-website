@@ -66,9 +66,11 @@ function TeamLobbyPageContent({
   const [copied, setCopied] = useState(false);
   const prefilledPinRef = useRef(initialPin);
   const autoJoinTriedRef = useRef(false);
+  const joinedUserIdRef = useRef<string | null>(null);
+  const shouldLeaveOnUnmountRef = useRef(true);
 
   useEffect(() => {
-    fetch(`/api/questions/sessions/${sessionId}`)
+    fetch(`/api/quizzes/${sessionId}`)
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => { if (data) setSessionName(data.name); });
   }, [sessionId]);
@@ -101,6 +103,10 @@ function TeamLobbyPageContent({
   }, [roomId, router, sessionId, user]);
 
   useEffect(() => {
+    joinedUserIdRef.current = user?.uid ?? null;
+  }, [user?.uid]);
+
+  useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
     };
@@ -110,9 +116,12 @@ function TeamLobbyPageContent({
 
   useEffect(() => {
     return () => {
-      if (user && phase === 'lobby') leaveTeamRoom(roomId, user.uid);
+      const uid = joinedUserIdRef.current;
+      if (shouldLeaveOnUnmountRef.current && uid && phase === 'lobby') {
+        leaveTeamRoom(roomId, uid);
+      }
     };
-  }, [phase, roomId, user]);
+  }, [phase, roomId]);
 
   const handleJoin = useCallback(async () => {
     if (!user || !room) return;
@@ -167,6 +176,7 @@ function TeamLobbyPageContent({
   };
 
   const handleLeave = useCallback(async () => {
+    shouldLeaveOnUnmountRef.current = false;
     if (user) {
       await leaveTeamRoom(roomId, user.uid);
       await untrackUserSession(user.uid, sessionId, roomId);

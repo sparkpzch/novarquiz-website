@@ -268,7 +268,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!user || user.isAnonymous) return;
-    fetch(`/api/play/me/history?uid=${encodeURIComponent(user.uid)}`)
+    fetch(`/api/users/${user.uid}/history`)
       .then((response) => (response.ok ? response.json() : []))
       .then((history: UserHistoryRow[]) => {
         if (!history.length) return;

@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState, useCallback } from 'react';
+import { use, useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { watchRoomStatus, watchRoomPlayers, leaveWaitingRoom, type WaitingPlayer } from '@/lib/firebase/rtdb';
@@ -38,6 +38,8 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
   const [players, setPlayers] = useState<Record<string, WaitingPlayer>>({});
   const [session, setSession] = useState<Quiz | null>(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const joinedUserIdRef = useRef<string | null>(null);
+  const shouldLeaveOnUnmountRef = useRef(true);
 
   useEffect(() => {
     fetch(`/api/sessions/${sessionId}`)
@@ -58,6 +60,10 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
   }, [sessionId]);
 
   useEffect(() => {
+    joinedUserIdRef.current = user?.uid ?? null;
+  }, [user?.uid]);
+
+  useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
     };
@@ -67,11 +73,15 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
 
   useEffect(() => {
     return () => {
-      if (user) leaveWaitingRoom(sessionId, user.uid);
+      const uid = joinedUserIdRef.current;
+      if (shouldLeaveOnUnmountRef.current && uid) {
+        leaveWaitingRoom(sessionId, uid);
+      }
     };
-  }, [sessionId, user]);
+  }, [sessionId]);
 
   const handleLeave = useCallback(async () => {
+    shouldLeaveOnUnmountRef.current = false;
     if (user) await leaveWaitingRoom(sessionId, user.uid);
     router.push('/');
   }, [router, sessionId, user]);

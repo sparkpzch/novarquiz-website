@@ -1,3 +1,5 @@
+import { SessionStatus } from '../constants/session';
+
 // ===================== Database Types =====================
 
 export interface Quiz {
@@ -97,7 +99,11 @@ export interface Session {
   pin_code: string | null;
   share_token: string | null;
   user_name?: string;
-  status: 'closed' | 'opened' | 'started' | 'archived';
+  status: SessionStatus;
+  question_count?: number;
+  cover_image_url?: string | null;
+  timer_seconds?: number | null;
+  slug?: string;
 }
 
 // ===================== Firebase / Auth Types =====================

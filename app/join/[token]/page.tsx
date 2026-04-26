@@ -7,6 +7,7 @@ import { auth } from '@/lib/firebase/config';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { joinWaitingRoom, claimLeaderIfEmpty, resolveJoinToken, trackUserSession, getRoom } from '@/lib/firebase/rtdb';
 import { trackEvent } from '@/lib/firebase/analytics';
+import { ROOM_STATUS } from '@/lib/constants/session';
 import { motion } from 'motion/react';
 
 type SessionInfo = {
@@ -57,7 +58,7 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
 
           // 1.5 Check if the session is joinable in RTDB
           const room = await getRoom(sessionIdFromRtdb);
-          if (room?.status === 'ended' || (data.is_private && room?.status === 'started')) {
+          if (!room || room.status === ROOM_STATUS.ENDED) {
             setFetchError('This invite link is no longer valid. Ask the host for a new one.');
             return;
           }
@@ -80,7 +81,7 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
           
           // Check if the session is joinable in RTDB
           const room = await getRoom(data.id);
-          if (room?.status === 'ended' || (data.is_private && room?.status === 'started')) {
+          if (!room || room.status === ROOM_STATUS.ENDED) {
             setFetchError('This invite link is no longer valid. Ask the host for a new one.');
             return;
           }
@@ -113,19 +114,30 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
         await updateProfile(user, { displayName: guestName.trim() });
       }
 
-      await joinWaitingRoom(session.id, user);
-      await claimLeaderIfEmpty(session.id, user.uid);
-      await trackUserSession(user.uid, {
-        sessionId: session.id,
-        sessionName: session.name,
-        mode: 'lobby',
-        joinedAt: Date.now(),
+      // 1. Call RESTful Join API
+      const res = await fetch(`/api/sessions/${session.id}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: user.displayName || guestName.trim() || 'Anonymous',
+          photoURL: user.photoURL,
+        }),
       });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to join session');
+      }
+
+      const joinData = await res.json();
+
+      // 2. Claim leader if empty (this remains client-side as a fast transaction)
+      await claimLeaderIfEmpty(session.id, user.uid);
+      
       trackEvent('session_join_succeeded', { session_id: session.id });
       
-      // If it's a public session and it's already started, skip lobby
-      const room = await getRoom(session.id);
-      if (!session.is_private && room?.status === 'started') {
+      // Once the room has started, late joiners go directly into gameplay.
+      if (joinData.roomStatus === ROOM_STATUS.STARTED) {
         router.push(`/play/${session.id}/question`);
       } else {
         router.push(`/play/${session.id}/lobby`);

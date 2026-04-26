@@ -109,10 +109,10 @@ export default function EditQuestionPage({
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/questions/sessions/${sessionId}`).then((r) =>
+      fetch(`/api/quizzes/${sessionId}`).then((r) =>
         r.ok ? r.json() : null,
       ),
-      fetch(`/api/questions/sessions/${sessionId}/graph`).then((r) =>
+      fetch(`/api/quizzes/${sessionId}/graph`).then((r) =>
         r.ok ? r.json() : { questions: [], connections: [] },
       ),
     ])
@@ -148,7 +148,7 @@ export default function EditQuestionPage({
     setSaving(true);
     try {
       // 1. Update session metadata
-      const sesRes = await fetch(`/api/questions/sessions/${sessionId}`, {
+      const sesRes = await fetch(`/api/quizzes/${sessionId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -161,7 +161,7 @@ export default function EditQuestionPage({
       if (!sesRes.ok) throw new Error((await sesRes.json()).error);
 
       // 2. Delete existing questions
-      const deleteGraphRes = await fetch(`/api/questions/sessions/${sessionId}/graph`, {
+      const deleteGraphRes = await fetch(`/api/quizzes/${sessionId}/graph`, {
         method: "DELETE",
       });
       if (!deleteGraphRes.ok) throw new Error(await getErrorMessage(deleteGraphRes));
@@ -191,7 +191,7 @@ export default function EditQuestionPage({
           body.choices = nd.choices;
         }
 
-        const qRes = await fetch(`/api/questions/sessions/${sessionId}/graph`, {
+        const qRes = await fetch(`/api/quizzes/${sessionId}/graph`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -210,7 +210,7 @@ export default function EditQuestionPage({
           to_question_id: idMap[e.target],
         }));
 
-      const graphRes = await fetch(`/api/questions/sessions/${sessionId}/graph`, {
+      const graphRes = await fetch(`/api/quizzes/${sessionId}/graph`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ connections }),

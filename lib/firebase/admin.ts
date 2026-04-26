@@ -38,10 +38,12 @@ function getFirebaseAdmin() {
   return admin.initializeApp({
     credential,
     storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
   });
 }
 
 export const adminApp = getFirebaseAdmin();
 export const adminAuth = admin.auth(adminApp);
 export const adminDb = admin.firestore(adminApp);
+export const adminRtdb = admin.database(adminApp);
 export const adminStorage = admin.storage(adminApp);

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getSessionByToken } from '@/lib/db/queries';
 
-// Join tokens are now resolved via Firebase RTDB (resolveJoinToken).
+// Join tokens are resolved via Firebase RTDB (resolveJoinToken).
 // The client resolves the token to a sessionId client-side, then fetches
-// the session by ID. This route provides a server-side fallback.
+// the session by ID. This route provides a server-side fallback for full tokens.
 export async function GET(
   _: Request,
   { params }: { params: Promise<{ token: string }> },

@@ -11,6 +11,7 @@ import {
   type DataSnapshot,
 } from 'firebase/database';
 import app from './config';
+import { ROOM_STATUS, RoomStatus } from '../constants/session';
 
 export const rtdb = getDatabase(app);
 
@@ -22,7 +23,7 @@ export type WaitingPlayer = {
   joinedAt: number;
 };
 
-export type RoomStatus = 'waiting' | 'started' | 'ended';
+// export type RoomStatus = 'waiting' | 'started' | 'ended'; // Moved to constants/session.ts
 
 export type SessionRoom = {
   status: RoomStatus;
@@ -53,7 +54,7 @@ export async function getRoom(sessionId: string): Promise<SessionRoom | null> {
 export async function initRoom(sessionId: string, hostId: string) {
   await runTransaction(ref(rtdb, `sessions/${sessionId}`), (current) => {
     if (current?.status === 'started' || current?.status === 'ended') return;
-    return { ...(current ?? {}), status: 'waiting', hostId };
+    return { ...(current ?? {}), status: ROOM_STATUS.WAITING, hostId };
   });
 }
 
@@ -63,22 +64,26 @@ export async function initRoom(sessionId: string, hostId: string) {
 export async function reopenLobby(sessionId: string, hostId: string): Promise<void> {
   await runTransaction(ref(rtdb, `sessions/${sessionId}`), (current) => {
     // First time: create fresh
-    if (!current) return { status: 'waiting', hostId };
+    if (!current) return { status: ROOM_STATUS.WAITING, hostId };
     // Previous game finished — start clean (drop old players, scores, leaderId, joinToken)
     if (current.status === 'started' || current.status === 'ended') {
-      return { status: 'waiting', hostId };
+      return {
+        status: ROOM_STATUS.WAITING,
+        hostId,
+        joinToken: current.joinToken ?? null,
+      };
     }
     // Live waiting room — keep players, just refresh hostId
-    return { ...current, hostId, status: 'waiting' };
+    return { ...current, hostId, status: ROOM_STATUS.WAITING };
   });
 }
 
 export async function startRoom(sessionId: string) {
-  await set(ref(rtdb, `sessions/${sessionId}/status`), 'started');
+  await set(ref(rtdb, `sessions/${sessionId}/status`), ROOM_STATUS.STARTED);
 }
 
 export async function endRoom(sessionId: string) {
-  await set(ref(rtdb, `sessions/${sessionId}/status`), 'ended');
+  await set(ref(rtdb, `sessions/${sessionId}/status`), ROOM_STATUS.ENDED);
 }
 
 // ─── Player operations ────────────────────────────────────────────────────────
@@ -341,7 +346,7 @@ export async function createTeamRoom(
     sessionId,
     hostId: host.uid,
     pin,
-    status: 'waiting',
+    status: ROOM_STATUS.WAITING,
     players: {
       [host.uid]: {
         displayName: host.displayName || 'Anonymous',
@@ -361,7 +366,7 @@ export async function joinTeamRoom(
 ): Promise<boolean> {
   const snap = await get(ref(rtdb, `teamRooms/${roomId}`));
   const room = snap.val() as TeamRoom | null;
-  if (!room || room.pin !== pin || room.status !== 'waiting') return false;
+  if (!room || room.pin !== pin || room.status !== ROOM_STATUS.WAITING) return false;
   const playerRef = ref(rtdb, `teamRooms/${roomId}/players/${user.uid}`);
   onDisconnect(playerRef).remove();
   await set(playerRef, {
@@ -377,7 +382,7 @@ export async function leaveTeamRoom(roomId: string, uid: string) {
 }
 
 export async function startTeamRoom(roomId: string) {
-  await set(ref(rtdb, `teamRooms/${roomId}/status`), 'started');
+  await set(ref(rtdb, `teamRooms/${roomId}/status`), ROOM_STATUS.STARTED);
 }
 
 export function watchTeamRoom(

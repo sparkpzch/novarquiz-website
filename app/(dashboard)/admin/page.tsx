@@ -161,7 +161,7 @@ function AdminDashboardContent() {
 
   const fetchData = () => {
     Promise.all([
-      fetch("/api/questions/sessions?all=true").then((r) => (r.ok ? r.json() : [])),
+      fetch("/api/quizzes?all=true").then((r) => (r.ok ? r.json() : [])),
       fetch("/api/sessions").then((r) => (r.ok ? r.json() : []))
     ])
       .then(([quizzes, sessionsData]) => {
@@ -207,7 +207,7 @@ function AdminDashboardContent() {
   const sessions = allData;
 
   const handleDeleteQuiz = async (id: string) => {
-    await fetch(`/api/questions/sessions/${id}`, { method: "DELETE" });
+    await fetch(`/api/quizzes/${id}`, { method: "DELETE" });
     setAllData((prev) => prev.filter((s) => s.id !== id));
   };
 
@@ -220,7 +220,7 @@ function AdminDashboardContent() {
     if (!user) return;
     setLoadingData(true);
     try {
-      const res = await fetch(`/api/questions/sessions/${id}/duplicate`, {
+      const res = await fetch(`/api/quizzes/${id}/duplicate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ createdBy: user.uid, isQuizDuplicate }),
@@ -258,7 +258,7 @@ function AdminDashboardContent() {
 
   const handleToggleStatus = async (id: string, currentStatus: boolean) => {
     try {
-      const res = await fetch(`/api/questions/sessions/${id}`, {
+      const res = await fetch(`/api/quizzes/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_published: !currentStatus }),
