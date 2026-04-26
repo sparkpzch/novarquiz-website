@@ -1,30 +1,13 @@
 import { NextResponse } from "next/server";
-import {
-  getAllQuizzes,
-  getPublishedQuizzes,
-  createQuiz,
-} from "@/lib/db/queries";
+import { getAllQuizzes } from "@/lib/db/queries";
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const quizzes =
-      searchParams.get("all") === "true"
-        ? await getAllQuizzes()
-        : await getPublishedQuizzes();
-    return NextResponse.json(quizzes);
+    const quizzes = await getAllQuizzes();
+    const published = quizzes.filter((q: any) => q.is_published === true);
+    return NextResponse.json(published);
   } catch (error) {
     console.error("Failed to load quizzes:", error);
     return NextResponse.json([], { status: 500 });
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const quiz = await createQuiz(body);
-    return NextResponse.json(quiz, { status: 201 });
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
