@@ -394,7 +394,7 @@ export default function QuizzesManager({
                     variant="secondary"
                     size="sm"
                     disabled={loadingIds[q.id]}
-                    onClick={() => router.push(`/admin/questions/${q.id}/edit`)}
+                    onClick={() => router.push(`/admin/questions/${q.slug || q.id}/edit`)}
                   >
                     Edit
                   </Button>

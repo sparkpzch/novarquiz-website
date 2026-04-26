@@ -48,6 +48,10 @@ export interface LeftInspectorProps {
   onConnectionChange: (choiceLabel: string, toQuestionId: string | null) => void;
   /** The session ID for uploading media to Firebase Storage */
   sessionId: string;
+  /** Triggered when a file is picked in the inspector */
+  onUpload: (file: File) => void;
+  /** External upload status (from parent) */
+  uploadStatus: { uploading: boolean; progress: number } | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -119,59 +123,36 @@ export function LeftInspector({
   connections,
   onConnectionChange,
   sessionId,
+  onUpload,
+  uploadStatus,
 }: LeftInspectorProps) {
   const [draft, setDraft] = useState<NodeData | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const [panelWidth, setPanelWidth] = useState(340);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const handleFileUpload = (file: File) => {
     if (!file || !selectedNode) return;
-    const targetNodeId = selectedNode.id;
-    const isVideo = file.type.startsWith('video/');
-    const isImage = file.type.startsWith('image/');
-    if (!isVideo && !isImage) return;
+    onUpload(file);
+  };
 
-    const mediaType = isVideo ? 'video' : 'image';
-    const ext = file.name.split('.').pop();
-    const path = `question-sessions/${sessionId}/${selectedNode.id}_${Date.now()}.${ext}`;
-    const storageRef = ref(storage, path);
-
-    setUploading(true);
-    setUploadProgress(0);
-
-    const task = uploadBytesResumable(storageRef, file);
-    task.on(
-      'state_changed',
-      snap => setUploadProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-      () => setUploading(false),
-      async () => {
-        const url = await getDownloadURL(task.snapshot.ref);
-        let nextDraft: NodeData | null = null;
-        setDraft(d => {
-          if (!d) return d;
-          nextDraft = { ...d, media_type: mediaType, media_url: url } as NodeData;
-          return nextDraft;
-        });
-        if (nextDraft) onChange(targetNodeId, nextDraft);
-        setUploading(false);
-      },
-    );
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+    if (!selectedNode) return;
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileUpload(file);
   };
 
   const handleRemoveMedia = async () => {
     if (!draft || !selectedNode) return;
-    const url = draft.media_url;
 
-    const next = { ...draft, media_type: null, media_url: null } as NodeData;
+    const next = { ...draft, media_type: null, media_url: null, media_path: null } as NodeData;
     setDraft(next);
     onChange(selectedNode.id, next);
 
-    if (url?.includes('firebasestorage')) {
-      try { await deleteObject(ref(storage, url)); } catch { /* ignore if already deleted */ }
-    }
+    // Direct deletion from client is removed to support reference counting.
+    // The backend will delete the file if its usage count drops to zero during Save.
   };
 
   const startResizing = useCallback((e: React.MouseEvent) => {
@@ -257,7 +238,12 @@ export function LeftInspector({
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
 
         {/* ── Media ── */}
-        <div style={{ marginBottom: 12 }}>
+        <div 
+          style={{ marginBottom: 12, position: 'relative' }}
+          onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
+          onDragLeave={() => setIsDraggingOver(false)}
+          onDrop={handleDrop}
+        >
           <FieldLabel hint="Optional">Media</FieldLabel>
           <input
             ref={fileInputRef}
@@ -267,32 +253,49 @@ export function LeftInspector({
             onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ''; }}
           />
 
-          {!draft.media_url && !uploading && (
+          {!draft.media_url && !uploadStatus?.uploading && (
             <button
               onClick={() => fileInputRef.current?.click()}
               style={{
                 width: '100%', padding: '24px 0', borderRadius: 8, marginTop: 6,
-                border: '1px dashed rgba(112,162,249,0.24)', background: 'rgba(255,255,255,0.55)',
-                color: '#35527e', fontSize: 11, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s'
+                border: isDraggingOver ? '2px dashed #4f82e8' : '1px dashed rgba(112,162,249,0.24)', 
+                background: isDraggingOver ? 'rgba(79,130,232,0.08)' : 'rgba(255,255,255,0.55)',
+                color: '#35527e', fontSize: 11, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s',
+                transform: isDraggingOver ? 'scale(1.02)' : 'none',
               }}
             >
-              + Upload Image or Video
+              {isDraggingOver ? 'Drop to upload!' : '+ Upload Image or Video'}
             </button>
           )}
 
-          {uploading && (
+          {uploadStatus?.uploading && (
             <div style={{ padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(112,162,249,0.18)', marginTop: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#35527e', marginBottom: 6, fontWeight: 600 }}>
-                <span>Uploading…</span><span>{uploadProgress}%</span>
+                <span>Uploading…</span><span>{uploadStatus.progress}%</span>
               </div>
               <div style={{ height: 4, background: 'rgba(112,162,249,0.12)', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${uploadProgress}%`, background: '#4f82e8', transition: 'width 0.2s' }} />
+                <div style={{ height: '100%', width: `${uploadStatus.progress}%`, background: '#4f82e8', transition: 'width 0.2s' }} />
               </div>
             </div>
           )}
 
-          {draft.media_url && !uploading && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
+          {draft.media_url && !uploadStatus?.uploading && (
+            <div style={{ 
+              display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6,
+              opacity: isDraggingOver ? 0.6 : 1,
+              transform: isDraggingOver ? 'scale(0.98)' : 'none',
+              transition: 'all 0.2s',
+            }}>
+              {isDraggingOver && (
+                <div style={{
+                  position: 'absolute', inset: 0, zIndex: 10, 
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(79,130,232,0.12)', borderRadius: 8,
+                  fontWeight: 700, color: '#4f82e8', fontSize: 12
+                }}>
+                  Drop to replace
+                </div>
+              )}
               {draft.media_type === 'image' ? (
                 <img src={draft.media_url} alt="Media preview" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
               ) : (

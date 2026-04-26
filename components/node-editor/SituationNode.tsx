@@ -7,6 +7,7 @@ export type SituationNodeData = {
   question_text: string;
   media_type: string | null;
   media_url: string | null;
+  media_path: string | null;
   is_entry_point: boolean;
 };
 
@@ -15,52 +16,20 @@ const H_HEADER = 36;
 export const SituationNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as SituationNodeData;
   const { updateNodeData } = useReactFlow();
-  const [dragOver, setDragOver] = useState(false);
-
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    const form = new FormData();
-    form.append('file', file);
-    try {
-      const res = await fetch('/api/upload', { method: 'POST', body: form });
-      if (!res.ok) return;
-      const { url } = await res.json();
-      updateNodeData(id, { media_type: file.type.startsWith('video/') ? 'video' : 'image', media_url: url });
-    } catch { /* non-fatal */ }
-  }, [id, updateNodeData]);
 
   const totalH = H_HEADER + 52 + (d.media_url ? 80 : 0) + 28;
 
   return (
     <div
-      onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={handleDrop}
       style={{
         width: 220,
         borderRadius: 12,
-        border: `2px solid ${dragOver ? '#8b5cf6' : selected ? '#8b5cf6' : 'rgba(139,92,246,0.3)'}`,
-        boxShadow: dragOver
-          ? '0 0 0 4px rgba(139,92,246,0.4), 0 8px 32px rgba(0,0,0,0.6)'
-          : selected
+        border: `2px solid ${selected ? '#8b5cf6' : 'rgba(139,92,246,0.3)'}`,
+        boxShadow: selected
             ? '0 0 0 3px rgba(139,92,246,0.25), 0 8px 32px rgba(0,0,0,0.6)'
             : '0 4px 24px rgba(0,0,0,0.5)',
         position: 'relative',
       }}>
-      {dragOver && (
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 20, borderRadius: 10,
-          background: 'rgba(139,92,246,0.18)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none',
-        }}>
-          <span style={{ color: '#c4b5fd', fontSize: 11, fontWeight: 700 }}>Drop media here</span>
-        </div>
-      )}
 
       {/* Target handle */}
       <Handle

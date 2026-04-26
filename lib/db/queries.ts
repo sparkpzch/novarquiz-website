@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import pool, { queryWithRetry } from './postgres';
 import { SESSION_STATUS, SessionStatus } from '../constants/session';
+import { incrementMediaUsage, decrementMediaUsage } from './media';
 
 // ===================== Quizzes =====================
 
@@ -78,10 +79,16 @@ export async function getPublishedQuizzes() {
 
 export async function getQuizById(sessionId: string) {
   const result = await queryWithRetry(
-    'SELECT * FROM quizzes WHERE id = $1',
+    'SELECT * FROM quizzes WHERE id::text = $1 OR slug = $1',
     [sessionId]
   );
   return result.rows[0] || null;
+}
+
+export async function resolveQuizId(idOrSlug: string): Promise<string> {
+  const quiz = await getQuizById(idOrSlug);
+  if (!quiz) throw new Error('Quiz not found');
+  return quiz.id;
 }
 
 function generatePinCode() {
@@ -89,71 +96,140 @@ function generatePinCode() {
 }
 
 // Removed: getSessionByShareToken — share tokens now live in Firebase RTDB (joinTokens/{token})
-
 export async function createQuiz(data: {
   id?: string;
   name: string;
   description?: string;
   cover_image_url?: string;
+  cover_image_path?: string;
   timer_seconds?: number;
-  is_published?: boolean;
   created_by: string;
+  is_published?: boolean;
 }) {
-  const quizId = data.id ?? randomUUID();
-  const result = await queryWithRetry(
-    `INSERT INTO quizzes (id, name, description, cover_image_url, timer_seconds, created_by, is_published)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT (id) DO UPDATE SET
-       name = EXCLUDED.name,
-       description = EXCLUDED.description,
-       cover_image_url = EXCLUDED.cover_image_url,
-       timer_seconds = EXCLUDED.timer_seconds,
-       is_published = EXCLUDED.is_published,
-       updated_at = NOW()
-     RETURNING *`,
-    [
-      quizId,
-      data.name,
-      data.description || null,
-      data.cover_image_url || null,
-      data.timer_seconds ?? null,
-      data.created_by,
-      data.is_published ?? false,
-    ],
-    { allowWriteRetry: true }
-  );
-  return result.rows[0];
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const quizId = data.id ?? randomUUID();
+    const baseSlug = data.name.toLowerCase().trim().replace(/[^\u0E00-\u0E7Fa-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const slug = baseSlug || 'quiz';
+
+    const result = await client.query(
+      `INSERT INTO quizzes (id, name, description, cover_image_url, cover_image_path, timer_seconds, created_by, is_published, slug)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (id) DO UPDATE SET
+         name = EXCLUDED.name,
+         slug = EXCLUDED.slug,
+         description = EXCLUDED.description,
+         cover_image_url = EXCLUDED.cover_image_url,
+         cover_image_path = EXCLUDED.cover_image_path,
+         timer_seconds = EXCLUDED.timer_seconds,
+         is_published = EXCLUDED.is_published,
+         updated_at = NOW()
+       RETURNING *`,
+      [quizId, data.name, data.description || null, data.cover_image_url || null, data.cover_image_path || null, data.timer_seconds ?? null, data.created_by, data.is_published ?? false, slug]
+    );
+
+    if (data.cover_image_path) {
+      await incrementMediaUsage(client, data.cover_image_path);
+    }
+
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function updateQuiz(sessionId: string, data: Partial<{
   name: string;
   description: string;
   cover_image_url: string;
+  cover_image_path: string;
   timer_seconds: number;
   is_published: boolean;
 }>) {
-  const fields: string[] = [];
-  const values: unknown[] = [];
-  let paramIdx = 1;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const realId = await resolveQuizId(sessionId);
+    
+    // Get old path
+    const { rows: oldRows } = await client.query('SELECT cover_image_path FROM quizzes WHERE id = $1', [realId]);
+    const oldPath = oldRows[0]?.cover_image_path;
 
-  for (const [key, value] of Object.entries(data)) {
-    fields.push(`${key} = $${paramIdx}`);
-    values.push(value);
-    paramIdx++;
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    let paramIdx = 1;
+
+    for (const [key, value] of Object.entries(data)) {
+      fields.push(`${key} = $${paramIdx}`);
+      values.push(value);
+      paramIdx++;
+    }
+
+    if (data.name) {
+    const baseSlug = data.name.toLowerCase().trim().replace(/[^\u0E00-\u0E7Fa-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const slug = baseSlug || 'quiz';
+      fields.push(`slug = $${paramIdx}`);
+      values.push(slug);
+      paramIdx++;
+    }
+
+    fields.push(`updated_at = NOW()`);
+    values.push(realId);
+
+    const result = await client.query(
+      `UPDATE quizzes SET ${fields.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
+      values
+    );
+
+    // Sync media usage
+    if (data.cover_image_path !== undefined && data.cover_image_path !== oldPath) {
+      if (oldPath) await decrementMediaUsage(client, oldPath);
+      if (data.cover_image_path) await incrementMediaUsage(client, data.cover_image_path);
+    }
+
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
-  fields.push(`updated_at = NOW()`);
-  values.push(sessionId);
-
-  const result = await queryWithRetry(
-    `UPDATE quizzes SET ${fields.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
-    values,
-    { allowWriteRetry: true }
-  );
-  return result.rows[0];
 }
 
-export async function deleteQuiz(id: string) {
-  await pool.query('DELETE FROM quizzes WHERE id = $1', [id]);
+export async function deleteQuiz(idOrSlug: string) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const id = await resolveQuizId(idOrSlug);
+    
+    // 1. Get all media paths for questions in this quiz
+    const { rows: mediaRows } = await client.query('SELECT media_path FROM questions WHERE session_id = $1', [id]);
+    const { rows: quizRows } = await client.query('SELECT cover_image_path FROM quizzes WHERE id = $1', [id]);
+    
+    // 2. Delete quiz (will cascade delete questions in DB if set, but let's be explicit if needed)
+    // Actually, we need to decrement counts BEFORE we lose the references in the DB
+    for (const row of mediaRows) {
+      if (row.media_path) await decrementMediaUsage(client, row.media_path);
+    }
+    if (quizRows[0]?.cover_image_path) {
+      await decrementMediaUsage(client, quizRows[0].cover_image_path);
+    }
+
+    await client.query('DELETE FROM quizzes WHERE id = $1', [id]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function createSession(quizId: string, userId: string, isPrivate: boolean = true, name?: string) {
@@ -175,10 +251,11 @@ export async function deleteSession(id: string) {
   await pool.query('DELETE FROM sessions WHERE id = $1', [id]);
 }
 
-export async function duplicateQuiz(sourceId: string, createdBy: string, isQuizDuplicate: boolean) {
+export async function duplicateQuiz(sourceIdOrSlug: string, createdBy: string, isQuizDuplicate: boolean) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const sourceId = await resolveQuizId(sourceIdOrSlug);
 
     // 1. Get original session
     const { rows: qsRows } = await client.query('SELECT * FROM quizzes WHERE id = $1', [sourceId]);
@@ -190,11 +267,14 @@ export async function duplicateQuiz(sourceId: string, createdBy: string, isQuizD
 
     // 2. Duplicate quizzes record
     const { rows: newQsRows } = await client.query(
-      `INSERT INTO quizzes (name, description, cover_image_url, timer_seconds, created_by, is_published)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [newName, orig.description, orig.cover_image_url, orig.timer_seconds, createdBy, false]
+      `INSERT INTO quizzes (name, description, cover_image_url, cover_image_path, timer_seconds, created_by, is_published)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [newName, orig.description, orig.cover_image_url, orig.cover_image_path, orig.timer_seconds, createdBy, false]
     );
     const newSession = newQsRows[0];
+    if (orig.cover_image_path) {
+      await incrementMediaUsage(client, orig.cover_image_path);
+    }
 
     // 3. Get all questions
     const { rows: qRows } = await client.query('SELECT * FROM questions WHERE session_id = $1', [sourceId]);
@@ -202,10 +282,13 @@ export async function duplicateQuiz(sourceId: string, createdBy: string, isQuizD
 
     for (const q of qRows) {
       const { rows: newQRows } = await client.query(
-        `INSERT INTO questions (session_id, question_order, question_text, media_type, media_url, timer_override, is_entry_point, node_x, node_y, node_type)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-        [newSession.id, q.question_order, q.question_text, q.media_type, q.media_url, q.timer_override, q.is_entry_point, q.node_x, q.node_y, q.node_type]
+        `INSERT INTO questions (session_id, question_order, question_text, media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+        [newSession.id, q.question_order, q.question_text, q.media_type, q.media_url, q.media_path, q.timer_override, q.is_entry_point, q.node_x, q.node_y, q.node_type]
       );
+      if (q.media_path) {
+        await incrementMediaUsage(client, q.media_path);
+      }
       const newQId = newQRows[0].id;
       questionIdMap[q.id] = newQId;
 
@@ -268,8 +351,9 @@ export async function getQuestionsByQuiz(sessionId: string) {
     `SELECT q.*, 
       json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
      FROM questions q
+     JOIN quizzes qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
-     WHERE q.session_id = $1
+     WHERE qs.id::text = $1 OR qs.slug = $1
      GROUP BY q.id
      ORDER BY q.question_order`,
     [sessionId]
@@ -310,74 +394,141 @@ export async function createQuestion(data: {
   session_id: string;
   question_order: number;
   question_text: string;
-  media_type?: string;
+  media_type?: 'image' | 'video';
   media_url?: string;
+  media_path?: string;
   timer_override?: number;
   is_entry_point?: boolean;
   node_x?: number;
   node_y?: number;
   node_type?: string;
 }) {
-  const questionId = data.id ?? randomUUID();
-  const result = await queryWithRetry(
-    `INSERT INTO questions (id, session_id, question_order, question_text, media_type, media_url, timer_override, is_entry_point, node_x, node_y, node_type)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-     ON CONFLICT (id) DO UPDATE SET
-       session_id = EXCLUDED.session_id,
-       question_order = EXCLUDED.question_order,
-       question_text = EXCLUDED.question_text,
-       media_type = EXCLUDED.media_type,
-       media_url = EXCLUDED.media_url,
-       timer_override = EXCLUDED.timer_override,
-       is_entry_point = EXCLUDED.is_entry_point,
-       node_x = EXCLUDED.node_x,
-       node_y = EXCLUDED.node_y,
-       node_type = EXCLUDED.node_type,
-       updated_at = NOW()
-     RETURNING *`,
-    [questionId, data.session_id, data.question_order, data.question_text, data.media_type || null, data.media_url || null, data.timer_override || null, data.is_entry_point || false, data.node_x || 0, data.node_y || 0, data.node_type || 'normal'],
-    { allowWriteRetry: true }
-  );
-  return result.rows[0];
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const questionId = data.id ?? randomUUID();
+    const result = await client.query(
+      `INSERT INTO questions (id, session_id, question_order, question_text, media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       ON CONFLICT (id) DO UPDATE SET
+         session_id = EXCLUDED.session_id,
+         question_order = EXCLUDED.question_order,
+         question_text = EXCLUDED.question_text,
+         media_type = EXCLUDED.media_type,
+         media_url = EXCLUDED.media_url,
+         media_path = EXCLUDED.media_path,
+         timer_override = EXCLUDED.timer_override,
+         is_entry_point = EXCLUDED.is_entry_point,
+         node_x = EXCLUDED.node_x,
+         node_y = EXCLUDED.node_y,
+         node_type = EXCLUDED.node_type,
+         updated_at = NOW()
+       RETURNING *`,
+      [questionId, data.session_id, data.question_order, data.question_text, data.media_type || null, data.media_url || null, data.media_path || null, data.timer_override || null, data.is_entry_point || false, data.node_x || 0, data.node_y || 0, data.node_type || 'normal']
+    );
+    
+    if (data.media_path) {
+      await incrementMediaUsage(client, data.media_path);
+    }
+
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function updateQuestion(questionId: string, data: Partial<{
   question_text: string;
   media_type: string;
   media_url: string;
+  media_path: string;
   timer_override: number;
   is_entry_point: boolean;
   node_x: number;
   node_y: number;
   question_order: number;
 }>) {
-  const fields: string[] = [];
-  const values: unknown[] = [];
-  let paramIdx = 1;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // Get old data
+    const { rows: oldRows } = await client.query('SELECT media_path FROM questions WHERE id = $1', [questionId]);
+    const oldPath = oldRows[0]?.media_path;
 
-  for (const [key, value] of Object.entries(data)) {
-    fields.push(`${key} = $${paramIdx}`);
-    values.push(value);
-    paramIdx++;
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    let paramIdx = 1;
+
+    for (const [key, value] of Object.entries(data)) {
+      fields.push(`${key} = $${paramIdx}`);
+      values.push(value);
+      paramIdx++;
+    }
+    fields.push(`updated_at = NOW()`);
+    values.push(questionId);
+
+    const result = await client.query(
+      `UPDATE questions SET ${fields.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
+      values
+    );
+
+    // Sync media usage
+    if (data.media_path !== undefined && data.media_path !== oldPath) {
+      if (oldPath) await decrementMediaUsage(client, oldPath);
+      if (data.media_path) await incrementMediaUsage(client, data.media_path);
+    }
+
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
-  fields.push(`updated_at = NOW()`);
-  values.push(questionId);
-
-  const result = await pool.query(
-    `UPDATE questions SET ${fields.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
-    values
-  );
-  return result.rows[0];
 }
 
 export async function deleteQuestion(questionId: string) {
-  await pool.query('DELETE FROM questions WHERE id = $1', [questionId]);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query('SELECT media_path FROM questions WHERE id = $1', [questionId]);
+    if (rows[0]?.media_path) {
+      await decrementMediaUsage(client, rows[0].media_path);
+    }
+    await client.query('DELETE FROM questions WHERE id = $1', [questionId]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function deleteQuestionsByQuiz(sessionId: string) {
-  await queryWithRetry('DELETE FROM questions WHERE session_id = $1', [sessionId], {
-    allowWriteRetry: true,
-  });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query('SELECT media_path FROM questions WHERE session_id = $1', [sessionId]);
+    for (const row of rows) {
+      if (row.media_path) {
+        await decrementMediaUsage(client, row.media_path);
+      }
+    }
+    await client.query('DELETE FROM questions WHERE session_id = $1', [sessionId]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // ===================== Choices =====================
@@ -419,7 +570,9 @@ export async function upsertChoices(questionId: string, choices: Array<{
 
 export async function getConnectionsByQuiz(sessionId: string) {
   const result = await queryWithRetry(
-    'SELECT * FROM question_connections WHERE session_id = $1',
+    `SELECT qc.* FROM question_connections qc
+     JOIN quizzes qs ON qs.id = qc.session_id
+     WHERE qs.id::text = $1 OR qs.slug = $1`,
     [sessionId]
   );
   return result.rows;

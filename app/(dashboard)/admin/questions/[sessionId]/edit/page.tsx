@@ -48,6 +48,7 @@ function toFlowNodes(questions: Question[]): AppNode[] {
       question_text: q.question_text,
       media_type: q.media_type,
       media_url: q.media_url,
+      media_path: q.media_path,
       is_entry_point: q.is_entry_point,
     };
     const data: AppNodeData =
@@ -158,7 +159,13 @@ export default function EditQuestionPage({
           is_published: true,
         }),
       });
-      if (!sesRes.ok) throw new Error((await sesRes.json()).error);
+      const sesData = await sesRes.json();
+      if (!sesRes.ok) throw new Error(sesData.error);
+      
+      // Update URL if slug changed
+      if (sesData.slug && sesData.slug !== sessionId) {
+        router.replace(`/admin/questions/${sesData.slug}/edit`);
+      }
 
       // 2. Delete existing questions
       const deleteGraphRes = await fetch(`/api/quizzes/${sessionId}/graph`, {
@@ -180,6 +187,7 @@ export default function EditQuestionPage({
           question_text: d.question_text,
           media_type: d.media_type,
           media_url: d.media_url,
+          media_path: d.media_path,
           is_entry_point: d.is_entry_point,
           node_x: Math.round(node.position.x),
           node_y: Math.round(node.position.y),
@@ -218,7 +226,7 @@ export default function EditQuestionPage({
       if (!graphRes.ok) throw new Error(await getErrorMessage(graphRes));
 
       showToast("Quiz saved!", "success");
-      router.push("/admin?tab=quizzes-manager");
+      // router.push("/admin?tab=quizzes-manager"); // Removed as per user request
     } catch (err) {
       showToast(`Save failed: ${(err as Error).message}`, "error");
     } finally {

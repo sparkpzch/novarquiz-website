@@ -7,11 +7,13 @@ export interface Quiz {
   name: string;
   description: string | null;
   cover_image_url: string | null;
+  cover_image_path: string | null;
   timer_seconds: number | null;
   is_published: boolean;
   created_by: string;
   created_at: string;
   updated_at: string;
+  slug: string | null;
   question_count?: number;
   play_count?: number;
   avg_score?: number;
@@ -25,6 +27,7 @@ export interface Question {
   question_text: string;
   media_type: 'image' | 'video' | null;
   media_url: string | null;
+  media_path: string | null;
   timer_override: number | null;
   session_timer_seconds: number | null;
   is_entry_point: boolean;

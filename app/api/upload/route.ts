@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     await fileRef.makePublic();
 
     const url = `https://storage.googleapis.com/${bucket.name}/${dest}`;
-    return NextResponse.json({ url });
+    return NextResponse.json({ url, path: dest });
   } catch (err) {
     console.error('Upload failed:', err);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });

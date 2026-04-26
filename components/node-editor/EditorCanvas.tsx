@@ -24,6 +24,8 @@ import {
   type Node,
   type NodeTypes,
 } from '@xyflow/react';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { storage } from '@/lib/firebase/config';
 import type { Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -91,6 +93,7 @@ export const defaultNormalData = (): NormalNodeData => ({
   ],
   media_type: null,
   media_url: null,
+  media_path: null,
   is_entry_point: false,
   timer_override: null,
 });
@@ -99,6 +102,7 @@ export const defaultSituationData = (): SituationNodeData => ({
   question_text: '',
   media_type: null,
   media_url: null,
+  media_path: null,
   is_entry_point: false,
 });
 
@@ -106,6 +110,7 @@ export const defaultEndData = (): EndNodeData => ({
   question_text: '',
   media_type: null,
   media_url: null,
+  media_path: null,
   is_entry_point: false,
 });
 
@@ -130,6 +135,7 @@ export function EditorCanvas({
   const { screenToFlowPosition } = useReactFlow();
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
   const [inspectedNode, setInspectedNode] = useState<AppNode | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<{ nodeId: string; uploading: boolean; progress: number } | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   // ── Inspector helpers ──────────────────────────────────────────────────────
@@ -150,8 +156,48 @@ export function EditorCanvas({
 
   const applyInspector = useCallback((id: string, data: AppNodeData) => {
     setNodes(ns => ns.map(n => n.id === id ? { ...n, data } as AppNode : n));
-    setInspectedNode(prev => prev?.id === id ? { ...prev, data } as AppNode : prev);
+    setInspectedNode(prev => prev?.id === id ? { ...prev, data: { ...data } } as AppNode : prev);
   }, [setNodes]);
+
+  const handleFileUpload = useCallback(async (nodeId: string, file: File) => {
+    const isVideo = file.type.startsWith('video/');
+    const isImage = file.type.startsWith('image/');
+    if (!isVideo && !isImage) return;
+
+    const mediaType = isVideo ? 'video' : 'image';
+    const ext = file.name.split('.').pop();
+    const path = `question-sessions/${sessionId}/${nodeId}_${Date.now()}.${ext}`;
+    const storageRef = ref(storage, path);
+
+    setUploadStatus({ nodeId, uploading: true, progress: 0 });
+
+    const task = uploadBytesResumable(storageRef, file);
+    task.on(
+      'state_changed',
+      snap => setUploadStatus({ nodeId, uploading: true, progress: Math.round((snap.bytesTransferred / snap.totalBytes) * 100) }),
+      () => setUploadStatus(null),
+      async () => {
+        const url = await getDownloadURL(task.snapshot.ref);
+        const updateData = {
+          media_type: mediaType,
+          media_url: url,
+          media_path: path
+        };
+
+        setNodes(ns => ns.map(n => n.id === nodeId ? {
+          ...n,
+          data: { ...n.data, ...updateData }
+        } as AppNode : n));
+
+        setInspectedNode(prev => prev?.id === nodeId ? {
+          ...prev,
+          data: { ...prev.data, ...updateData }
+        } as AppNode : prev);
+
+        setUploadStatus(null);
+      },
+    );
+  }, [sessionId, setNodes]);
 
   const handleConnectionChange = useCallback((choiceLabel: string, toQuestionId: string | null) => {
     if (!inspectedNode) return;
@@ -232,6 +278,7 @@ export function EditorCanvas({
     }, es));
   }, [setEdges]);
 
+
   // ── Event handlers ─────────────────────────────────────────────────────────
 
   const onPaneCtx = useCallback((e: React.MouseEvent | MouseEvent) => {
@@ -279,6 +326,8 @@ export function EditorCanvas({
         connections={inspectorConnections(inspectedNode)}
         onConnectionChange={handleConnectionChange}
         sessionId={sessionId}
+        onUpload={(file) => inspectedNode && handleFileUpload(inspectedNode.id, file)}
+        uploadStatus={uploadStatus?.nodeId === inspectedNode?.id ? uploadStatus : null}
       />
 
       {/* ── Canvas ── */}
