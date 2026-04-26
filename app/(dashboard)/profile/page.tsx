@@ -330,10 +330,6 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-5">
-      <div className="pt-2 text-center">
-        <h1 className="text-3xl font-bold text-[#192246]">{t("profile.title")}</h1>
-      </div>
-
       <motion.section
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
@@ -350,25 +346,25 @@ export default function ProfilePage() {
               ringClassName="ring-2 ring-white/35 shadow-lg shadow-[#1E5FB0]/25"
             />
             <div className="min-w-0">
-              <p className="truncate text-[1.75rem] font-semibold leading-tight">
+              <p className="nq-on-dark truncate text-[1.75rem] font-semibold leading-tight">
                 {user?.displayName || "Player"}
               </p>
-              <p className="truncate text-base text-white/80">
+              <p className="nq-on-dark-muted truncate text-base">
                 @{user?.displayName?.toLowerCase().replace(/\s+/g, ".") || user?.email?.split("@")[0] || "player"}
               </p>
             </div>
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <div className="rounded-[18px] bg-white/14 px-4 py-3 text-center">
-              <p className="text-2xl font-bold">{userStats.bestStreak || 0}</p>
-              <p className="text-sm text-white/80">{t("dashboard.best_streak")}</p>
+            <div className="rounded-[18px] bg-white/14 px-4 py-4 text-center">
+              <p className="nq-on-dark text-3xl font-bold">{userStats.bestStreak || 0}</p>
+              <p className="nq-on-dark mt-1 text-sm font-medium">{t("dashboard.best_streak")}</p>
             </div>
-            <div className="rounded-[18px] bg-white/14 px-4 py-3 text-center">
-              <p className="text-2xl font-bold">
+            <div className="rounded-[18px] bg-white/14 px-4 py-4 text-center">
+              <p className="nq-on-dark text-3xl font-bold">
                 {(userStats.bestScore || 0).toLocaleString()}
               </p>
-              <p className="text-sm text-white/80">{t("profile.best_score")}</p>
+              <p className="nq-on-dark mt-1 text-sm font-medium">{t("profile.best_score")}</p>
             </div>
           </div>
 
