@@ -2,6 +2,7 @@
   "name": "novarquiz-website",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "bun@1.2.0",
   "scripts": {
     "dev": "dotenv -e .env.neon -- next dev",
     "dev:docker": "dotenv -e .env.local -- next dev",
@@ -31,6 +32,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-i18next": "^15.0.0",
+    "sharp": "^0.33.0",
     "ws": "^8.20.0"
   },
   "devDependencies": {
