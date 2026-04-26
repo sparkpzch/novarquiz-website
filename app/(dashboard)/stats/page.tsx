@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { motion } from "motion/react";
-import { useTranslation } from "react-i18next";
-import "@/lib/i18n";
+
 
 type HistoryEntry = {
   session_id: string;
@@ -49,7 +48,6 @@ function ScoreBar({ score, max }: { score: number; max: number }) {
 }
 
 export default function StatsPage() {
-  const { t } = useTranslation();
   const { user } = useAuth();
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +57,7 @@ export default function StatsPage() {
       setLoading(false);
       return;
     }
-    fetch(`/api/play/me/history?uid=${encodeURIComponent(user.uid)}`)
+    fetch(`/api/users/${user.uid}/history`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data: HistoryEntry[]) => setHistory(data))
       .catch(() => {})
