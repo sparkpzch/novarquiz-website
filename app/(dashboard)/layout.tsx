@@ -162,8 +162,8 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="nq-sky min-h-screen">
-      <div className="nq-content flex min-h-screen">
+    <div className="nq-sky min-h-dvh">
+      <div className="nq-content flex min-h-dvh">
         <aside className="sticky top-0 h-screen hidden w-[310px] shrink-0 p-5 xl:block">
           <div className="nq-card flex h-full flex-col rounded-[32px] p-6 shadow-2xl">
             <Link href="/" className="flex justify-center rounded-3xl px-2 py-1">
@@ -257,35 +257,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {!isProfileDetail && (
-            <header className="px-4 pb-4 pt-5 md:px-6 xl:px-8">
-              <div className="nq-card flex items-center justify-between rounded-[28px] px-4 py-3 md:px-6">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#5D7EA1]">NovarQuiz</p>
-                  <p className="text-lg font-semibold text-[#16324F]">
-                    {pathname === '/' ? 'Dashboard' : pathname.replace('/', '').replace(/-/g, ' ')}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  {isAdmin && (
-                    <span className="hidden rounded-full bg-[#70A2F9] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white md:inline-flex">
-                      Admin
-                    </span>
-                  )}
-                  <Link href="/profile" className="rounded-full">
-                    <ProfileAvatar
-                      displayName={user.displayName}
-                      photoURL={user.photoURL}
-                      size={42}
-                      ringClassName="ring-4 ring-white/80 shadow-sm shadow-[#0460A9]/15"
-                    />
-                  </Link>
-                </div>
-              </div>
-            </header>
-          )}
-
-          <main className={`${isProfileDetail ? "px-4 pb-8 pt-8 md:px-6 xl:px-8" : "nq-bottom-safe px-4 pb-8 md:px-6 xl:px-8"} flex-1`}>
+          <main className={`${isProfileDetail ? "px-4 pb-8 pt-8 md:px-6 xl:px-8" : "nq-bottom-safe px-4 pb-8 pt-5 md:px-6 xl:px-8"} flex-1`}>
             <motion.div key={pathname} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
               {children}
             </motion.div>
@@ -294,24 +266,29 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
       </div>
 
       {!isProfileDetail && (
+      <>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-30 h-[20px] bg-[linear-gradient(180deg,rgba(196,222,255,0.24)_0%,rgba(196,222,255,0.72)_100%)] backdrop-blur-md xl:hidden"
+      />
       <nav className="fixed inset-x-0 bottom-0 z-40 block px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 xl:hidden">
-        <div ref={mobileNavContainerRef} className="relative mx-auto flex h-[60px] w-[370px] max-w-full items-center rounded-[999px] border border-white/80 bg-white/96 p-2 shadow-[0_18px_40px_rgba(70,112,165,0.2)] backdrop-blur-xl">
+        <div ref={mobileNavContainerRef} className="relative mx-auto flex h-[60px] w-[370px] max-w-full items-center rounded-[999px] border border-white/50 bg-white/50 px-1.5 py-1 shadow-[0_18px_40px_rgba(70,112,165,0.2)] backdrop-blur-xl">
           <motion.span
             aria-hidden="true"
             animate={mobilePillStyle}
             transition={{ type: "spring", stiffness: 420, damping: 34 }}
-            className="absolute inset-y-1.5 left-0 rounded-[999px] border-2 border-[#BFD9FF] bg-[#BFD9FF] shadow-[0_8px_18px_rgba(14,99,216,0.2)]"
+            className="absolute inset-y-1 left-0 rounded-[999px] border-2 border-[#92BFFF] bg-[#92BFFF] shadow-[0_8px_18px_rgba(14,99,216,0.22)]"
           />
           {mobileNavItems.map((item, index) => {
             const active = isActive(item.href, item.exact);
             return (
-              <div key={item.href} className="relative z-10 flex h-full flex-1 items-center justify-center">
+              <div key={item.href} className="relative z-10 flex h-full flex-1">
                 <Link
                   href={item.href}
                   ref={(el) => {
                     mobileNavRefs.current[index] = el;
                   }}
-                  className={`inline-flex min-w-[98px] flex-col items-center justify-center gap-0.5 rounded-[999px] px-4 py-1 text-[13px] font-semibold leading-none transition-colors ${
+                  className={`flex w-full flex-col items-center justify-center gap-0.5 rounded-[999px] px-3 text-[13px] font-semibold leading-none transition-colors ${
                     active ? 'text-[#234C8F]' : 'text-[#8B8B8B]'
                   }`}
                 >
@@ -323,6 +300,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
           })}
         </div>
       </nav>
+      </>
       )}
     </div>
   );

@@ -51,27 +51,30 @@
   scrollbar-color: rgba(255,255,255,0.1) transparent;
 }
 
+html {
+  background-color: #92BFFF;
+}
+
 body {
-  background: var(--background);
+  background: transparent;
   color: var(--foreground);
 }
 
 .nq-sky {
   position: relative;
   background:
-    linear-gradient(180deg, rgba(4, 96, 169, 0.1), transparent 16%),
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.45), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(146, 191, 255, 0.35), transparent 26%),
-    linear-gradient(180deg, #8ebffc 0%, #bcdcff 40%, #d8ebff 100%);
+    linear-gradient(180deg, rgba(4, 96, 169, 0.18), transparent 20%),
+    radial-gradient(circle at bottom right, rgba(146, 191, 255, 0.22), transparent 26%),
+    linear-gradient(180deg, #70A2F9 0%, #92BFFF 50%, #c4deff 100%);
 }
 
 .nq-sky::before {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.52) 1.5px, transparent 1.5px);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.45) 1.5px, transparent 1.5px);
   background-size: 22px 22px;
-  opacity: 0.65;
+  opacity: 0.45;
   pointer-events: none;
 }
 
@@ -80,8 +83,8 @@ body {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(135deg, transparent 0 66%, rgba(255, 255, 255, 0.28) 66%, transparent 82%),
-    radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.24), transparent 20%);
+    linear-gradient(135deg, transparent 0 66%, rgba(255, 255, 255, 0.18) 66%, transparent 82%),
+    radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.16), transparent 20%);
   pointer-events: none;
 }
 
@@ -131,12 +134,12 @@ body {
 }
 
 .nq-card-blue {
-  border: 1px solid rgba(146, 191, 255, 0.16);
+  border: 1px solid rgba(146, 191, 255, 0.2);
   background:
-    linear-gradient(135deg, rgba(119, 168, 255, 0.96), rgba(84, 136, 235, 0.94)),
-    linear-gradient(90deg, rgba(5, 90, 158, 0.16), transparent 70%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.15), transparent);
-  box-shadow: 0 24px 56px rgba(17, 87, 145, 0.28);
+    linear-gradient(135deg, rgba(146, 191, 255, 0.97), rgba(4, 96, 169, 0.94)),
+    linear-gradient(90deg, rgba(5, 90, 158, 0.18), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent);
+  box-shadow: 0 24px 56px rgba(17, 87, 145, 0.3);
 }
 
 .nq-chip {

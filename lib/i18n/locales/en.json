@@ -48,6 +48,8 @@
     "privacy": "Privacy Policy",
     "delete_account": "Delete Account",
     "delete_confirm": "Are you sure? This action cannot be undone.",
+    "delete_account_description": "This permanently removes your Firebase account, profile photo, live room presence, and quiz history.",
+    "deleting_account": "Deleting Account...",
     "save": "Save Changes",
     "cancel": "Cancel",
     "best_score": "Best Score",
