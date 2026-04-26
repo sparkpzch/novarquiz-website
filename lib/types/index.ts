@@ -25,7 +25,8 @@ export interface Question {
   session_id: string;
   question_order: number;
   question_text: string;
-  media_type: 'image' | 'video' | null;
+  node_name: string | null;
+  media_type: 'image' | 'gif' | 'video' | null;
   media_url: string | null;
   media_path: string | null;
   timer_override: number | null;

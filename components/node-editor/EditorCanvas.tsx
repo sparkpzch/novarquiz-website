@@ -62,6 +62,8 @@ export interface EditorCanvasProps {
   saving: boolean;
   /** Real session UUID (edit page) or 'draft' (create page) */
   sessionId?: string;
+  /** Quiz UUID from DB — used as Firebase Storage folder to avoid slug encoding issues */
+  quizId?: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -84,6 +86,7 @@ const nodeTypes: NodeTypes = {
 // ─── Default node data factories ─────────────────────────────────────────────
 
 export const defaultNormalData = (): NormalNodeData => ({
+  node_name: null,
   question_text: '',
   choices: [
     { label: 'A', choice_text: '', score_impact: 0, explanation: '' },
@@ -99,6 +102,7 @@ export const defaultNormalData = (): NormalNodeData => ({
 });
 
 export const defaultSituationData = (): SituationNodeData => ({
+  node_name: null,
   question_text: '',
   media_type: null,
   media_url: null,
@@ -107,6 +111,7 @@ export const defaultSituationData = (): SituationNodeData => ({
 });
 
 export const defaultEndData = (): EndNodeData => ({
+  node_name: null,
   question_text: '',
   media_type: null,
   media_url: null,
@@ -131,6 +136,7 @@ export function EditorCanvas({
   onNodesChange, onEdgesChange,
   onSave, saving,
   sessionId = 'draft',
+  quizId,
 }: EditorCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
@@ -161,12 +167,15 @@ export function EditorCanvas({
 
   const handleFileUpload = useCallback(async (nodeId: string, file: File) => {
     const isVideo = file.type.startsWith('video/');
+    const isGif = file.type === 'image/gif';
     const isImage = file.type.startsWith('image/');
     if (!isVideo && !isImage) return;
 
-    const mediaType = isVideo ? 'video' : 'image';
+    const mediaType = isVideo ? 'video' : isGif ? 'gif' : 'image';
+    const folder = isVideo ? 'video' : isGif ? 'gif' : 'image';
     const ext = file.name.split('.').pop();
-    const path = `question-sessions/${sessionId}/${nodeId}_${Date.now()}.${ext}`;
+    const storageBucket = quizId ?? sessionId;
+    const path = `question-sessions/${storageBucket}/${folder}/${nodeId}_${Date.now()}.${ext}`;
     const storageRef = ref(storage, path);
 
     setUploadStatus({ nodeId, uploading: true, progress: 0 });
@@ -197,7 +206,7 @@ export function EditorCanvas({
         setUploadStatus(null);
       },
     );
-  }, [sessionId, setNodes]);
+  }, [sessionId, quizId, setNodes]);
 
   const handleConnectionChange = useCallback((choiceLabel: string, toQuestionId: string | null) => {
     if (!inspectedNode) return;

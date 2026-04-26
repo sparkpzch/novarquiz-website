@@ -397,7 +397,8 @@ export async function createQuestion(data: {
   session_id: string;
   question_order: number;
   question_text: string;
-  media_type?: 'image' | 'video';
+  node_name?: string;
+  media_type?: 'image' | 'gif' | 'video';
   media_url?: string;
   media_path?: string;
   timer_override?: number;
@@ -411,12 +412,13 @@ export async function createQuestion(data: {
     await client.query('BEGIN');
     const questionId = data.id ?? randomUUID();
     const result = await client.query(
-      `INSERT INTO questions (id, session_id, question_order, question_text, media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `INSERT INTO questions (id, session_id, question_order, question_text, node_name, media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        ON CONFLICT (id) DO UPDATE SET
          session_id = EXCLUDED.session_id,
          question_order = EXCLUDED.question_order,
          question_text = EXCLUDED.question_text,
+         node_name = EXCLUDED.node_name,
          media_type = EXCLUDED.media_type,
          media_url = EXCLUDED.media_url,
          media_path = EXCLUDED.media_path,
@@ -427,7 +429,7 @@ export async function createQuestion(data: {
          node_type = EXCLUDED.node_type,
          updated_at = NOW()
        RETURNING *`,
-      [questionId, data.session_id, data.question_order, data.question_text, data.media_type || null, data.media_url || null, data.media_path || null, data.timer_override || null, data.is_entry_point || false, data.node_x || 0, data.node_y || 0, data.node_type || 'normal']
+      [questionId, data.session_id, data.question_order, data.question_text, data.node_name || null, data.media_type || null, data.media_url || null, data.media_path || null, data.timer_override || null, data.is_entry_point || false, data.node_x || 0, data.node_y || 0, data.node_type || 'normal']
     );
     
     if (data.media_path) {
@@ -446,6 +448,7 @@ export async function createQuestion(data: {
 
 export async function updateQuestion(questionId: string, data: Partial<{
   question_text: string;
+  node_name: string;
   media_type: string;
   media_url: string;
   media_path: string;
@@ -710,9 +713,9 @@ export async function completeSession(data: {
   // showing it as in-progress.
   await pool.query(
     `UPDATE sessions
-     SET finished_at = NOW(), current_score = $3
+     SET finished_at = NOW()
      WHERE session_id = $1 AND user_id = $2 AND finished_at IS NULL`,
-    [data.session_id, data.user_id, row.total_score],
+    [data.session_id, data.user_id],
   );
 
   return { total_score: row.total_score as number, streak: best, total_time_ms: row.total_time_ms as number };

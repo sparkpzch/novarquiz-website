@@ -7,6 +7,7 @@ import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react';
 // to the player, then finish the session. Target handle only — no outgoing
 // edges. A session can have multiple end nodes (different endings).
 export type EndNodeData = {
+  node_name: string | null;
   question_text: string;
   media_type: string | null;
   media_url: string | null;
@@ -20,7 +21,7 @@ export const EndNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as EndNodeData;
   const { updateNodeData } = useReactFlow();
 
-  const totalH = H_HEADER + 52 + (d.media_url ? 80 : 0) + 28;
+  const totalH = H_HEADER + 52 + 28;
 
   return (
     <div
@@ -53,11 +54,17 @@ export const EndNode = memo(({ id, data, selected }: NodeProps) => {
         justifyContent: 'space-between',
         padding: '0 10px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 11 }}>🏁</span>
-          <span style={{ color: '#fda4af', fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            End
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 11, flexShrink: 0 }}>🏁</span>
+          <span style={{
+            color: '#9f1239', fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {d.node_name || 'End'}
           </span>
+          {d.media_url && (
+            <span style={{ fontSize: 9, flexShrink: 0 }}>{d.media_type === 'video' ? '🎬' : '🖼'}</span>
+          )}
         </div>
       </div>
 
@@ -77,20 +84,6 @@ export const EndNode = memo(({ id, data, selected }: NodeProps) => {
       }}>
         {d.question_text || 'Final message (optional)…'}
       </div>
-
-      {/* Media thumbnail */}
-      {d.media_url && (
-        <div style={{ height: 80, overflow: 'hidden', borderBottom: '1px solid rgba(255,255,255,0.06)', position: 'relative', background: '#0d0d20' }}>
-          {d.media_type === 'video' ? (
-            <video src={d.media_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
-          ) : (
-            <img src={d.media_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          )}
-          <span style={{ position: 'absolute', bottom: 3, right: 5, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
-            {d.media_type === 'video' ? '🎬' : '🖼'}
-          </span>
-        </div>
-      )}
 
       {/* Terminal badge */}
       <div style={{

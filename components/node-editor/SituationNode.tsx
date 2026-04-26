@@ -4,6 +4,7 @@ import { memo, useState, useCallback } from 'react';
 import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react';
 
 export type SituationNodeData = {
+  node_name: string | null;
   question_text: string;
   media_type: string | null;
   media_url: string | null;
@@ -17,7 +18,7 @@ export const SituationNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as SituationNodeData;
   const { updateNodeData } = useReactFlow();
 
-  const totalH = H_HEADER + 52 + (d.media_url ? 80 : 0) + 28;
+  const totalH = H_HEADER + 52 + 28;
 
   return (
     <div
@@ -58,11 +59,17 @@ export const SituationNode = memo(({ id, data, selected }: NodeProps) => {
         justifyContent: 'space-between',
         padding: '0 10px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 11 }}>🎬</span>
-          <span style={{ color: '#c4b5fd', fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            Situation
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 11, flexShrink: 0 }}>🎬</span>
+          <span style={{
+            color: '#5b21b6', fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {d.node_name || 'Situation'}
           </span>
+          {d.media_url && (
+            <span style={{ fontSize: 9, flexShrink: 0 }}>{d.media_type === 'video' ? '🎬' : '🖼'}</span>
+          )}
           {d.is_entry_point && (
             <span style={{
               background: 'rgba(16,185,129,0.18)',
@@ -72,6 +79,7 @@ export const SituationNode = memo(({ id, data, selected }: NodeProps) => {
               padding: '1px 5px',
               fontSize: 9,
               fontWeight: 700,
+              flexShrink: 0,
             }}>START</span>
           )}
         </div>
@@ -93,20 +101,6 @@ export const SituationNode = memo(({ id, data, selected }: NodeProps) => {
       }}>
         {d.question_text || 'Double-click to edit…'}
       </div>
-
-      {/* Media thumbnail */}
-      {d.media_url && (
-        <div style={{ height: 80, overflow: 'hidden', borderBottom: '1px solid rgba(255,255,255,0.06)', position: 'relative', background: '#0d0d20' }}>
-          {d.media_type === 'video' ? (
-            <video src={d.media_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
-          ) : (
-            <img src={d.media_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          )}
-          <span style={{ position: 'absolute', bottom: 3, right: 5, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
-            {d.media_type === 'video' ? '🎬' : '🖼'}
-          </span>
-        </div>
-      )}
 
       {/* Display-only badge */}
       <div style={{
