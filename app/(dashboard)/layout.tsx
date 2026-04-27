@@ -178,7 +178,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   return (
     <div className="nq-sky min-h-dvh">
       <div className="nq-content flex min-h-dvh">
-        <aside className="sticky top-0 h-screen hidden w-[310px] shrink-0 p-5 xl:block">
+        <aside className="sticky top-0 h-screen hidden w-[310px] shrink-0 p-5 lg:block">
           <div className="nq-card flex h-full flex-col rounded-[32px] p-6 shadow-2xl">
             <Link href="/" className="flex justify-center rounded-3xl px-2 py-1">
               <Image
@@ -327,7 +327,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <main className={`${isProfileDetail ? "px-4 pb-8 pt-8 md:px-6 xl:px-8" : "nq-bottom-safe px-4 pb-8 pt-5 md:px-6 xl:px-8"} flex-1`}>
+          <main className={`${isProfileDetail ? "px-4 pb-8 pt-8 md:px-6 lg:px-8" : "nq-bottom-safe px-4 pb-8 pt-5 md:px-6 lg:px-8"} flex-1`}>
             <motion.div key={pathname} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
               {children}
             </motion.div>
@@ -339,10 +339,10 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
       <>
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-30 h-[20px] bg-[linear-gradient(180deg,rgba(196,222,255,0.24)_0%,rgba(196,222,255,0.72)_100%)] backdrop-blur-md xl:hidden"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-30 h-[20px] bg-[linear-gradient(180deg,rgba(196,222,255,0.24)_0%,rgba(196,222,255,0.72)_100%)] backdrop-blur-md lg:hidden"
       />
       {/* Mobile bottom nav — 4 regular items + 1 special Quizzes center FAB */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 block px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 xl:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 block px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 lg:hidden">
         <div className="relative mx-auto flex max-w-[430px] items-end justify-around">
 
           {/* Animated pill background (for 4 regular items only) */}

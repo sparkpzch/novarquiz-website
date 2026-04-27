@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
-import { LayoutGroup, motion } from 'motion/react';
-import type { LeaderboardEntry, Quiz, Session } from '@/lib/types';
+import { motion } from 'motion/react';
+import { Card } from '@/components/ui/Card';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
+import type { LeaderboardEntry, Session } from '@/lib/types';
 
 type UserHistoryRow = {
   session_id: string;
@@ -22,8 +23,6 @@ type UserHistoryRow = {
   rank: number;
   total_players: number;
 };
-
-type Tab = 'session' | 'mine';
 
 function formatDuration(ms: number | null) {
   if (!ms || ms <= 0) return 'No timer';
@@ -48,69 +47,45 @@ function HistoryPageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const viewParam = searchParams.get('view');
-  const sessionParam = searchParams.get('session') || '';
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [selectedSession, setSelectedSession] = useState(sessionParam);
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const sessionParam = searchParams.get('session');
+
   const [mine, setMine] = useState<UserHistoryRow[] | null>(null);
-  const [loading, setLoading] = useState(Boolean(sessionParam));
-  const tab: Tab = sessionParam || viewParam === 'session' ? 'session' : 'mine';
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [sessionMeta, setSessionMeta] = useState<Session | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
+  // Fetch personal history
   useEffect(() => {
-    fetch('/api/sessions')
-      .then((response) => (response.ok ? response.json() : []))
-      .then(setSessions)
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    setSelectedSession(sessionParam);
-    setLoading(Boolean(sessionParam));
-    if (!sessionParam) {
-      setEntries([]);
-    }
-  }, [sessionParam]);
-
-  useEffect(() => {
-    if (!selectedSession) return;
-    fetch(`/api/sessions/${selectedSession}/leaderboard`)
-      .then((response) => (response.ok ? response.json() : []))
-      .then(setEntries)
-      .catch(() => setEntries([]))
-      .finally(() => setLoading(false));
-  }, [selectedSession]);
-
-  useEffect(() => {
-    if (tab !== 'mine' || !user) return;
+    if (!user) return;
     fetch(`/api/users/${user.uid}/history`)
       .then((response) => (response.ok ? response.json() : []))
       .then(setMine)
       .catch(() => setMine([]));
-  }, [tab, user]);
+  }, [user]);
 
-  const sortedEntries = [...entries].sort((a, b) => {
-    if (b.total_score !== a.total_score) return b.total_score - a.total_score;
-    if (a.total_time_ms !== b.total_time_ms) return a.total_time_ms - b.total_time_ms;
-    return a.user_display_name.localeCompare(b.user_display_name);
-  });
-  const topThree = sortedEntries.slice(0, 3);
-  const podium =
-    topThree.length === 1
-      ? [{ entry: topThree[0], rank: 1, height: 'h-40', featured: true, surface: 'from-[#055A9E] via-[#0460A9] to-[#92BFFF]' }]
-      : topThree.length === 2
-        ? [
-            { entry: topThree[0], rank: 1, height: 'h-40', featured: true, surface: 'from-[#055A9E] via-[#0460A9] to-[#92BFFF]' },
-            { entry: topThree[1], rank: 2, height: 'h-32', featured: false, surface: 'from-[#7AA7E7] to-[#C9DDF7]' },
-          ]
-        : [
-            { entry: topThree[1], rank: 2, height: 'h-32', featured: false, surface: 'from-[#7AA7E7] to-[#C9DDF7]' },
-            { entry: topThree[0], rank: 1, height: 'h-40', featured: true, surface: 'from-[#055A9E] via-[#0460A9] to-[#92BFFF]' },
-            { entry: topThree[2], rank: 3, height: 'h-28', featured: false, surface: 'from-[#A9C6F4] to-[#DDEAFB]' },
-          ];
-  const myEntry = sortedEntries.find((entry) => entry.user_id === user?.uid);
-  const myRank = sortedEntries.findIndex((entry) => entry.user_id === user?.uid) + 1;
-  const selectedSessionMeta = sessions.find((session) => session.id === selectedSession);
+  // Fetch detail if session is selected
+  useEffect(() => {
+    if (!sessionParam) {
+      setEntries([]);
+      setSessionMeta(null);
+      return;
+    }
+
+    setLoadingDetail(true);
+    // Fetch leaderboard
+    fetch(`/api/sessions/${sessionParam}/leaderboard`)
+      .then((response) => (response.ok ? response.json() : []))
+      .then((data) => {
+        setEntries([...data].sort((a, b) => b.total_score - a.total_score));
+      })
+      .catch(() => setEntries([]));
+
+    // Fetch session meta
+    fetch(`/api/sessions/${sessionParam}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then(setSessionMeta)
+      .finally(() => setLoadingDetail(false));
+  }, [sessionParam]);
 
   const totalAttempts = mine?.length ?? 0;
   const averageScore =
@@ -119,383 +94,214 @@ function HistoryPageContent() {
       : 0;
   const bestRank =
     mine && mine.length ? Math.min(...mine.map((row) => row.rank)) : 0;
-  const sessionBestScore =
-    sortedEntries.length ? Math.max(...sortedEntries.map((entry) => entry.total_score)) : 0;
 
-  const switchTab = (nextTab: Tab) => {
-    if (nextTab === 'mine') {
-      setSelectedSession('');
-      router.replace('/history');
-      return;
-    }
-    router.replace(selectedSession ? `/history?session=${selectedSession}` : '/history?view=session');
-  };
+  // Handle Detail View
+  if (sessionParam) {
+    const sortedEntries = entries;
+    const topThree = sortedEntries.slice(0, 3);
+    const podium =
+      topThree.length === 1
+        ? [{ entry: topThree[0], rank: 1, height: 'h-40', featured: true, surface: 'from-[#055A9E] via-[#0460A9] to-[#92BFFF]' }]
+        : topThree.length === 2
+          ? [
+              { entry: topThree[0], rank: 1, height: 'h-40', featured: true, surface: 'from-[#055A9E] via-[#0460A9] to-[#92BFFF]' },
+              { entry: topThree[1], rank: 2, height: 'h-32', featured: false, surface: 'from-[#7AA7E7] to-[#C9DDF7]' },
+            ]
+          : [
+              { entry: topThree[1], rank: 2, height: 'h-32', featured: false, surface: 'from-[#7AA7E7] to-[#C9DDF7]' },
+              { entry: topThree[0], rank: 1, height: 'h-40', featured: true, surface: 'from-[#055A9E] via-[#0460A9] to-[#92BFFF]' },
+              { entry: topThree[2], rank: 3, height: 'h-28', featured: false, surface: 'from-[#A9C6F4] to-[#DDEAFB]' },
+            ];
 
+    return (
+      <div className="mx-auto max-w-6xl space-y-6">
+        <button
+          onClick={() => router.push('/history')}
+          className="group flex items-center gap-2 text-sm font-bold text-white transition hover:opacity-80"
+        >
+          <svg className="h-4 w-4 transition-transform group-hover:-translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+          Back to History
+        </button>
+
+        {loadingDetail ? (
+          <div className="flex justify-center py-20">
+             <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+          </div>
+        ) : (
+          <>
+            <section className="nq-card rounded-[34px] p-6 md:p-8">
+              <div className="flex flex-col gap-5 border-b border-[#0460A9]/10 pb-6 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="nq-details font-bold text-[#5D7EA1]">Session Detail</p>
+                  <h1 className="mt-2 text-3xl font-bold text-[#16324F] font-display tracking-tight">
+                    {sessionMeta?.name || 'Leaderboard'}
+                  </h1>
+                  <p className="mt-2 max-w-2xl text-sm text-[#5D7EA1] font-medium">
+                    {sessionMeta?.description || 'Review the final rankings and podium for this quiz session.'}
+                  </p>
+                </div>
+                <div className="rounded-[24px] bg-[#EAF5FF] px-5 py-4 text-right border border-[#0460A9]/08">
+                  <p className="nq-details font-bold text-[#5D7EA1]">Final Players</p>
+                  <p className="mt-2 text-2xl font-bold text-[#0460A9] font-display">{entries.length}</p>
+                </div>
+              </div>
+
+              {entries.length > 0 && (
+                <div className="mt-8 flex items-end justify-center gap-4">
+                  {podium.map(({ entry, rank, height, surface, featured }) => (
+                    <div key={entry.user_id} className="flex w-24 flex-col items-center">
+                      <div className="mb-3 rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-[#5D7EA1]">#{rank}</div>
+                      <ProfileAvatar
+                        displayName={entry.user_display_name}
+                        photoURL={entry.user_photo_url}
+                        size={featured ? 68 : 56}
+                        ringClassName="ring-4 ring-[#DDF0FF] shadow-lg shadow-[#113D7A]/14"
+                      />
+                      <p className="mt-3 w-full truncate text-center text-xs font-bold text-[#16324F]">{entry.user_display_name}</p>
+                      <p className="mt-1 text-xs font-bold text-[#0460A9]">{entry.total_score} pts</p>
+                      <div className={`mt-4 flex w-full items-start justify-center rounded-t-[28px] bg-gradient-to-b ${surface} pt-4 text-xl font-bold ${featured ? 'text-white' : 'text-[#16324F]'} ${height}`}>
+                        {rank}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="nq-card rounded-[34px] p-4 md:p-6">
+              <h2 className="mb-4 px-2 text-xl font-bold text-[#16324F] font-display">Full Standings</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#0460A9]/10 text-[#5D7EA1]">
+                      <th className="px-4 py-3 text-left font-bold">Rank</th>
+                      <th className="px-4 py-3 text-left font-bold">Player</th>
+                      <th className="px-4 py-3 text-right font-bold">Score</th>
+                      <th className="hidden px-4 py-3 text-right font-bold sm:table-cell">Accuracy</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedEntries.map((entry, idx) => (
+                      <tr key={entry.user_id} className={`border-b border-[#0460A9]/05 ${entry.user_id === user?.uid ? 'bg-[#0460A9]/05' : 'hover:bg-white/40'}`}>
+                        <td className="px-4 py-3 font-bold text-[#5D7EA1]">#{idx + 1}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <ProfileAvatar displayName={entry.user_display_name} photoURL={entry.user_photo_url} size={32} />
+                            <span className="font-bold text-[#16324F]">{entry.user_id === user?.uid ? 'You' : entry.user_display_name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-[#0460A9]">{entry.total_score}</td>
+                        <td className="hidden px-4 py-3 text-right font-medium text-[#5D7EA1] sm:table-cell">
+                          {Math.round((entry.correct_count / (entry.correct_count + entry.incorrect_count || 1)) * 100)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Main History List
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <section className="nq-card relative overflow-hidden rounded-[34px] p-6 md:p-8">
         <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(146,191,255,0.38),transparent_65%)]" />
-        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#5D7EA1]">NovarQuiz archive</p>
-            <h1 className="mt-2 text-3xl font-bold text-[#16324F] md:text-4xl">{t('leaderboard.title')}</h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-[#5D7EA1]">
-              Track your finished attempts or open any completed session to review standings,
-              streaks, and score spread in the Angular-blue dashboard style.
+            <p className="nq-details font-bold text-[#5D7EA1]">NovarQuiz archive</p>
+            <h1 className="mt-2 text-3xl font-bold text-[#16324F] md:text-4xl font-display tracking-tight">{t('leaderboard.title')}</h1>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#5D7EA1] font-medium">
+              Track your finished attempts, review scores, placements, and streaks from all your completed quiz sessions.
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:w-[440px]">
-            <div className="rounded-[24px] bg-white/72 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5D7EA1]">
-                {tab === 'mine' ? 'Attempts' : 'Players'}
-              </p>
-              <p className="mt-2 text-2xl font-bold text-[#0460A9]">
-                {tab === 'mine' ? totalAttempts : entries.length}
-              </p>
-            </div>
-            <div className="rounded-[24px] bg-white/72 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5D7EA1]">
-                {tab === 'mine' ? 'Avg score' : 'Best score'}
-              </p>
-              <p className="mt-2 text-2xl font-bold text-[#0460A9]">
-                {tab === 'mine' ? averageScore : sessionBestScore}
-              </p>
-            </div>
-            <div className="rounded-[24px] bg-white/72 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5D7EA1]">
-                {tab === 'mine' ? 'Best rank' : 'Your place'}
-              </p>
-              <p className="mt-2 text-2xl font-bold text-[#0460A9]">
-                {tab === 'mine' ? (bestRank ? `#${bestRank}` : '--') : myEntry ? `#${myRank}` : '--'}
-              </p>
-            </div>
+            <Card.Tile
+              label="Attempts"
+              value={totalAttempts}
+            />
+            <Card.Tile
+              label="Avg score"
+              value={averageScore}
+            />
+            <Card.Tile
+              label="Best rank"
+              value={bestRank ? `#${bestRank}` : '--'}
+            />
           </div>
         </div>
       </section>
 
-      <section className="nq-card rounded-[30px] p-4 md:p-5">
-        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start lg:gap-6">
-          <LayoutGroup id="history-tabs">
-            <div className="relative inline-flex rounded-[93px] border border-[#0460A9]/12 bg-white/88 p-1.5 shadow-[0_18px_45px_rgba(17,87,145,0.12)] backdrop-blur-xl">
-              {(['mine', 'session'] as Tab[]).map((item) => {
-                const active = tab === item;
-                return (
-                  <button
-                    key={item}
-                    onClick={() => switchTab(item)}
-                    className={`relative z-10 min-w-[170px] rounded-[93px] px-6 py-3 text-sm font-semibold transition-colors ${
-                      active ? 'text-white' : 'text-[#5D7EA1]'
-                    }`}
-                  >
-                    {active && (
-                      <motion.span
-                        layoutId="history-tab-pill"
-                        className="absolute inset-0 rounded-[93px] border border-[#70A2F9]/15 bg-[#70A2F9] shadow-[0_12px_24px_rgba(17,87,145,0.24)]"
-                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                      />
-                    )}
-                    <span className={`relative z-10 ${active ? 'nq-on-dark' : ''}`}>
-                      {item === 'mine' ? 'My attempts' : 'By session'}
-                    </span>
-                  </button>
-                );
-              })}
+      <div className="space-y-4">
+          {!user ? (
+            <div className="nq-card rounded-[34px] p-10 text-center">
+              <p className="text-lg font-bold text-[#16324F] font-display">Sign in to see your attempts.</p>
+              <p className="mt-2 text-sm text-[#5D7EA1] font-medium">Finished quizzes linked to your account will appear here.</p>
             </div>
-          </LayoutGroup>
-
-          <div className="w-full lg:ml-auto lg:max-w-xl lg:min-h-[84px]">
-            {tab === 'session' ? (
-              <>
-                <label className="mb-2 block text-sm font-semibold text-[#16324F]">
-                  {t('leaderboard.select_session')}
-                </label>
-                <select
-                  value={selectedSession}
-                  onChange={(event) => {
-                    const nextSession = event.target.value;
-                    setLoading(Boolean(nextSession));
-                    setSelectedSession(nextSession);
-                    router.replace(nextSession ? `/history?session=${nextSession}` : '/history?view=session');
-                  }}
-                  className="w-full rounded-[22px] border border-[#0460A9]/12 bg-white/85 px-4 py-3 text-[#16324F] outline-none transition focus:border-[#0460A9]/40"
+          ) : mine === null ? (
+            <div className="flex justify-center py-14">
+              <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#0460A9] border-t-transparent" />
+            </div>
+          ) : mine.length === 0 ? (
+            <div className="nq-card rounded-[34px] p-10 text-center">
+              <p className="text-lg font-bold text-[#16324F] font-display">You have not finished any sessions yet.</p>
+              <p className="mt-2 text-sm text-[#5D7EA1] font-medium">Complete a quiz and this page will turn into your personal record board.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {mine.map((row, index) => (
+                <Card
+                  key={`${row.session_id}-${row.completed_at ?? index}`}
+                  onClick={() => router.push(`/history?session=${row.session_id}`)}
+                  variant="soft"
+                  className="w-full !p-5"
                 >
-                  <option value="">{t('leaderboard.select_session')}</option>
-                  {sessions.map((session: any) => (
-                    <option key={session.id} value={session.id}>
-                      {session.name || session.quiz_name} ({new Date(session.started_at).toLocaleDateString()})
-                    </option>
-                  ))}
-                </select>
-              </>
-            ) : (
-              <div
-                aria-hidden="true"
-                className="hidden h-[84px] rounded-[22px] lg:block"
-              />
-            )}
-          </div>
-        </div>
-      </section>
-
-      {tab === 'mine' ? (
-        <div className="space-y-4">
-            {!user ? (
-              <div className="nq-card rounded-[34px] p-10 text-center">
-                <p className="text-lg font-semibold text-[#16324F]">Sign in to see your attempts.</p>
-                <p className="mt-2 text-sm text-[#5D7EA1]">Finished quizzes linked to your account will appear here.</p>
-              </div>
-            ) : mine === null ? (
-              <div className="flex justify-center py-14">
-                <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#0460A9] border-t-transparent" />
-              </div>
-            ) : mine.length === 0 ? (
-              <div className="nq-card rounded-[34px] p-10 text-center">
-                <p className="text-lg font-semibold text-[#16324F]">You have not finished any sessions yet.</p>
-                <p className="mt-2 text-sm text-[#5D7EA1]">Complete a quiz and this page will turn into your personal record board.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {mine.map((row, index) => (
-                  <button
-                    key={`${row.session_id}-${row.completed_at ?? index}`}
-                    onClick={() => {
-                      setLoading(true);
-                      setSelectedSession(row.session_id);
-                      router.replace(`/history?session=${row.session_id}`);
-                    }}
-                    className="nq-card-soft w-full rounded-[30px] p-5 text-left transition hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(17,87,145,0.18)]"
-                  >
-                    <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-[#0460A9]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0460A9]">
-                            Attempt
-                          </span>
-                          <span className="text-sm font-medium text-[#5D7EA1]">{formatDate(row.completed_at)}</span>
-                        </div>
-                        <h2 className="mt-3 truncate text-xl font-bold text-[#16324F]">{row.session_name}</h2>
-                        <p className="mt-2 text-sm text-[#5D7EA1]">
-                          {row.session_description || 'Completed session overview with your score, placement, and streak.'}
-                        </p>
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-[#0460A9]/10 px-3 py-1 nq-details font-bold text-[#0460A9]">
+                          Attempt
+                        </span>
+                        <span className="text-sm font-bold text-[#5D7EA1]">{formatDate(row.completed_at)}</span>
                       </div>
+                      <h2 className="mt-3 truncate text-xl font-bold text-[#16324F] font-display">{row.session_name}</h2>
+                      <p className="mt-2 text-sm text-[#5D7EA1] font-medium line-clamp-2">
+                        {row.session_description || 'Completed session overview with your score, placement, and streak.'}
+                      </p>
+                    </div>
 
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[420px]">
-                        <div className="rounded-[24px] bg-white/82 px-4 py-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5D7EA1]">Score</p>
-                          <p className="mt-2 text-xl font-bold text-[#0460A9]">{row.total_score}</p>
-                        </div>
-                        <div className="rounded-[24px] bg-white/82 px-4 py-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5D7EA1]">Rank</p>
-                          <p className="mt-2 text-xl font-bold text-[#16324F]">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[420px]">
+                      <Card.Tile label="Score" value={row.total_score} />
+                      <Card.Tile
+                        label="Rank"
+                        value={
+                          <span className="font-display">
                             #{row.rank}
                             <span className="text-sm font-medium text-[#5D7EA1]">/{row.total_players}</span>
-                          </p>
-                        </div>
-                        <div className="rounded-[24px] bg-white/82 px-4 py-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5D7EA1]">Correct</p>
-                          <p className="mt-2 text-xl font-bold text-[#0D8C6D]">
-                            {row.correct_count}/{row.correct_count + row.incorrect_count}
-                          </p>
-                        </div>
-                        <div className="rounded-[24px] bg-white/82 px-4 py-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5D7EA1]">Streak</p>
-                          <p className="mt-2 text-xl font-bold text-[#E67E22]">{row.streak}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex items-center justify-between border-t border-[#0460A9]/10 pt-4">
-                      <p className="text-sm text-[#5D7EA1]">Completion time: {formatDuration(row.total_time_ms)}</p>
-                      <span className="text-sm font-semibold text-[#0460A9]">Open session history</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-        </div>
-      ) : (
-        <div className="space-y-6">
-            {!selectedSession ? (
-              <div className="nq-card rounded-[34px] p-10 text-center">
-                <p className="text-lg font-semibold text-[#16324F]">Select a quiz session to view history.</p>
-                <p className="mt-2 text-sm text-[#5D7EA1]">The session leaderboard, podium, and detailed rankings will appear here.</p>
-              </div>
-            ) : loading ? (
-              <div className="flex justify-center py-14">
-                <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#0460A9] border-t-transparent" />
-              </div>
-            ) : entries.length === 0 ? (
-              <div className="nq-card rounded-[34px] p-10 text-center">
-                <p className="text-lg font-semibold text-[#16324F]">No entries yet for this session.</p>
-                <p className="mt-2 text-sm text-[#5D7EA1]">When players finish the quiz, the standings will show up here.</p>
-              </div>
-            ) : (
-              <>
-                <section className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
-                  <div className="nq-card rounded-[34px] p-6 md:p-8">
-                    <div className="flex flex-col gap-5 border-b border-[#0460A9]/10 pb-5 md:flex-row md:items-end md:justify-between">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#5D7EA1]">Session leaderboard</p>
-                        <h2 className="mt-2 text-2xl font-bold text-[#16324F]">
-                          {selectedSessionMeta?.name || t('leaderboard.title')}
-                        </h2>
-                        <p className="mt-2 max-w-2xl text-sm text-[#5D7EA1]">
-                          {selectedSessionMeta?.description || 'Review the final order, score gaps, and streak performance for this completed quiz.'}
-                        </p>
-                      </div>
-                      <div className="rounded-[24px] bg-[#EAF5FF] px-4 py-3 text-right">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5D7EA1]">Players finished</p>
-                        <p className="mt-2 text-2xl font-bold text-[#0460A9]">{entries.length}</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-8 flex items-end justify-center gap-4">
-                      {podium.map(({ entry, rank, height, surface, featured }, index) => {
-                        return (
-                          <div
-                            key={entry.user_id}
-                            className="flex w-24 flex-col items-center"
-                          >
-                            <div className="mb-3 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-[#5D7EA1]">
-                              #{rank}
-                            </div>
-                            <ProfileAvatar
-                              displayName={entry.user_display_name}
-                              photoURL={entry.user_photo_url}
-                              size={featured ? 68 : 56}
-                              ringClassName="ring-4 ring-[#DDF0FF] shadow-[0_16px_28px_rgba(17,87,145,0.14)]"
-                            />
-                            <p className="mt-3 w-full truncate text-center text-xs font-bold text-[#16324F]">
-                              {entry.user_display_name}
-                            </p>
-                            <p className="mt-1 text-xs font-semibold text-[#0460A9]">{entry.total_score} pts</p>
-                            <div className={`mt-4 flex w-24 items-start justify-center rounded-t-[28px] bg-linear-to-b ${surface} pt-4 text-xl font-bold ${featured ? 'nq-on-dark' : 'text-[#16324F]'} ${height}`}>
-                              {rank}
-                            </div>
-                          </div>
-                        );
-                      })}
+                          </span>
+                        }
+                      />
+                      <Card.Tile label="Correct" value={row.correct_count} className="[&_p:last-child]:text-[#0D8C6D]" />
+                      <Card.Tile label="Streak" value={row.streak} className="[&_p:last-child]:text-[#E67E22]" />
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <section className="nq-card-blue rounded-[30px] p-5">
-                      <p className="nq-on-dark-soft text-xs font-semibold uppercase tracking-[0.22em]">Top score</p>
-                      <p className="nq-on-dark mt-3 text-3xl font-bold">{sessionBestScore}</p>
-                      <p className="nq-on-dark-muted mt-2 text-sm">
-                        Leading score in this finished session.
-                      </p>
-                    </section>
-
-                    {myEntry ? (
-                      <section className="nq-card rounded-[30px] p-5">
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#5D7EA1]">
-                          {t('leaderboard.your_result')}
-                        </p>
-                        <div className="mt-4 flex items-center gap-4">
-                          <ProfileAvatar
-                            displayName={myEntry.user_display_name}
-                            photoURL={myEntry.user_photo_url}
-                            size={56}
-                            ringClassName="ring-4 ring-white/80 shadow-md shadow-[#0460A9]/20"
-                          />
-                          <div>
-                            <p className="text-lg font-bold text-[#16324F]">#{myRank}</p>
-                            <p className="text-sm text-[#5D7EA1]">{myEntry.user_display_name}</p>
-                          </div>
-                        </div>
-                        <div className="mt-5 grid grid-cols-3 gap-3">
-                          <div className="rounded-[20px] bg-white/72 px-3 py-3 text-center">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5D7EA1]">Score</p>
-                            <p className="mt-2 text-lg font-bold text-[#0460A9]">{myEntry.total_score}</p>
-                          </div>
-                          <div className="rounded-[20px] bg-white/72 px-3 py-3 text-center">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5D7EA1]">Correct</p>
-                            <p className="mt-2 text-lg font-bold text-[#0D8C6D]">
-                              {myEntry.correct_count}/{myEntry.correct_count + myEntry.incorrect_count}
-                            </p>
-                          </div>
-                          <div className="rounded-[20px] bg-white/72 px-3 py-3 text-center">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5D7EA1]">Streak</p>
-                            <p className="mt-2 text-lg font-bold text-[#E67E22]">{myEntry.streak}</p>
-                          </div>
-                        </div>
-                      </section>
-                    ) : (
-                      <section className="nq-card-soft rounded-[30px] p-5">
-                        <p className="text-lg font-semibold text-[#16324F]">You did not appear in this session.</p>
-                        <p className="mt-2 text-sm text-[#5D7EA1]">Join the next run to compare your score with the full leaderboard here.</p>
-                      </section>
-                    )}
+                  <div className="mt-5 flex items-center justify-between border-t border-[#0460A9]/10 pt-4">
+                    <p className="text-sm text-[#5D7EA1] font-medium">Completion time: {formatDuration(row.total_time_ms)}</p>
+                    <span className="text-sm font-bold text-[#0460A9] font-display">View Standings →</span>
                   </div>
-                </section>
-
-                <section className="nq-card rounded-[34px] p-4 md:p-5">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#5D7EA1]">Full standings</p>
-                      <h3 className="mt-2 text-xl font-bold text-[#16324F]">All players</h3>
-                    </div>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-[#0460A9]/10 text-[#5D7EA1]">
-                          <th className="px-4 py-3 text-left font-semibold">{t('leaderboard.rank')}</th>
-                          <th className="px-4 py-3 text-left font-semibold">{t('leaderboard.player')}</th>
-                          <th className="px-4 py-3 text-right font-semibold">{t('leaderboard.score')}</th>
-                          <th className="hidden px-4 py-3 text-right font-semibold sm:table-cell">{t('leaderboard.correct')}</th>
-                          <th className="hidden px-4 py-3 text-right font-semibold sm:table-cell">{t('leaderboard.streak')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sortedEntries.map((entry, index) => {
-                          const isMe = entry.user_id === user?.uid;
-                          return (
-                            <tr
-                              key={entry.user_id}
-                              className={`border-b border-[#0460A9]/8 ${
-                                isMe ? 'bg-[#0460A9]/6' : 'hover:bg-white/50'
-                              }`}
-                            >
-                              <td className="px-4 py-3 font-semibold text-[#456786]">{index + 1}</td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-3">
-                                  <ProfileAvatar
-                                    displayName={entry.user_display_name}
-                                    photoURL={entry.user_photo_url}
-                                    size={40}
-                                  />
-                                  <div className="min-w-0">
-                                    <p className="truncate font-semibold text-[#16324F]">
-                                      {isMe ? 'You' : entry.user_display_name}
-                                    </p>
-                                    <p className="text-xs text-[#5D7EA1]">
-                                      {entry.correct_count + entry.incorrect_count} answered
-                                    </p>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-right font-bold text-[#0460A9]">{entry.total_score}</td>
-                              <td className="hidden px-4 py-3 text-right font-semibold text-[#0D8C6D] sm:table-cell">
-                                {entry.correct_count}/{entry.correct_count + entry.incorrect_count}
-                              </td>
-                              <td className="hidden px-4 py-3 text-right font-semibold text-[#E67E22] sm:table-cell">
-                                {entry.streak}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              </>
-            )}
-        </div>
-      )}
+                </Card>
+              ))}
+            </div>
+          )}
+      </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { motion } from "motion/react";
+import { Card } from "@/components/ui/Card";
 
 
 type HistoryEntry = {
@@ -116,39 +117,25 @@ export default function StatsPage() {
         <div className="absolute inset-y-0 right-[-36px] top-[14px] w-48 rounded-full border border-[#0460A9]/10 bg-[#70A2F9]/08" />
         <div className="absolute inset-y-0 right-[18px] top-[-20px] w-36 rounded-full border border-[#0460A9]/10 bg-[#70A2F9]/10" />
 
-        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           {/* Left: label + title + subtitle */}
           <div className="max-w-xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#5D7EA1]">
-              Your performance
-            </p>
-            <h1 className="mt-2 text-3xl font-bold text-[#16324F] md:text-4xl">
+            <p className="nq-details font-bold text-[#5D7EA1]">Your performance</p>
+            <h1 className="mt-2 text-3xl font-bold text-[#16324F] md:text-4xl font-display tracking-tight">
               Stats
             </h1>
-            <p className="mt-3 text-sm leading-6 text-[#5D7EA1]">
+            <p className="mt-3 text-sm leading-relaxed text-[#5D7EA1] font-medium">
               Track your lifetime totals, score distribution, and recent quiz activity
               across all completed sessions.
             </p>
           </div>
 
-          {/* Right: inline stat mini-cards — same style as history page */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-auto lg:min-w-[400px]">
-            {[
-              { label: "Total Played", value: totalPlayed },
-              { label: "Best Score", value: bestScore.toLocaleString() },
-              { label: "Avg Score", value: avgScore.toLocaleString() },
-              { label: "Best Streak", value: bestStreak },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className="rounded-[24px] bg-white/72 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5D7EA1]">
-                  {item.label}
-                </p>
-                <p className="mt-2 text-2xl font-bold text-[#0460A9]">{item.value}</p>
-              </div>
-            ))}
+          {/* Right: inline stat mini-cards */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-auto lg:min-w-[440px]">
+            <Card.Tile label="Total Played" value={totalPlayed} />
+            <Card.Tile label="Best Score" value={bestScore.toLocaleString()} />
+            <Card.Tile label="Avg Score" value={avgScore.toLocaleString()} />
+            <Card.Tile label="Best Streak" value={bestStreak} />
           </div>
         </div>
       </motion.section>
@@ -162,8 +149,8 @@ export default function StatsPage() {
           <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-[28px] bg-gradient-to-br from-[#92BFFF] to-[#0460A9] text-4xl shadow-lg shadow-[#0460A9]/20">
             🎯
           </div>
-          <h2 className="text-xl font-bold text-[#16324F]">No data yet</h2>
-          <p className="mt-2 text-sm text-[#5D7EA1]">
+          <h2 className="text-xl font-bold text-[#16324F] font-display">No data yet</h2>
+          <p className="mt-2 text-sm text-[#5D7EA1] font-medium">
             Play some quizzes to start seeing your stats here.
           </p>
         </motion.div>
@@ -177,26 +164,13 @@ export default function StatsPage() {
             className="nq-card rounded-[30px] p-4 md:p-5"
           >
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                { label: "Accuracy", value: `${accuracy}%`, color: "text-[#0460A9]" },
-                { label: "Correct Answers", value: totalCorrect, color: "text-[#0D8C6D]" },
-                { label: "Wrong Answers", value: totalIncorrect, color: "text-[#E67E22]" },
-                {
-                  label: "Top Rank",
-                  value: history.length ? `#${Math.min(...history.map((h) => h.rank))}` : "—",
-                  color: "text-[#0460A9]",
-                },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-[24px] bg-white/72 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
-                >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5D7EA1]">
-                    {item.label}
-                  </p>
-                  <p className={`mt-2 text-2xl font-bold ${item.color}`}>{item.value}</p>
-                </div>
-              ))}
+              <Card.Tile label="Accuracy" value={`${accuracy}%`} />
+              <Card.Tile label="Correct" value={totalCorrect} className="[&_p:last-child]:text-[#0D8C6D]" />
+              <Card.Tile label="Wrong" value={totalIncorrect} className="[&_p:last-child]:text-[#E67E22]" />
+              <Card.Tile
+                label="Top Rank"
+                value={history.length ? `#${Math.min(...history.map((h) => h.rank))}` : "—"}
+              />
             </div>
           </motion.section>
 
