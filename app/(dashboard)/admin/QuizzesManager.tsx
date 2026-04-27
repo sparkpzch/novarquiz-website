@@ -15,7 +15,6 @@ function ItemCard({
   badges,
   subtitle,
   content,
-  footerText,
   actions,
   highlighted = false,
   noBorder = false
@@ -48,7 +47,7 @@ function ItemCard({
 interface QuizzesManagerProps {
   allData: Quiz[];
   allSessions: (Session & { quiz_name?: string })[];
-  rooms: Record<string, SessionRoom>;
+  rooms: Partial<Record<string, SessionRoom>>;
   onDuplicate: (id: string, isQuizDuplicate: boolean) => Promise<void>;
   onCreateSession: (quizId: string, isPrivate: boolean, name?: string) => Promise<void>;
   onDeleteQuiz: (id: string) => Promise<void>;

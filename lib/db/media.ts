@@ -1,11 +1,11 @@
-import { PoolClient } from 'pg';
 import { adminStorage } from '../firebase/admin';
+import type { IDbClient } from './postgres';
 
 /**
  * Increments the usage count of a media asset in the database.
  * If the asset doesn't exist, it is created with usage_count = 1.
  */
-export async function incrementMediaUsage(client: PoolClient, path: string | null) {
+export async function incrementMediaUsage(client: IDbClient, path: string | null) {
   if (!path) return;
   
   await client.query(
@@ -22,7 +22,7 @@ export async function incrementMediaUsage(client: PoolClient, path: string | nul
  * Decrements the usage count of a media asset in the database.
  * If usage_count hits 0, it deletes the file from Firebase Storage.
  */
-export async function decrementMediaUsage(client: PoolClient, path: string | null) {
+export async function decrementMediaUsage(client: IDbClient, path: string | null) {
   if (!path) return;
 
   const result = await client.query(
@@ -56,7 +56,7 @@ export async function decrementMediaUsage(client: PoolClient, path: string | nul
  * Synchronizes media usage for a quiz/question set.
  * Increments new paths and decrements old paths that are no longer used.
  */
-export async function syncMediaUsage(client: PoolClient, oldPaths: (string | null)[], newPaths: (string | null)[]) {
+export async function syncMediaUsage(client: IDbClient, oldPaths: (string | null)[], newPaths: (string | null)[]) {
   const oldSet = new Set(oldPaths.filter(Boolean));
   const newSet = new Set(newPaths.filter(Boolean));
 

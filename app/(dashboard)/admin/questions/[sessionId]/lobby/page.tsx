@@ -4,7 +4,7 @@ import { use, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useToast } from '@/components/ui/Toast';
-import { startRoom, watchRoom, endRoom, closeLobby, type PlayerScore, type SessionRoom } from '@/lib/firebase/rtdb';
+import { startRoom, watchRoom, endRoom, closeLobby, openLobby, type PlayerScore, type SessionRoom } from '@/lib/firebase/rtdb';
 import { trackEvent } from '@/lib/firebase/analytics';
 import { ROOM_STATUS, SESSION_STATUS } from '@/lib/constants/session';
 import { motion, AnimatePresence } from 'motion/react';
@@ -127,8 +127,12 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
         if (nextRoom.joinToken) {
           setJoinToken(nextRoom.joinToken);
         } else {
-          // Missing token? Try to open lobby to generate one
-          openLobby(session.id);
+          // Recover a missing join token so the host can still share the lobby.
+          void openLobby(session.id)
+            .then((token) => setJoinToken(token))
+            .catch(() => {
+              setJoinToken(null);
+            });
         }
       } else {
         setJoinToken(null);
@@ -417,11 +421,6 @@ export default function HostLobbyPage({ params }: { params: Promise<{ sessionId:
                           {player.finished && (
                             <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
                               Finished
-                            </span>
-                          )}
-                          {roomStatus === ROOM_STATUS.STARTED && !player.finished && player.currentQuestionLabel && (
-                            <span className="rounded-full bg-[#92BFFF]/15 px-2 py-0.5 text-[10px] font-semibold text-[#CFE3FF]">
-                              {player.currentQuestionLabel}
                             </span>
                           )}
                         </div>
