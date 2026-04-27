@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 type ProfileAvatarProps = {
   displayName?: string | null;
   photoURL?: string | null;
@@ -17,9 +19,10 @@ export default function ProfileAvatar({
   className = '',
   textClassName = '',
 }: ProfileAvatarProps) {
+  const [imgFailed, setImgFailed] = useState(false);
   const initial = (displayName?.trim()?.[0] || '?').toUpperCase();
 
-  if (photoURL) {
+  if (photoURL && !imgFailed) {
     return (
       <div
         className={`overflow-hidden rounded-full bg-white/40 ${ringClassName} ${className}`}
@@ -29,6 +32,7 @@ export default function ProfileAvatar({
           src={photoURL}
           alt={displayName || 'Profile'}
           className="h-full w-full object-cover"
+          onError={() => setImgFailed(true)}
         />
       </div>
     );

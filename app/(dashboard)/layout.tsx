@@ -98,7 +98,9 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user, loading, isAdmin } = useAuth();
+  const { user, loading, isAdmin, cachedProfile } = useAuth();
+  const avatarName = user?.displayName ?? cachedProfile?.displayName;
+  const avatarPhoto = user?.photoURL ?? cachedProfile?.photoURL;
   const reduceMotion = useReducedMotion();
   
   const isProfileDetail =
@@ -165,8 +167,8 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
               >
                 <div className="flex items-center gap-4">
                   <ProfileAvatar
-                    displayName={user.displayName}
-                    photoURL={user.photoURL}
+                    displayName={avatarName}
+                    photoURL={avatarPhoto}
                     size={56}
                     ringClassName="ring-4 ring-white/80 shadow-md shadow-[#0460A9]/20"
                   />
