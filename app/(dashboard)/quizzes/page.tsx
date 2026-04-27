@@ -208,10 +208,10 @@ function QuizzesContent() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
         >
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/80 drop-shadow-sm">
+          <p className="nq-details font-bold uppercase tracking-[0.28em] text-white/80 drop-shadow-sm">
             Library
           </p>
-          <h1 className="mt-1 text-3xl font-bold text-white drop-shadow-md">Browse Quizzes</h1>
+          <h1 className="mt-1 text-3xl font-bold text-white drop-shadow-md font-display tracking-tight">Browse Quizzes</h1>
         </motion.div>
 
         {/* Search + Filters */}
@@ -219,7 +219,7 @@ function QuizzesContent() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08, duration: 0.35 }}
-          className="nq-card rounded-[28px] p-5 space-y-4"
+          className="nq-card rounded-[28px] p-5 space-y-6"
         >
           {/* Search bar */}
           <div role="search" className="relative">
@@ -244,7 +244,7 @@ function QuizzesContent() {
               value={inputValue}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Search quizzes by name or description…"
-              className="w-full rounded-[18px] border border-[#0460A9]/14 bg-white/80 py-3 pl-11 pr-4 text-[#16324F] outline-none placeholder:text-[#5D7EA1]/70 focus:border-[#0460A9]/40 focus:ring-2 focus:ring-[#0460A9]/10 transition"
+              className="w-full rounded-[18px] border border-[#0460A9]/14 bg-white/80 py-3 pl-11 pr-4 text-[#16324F] outline-none placeholder:text-[#5D7EA1]/70 focus:border-[#0460A9]/40 focus:ring-2 focus:ring-[#0460A9]/10 transition font-medium"
             />
             {inputValue && (
               <button
@@ -260,13 +260,13 @@ function QuizzesContent() {
           </div>
 
           {/* Filter rows */}
-          <div className="space-y-2.5">
+          <div className="space-y-4">
             {/* Sort */}
-            <div className="flex items-center gap-2">
-              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5D7EA1] w-10">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <span className="shrink-0 nq-details font-bold uppercase tracking-[0.18em] text-[#5D7EA1] sm:w-10">
                 Sort
               </span>
-              <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
+              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar sm:pb-0">
                 {sortOptions.map((opt) => (
                   <FilterChip
                     key={opt.value}
@@ -279,11 +279,11 @@ function QuizzesContent() {
             </div>
 
             {/* Length */}
-            <div className="flex items-center gap-2">
-              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5D7EA1] w-10">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <span className="shrink-0 nq-details font-bold uppercase tracking-[0.18em] text-[#5D7EA1] sm:w-10">
                 Size
               </span>
-              <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
+              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar sm:pb-0">
                 {lengthOptions.map((opt) => (
                   <FilterChip
                     key={opt.value}

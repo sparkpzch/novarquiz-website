@@ -21,27 +21,26 @@ export default function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  const base = 'inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+  const base = 'inline-flex items-center justify-center gap-2 font-bold rounded-2xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed font-display tracking-tight';
 
   const variants = {
-    primary: 'nq-on-dark shadow-md active:opacity-90 focus:ring-blue-400',
-    secondary: 'bg-white text-[#192246] border border-[#0460A9]/14 hover:bg-[#F3F8FF] hover:border-[#70A2F9]/40 focus:ring-[#92BFFF] shadow-sm',
-    danger: 'bg-gradient-to-r from-red-600 to-rose-600 text-white hover:from-red-700 hover:to-rose-700 focus:ring-red-500 shadow-lg shadow-red-500/25',
-    ghost: 'text-[#5D7EA1] hover:text-[#192246] hover:bg-white/70 focus:ring-[#92BFFF]',
+    primary: 'nq-on-dark shadow-lg shadow-[#0460A9]/25 active:scale-[0.97] focus:ring-[#70A2F9]',
+    secondary: 'bg-white/80 text-[#0460A9] border border-[#0460A9]/14 hover:bg-white hover:border-[#0460A9]/30 focus:ring-[#92BFFF] shadow-sm active:scale-[0.98]',
+    danger: 'bg-gradient-to-br from-red-500 to-rose-600 text-white hover:shadow-red-500/30 focus:ring-red-500 shadow-lg active:scale-[0.97]',
+    ghost: 'text-[#5D7EA1] hover:text-[#0460A9] hover:bg-white/60 focus:ring-[#92BFFF] active:scale-[0.98]',
   };
 
   const sizes = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-5 py-3 text-sm',
-    lg: 'px-6 py-3.5 text-base',
+    sm: 'px-4 py-2 text-sm',
+    md: 'px-6 py-3 text-base',
+    lg: 'px-8 py-4 text-lg',
   };
 
-  // Primary gets blue gradient via inline style so it works reliably on mobile too
+  // Primary gets the vibrant Novartis-blue gradient
   const primaryStyle: CSSProperties = variant === 'primary'
     ? {
-        background: 'linear-gradient(135deg, #4f82e8 0%, #3b5fd4 100%)',
+        background: 'linear-gradient(135deg, #0460A9 0%, #70A2F9 100%)',
         color: '#ffffff',
-        WebkitTextFillColor: '#ffffff',
         ...style,
       }
     : (style ?? {});

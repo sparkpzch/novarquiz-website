@@ -247,7 +247,7 @@ export default function DashboardPage() {
     <div className="mx-auto max-w-6xl space-y-4 md:space-y-5">
 
       {/* ── Profile + Stats row ── */}
-      <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+      <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
 
         {/* Profile card */}
         <motion.div
@@ -258,15 +258,16 @@ export default function DashboardPage() {
             <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(146,191,255,0.4),transparent_65%)] pointer-events-none" />
             <div className="absolute right-[-36px] top-[14px] h-full w-48 rounded-full border border-[#0460A9]/12 bg-[#70A2F9]/10 pointer-events-none" />
             <div className="absolute right-[18px] top-[-20px] h-full w-36 rounded-full border border-[#0460A9]/12 bg-[#70A2F9]/12 pointer-events-none" />
-            <div className="relative flex items-center gap-3">
+            <div className="relative flex items-center gap-4">
               <ProfileAvatar
                 displayName={user?.displayName}
                 photoURL={user?.photoURL}
-                size={52}
+                size={64}
                 ringClassName="ring-2 ring-white/80 shadow-lg shadow-[#113D7A]/18"
               />
               <div className="min-w-0">
-                <h1 className="nq-header truncate">{user?.displayName || "Player"}</h1>
+                <p className="nq-details mb-1 font-bold text-[#5D7EA1]">Welcome back,</p>
+                <h1 className="nq-header truncate text-xl sm:text-2xl font-display tracking-tight">{user?.displayName || "Player"}</h1>
               </div>
             </div>
           </Card>
@@ -275,7 +276,7 @@ export default function DashboardPage() {
         {/* Stat summary card */}
         <Card>
           <Card.Header icon="📊" title="Stat Summary" />
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
             {statItems.map((item) => (
               <Card.Tile key={item.label} label={item.label} value={item.value} />
             ))}
