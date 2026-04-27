@@ -14,6 +14,7 @@ import { useToast } from "@/components/ui/Toast";
 import { motion } from "motion/react";
 import Link from "next/link";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
+import { Card } from "@/components/ui/Card";
 
 type UserHistoryRow = {
   total_score: number;
@@ -224,14 +225,14 @@ function GeneralRow({
 }) {
   const content = (
     <div className="flex items-center gap-4 py-1">
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F3F8FF]">
+      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F3F8FF] shadow-sm border border-[#0460A9]/05">
         {icon}
       </div>
       <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[1.05rem] font-medium text-[#202A3F]">{label}</p>
+          <p className="text-[1.05rem] font-bold text-[#16324F] font-display tracking-tight">{label}</p>
           {description && (
-            <p className="mt-0.5 text-xs text-[#8FA3BD]">{description}</p>
+            <p className="nq-content mt-0.5 text-[#8FA3BD] font-medium">{description}</p>
           )}
         </div>
         <div className="flex items-center gap-2">{trailing}</div>
@@ -378,49 +379,49 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="mx-auto max-w-lg space-y-5">
+    <div className="mx-auto max-w-lg space-y-6">
       <motion.section
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
-        className="nq-card-blue relative overflow-hidden rounded-[28px] p-4 text-white"
+        className="nq-card-blue relative overflow-hidden rounded-[28px] p-5 text-white"
       >
         <div className="absolute inset-y-0 right-[-18px] top-[18px] w-48 rounded-full border border-white/10 bg-white/10" />
         <div className="absolute inset-y-0 right-[32px] top-[-6px] w-32 rounded-full border border-white/10 bg-white/10" />
         <div className="relative">
-          <div className="flex items-center gap-3.5">
+          <div className="flex items-center gap-4">
             <ProfileAvatar
               displayName={user?.displayName}
               photoURL={user?.photoURL}
-              size={60}
+              size={72}
               ringClassName="ring-2 ring-white/35 shadow-lg shadow-[#1E5FB0]/25"
             />
-            <div className="min-w-0">
-              <p className="nq-on-dark truncate text-[1.55rem] font-semibold leading-tight">
+            <div className="min-w-0 flex-1">
+              <p className="nq-on-dark truncate text-2xl font-bold leading-tight">
                 {user?.displayName || "Player"}
               </p>
-              <p className="nq-on-dark-muted truncate text-[15px]">
-                @{user?.email?.split("@")[0] || user?.displayName?.toLowerCase().replace(/\s+/g, ".") || "player"}
+              <p className="nq-on-dark-muted truncate text-sm">
+                {user?.email}
               </p>
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2.5">
-            <div className="rounded-[16px] bg-white/14 px-3.5 py-3.5 text-center">
-              <p className="nq-on-dark text-[2rem] font-bold">{userStats.bestStreak || 0}</p>
-              <p className="nq-on-dark mt-1 text-[13px] font-medium">{t("dashboard.best_streak")}</p>
-            </div>
-            <div className="rounded-[16px] bg-white/14 px-3.5 py-3.5 text-center">
-              <p className="nq-on-dark text-[2rem] font-bold">
-                {(userStats.bestScore || 0).toLocaleString()}
-              </p>
-              <p className="nq-on-dark mt-1 text-[13px] font-medium">{t("profile.best_score")}</p>
-            </div>
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <Card.Tile
+              label={t("dashboard.best_streak")}
+              value={userStats.bestStreak || 0}
+              className="bg-white/14 border-none shadow-none [&_p]:nq-on-dark"
+            />
+            <Card.Tile
+              label={t("profile.best_score")}
+              value={(userStats.bestScore || 0).toLocaleString()}
+              className="bg-white/14 border-none shadow-none [&_p]:nq-on-dark"
+            />
           </div>
 
           <button
             type="button"
             onClick={() => { setNewName(user?.displayName || ""); setEditModal(true); }}
-            className="mt-3.5 flex w-full items-center justify-center gap-2 rounded-[16px] bg-white px-4 py-2.5 text-base font-semibold text-[#70A2F9] shadow-[0_12px_28px_rgba(17,87,145,0.18)]"
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-[18px] bg-white px-4 py-3 text-base font-semibold text-[#70A2F9] shadow-lg shadow-[#113D7A]/15 transition hover:scale-[1.02] active:scale-[0.98]"
           >
             <EditIcon />
             <span>{t("profile.edit_profile")}</span>
