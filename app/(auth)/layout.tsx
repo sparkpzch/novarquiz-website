@@ -17,13 +17,13 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <>
       {/* ─── MOBILE LAYOUT ─── */}
-      <div className="md:hidden min-h-screen flex flex-col overflow-hidden" style={{ backgroundColor: '#e8f0fe' }}>
+      <div className="md:hidden min-h-screen flex flex-col overflow-hidden nq-sky">
         {/* Blue gradient header */}
         <div
           className="relative flex-shrink-0 overflow-hidden"
           style={{
-            minHeight: '240px',
-            height: '42vh',
+            minHeight: '180px',
+            height: '30vh',
             background: 'linear-gradient(135deg, #6ba3f5 0%, #4f82e8 40%, #3b5fd4 100%)',
           }}
         >
@@ -53,14 +53,14 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
             className="absolute left-6 right-6"
-            style={{ bottom: '40px' }}
+            style={{ bottom: '30px' }}
           >
-            <p className="text-white font-semibold" style={{ fontSize: '22px', lineHeight: 1.15, marginBottom: '2px' }}>
+            <p className="text-white font-semibold" style={{ fontSize: '20px', lineHeight: 1.15, marginBottom: '2px' }}>
               Welcome back
             </p>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-white/75 font-normal" style={{ fontSize: '15px' }}>To</span>
-              <span className="text-white font-extrabold tracking-tight" style={{ fontSize: '32px' }}>NovarQuiz</span>
+              <span className="text-white/75 font-normal" style={{ fontSize: '14px' }}>To</span>
+              <span className="text-white font-extrabold tracking-tight" style={{ fontSize: '28px' }}>NovarQuiz</span>
             </div>
           </motion.div>
         </div>
@@ -77,11 +77,11 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             boxShadow: '0 -6px 32px rgba(0,0,0,0.13)',
           }}
         >
-          <div style={{ padding: '28px 22px 40px' }}>
+          <div style={{ padding: '24px 22px 32px' }}>
             {/* ── Tab switcher (only for login/signup pages) ── */}
             {isTabPage && (
               <div
-                className="flex mb-6 relative"
+                className="flex mb-5 relative"
                 style={{
                   background: '#f0f0f0',
                   borderRadius: '12px',
@@ -97,8 +97,8 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
                       className="relative flex-1 text-center z-10"
                       style={{
                         borderRadius: '9px',
-                        padding: '9px 0',
-                        fontSize: '15px',
+                        padding: '8px 0',
+                        fontSize: '14px',
                         fontWeight: isActive ? 700 : 500,
                         color: isActive ? '#111' : '#6b7280',
                         textDecoration: 'none',
@@ -132,15 +132,14 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 
       {/* ─── DESKTOP LAYOUT ─── */}
       <div
-        className="hidden md:flex min-h-screen flex-col overflow-hidden"
-        style={{ backgroundColor: '#e8f0fe' }}
+        className="hidden md:flex min-h-screen flex-col overflow-hidden nq-sky"
       >
         {/* Blue gradient header */}
         <div
           className="relative flex-shrink-0 overflow-hidden flex items-end"
           style={{
-            minHeight: '260px',
-            height: '38vh',
+            minHeight: '220px',
+            height: '32vh',
             background: 'linear-gradient(135deg, #6ba3f5 0%, #4f82e8 40%, #3b5fd4 100%)',
           }}
         >
@@ -169,7 +168,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
-            className="relative z-10 w-full max-w-md mx-auto px-8 pb-10"
+            className="relative z-10 w-full max-w-md mx-auto px-8 pb-8"
           >
             <p className="text-white font-semibold" style={{ fontSize: '22px', lineHeight: 1.15, marginBottom: '2px' }}>
               Welcome back
@@ -193,7 +192,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             boxShadow: '0 -6px 32px rgba(0,0,0,0.13)',
           }}
         >
-          <div className="w-full max-w-md mx-auto" style={{ padding: '28px 22px 40px' }}>
+          <div className="w-full max-w-md mx-auto" style={{ padding: '24px 22px 40px' }}>
             {/* ── Tab switcher (only for login/signup pages) ── */}
             {isTabPage && (
               <div

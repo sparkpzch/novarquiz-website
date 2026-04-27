@@ -94,7 +94,7 @@ function SignInForm() {
     <>
 
 
-      <form onSubmit={handleSignIn} className="space-y-4">
+      <form onSubmit={handleSignIn} className="space-y-3">
         <Input
           label={t('auth.email')}
           type="email"
@@ -155,13 +155,13 @@ function SignInForm() {
           </motion.div>
         )}
 
-        <Button type="submit" loading={loading} className="w-full" style={{ marginTop: '8px' }}>
+        <Button type="submit" loading={loading} className="w-full" style={{ marginTop: '4px' }}>
           Login
         </Button>
       </form>
 
       {/* Or divider — all screens */}
-      <div className="relative my-5">
+      <div className="relative my-4">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-gray-200" />
         </div>
@@ -175,8 +175,8 @@ function SignInForm() {
         type="button"
         onClick={handleGoogleSignIn}
         disabled={loading}
-        className="w-full flex items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 transition-all py-3 text-sm font-medium text-gray-700 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
-        style={{ minHeight: '48px' }}
+        className="w-full flex items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 transition-all py-2.5 text-sm font-medium text-gray-700 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+        style={{ minHeight: '44px' }}
       >
         <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />

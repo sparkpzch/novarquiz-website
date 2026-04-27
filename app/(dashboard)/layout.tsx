@@ -100,15 +100,16 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { user, loading, isAdmin } = useAuth();
   const reduceMotion = useReducedMotion();
-  const mobileNavContainerRef = useRef<HTMLDivElement | null>(null);
-  const mobileNavRefs = useRef<Array<HTMLAnchorElement | null>>([]);
-  const [mobilePillStyle, setMobilePillStyle] = useState<{ x: number; width: number; opacity: number }>({
-    x: 0,
-    width: 0,
-    opacity: 0,
-  });
+  
   const isProfileDetail =
     pathname === "/profile/change-password" || pathname === "/profile/language";
+
+  const isActive = useCallback(
+    (href: string, exact = false) => matchesNavItem(href, pathname, searchParams, exact),
+    [pathname, searchParams],
+  );
+
+  const [slotIndex, setSlotIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -116,48 +117,14 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
     }
   }, [user, loading, router]);
 
-  const isActive = useCallback(
-    (href: string, exact = false) => matchesNavItem(href, pathname, searchParams, exact),
-    [pathname, searchParams],
-  );
-
-  useLayoutEffect(() => {
-    if (loading || !user) {
-      return;
+  useEffect(() => {
+    const idx = mobileNavItems.findIndex((item) => isActive(item.href, item.exact));
+    if (idx !== -1) {
+      setSlotIndex(idx >= 2 ? idx + 1 : idx);
+    } else if (isActive(quizzesNavItem.href)) {
+      setSlotIndex(null);
     }
-
-    const activeIndex = mobileNavItems.findIndex((item) => isActive(item.href, item.exact));
-    const activeEl = activeIndex >= 0 ? mobileNavRefs.current[activeIndex] : null;
-    const containerEl = mobileNavContainerRef.current;
-
-    if (!activeEl || !containerEl) {
-      setMobilePillStyle((prev) => ({ ...prev, opacity: 0 }));
-      return;
-    }
-
-    const updatePill = () => {
-      const activeRect = activeEl.getBoundingClientRect();
-      const containerRect = containerEl.getBoundingClientRect();
-
-      setMobilePillStyle({
-        x: activeRect.left - containerRect.left,
-        width: activeRect.width,
-        opacity: 1,
-      });
-    };
-
-    updatePill();
-
-    const resizeObserver = new ResizeObserver(updatePill);
-    resizeObserver.observe(activeEl);
-    resizeObserver.observe(containerEl);
-    window.addEventListener('resize', updatePill);
-
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', updatePill);
-    };
-  }, [isActive, loading, user]);
+  }, [isActive]);
 
   const handleSignOut = async () => {
     await fetch('/api/auth/session', { method: 'DELETE' });
@@ -176,274 +143,285 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="nq-sky min-h-dvh">
-      <div className="nq-content flex min-h-dvh">
-        <aside className="sticky top-0 h-screen hidden w-[310px] shrink-0 p-5 lg:block">
-          <div className="nq-card flex h-full flex-col rounded-[32px] p-6 shadow-2xl">
-            <Link href="/" className="flex justify-center rounded-3xl px-2 py-1">
-              <Image
-                src="/image/icon/novartis-logo-transparent.png"
-                alt="Novartis logo"
-                width={160}
-                height={64}
-                className="h-16 w-auto object-contain"
-                priority
-              />
-            </Link>
-
-            <Link
-              href="/profile"
-              className="mt-7 block rounded-[28px] bg-white/55 p-4 transition hover:bg-white/70"
-            >
-              <div className="flex items-center gap-4">
-                <ProfileAvatar
-                  displayName={user.displayName}
-                  photoURL={user.photoURL}
-                  size={56}
-                  ringClassName="ring-4 ring-white/80 shadow-md shadow-[#0460A9]/20"
+    <>
+      <div className="nq-sky min-h-dvh">
+        <div className="nq-content flex min-h-dvh">
+          <aside className="sticky top-0 h-screen hidden w-[310px] shrink-0 p-5 lg:block">
+            <div className="nq-card flex h-full flex-col rounded-[32px] p-6 shadow-2xl">
+              <Link href="/" className="flex justify-center rounded-3xl px-2 py-1">
+                <Image
+                  src="/image/icon/novartis-logo-transparent.png"
+                  alt="Novartis logo"
+                  width={160}
+                  height={64}
+                  className="h-16 w-auto object-contain"
+                  priority
                 />
-                <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-[#16324F]">{user.displayName || 'Player'}</p>
-                  <p className="truncate text-sm text-[#5D7EA1]">{user.email}</p>
+              </Link>
+
+              <Link
+                href="/profile"
+                className="mt-7 block rounded-[28px] bg-white/55 p-4 transition hover:bg-white/70"
+              >
+                <div className="flex items-center gap-4">
+                  <ProfileAvatar
+                    displayName={user.displayName}
+                    photoURL={user.photoURL}
+                    size={56}
+                    ringClassName="ring-4 ring-white/80 shadow-md shadow-[#0460A9]/20"
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-base font-semibold text-[#16324F]">{user.displayName || 'Player'}</p>
+                    <p className="truncate text-sm text-[#5D7EA1]">{user.email}</p>
+                  </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
 
-            <nav className="mt-8 space-y-2">
-              {/* Home + Stats first */}
-              {mobileNavItems.slice(0, 2).map((item) => {
-                const active = isActive(item.href, item.exact);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
-                      active
-                        ? 'bg-[#0460A9] text-[#F8FBFF] shadow-lg shadow-[#0460A9]/20'
-                        : 'text-[#4D6F93] hover:bg-white/60 hover:text-[#16324F]'
-                    }`}
-                  >
-                    <Icon path={item.icon} active={active} />
-                    <span className="font-medium">{t(item.label)}</span>
-                  </Link>
-                );
-              })}
-
-              {/* Quizzes — featured gradient pill */}
-              {(() => {
-                const active = isActive(quizzesNavItem.href);
-                return (
-                  <motion.div
-                    whileTap={reduceMotion ? undefined : { scale: 0.985, y: 1 }}
-                    transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-                  >
+              <nav className="mt-8 space-y-2">
+                {/* Home + Stats first */}
+                {mobileNavItems.slice(0, 2).map((item) => {
+                  const active = isActive(item.href, item.exact);
+                  return (
                     <Link
-                      href={quizzesNavItem.href}
-                      className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[#ffffff] transition-all ${
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
                         active
-                          ? 'bg-gradient-to-r from-[#0460A9] to-[#55A0FF] shadow-lg shadow-[#0460A9]/25'
-                          : 'bg-gradient-to-r from-[#0460A9] to-[#3A8FE8] opacity-85 hover:opacity-100'
+                          ? 'bg-[#0460A9] text-[#F8FBFF] shadow-lg shadow-[#0460A9]/20'
+                          : 'text-[#4D6F93] hover:bg-white/60 hover:text-[#16324F]'
                       }`}
                     >
-                      <motion.div
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-[#ffffff]"
-                        whileTap={reduceMotion ? undefined : { scale: 0.92, rotate: -10 }}
-                        transition={{ type: 'spring', stiffness: 420, damping: 24 }}
-                      >
-                        <Icon path={quizzesNavItem.icon} active={true} />
-                      </motion.div>
-                      <span className="font-semibold text-[#ffffff]">{t(quizzesNavItem.label)}</span>
-                      <motion.span
-                        className="ml-auto rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-[#ffffff]"
-                        whileTap={reduceMotion ? undefined : { scale: 0.94 }}
-                        transition={{ type: 'spring', stiffness: 420, damping: 24 }}
-                      >
-                        NEW
-                      </motion.span>
+                      <Icon path={item.icon} active={active} />
+                      <span className="font-medium">{t(item.label)}</span>
                     </Link>
-                  </motion.div>
-                );
-              })()}
+                  );
+                })}
 
-              {/* History + Profile */}
-              {mobileNavItems.slice(2).map((item) => {
-                const active = isActive(item.href, item.exact);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
-                      active
-                        ? 'bg-[#0460A9] text-[#F8FBFF] shadow-lg shadow-[#0460A9]/20'
-                        : 'text-[#4D6F93] hover:bg-white/60 hover:text-[#16324F]'
-                    }`}
-                  >
-                    <Icon path={item.icon} active={active} />
-                    <span className="font-medium">{t(item.label)}</span>
-                  </Link>
-                );
-              })}
-            </nav>
-
-            {isAdmin && (
-              <div className="mt-8">
-                <div className="mb-3 px-4 text-xs font-semibold uppercase tracking-[0.28em] text-[#5D7EA1]">
-                  Admin
-                </div>
-                <div className="space-y-2">
-                  {desktopAdminItems.map((item) => {
-                    const active = isActive(item.href);
-                    return (
+                {/* Quizzes — featured gradient pill */}
+                {(() => {
+                  const active = isActive(quizzesNavItem.href);
+                  return (
+                    <motion.div
+                      whileTap={reduceMotion ? undefined : { scale: 0.985, y: 1 }}
+                      transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+                    >
                       <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
+                        href={quizzesNavItem.href}
+                        className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[#ffffff] transition-all ${
                           active
-                            ? 'bg-[#0460A9] text-[#F8FBFF] shadow-lg shadow-[#0460A9]/20'
-                            : 'bg-white/45 text-[#4D6F93] hover:bg-white/70 hover:text-[#16324F]'
+                            ? 'bg-gradient-to-r from-[#0460A9] to-[#55A0FF] shadow-lg shadow-[#0460A9]/25'
+                            : 'bg-gradient-to-r from-[#0460A9] to-[#3A8FE8] opacity-85 hover:opacity-100'
                         }`}
                       >
-                        <Icon path={item.icon} active={active} />
-                        <span className="text-sm font-medium">{item.label}</span>
+                        <motion.div
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-[#ffffff]"
+                          whileTap={reduceMotion ? undefined : { scale: 0.92, rotate: -10 }}
+                          transition={{ type: 'spring', stiffness: 420, damping: 24 }}
+                        >
+                          <Icon path={quizzesNavItem.icon} active={true} />
+                        </motion.div>
+                        <span className="font-semibold text-[#ffffff]">{t(quizzesNavItem.label)}</span>
+                        <motion.span
+                          className="ml-auto rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-[#ffffff]"
+                          whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+                          transition={{ type: 'spring', stiffness: 420, damping: 24 }}
+                        >
+                          NEW
+                        </motion.span>
                       </Link>
-                    );
-                  })}
+                    </motion.div>
+                  );
+                })()}
+
+                {/* History + Profile */}
+                {mobileNavItems.slice(2).map((item) => {
+                  const active = isActive(item.href, item.exact);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
+                        active
+                          ? 'bg-[#0460A9] text-[#F8FBFF] shadow-lg shadow-[#0460A9]/20'
+                          : 'text-[#4D6F93] hover:bg-white/60 hover:text-[#16324F]'
+                      }`}
+                    >
+                      <Icon path={item.icon} active={active} />
+                      <span className="font-medium">{t(item.label)}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              {isAdmin && (
+                <div className="mt-8">
+                  <div className="mb-3 px-4 text-xs font-semibold uppercase tracking-[0.28em] text-[#5D7EA1]">
+                    Admin
+                  </div>
+                  <div className="space-y-2">
+                    {desktopAdminItems.map((item) => {
+                      const active = isActive(item.href);
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
+                            active
+                              ? 'bg-[#0460A9] text-[#F8FBFF] shadow-lg shadow-[#0460A9]/20'
+                              : 'bg-white/45 text-[#4D6F93] hover:bg-white/70 hover:text-[#16324F]'
+                          }`}
+                        >
+                          <Icon path={item.icon} active={active} />
+                          <span className="text-sm font-medium">{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
                 </div>
+              )}
+
+              <div className="mt-auto space-y-3 pt-8">
+                <button
+                  onClick={handleSignOut}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[#0460A9]/10 bg-white/70 px-4 py-3 text-sm font-semibold text-[#16324F] transition hover:bg-white"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m-3-3h9m0 0-3-3m3 3-3 3" />
+                  </svg>
+                  {t('nav.logout')}
+                </button>
               </div>
-            )}
-
-            <div className="mt-auto space-y-3 pt-8">
-              <button
-                onClick={handleSignOut}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[#0460A9]/10 bg-white/70 px-4 py-3 text-sm font-semibold text-[#16324F] transition hover:bg-white"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m-3-3h9m0 0-3-3m3 3-3 3" />
-                </svg>
-                {t('nav.logout')}
-              </button>
             </div>
-          </div>
-        </aside>
+          </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <main className={`${isProfileDetail ? "px-4 pb-8 pt-8 md:px-6 lg:px-8" : "nq-bottom-safe px-4 pb-8 pt-5 md:px-6 lg:px-8"} flex-1`}>
-            <motion.div key={pathname} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-              {children}
-            </motion.div>
-          </main>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <main className={`${isProfileDetail ? "px-4 pb-8 pt-8 md:px-6 lg:px-8" : "nq-bottom-safe px-4 pb-8 pt-5 md:px-6 lg:px-8"} flex-1`}>
+              <motion.div key={pathname} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                {children}
+              </motion.div>
+            </main>
+          </div>
         </div>
       </div>
 
       {!isProfileDetail && (
       <>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-30 h-[20px] bg-[linear-gradient(180deg,rgba(196,222,255,0.24)_0%,rgba(196,222,255,0.72)_100%)] backdrop-blur-md lg:hidden"
-      />
-      {/* Mobile bottom nav — 4 regular items + 1 special Quizzes center FAB */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 block px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 lg:hidden">
-        <div className="relative mx-auto flex max-w-[430px] items-end justify-around">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-30 h-[20px] bg-[linear-gradient(180deg,rgba(196,222,255,0.24)_0%,rgba(196,222,255,0.72)_100%)] backdrop-blur-md lg:hidden"
+        />
+        {/* Mobile bottom nav — 4 regular items + 1 special Quizzes center FAB */}
+        <nav 
+          className="fixed inset-x-0 bottom-0 z-40 block px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 lg:hidden"
+          style={{ transform: 'translateZ(0)', touchAction: 'none' }}
+        >
+          <div className="relative mx-auto flex max-w-[430px] items-end justify-around">
 
-          {/* Animated pill background (for 4 regular items only) */}
-          <div ref={mobileNavContainerRef} className="absolute inset-x-0 bottom-0 flex h-[60px] items-center rounded-[999px] border border-white/50 bg-white/50 shadow-[0_18px_40px_rgba(70,112,165,0.2)] backdrop-blur-xl">
-            <motion.span
-              aria-hidden="true"
-              animate={mobilePillStyle}
-              transition={{ type: "spring", stiffness: 420, damping: 34 }}
-              className="absolute inset-y-1 left-0 rounded-[999px] border-2 border-[#92BFFF] bg-[#92BFFF] shadow-[0_8px_18px_rgba(14,99,216,0.22)]"
-            />
-          </div>
-
-          {/* Left 2 items: Home, Stats */}
-          {mobileNavItems.slice(0, 2).map((item, index) => {
-            const active = isActive(item.href, item.exact);
-            return (
-              <div key={item.href} className="relative z-10 flex h-[60px] flex-1 items-center justify-center">
-                <Link
-                  href={item.href}
-                  ref={(el) => { mobileNavRefs.current[index] = el; }}
-                  className={`flex w-full flex-col items-center justify-center gap-0.5 rounded-[999px] px-2 text-[11px] font-semibold leading-none transition-colors ${
-                    active ? 'text-[#234C8F]' : 'text-[#8B8B8B]'
-                  }`}
-                >
-                  <Icon path={item.icon} active={active} />
-                  <span>{t(item.label)}</span>
-                </Link>
-              </div>
-            );
-          })}
-
-          {/* Center: Special Quizzes FAB-style circle button */}
-          {(() => {
-            const active = isActive(quizzesNavItem.href);
-            return (
-              <motion.div
-                className="relative z-20 flex flex-col items-center"
-                style={{ marginBottom: '10px' }}
-                whileTap={reduceMotion ? undefined : { scale: 0.94, y: 2 }}
-                transition={{ type: 'spring', stiffness: 420, damping: 26 }}
-              >
-                <Link
-                  href={quizzesNavItem.href}
-                  className="flex flex-col items-center gap-1"
-                >
+            {/* Animated pill background (for 4 regular items only) */}
+            <div className="absolute inset-x-0 bottom-0 h-[60px] overflow-hidden rounded-[999px] border border-white/50 bg-white/50 shadow-[0_18px_40px_rgba(70,112,165,0.2)] backdrop-blur-xl">
+              <div className="relative h-full w-full">
+                {slotIndex !== null && (
                   <motion.div
-                    className={`flex h-[64px] w-[64px] flex-col items-center justify-center gap-1 rounded-full shadow-lg transition-all ${
-                      active
-                        ? 'bg-gradient-to-br from-[#0460A9] to-[#92BFFF] shadow-[0_10px_28px_rgba(4,96,169,0.45)] scale-105'
-                        : 'bg-gradient-to-br from-[#0460A9] to-[#55A0FF] shadow-[0_8px_22px_rgba(4,96,169,0.32)] hover:scale-105'
-                    }`}
-                    whileTap={reduceMotion ? undefined : { scale: 0.96 }}
-                    transition={{ type: 'spring', stiffness: 420, damping: 24 }}
+                    aria-hidden="true"
+                    animate={{ x: `${slotIndex * 100}%` }}
+                    initial={false}
+                    transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                    className="absolute inset-y-0 left-0 flex w-1/5 items-center justify-center p-1.5"
                   >
-                    {/* Inner decorative ring */}
-                    <div className="absolute h-[64px] w-[64px] rounded-full border-2 border-white/25" />
-                    <motion.svg
-                      className="h-5 w-5 text-[#ffffff]"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      whileTap={reduceMotion ? undefined : { scale: 0.88, rotate: -12 }}
-                      transition={{ type: 'spring', stiffness: 420, damping: 22 }}
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d={quizzesNavItem.icon} />
-                    </motion.svg>
-                    <span className="text-[10px] font-bold leading-none text-[#ffffff]" style={{ textShadow: '0 1px 2px rgba(4,96,169,0.6)' }}>
-                      {t(quizzesNavItem.label)}
-                    </span>
+                    <div className="h-full w-full rounded-[999px] border-2 border-[#92BFFF] bg-[#92BFFF] shadow-[0_8px_18px_rgba(14,99,216,0.22)]" />
                   </motion.div>
-                </Link>
-              </motion.div>
-            );
-          })()}
-
-          {/* Right 2 items: History, Profile */}
-          {mobileNavItems.slice(2).map((item, index) => {
-            const realIndex = index + 2;
-            const active = isActive(item.href, item.exact);
-            return (
-              <div key={item.href} className="relative z-10 flex h-[60px] flex-1 items-center justify-center">
-                <Link
-                  href={item.href}
-                  ref={(el) => { mobileNavRefs.current[realIndex] = el; }}
-                  className={`flex w-full flex-col items-center justify-center gap-0.5 rounded-[999px] px-2 text-[11px] font-semibold leading-none transition-colors ${
-                    active ? 'text-[#234C8F]' : 'text-[#8B8B8B]'
-                  }`}
-                >
-                  <Icon path={item.icon} active={active} />
-                  <span>{t(item.label)}</span>
-                </Link>
+                )}
               </div>
-            );
-          })}
+            </div>
 
-        </div>
-      </nav>
+            {/* Left 2 items: Home, Stats */}
+            {mobileNavItems.slice(0, 2).map((item) => {
+              const active = isActive(item.href, item.exact);
+              return (
+                <div key={item.href} className="relative z-10 flex h-[60px] flex-1 items-center justify-center">
+                  <Link
+                    href={item.href}
+                    className={`flex w-full flex-col items-center justify-center gap-0.5 rounded-[999px] px-2 text-[11px] font-semibold leading-none transition-colors ${
+                      active ? 'text-[#234C8F]' : 'text-[#8B8B8B]'
+                    }`}
+                  >
+                    <Icon path={item.icon} active={active} />
+                    <span>{t(item.label)}</span>
+                  </Link>
+                </div>
+              );
+            })}
+
+            {/* Center: Special Quizzes FAB-style circle button */}
+            {(() => {
+              const active = isActive(quizzesNavItem.href);
+              return (
+                <div className="relative z-20 flex flex-1 items-center justify-center">
+                  <motion.div
+                    className="flex flex-col items-center"
+                    style={{ marginBottom: '10px' }}
+                    whileTap={reduceMotion ? undefined : { scale: 0.94, y: 2 }}
+                    transition={{ type: 'spring', stiffness: 420, damping: 26 }}
+                  >
+                    <Link
+                      href={quizzesNavItem.href}
+                      className="flex flex-col items-center gap-1"
+                    >
+                      <motion.div
+                        className={`flex h-[64px] w-[64px] flex-col items-center justify-center gap-1 rounded-full shadow-lg transition-all ${
+                          active
+                            ? 'bg-gradient-to-br from-[#0460A9] to-[#92BFFF] shadow-[0_10px_28px_rgba(4,96,169,0.45)] scale-105'
+                            : 'bg-gradient-to-br from-[#0460A9] to-[#55A0FF] shadow-[0_8px_22px_rgba(4,96,169,0.32)] hover:scale-105'
+                        }`}
+                        whileTap={reduceMotion ? undefined : { scale: 0.96 }}
+                        transition={{ type: 'spring', stiffness: 420, damping: 24 }}
+                      >
+                        {/* Inner decorative ring */}
+                        <div className="absolute h-[64px] w-[64px] rounded-full border-2 border-white/25" />
+                        <motion.svg
+                          className="h-5 w-5 text-[#ffffff]"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          whileTap={reduceMotion ? undefined : { scale: 0.88, rotate: -12 }}
+                          transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d={quizzesNavItem.icon} />
+                        </motion.svg>
+                        <span className="text-[10px] font-bold leading-none text-[#ffffff]" style={{ textShadow: '0 1px 2px rgba(4,96,169,0.6)' }}>
+                          {t(quizzesNavItem.label)}
+                        </span>
+                      </motion.div>
+                    </Link>
+                  </motion.div>
+                </div>
+              );
+            })()}
+
+            {/* Right 2 items: History, Profile */}
+            {mobileNavItems.slice(2).map((item) => {
+              const active = isActive(item.href, item.exact);
+              return (
+                <div key={item.href} className="relative z-10 flex h-[60px] flex-1 items-center justify-center">
+                  <Link
+                    href={item.href}
+                    className={`flex w-full flex-col items-center justify-center gap-0.5 rounded-[999px] px-2 text-[11px] font-semibold leading-none transition-colors ${
+                      active ? 'text-[#234C8F]' : 'text-[#8B8B8B]'
+                    }`}
+                  >
+                    <Icon path={item.icon} active={active} />
+                    <span>{t(item.label)}</span>
+                  </Link>
+                </div>
+              );
+            })}
+
+          </div>
+        </nav>
       </>
       )}
-    </div>
+    </>
   );
 }
 
