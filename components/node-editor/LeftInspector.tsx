@@ -148,12 +148,14 @@ export function LeftInspector({
   const handleRemoveMedia = async () => {
     if (!draft || !selectedNode) return;
     setImgLoadError(false);
+    const path = draft.media_path;
     const next = { ...draft, media_type: null, media_url: null, media_path: null } as NodeData;
     setDraft(next);
     onChange(selectedNode.id, next);
 
-    // Direct deletion from client is removed to support reference counting.
-    // The backend will delete the file if its usage count drops to zero during Save.
+    if (path) {
+      deleteObject(ref(storage, path)).catch(() => {});
+    }
   };
 
   const startResizing = useCallback((e: React.MouseEvent) => {

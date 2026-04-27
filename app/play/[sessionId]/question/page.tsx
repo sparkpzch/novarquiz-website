@@ -72,24 +72,24 @@ function QuizHeader({
   currentUserId?: string;
 }) {
   return (
-    <div className="nq-card-dark rounded-[28px] px-5 py-4 text-white shadow-[0_24px_56px_rgba(7,16,43,0.34)]">
+    <div className="rounded-[24px] border border-white/25 bg-white/15 px-4 py-3 text-white shadow-[0_20px_48px_rgba(7,16,43,0.18)] backdrop-blur-md">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="nq-details text-[#8DA8D0]">Time</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums">{elapsed}</p>
+          <p className="nq-details" style={{ color: 'rgba(255,255,255,0.65)' }}>Time</p>
+          <p className="mt-0.5 text-xl font-bold tabular-nums">{elapsed}</p>
         </div>
 
         <ProfileAvatar
           displayName={userName}
           photoURL={photoURL}
-          size={40}
+          size={36}
           ringClassName="ring-2 ring-[#92BFFF]/70"
         />
 
         <div className="text-right">
-          <p className="nq-details text-[#8DA8D0]">Score</p>
-          <div className="mt-1 flex items-center justify-end gap-1.5">
-            <p className="text-2xl font-bold tabular-nums">{score}</p>
+          <p className="nq-details" style={{ color: 'rgba(255,255,255,0.65)' }}>Score</p>
+          <div className="mt-0.5 flex items-center justify-end gap-1.5">
+            <p className="text-xl font-bold tabular-nums">{score}</p>
             <AnimatePresence>
               {lastDelta !== null && (
                 <motion.span
@@ -108,12 +108,12 @@ function QuizHeader({
       </div>
 
       {(topScores.length > 1 || streak > 1) && (
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/10 pt-3">
-          <span className="nq-details text-[#92BFFF]">🏆 Live</span>
-          <span className="nq-details text-[#8DA8D0]">{totalPlayers} players</span>
-          {streak > 1 && <span className="rounded-full bg-[#FFB020]/18 px-2.5 py-0.5 text-xs font-semibold text-[#FFD48A]">🔥 {streak}</span>}
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/15 pt-2.5">
+          <span className="nq-details" style={{ color: 'rgba(255,255,255,0.55)' }}>🏆 Live</span>
+          <span className="nq-details" style={{ color: 'rgba(255,255,255,0.55)' }}>{totalPlayers} players</span>
+          {streak > 1 && <span className="rounded-full bg-[#FFB020]/20 px-2 py-0.5 text-xs font-semibold text-[#FFD48A]">🔥 {streak}</span>}
           {topScores.map((player, index) => (
-            <span key={player.uid} className={`text-xs ${player.uid === currentUserId ? 'font-bold text-white' : 'text-[#D9E7FF]'}`}>
+            <span key={player.uid} className={`text-xs ${player.uid === currentUserId ? 'font-bold text-white' : 'text-white/75'}`}>
               #{index + 1} {formatPlayerName(player.displayName, player.uid === currentUserId)} {player.score}
             </span>
           ))}
@@ -123,6 +123,22 @@ function QuizHeader({
   );
 }
 
+type VideoQuality = 'auto' | 'hd' | 'sd';
+
+function useVideoQuality(): VideoQuality {
+  if (typeof window === 'undefined') return 'auto';
+  return (localStorage.getItem('novarquiz-video-quality') as VideoQuality) ?? 'auto';
+}
+
+function resolvePreload(quality: VideoQuality): 'none' | 'metadata' {
+  if (quality === 'hd') return 'metadata';
+  if (quality === 'sd') return 'none';
+  // auto: detect connection type
+  const conn = (navigator as Navigator & { connection?: { effectiveType?: string } }).connection;
+  const type = conn?.effectiveType ?? '';
+  return type === '2g' || type === '3g' ? 'none' : 'metadata';
+}
+
 function QuestionVisual({
   question,
   totalQuestions,
@@ -130,25 +146,42 @@ function QuestionVisual({
   question: Question;
   totalQuestions?: number;
 }) {
+  const [mediaError, setMediaError] = useState(false);
+  const quality = useVideoQuality();
+  const preload = resolvePreload(quality);
+
+  useEffect(() => {
+    setMediaError(false);
+  }, [question.id]);
+
   return (
     <>
       {question.media_url && (
         <div className="relative overflow-hidden rounded-[22px]">
-          {question.media_type === 'video' ? (
+          {mediaError ? (
+            <div className="flex h-44 w-full items-center justify-center bg-[#EEF3F8] md:h-56">
+              <p className="nq-details text-[#B0C4D8]">Media unavailable</p>
+            </div>
+          ) : question.media_type === 'video' ? (
             <video
               key={question.id}
               src={question.media_url}
               controls
+              preload={preload}
               className="h-44 w-full object-cover md:h-56"
+              onError={() => setMediaError(true)}
             />
           ) : (
             <img
               src={question.media_url}
               alt=""
               className="h-44 w-full object-cover md:h-56"
+              onError={() => setMediaError(true)}
             />
           )}
-          <div className="absolute inset-x-0 bottom-0 h-14 bg-linear-to-t from-black/40 to-transparent" />
+          {!mediaError && (
+            <div className="absolute inset-x-0 bottom-0 h-14 bg-linear-to-t from-black/40 to-transparent" />
+          )}
         </div>
       )}
 

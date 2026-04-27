@@ -126,6 +126,24 @@ function ShieldIcon() {
   );
 }
 
+function VideoQualityIcon() {
+  return (
+    <svg
+      className="h-5 w-5 text-[#6EA2FF]"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5A1.125 1.125 0 0 1 18 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0 1 18 9.375v1.5m1.5-3.75C19.496 8.25 20 8.754 20 9.375v1.5m0 0v1.5c0 .621-.504 1.125-1.125 1.125m1.125-2.625h-1.5m-6 3.75 3-3m0 0-3-3m3 3H9"
+      />
+    </svg>
+  );
+}
+
 function LogoutIcon() {
   return (
     <svg
@@ -282,6 +300,10 @@ export default function ProfilePage() {
     const stored = window.localStorage.getItem("novarquiz-sound-enabled");
     return stored === null ? true : stored === "true";
   });
+  const [videoQuality, setVideoQuality] = useState<'auto' | 'hd' | 'sd'>(() => {
+    if (typeof window === "undefined") return "auto";
+    return (window.localStorage.getItem("novarquiz-video-quality") as 'auto' | 'hd' | 'sd') ?? "auto";
+  });
   const [userStats, setUserStats] = useState<{ bestScore: number; bestStreak: number }>({
     bestScore: 0,
     bestStreak: 0,
@@ -376,6 +398,14 @@ export default function ProfilePage() {
     const next = !soundEnabled;
     setSoundEnabled(next);
     window.localStorage.setItem("novarquiz-sound-enabled", String(next));
+  };
+
+  const [videoQualityModal, setVideoQualityModal] = useState(false);
+
+  const handleVideoQualitySelect = (value: 'auto' | 'hd' | 'sd') => {
+    setVideoQuality(value);
+    window.localStorage.setItem("novarquiz-video-quality", value);
+    setVideoQualityModal(false);
   };
 
   return (
@@ -482,6 +512,21 @@ export default function ProfilePage() {
           />
 
           <GeneralRow
+            icon={<VideoQualityIcon />}
+            label="Video Quality"
+            description={videoQuality === 'auto' ? 'Auto (detects Wi-Fi vs cellular)' : videoQuality === 'hd' ? 'Always HD (1080p)' : 'Always SD (720p, saves data)'}
+            onClick={() => setVideoQualityModal(true)}
+            trailing={
+              <>
+                <span className="rounded-full bg-[#EEF3FB] px-3 py-1 text-xs font-bold text-[#3A66C1] uppercase tracking-wide">
+                  {videoQuality === 'auto' ? 'Auto' : videoQuality === 'hd' ? 'HD' : 'SD'}
+                </span>
+                <ChevronRight />
+              </>
+            }
+          />
+
+          <GeneralRow
             icon={<ShieldIcon />}
             label={t("profile.terms_privacy")}
             onClick={() => setTermsModal(true)}
@@ -522,6 +567,51 @@ export default function ProfilePage() {
           </button>
         </div>
       </motion.section>
+
+      <Modal
+        isOpen={videoQualityModal}
+        onClose={() => setVideoQualityModal(false)}
+        title="Video Quality"
+        size="sm"
+      >
+        <p className="mb-4 text-sm text-[#5D7EA1]">
+          Choose how videos load during a quiz. Lower quality uses less data on cellular.
+        </p>
+        <div className="flex flex-col gap-3">
+          {(
+            [
+              { value: 'auto', label: 'Auto', sub: 'Uses HD on Wi-Fi, SD on cellular' },
+              { value: 'hd',   label: 'HD — 1080p', sub: 'Always full quality, higher data usage' },
+              { value: 'sd',   label: 'SD — 720p', sub: 'Always lower quality, saves data' },
+            ] as const
+          ).map(({ value, label, sub }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => handleVideoQualitySelect(value)}
+              className={`flex items-center gap-4 rounded-2xl border px-4 py-3.5 text-left transition ${
+                videoQuality === value
+                  ? 'border-[#3A66C1] bg-[#EEF3FB]'
+                  : 'border-[#DCE7F5] bg-white hover:border-[#92BFFF]'
+              }`}
+            >
+              <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                videoQuality === value ? 'border-[#3A66C1] bg-[#3A66C1]' : 'border-[#C2D4E8]'
+              }`}>
+                {videoQuality === value && (
+                  <span className="block h-2 w-2 rounded-full bg-white" />
+                )}
+              </span>
+              <div>
+                <p className={`text-sm font-semibold ${videoQuality === value ? 'text-[#3A66C1]' : 'text-[#16324F]'}`}>
+                  {label}
+                </p>
+                <p className="text-xs text-[#8FA3BD]">{sub}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </Modal>
 
       <Modal
         isOpen={termsModal}

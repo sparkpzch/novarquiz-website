@@ -30,6 +30,7 @@ import type { Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import Button from '@/components/ui/Button';
+import { useToast } from '@/components/ui/Toast';
 import { NormalNode, type NormalNodeData } from './NormalNode';
 import { SituationNode, type SituationNodeData } from './SituationNode';
 import { EndNode, type EndNodeData } from './EndNode';
@@ -139,6 +140,7 @@ export function EditorCanvas({
   quizId,
 }: EditorCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
+  const { showToast } = useToast();
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
   const [inspectedNode, setInspectedNode] = useState<AppNode | null>(null);
   const [uploadStatus, setUploadStatus] = useState<{ nodeId: string; uploading: boolean; progress: number } | null>(null);
@@ -170,6 +172,17 @@ export function EditorCanvas({
     const isGif = file.type === 'image/gif';
     const isImage = file.type.startsWith('image/');
     if (!isVideo && !isImage) return;
+
+    const MAX_IMAGE = 5 * 1024 * 1024;  // 5 MB
+    const MAX_VIDEO = 50 * 1024 * 1024; // 50 MB
+    if (isVideo && file.size > MAX_VIDEO) {
+      showToast('Video must be under 50 MB', 'error');
+      return;
+    }
+    if (!isVideo && file.size > MAX_IMAGE) {
+      showToast('Image must be under 5 MB', 'error');
+      return;
+    }
 
     const mediaType = isVideo ? 'video' : isGif ? 'gif' : 'image';
     const folder = isVideo ? 'video' : isGif ? 'gif' : 'image';

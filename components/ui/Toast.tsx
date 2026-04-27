@@ -36,7 +36,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
+      <div className="fixed top-4 right-4 z-100 flex flex-col gap-2">
         <AnimatePresence>
           {toasts.map((toast) => (
             <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
@@ -53,10 +53,10 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
     return () => clearTimeout(timer);
   }, [toast.id, onRemove]);
 
-  const colors = {
-    success: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300',
-    error: 'border-red-500/50 bg-red-500/10 text-red-300',
-    info: 'border-indigo-500/50 bg-indigo-500/10 text-indigo-300',
+  const styles = {
+    success: { bar: 'bg-emerald-500', bg: 'bg-white border-emerald-200', icon: 'bg-emerald-100 text-emerald-600', text: 'text-[#1B2530]' },
+    error:   { bar: 'bg-red-500',     bg: 'bg-white border-red-200',     icon: 'bg-red-100 text-red-600',     text: 'text-[#1B2530]' },
+    info:    { bar: 'bg-blue-500',    bg: 'bg-white border-blue-200',    icon: 'bg-blue-100 text-blue-600',   text: 'text-[#1B2530]' },
   };
 
   const icons = {
@@ -65,16 +65,21 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
     info: 'ℹ',
   };
 
+  const s = styles[toast.type];
+
   return (
     <motion.div
-      initial={{ opacity: 0, x: 50, scale: 0.9 }}
+      initial={{ opacity: 0, x: 50, scale: 0.95 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0, x: 50, scale: 0.9 }}
-      className={`flex items-center gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-md min-w-[300px] ${colors[toast.type]}`}
+      exit={{ opacity: 0, x: 50, scale: 0.95 }}
+      className={`relative overflow-hidden flex items-center gap-3 rounded-2xl border px-4 py-3.5 shadow-xl min-w-[320px] max-w-sm ${s.bg}`}
     >
-      <span className="text-lg font-bold">{icons[toast.type]}</span>
-      <span className="text-sm font-medium flex-1">{toast.message}</span>
-      <button onClick={() => onRemove(toast.id)} className="opacity-60 hover:opacity-100 transition-opacity">
+      <div className={`absolute left-0 top-0 bottom-0 w-1 ${s.bar}`} />
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${s.icon}`}>
+        {icons[toast.type]}
+      </span>
+      <span className={`text-sm font-semibold flex-1 leading-snug ${s.text}`}>{toast.message}</span>
+      <button onClick={() => onRemove(toast.id)} className="shrink-0 text-[#9BAFC6] hover:text-[#1B2530] transition-colors">
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
