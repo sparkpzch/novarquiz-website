@@ -4,10 +4,13 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, Re
 import { User, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 
+type CachedProfile = { displayName: string | null; photoURL: string | null; email: string | null } | null;
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
+  cachedProfile: CachedProfile;
   refreshUser: () => Promise<void>;
 }
 
@@ -15,13 +18,36 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   isAdmin: false,
+  cachedProfile: null,
   refreshUser: async () => {},
 });
+
+const PROFILE_CACHE_KEY = 'nq_profile';
+
+function saveProfileCache(user: User) {
+  try {
+    sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({
+      displayName: user.displayName,
+      photoURL: user.photoURL,
+      email: user.email,
+    }));
+  } catch {}
+}
+
+function clearProfileCache() {
+  try { sessionStorage.removeItem(PROFILE_CACHE_KEY); } catch {}
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [cachedProfile, setCachedProfile] = useState<CachedProfile>(() => {
+    try {
+      const raw = sessionStorage.getItem(PROFILE_CACHE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
   // Guards against repeated rehydration attempts on a broken cookie.
   const rehydrateTriedRef = useRef(false);
 
@@ -31,6 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const tokenResult = await firebaseUser.getIdTokenResult();
         setIsAdmin(!!tokenResult.claims.admin);
         setUser(firebaseUser);
+        saveProfileCache(firebaseUser);
+        setCachedProfile({ displayName: firebaseUser.displayName, photoURL: firebaseUser.photoURL, email: firebaseUser.email });
         setLoading(false);
         return;
       }
@@ -60,6 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setIsAdmin(false);
       setUser(null);
+      setCachedProfile(null);
+      clearProfileCache();
       setLoading(false);
     });
 
@@ -75,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, cachedProfile, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

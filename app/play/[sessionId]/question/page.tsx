@@ -10,6 +10,7 @@ import type { Choice, LeaderboardEntry, Question, Quiz } from '@/lib/types';
 import { updateScore, watchScores, untrackAllUserSessionsFor, type PlayerScore } from '@/lib/firebase/rtdb';
 import { trackEvent } from '@/lib/firebase/analytics';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
+import { Card } from '@/components/ui/Card';
 
 
 const IMPACT_THEME = {
@@ -71,61 +72,71 @@ function QuizHeader({
   currentUserId?: string;
 }) {
   return (
-    <div className="space-y-3">
-      <div className="nq-card-dark rounded-[28px] px-4 py-3 text-white shadow-[0_24px_56px_rgba(7,16,43,0.34)] md:px-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="rounded-[20px] border border-white/10 bg-white/[0.06] px-4 py-2.5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[#8DA8D0]">Time</p>
-            <p className="mt-1 text-3xl font-bold leading-none tabular-nums">{elapsed}</p>
-          </div>
+    <div className="rounded-[24px] border border-white/25 bg-white/15 px-4 py-3 text-white shadow-[0_20px_48px_rgba(7,16,43,0.18)] backdrop-blur-md">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="nq-details" style={{ color: 'rgba(255,255,255,0.65)' }}>Time</p>
+          <p className="mt-0.5 text-xl font-bold tabular-nums">{elapsed}</p>
+        </div>
 
-          <div className="flex items-center gap-3">
-            <ProfileAvatar
-              displayName={userName}
-              photoURL={photoURL}
-              size={44}
-              ringClassName="ring-2 ring-[#92BFFF]/70"
-            />
-            <div className="rounded-[20px] border border-white/10 bg-white/[0.06] px-4 py-2.5 text-right">
-              <p className="text-sm text-[#B8C7EA]">
-                <span className="font-bold text-white tabular-nums">{score}</span> Score
-              </p>
-              <AnimatePresence>
-                {lastDelta !== null && (
-                  <motion.p
-                    key={`delta-${score}-${lastDelta}`}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    className={`text-xs font-semibold ${lastDelta >= 0 ? 'text-[#92FFBF]' : 'text-[#FFB6B8]'}`}
-                  >
-                    {lastDelta >= 0 ? `+${lastDelta}` : lastDelta}
-                  </motion.p>
-                )}
-              </AnimatePresence>
-            </div>
+        <ProfileAvatar
+          displayName={userName}
+          photoURL={photoURL}
+          size={36}
+          ringClassName="ring-2 ring-[#92BFFF]/70"
+        />
+
+        <div className="text-right">
+          <p className="nq-details" style={{ color: 'rgba(255,255,255,0.65)' }}>Score</p>
+          <div className="mt-0.5 flex items-center justify-end gap-1.5">
+            <p className="text-xl font-bold tabular-nums">{score}</p>
+            <AnimatePresence>
+              {lastDelta !== null && (
+                <motion.span
+                  key={`delta-${score}-${lastDelta}`}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  className={`text-xs font-semibold ${lastDelta >= 0 ? 'text-[#92FFBF]' : 'text-[#FFB6B8]'}`}
+                >
+                  {lastDelta >= 0 ? `+${lastDelta}` : lastDelta}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
 
       {(topScores.length > 1 || streak > 1) && (
-        <div className="nq-card-dark rounded-[22px] px-4 py-3 text-white shadow-[0_18px_44px_rgba(7,16,43,0.3)]">
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#92BFFF]">🏆 Live Leaderboard</p>
-            <span className="text-sm text-[#8DA8D0]">{totalPlayers} players</span>
-            {streak > 1 && <span className="rounded-full bg-[#FFB020]/18 px-3 py-1 text-xs font-semibold text-[#FFD48A]">🔥 Streak {streak}</span>}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[#D9E7FF]">
-            {topScores.map((player, index) => (
-              <span key={player.uid} className={player.uid === currentUserId ? 'font-semibold text-white' : ''}>
-                #{index + 1} {formatPlayerName(player.displayName, player.uid === currentUserId)} {player.score}
-              </span>
-            ))}
-          </div>
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/15 pt-2.5">
+          <span className="nq-details" style={{ color: 'rgba(255,255,255,0.55)' }}>🏆 Live</span>
+          <span className="nq-details" style={{ color: 'rgba(255,255,255,0.55)' }}>{totalPlayers} players</span>
+          {streak > 1 && <span className="rounded-full bg-[#FFB020]/20 px-2 py-0.5 text-xs font-semibold text-[#FFD48A]">🔥 {streak}</span>}
+          {topScores.map((player, index) => (
+            <span key={player.uid} className={`text-xs ${player.uid === currentUserId ? 'font-bold text-white' : 'text-white/75'}`}>
+              #{index + 1} {formatPlayerName(player.displayName, player.uid === currentUserId)} {player.score}
+            </span>
+          ))}
         </div>
       )}
     </div>
   );
+}
+
+type VideoQuality = 'auto' | 'hd' | 'sd';
+
+function useVideoQuality(): VideoQuality {
+  if (typeof window === 'undefined') return 'auto';
+  return (localStorage.getItem('novarquiz-video-quality') as VideoQuality) ?? 'auto';
+}
+
+function resolvePreload(quality: VideoQuality): 'none' | 'metadata' {
+  if (quality === 'hd') return 'metadata';
+  if (quality === 'sd') return 'none';
+  // auto: detect connection type
+  const conn = (navigator as Navigator & { connection?: { effectiveType?: string } }).connection;
+  const type = conn?.effectiveType ?? '';
+  return type === '2g' || type === '3g' ? 'none' : 'metadata';
 }
 
 function QuestionVisual({
@@ -135,33 +146,51 @@ function QuestionVisual({
   question: Question;
   totalQuestions?: number;
 }) {
+  const [mediaError, setMediaError] = useState(false);
+  const quality = useVideoQuality();
+  const preload = resolvePreload(quality);
+
+  useEffect(() => {
+    setMediaError(false);
+  }, [question.id]);
+
   return (
     <>
       {question.media_url && (
-        <div className="relative overflow-hidden rounded-[28px] shadow-[0_18px_36px_rgba(17,87,145,0.12)]">
-          {question.media_type === 'video' ? (
+        <div className="relative overflow-hidden rounded-[22px]">
+          {mediaError ? (
+            <div className="flex h-44 w-full items-center justify-center bg-[#EEF3F8] md:h-56">
+              <p className="nq-details text-[#B0C4D8]">Media unavailable</p>
+            </div>
+          ) : question.media_type === 'video' ? (
             <video
-              src={question.media_url ?? ''}
+              key={question.id}
+              src={question.media_url}
               controls
-              className="h-[200px] w-full object-cover md:h-[260px]"
+              preload={preload}
+              className="h-44 w-full object-cover md:h-56"
+              onError={() => setMediaError(true)}
             />
           ) : (
             <img
-              src={question.media_url ?? ''}
+              src={question.media_url}
               alt=""
-              className="h-[200px] w-full object-cover md:h-[260px]"
+              className="h-44 w-full object-cover md:h-56"
+              onError={() => setMediaError(true)}
             />
           )}
-          <div className="absolute inset-x-0 bottom-0 h-20 bg-linear-to-t from-black/50 to-transparent" />
+          {!mediaError && (
+            <div className="absolute inset-x-0 bottom-0 h-14 bg-linear-to-t from-black/40 to-transparent" />
+          )}
         </div>
       )}
 
       <div>
-        <p className="text-sm font-medium text-[#7A8EA7]">
+        <p className="nq-details text-[#7A8EA7]">
           Question {question.question_order + 1}
           {typeof totalQuestions === 'number' && totalQuestions > 0 ? `/${totalQuestions}` : ''}
         </p>
-        <h1 className="mt-2 text-[1.8rem] font-bold leading-tight text-[#1B2530] md:text-[2.1rem]">
+        <h1 className="mt-2 text-lg font-bold leading-snug text-[#1B2530] md:text-xl">
           {question.question_text}
         </h1>
       </div>
@@ -720,18 +749,18 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     return (
       <div className="nq-sky min-h-screen">
         <div className="nq-content flex min-h-screen items-center justify-center p-4">
-          <div className="nq-card w-full max-w-3xl rounded-[34px] p-6 md:p-8">
+          <Card className="w-full max-w-3xl">
             <QuestionVisual question={question} totalQuestions={sessionMeta?.question_count} />
             {question.question_text && (
-              <p className="mt-6 text-lg leading-relaxed text-[#475E79]">{question.question_text}</p>
+              <p className="mt-5 nq-subject leading-relaxed text-[#475E79]">{question.question_text}</p>
             )}
             <button
               onClick={() => setFinished(true)}
-              className="mt-8 w-full rounded-[24px] bg-[#0460A9] px-4 py-4 text-lg font-semibold text-white! shadow-[0_20px_42px_rgba(17,87,145,0.24)]"
+              className="mt-6 w-full rounded-3xl bg-[#0460A9] px-4 py-4 text-base font-semibold text-white! shadow-[0_20px_42px_rgba(17,87,145,0.24)]"
             >
               Finish
             </button>
-          </div>
+          </Card>
         </div>
       </div>
     );
@@ -753,10 +782,10 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
             currentUserId={user?.uid}
           />
 
-          <div className="nq-card rounded-[34px] p-5 md:p-7">
+          <Card>
             <QuestionVisual question={question} totalQuestions={sessionMeta?.question_count} />
-            <div className="mt-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <p className="max-w-2xl text-base text-[#5D7EA1]">
+            <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <p className="max-w-2xl nq-subject text-[#5D7EA1]">
                 {question.question_text || 'Continue when you are ready for the next part of the quiz.'}
               </p>
               <button
@@ -767,7 +796,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
                 {nextLoading ? 'Loading…' : 'Continue'}
               </button>
             </div>
-          </div>
+          </Card>
         </div>
       </div>
     );
@@ -795,7 +824,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
           currentUserId={user?.uid}
         />
 
-        <div className="nq-card rounded-[34px] p-5 md:p-7">
+        <Card>
           <QuestionVisual question={question} totalQuestions={sessionMeta?.question_count} />
 
           <AnimatePresence mode="wait">
@@ -838,7 +867,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
             )}
 
           </AnimatePresence>
-        </div>
+        </Card>
       </div>
 
       <AnimatePresence>
