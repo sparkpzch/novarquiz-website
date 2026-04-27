@@ -110,8 +110,26 @@ function getFirebaseAdmin() {
   });
 }
 
-export const adminApp = getFirebaseAdmin();
-export const adminAuth = admin.auth(adminApp);
-export const adminDb = admin.firestore(adminApp);
-export const adminRtdb = admin.database(adminApp);
-export const adminStorage = admin.storage(adminApp);
+// Defer initialization until first property access so Next.js build doesn't
+// throw when no credentials are present (credentials are only available at runtime).
+function makeLazy<T extends object>(factory: () => T): T {
+  let inst: T | undefined;
+  return new Proxy({} as T, {
+    get(_, prop) {
+      inst ??= factory();
+      const v = Reflect.get(inst, prop, inst);
+      return typeof v === 'function' ? (v as (...args: unknown[]) => unknown).bind(inst) : v;
+    },
+  });
+}
+
+let _app: admin.app.App | undefined;
+function adminAppInstance() {
+  return (_app ??= getFirebaseAdmin());
+}
+
+export const adminApp = makeLazy(adminAppInstance);
+export const adminAuth = makeLazy(() => admin.auth(adminAppInstance()));
+export const adminDb = makeLazy(() => admin.firestore(adminAppInstance()));
+export const adminRtdb = makeLazy(() => admin.database(adminAppInstance()));
+export const adminStorage = makeLazy(() => admin.storage(adminAppInstance()));
