@@ -225,7 +225,7 @@ function GeneralRow({
 }) {
   const content = (
     <div className="flex items-center gap-4 py-1">
-      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F3F8FF] shadow-sm border border-[#0460A9]/05">
+      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F3F8FF] shadow-sm">
         {icon}
       </div>
       <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
@@ -502,7 +502,7 @@ export default function ProfilePage() {
             onClick={handleLogout}
             className="flex w-full items-center gap-4 py-1 transition hover:opacity-85"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 shadow-sm">
               <LogoutIcon />
             </div>
             <span className="text-[1.05rem] font-medium text-[#E85C5C]">{t("nav.logout")}</span>
@@ -513,7 +513,7 @@ export default function ProfilePage() {
             onClick={() => setDeleteModal(true)}
             className="flex w-full items-center gap-4 py-1 transition hover:opacity-85"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-50">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 shadow-sm">
               <DeleteAccountIcon />
             </div>
             <span className="text-[1.05rem] font-medium text-[#D9485F]">
