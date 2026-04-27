@@ -153,12 +153,6 @@ function AdminDashboardContent() {
     if (!authLoading && !isAdmin) router.push("/");
   }, [authLoading, isAdmin, router]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 1280) {
-      router.replace('/');
-    }
-  }, [router]);
-
   const fetchData = () => {
     Promise.all([
       fetch("/api/quizzes?all=true").then((r) => (r.ok ? r.json() : [])),
