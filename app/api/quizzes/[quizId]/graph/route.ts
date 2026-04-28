@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server';
-import { createQuestion, upsertChoices, getQuestionsByQuiz, saveConnections, getConnectionsByQuiz, deleteQuestionsByQuiz, resolveQuizId } from '@/lib/db/queries';
+import {
+  createQuestion,
+  upsertChoices,
+  getQuestionsByQuiz,
+  saveConnections,
+  getConnectionsByQuiz,
+  deleteQuestionsByQuiz,
+  resolveQuizId,
+  replaceQuizGraph,
+} from '@/lib/db/queries';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
@@ -52,6 +61,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ quiz
   try {
     const realId = await resolveQuizId(quizId);
     const body = await request.json();
+    if (Array.isArray(body.questions) && Array.isArray(body.connections)) {
+      const result = await replaceQuizGraph(realId, body.questions, body.connections);
+      return NextResponse.json({ ok: true, idMap: result.idMap });
+    }
     if (body.connections) {
       await saveConnections(realId, body.connections);
     }

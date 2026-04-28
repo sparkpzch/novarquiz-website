@@ -33,6 +33,54 @@ async function getErrorMessage(response: Response) {
   return payload?.error ?? `Request failed (${response.status})`;
 }
 
+function serializeGraph(nodes: AppNode[], edges: AppEdge[]) {
+  return {
+    questions: nodes.map((node, index) => {
+      const isNormal = node.type === "normalNode";
+      const isEnd = node.type === "endNode";
+      const data = node.data as AppNodeData;
+
+      return {
+        id: node.id,
+        question_order: index,
+        question_text: data.question_text,
+        node_name: data.node_name ?? null,
+        media_type: data.media_type,
+        media_url: data.media_url,
+        media_path: data.media_path,
+        is_entry_point: data.is_entry_point,
+        node_x: Math.round(node.position.x),
+        node_y: Math.round(node.position.y),
+        node_type: isNormal ? "normal" : isEnd ? "end" : "situation",
+        timer_override: isNormal ? null : undefined,
+        choices: isNormal ? (data as NormalNodeData).choices : [],
+      };
+    }),
+    connections: edges
+      .filter((edge) => edge.source && edge.target)
+      .map((edge) => ({
+        from_question_id: edge.source,
+        from_choice_label: edge.sourceHandle ?? "A",
+        to_question_id: edge.target,
+      })),
+  };
+}
+
+function remapGraphIds(nodes: AppNode[], edges: AppEdge[], idMap: Record<string, string>) {
+  const remappedNodes = nodes.map((node) =>
+    idMap[node.id] ? { ...node, id: idMap[node.id] } : node,
+  );
+
+  const remappedEdges = edges.map((edge) => ({
+    ...edge,
+    id: `${idMap[edge.source] ?? edge.source}-${edge.sourceHandle ?? "A"}-${idMap[edge.target] ?? edge.target}`,
+    source: idMap[edge.source] ?? edge.source,
+    target: idMap[edge.target] ?? edge.target,
+  }));
+
+  return { remappedNodes, remappedEdges };
+}
+
 type AppNodeType = "normalNode" | "situationNode" | "endNode";
 
 function nodeTypeFor(q: Question): AppNodeType {
@@ -135,7 +183,7 @@ export default function EditQuestionPage({
       )
       .catch(() => {})
       .finally(() => setFetching(false));
-  }, [sessionId]);
+  }, [sessionId, setEdges, setNodes]);
 
   if (authLoading || !isAdmin) return null;
 
@@ -170,69 +218,19 @@ export default function EditQuestionPage({
         router.replace(`/admin/questions/${sesData.slug}/edit`);
       }
 
-      // 2. Delete existing questions (preserve media paths that are still in use)
-      const preservePaths = nodes
-        .map((n) => (n.data as AppNodeData).media_path)
-        .filter((p): p is string => Boolean(p));
-      const deleteGraphRes = await fetch(`/api/quizzes/${sessionId}/graph`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preserve_paths: preservePaths }),
-      });
-      if (!deleteGraphRes.ok) throw new Error(await getErrorMessage(deleteGraphRes));
-
-      // 3. Re-create questions, map tempId → realId
-      const idMap: Record<string, string> = {};
-      for (let i = 0; i < nodes.length; i++) {
-        const node = nodes[i];
-        const isNormal = node.type === "normalNode";
-        const isEnd = node.type === "endNode";
-        const d = node.data as AppNodeData;
-
-        const body: Record<string, unknown> = {
-          session_id: sessionId,
-          question_order: i,
-          question_text: d.question_text,
-          node_name: d.node_name ?? null,
-          media_type: d.media_type,
-          media_url: d.media_url,
-          media_path: d.media_path,
-          is_entry_point: d.is_entry_point,
-          node_x: Math.round(node.position.x),
-          node_y: Math.round(node.position.y),
-          node_type: isNormal ? "normal" : isEnd ? "end" : "situation",
-        };
-        if (isNormal) {
-          const nd = d as NormalNodeData;
-          body.timer_override = null;
-          body.choices = nd.choices;
-        }
-
-        const qRes = await fetch(`/api/quizzes/${sessionId}/graph`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const q = await qRes.json();
-        if (!qRes.ok) throw new Error(q.error);
-        idMap[node.id] = q.id;
-      }
-
-      // 4. Save connections
-      const connections = edges
-        .filter((e) => idMap[e.source] && idMap[e.target])
-        .map((e) => ({
-          from_question_id: idMap[e.source],
-          from_choice_label: e.sourceHandle ?? "A",
-          to_question_id: idMap[e.target],
-        }));
-
       const graphRes = await fetch(`/api/quizzes/${sessionId}/graph`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ connections }),
+        body: JSON.stringify(serializeGraph(nodes, edges)),
       });
       if (!graphRes.ok) throw new Error(await getErrorMessage(graphRes));
+      const graphData = await graphRes.json();
+
+      if (graphData?.idMap) {
+        const { remappedNodes, remappedEdges } = remapGraphIds(nodes, edges, graphData.idMap);
+        setNodes(remappedNodes);
+        setEdges(remappedEdges);
+      }
 
       showToast("Quiz saved!", "success");
       // router.push("/admin?tab=quizzes-manager"); // Removed as per user request
