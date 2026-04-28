@@ -146,13 +146,10 @@ function QuestionVisual({
   question: Question;
   totalQuestions?: number;
 }) {
-  const [mediaError, setMediaError] = useState(false);
+  const [failedMediaQuestionId, setFailedMediaQuestionId] = useState<string | null>(null);
   const quality = useVideoQuality();
   const preload = resolvePreload(quality);
-
-  useEffect(() => {
-    setMediaError(false);
-  }, [question.id]);
+  const mediaError = failedMediaQuestionId === question.id;
 
   return (
     <>
@@ -167,16 +164,20 @@ function QuestionVisual({
               key={question.id}
               src={question.media_url}
               controls
+              autoPlay
+              loop
+              muted
+              playsInline
               preload={preload}
               className="h-44 w-full object-cover md:h-56"
-              onError={() => setMediaError(true)}
+              onError={() => setFailedMediaQuestionId(question.id)}
             />
           ) : (
             <img
               src={question.media_url}
               alt=""
               className="h-44 w-full object-cover md:h-56"
-              onError={() => setMediaError(true)}
+              onError={() => setFailedMediaQuestionId(question.id)}
             />
           )}
           {!mediaError && (
@@ -487,6 +488,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const completedRef = useRef(false);
   const scoreRef = useRef(score);
   const userRef = useRef(user);
+  const sessionStartRef = useRef<number>(0);
   const explanationTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -517,6 +519,14 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (userRef.current && !userRef.current.isAnonymous && !completedRef.current) {
+        untrackAllUserSessionsFor(userRef.current.uid, sessionId).catch(() => {});
+      }
+    };
+  }, [sessionId]);
+
   const isSituation = question?.node_type === 'situation';
   const isEnd = question?.node_type === 'end';
   const selectedChoice = question?.choices.find((choice) => choice.label === selectedLabel) ?? null;
@@ -528,7 +538,6 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     }
 
     setQuestion(nextQuestion);
-    setElapsed(0);
     setSelectedLabel(null);
     setLastDelta(null);
     setShowExplanationModal(false);
@@ -568,7 +577,10 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
           return;
         }
 
-        if (!cancelled) applyQuestion(data);
+        if (!cancelled) {
+          sessionStartRef.current = typeof performance !== 'undefined' ? performance.now() : 0;
+          applyQuestion(data);
+        }
       } catch {
         if (!cancelled) setFinished(true);
       } finally {
@@ -582,10 +594,12 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   }, [applyQuestion, sessionId]);
 
   useEffect(() => {
-    if (loading || finished || selectedLabel || isSituation || isEnd) return;
-    const interval = setInterval(() => setElapsed((current) => current + 1), 1000);
+    if (loading || finished || isSituation || isEnd || sessionStartRef.current === 0) return;
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((performance.now() - sessionStartRef.current) / 1000));
+    }, 1000);
     return () => clearInterval(interval);
-  }, [finished, isEnd, isSituation, loading, question?.id, selectedLabel]);
+  }, [finished, isEnd, isSituation, loading, question?.id]);
 
   const goToNext = async (fromQuestionId: string, choiceLabel: string) => {
     try {

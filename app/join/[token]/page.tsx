@@ -1,14 +1,20 @@
-'use client';
+"use client";
 
-import { use, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { signInAnonymously, updateProfile } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { joinWaitingRoom, claimLeaderIfEmpty, resolveJoinToken, trackUserSession, getRoom } from '@/lib/firebase/rtdb';
-import { trackEvent } from '@/lib/firebase/analytics';
-import { ROOM_STATUS } from '@/lib/constants/session';
-import { motion } from 'motion/react';
+import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { signInAnonymously, updateProfile } from "firebase/auth";
+import { auth } from "@/lib/firebase/config";
+import { useAuth } from "@/lib/hooks/useAuth";
+import {
+  joinWaitingRoom,
+  claimLeaderIfEmpty,
+  resolveJoinToken,
+  trackUserSession,
+  getRoom,
+} from "@/lib/firebase/rtdb";
+import { trackEvent } from "@/lib/firebase/analytics";
+import { ROOM_STATUS } from "@/lib/constants/session";
+import { motion } from "motion/react";
 
 type SessionInfo = {
   id: string;
@@ -17,23 +23,29 @@ type SessionInfo = {
   is_private?: boolean;
 };
 
-export default function JoinPage({ params }: { params: Promise<{ token: string }> }) {
+export default function JoinPage({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}) {
   const { token } = use(params);
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [session, setSession] = useState<SessionInfo | null>(null);
-  const [fetchError, setFetchError] = useState('');
+  const [fetchError, setFetchError] = useState("");
   const [joining, setJoining] = useState(false);
-  const [joinError, setJoinError] = useState('');
-  const [guestName, setGuestName] = useState('');
+  const [joinError, setJoinError] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [firstVideoUrl, setFirstVideoUrl] = useState<string | null>(null);
+  const [videoReady, setVideoReady] = useState(true);
 
   // Sign in anonymously if there's no existing session.
   // This lets anyone join via a shareable link without creating an account.
   useEffect(() => {
     if (!authLoading && !user) {
       signInAnonymously(auth).catch(() => {
-        setFetchError('Could not start a guest session. Please try again.');
+        setFetchError("Could not start a guest session. Please try again.");
       });
     }
   }, [authLoading, user]);
@@ -51,7 +63,7 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
         if (sessionIdFromRtdb) {
           const res = await fetch(`/api/sessions/${sessionIdFromRtdb}`);
           if (!res.ok) {
-            setFetchError('Session not found');
+            setFetchError("Session not found");
             return;
           }
           const data = await res.json();
@@ -59,16 +71,19 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
           // 1.5 Check if the session is joinable in RTDB
           const room = await getRoom(sessionIdFromRtdb);
           if (!room || room.status === ROOM_STATUS.ENDED) {
-            setFetchError('This invite link is no longer valid. Ask the host for a new one.');
+            setFetchError(
+              "This invite link is no longer valid. Ask the host for a new one.",
+            );
             return;
           }
 
-          if (!cancelled) setSession({ 
-            id: data.id, 
-            name: data.quiz_name || data.name, 
-            description: data.quiz_description || data.description,
-            is_private: data.is_private 
-          });
+          if (!cancelled)
+            setSession({
+              id: data.id,
+              name: data.quiz_name || data.name,
+              description: data.quiz_description || data.description,
+              is_private: data.is_private,
+            });
           return;
         }
 
@@ -78,36 +93,71 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
 
         if (res.ok) {
           const data = await res.json();
-          
+
           // Check if the session is joinable in RTDB
           const room = await getRoom(data.id);
           if (!room || room.status === ROOM_STATUS.ENDED) {
-            setFetchError('This invite link is no longer valid. Ask the host for a new one.');
+            setFetchError(
+              "This invite link is no longer valid. Ask the host for a new one.",
+            );
             return;
           }
 
-          if (!cancelled) setSession({ 
-            id: data.id, 
-            name: data.name, 
-            description: data.description,
-            is_private: data.is_private
-          });
+          if (!cancelled)
+            setSession({
+              id: data.id,
+              name: data.name,
+              description: data.description,
+              is_private: data.is_private,
+            });
         } else {
-          setFetchError('This invite link is no longer valid. Ask the host for a new one.');
+          setFetchError(
+            "This invite link is no longer valid. Ask the host for a new one.",
+          );
         }
       } catch {
-        if (!cancelled) setFetchError('Failed to load session');
+        if (!cancelled) setFetchError("Failed to load session");
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [token, user]);
+
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/sessions/${session.id}/preview`);
+        const data = res.ok ? await res.json() : null;
+        if (cancelled) return;
+        if (data?.media_type === "video" && data?.media_url) {
+          setVideoReady(false);
+          setFirstVideoUrl(data.media_url);
+        }
+      } catch {
+        // no video to preload — leave videoReady as true
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  useEffect(() => {
+    if (!firstVideoUrl) return;
+    // failsafe: unblock button after 10 s even if canplaythrough never fires
+    const timeout = window.setTimeout(() => setVideoReady(true), 10_000);
+    return () => window.clearTimeout(timeout);
+  }, [firstVideoUrl]);
 
   const handleJoin = async () => {
     if (!session || !user) return;
     setJoining(true);
-    setJoinError('');
+    setJoinError("");
 
-    trackEvent('session_join_attempted', { session_id: session.id });
+    trackEvent("session_join_attempted", { session_id: session.id });
 
     try {
       if (user.isAnonymous && guestName.trim()) {
@@ -116,26 +166,26 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
 
       // 1. Call RESTful Join API
       const res = await fetch(`/api/sessions/${session.id}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          displayName: user.displayName || guestName.trim() || 'Anonymous',
+          displayName: user.displayName || guestName.trim() || "Anonymous",
           photoURL: user.photoURL,
         }),
       });
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to join session');
+        throw new Error(errorData.error || "Failed to join session");
       }
 
       const joinData = await res.json();
 
       // 2. Claim leader if empty (this remains client-side as a fast transaction)
       await claimLeaderIfEmpty(session.id, user.uid);
-      
-      trackEvent('session_join_succeeded', { session_id: session.id });
-      
+
+      trackEvent("session_join_succeeded", { session_id: session.id });
+
       // Once the room has started, late joiners go directly into gameplay.
       if (joinData.roomStatus === ROOM_STATUS.STARTED) {
         router.push(`/play/${session.id}/question`);
@@ -143,8 +193,10 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
         router.push(`/play/${session.id}/lobby`);
       }
     } catch (err) {
-      console.error('Join failed:', err);
-      setJoinError(`Could not join: ${(err as Error).message || 'unknown error'}`);
+      console.error("Join failed:", err);
+      setJoinError(
+        `Could not join: ${(err as Error).message || "unknown error"}`,
+      );
       setJoining(false);
     }
   };
@@ -174,7 +226,9 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
         {fetchError ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-8 text-center">
             <div className="text-5xl mb-4">🔒</div>
-            <h1 className="text-xl font-bold text-white mb-2">Session Unavailable</h1>
+            <h1 className="text-xl font-bold text-white mb-2">
+              Session Unavailable
+            </h1>
             <p className="text-gray-400 text-sm">{fetchError}</p>
           </div>
         ) : !session ? (
@@ -188,7 +242,9 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
               <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-angular-700 to-angular-500 flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">🎮</span>
               </div>
-              <h1 className="text-2xl font-bold text-white mb-1">{session.name}</h1>
+              <h1 className="text-2xl font-bold text-white mb-1">
+                {session.name}
+              </h1>
               {session.description && (
                 <p className="text-gray-400 text-sm">{session.description}</p>
               )}
@@ -203,8 +259,8 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
                   type="text"
                   maxLength={30}
                   value={guestName}
-                  onChange={e => setGuestName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleJoin()}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleJoin()}
                   placeholder="Guest"
                   className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-angular-700 focus:outline-none placeholder:text-gray-600"
                 />
@@ -212,14 +268,31 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
             )}
 
             {joinError && (
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 text-sm mb-4 text-center">
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-red-400 text-sm mb-4 text-center"
+              >
                 {joinError}
               </motion.p>
             )}
 
+            {firstVideoUrl && (
+              <video
+                key={firstVideoUrl}
+                src={firstVideoUrl}
+                preload="auto"
+                muted
+                playsInline
+                className="hidden"
+                onCanPlayThrough={() => setVideoReady(true)}
+                onError={() => setVideoReady(true)}
+              />
+            )}
+
             <button
               onClick={handleJoin}
-              disabled={joining}
+              disabled={joining || !videoReady}
               className="w-full py-3 rounded-xl bg-linear-to-r from-angular-700 to-angular-500 text-white! font-semibold text-base disabled:opacity-50 disabled:cursor-not-allowed hover:from-angular-500 hover:to-angular-700 transition-all"
             >
               {joining ? (
@@ -227,15 +300,27 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   Joining…
                 </span>
+              ) : !videoReady ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Preparing Question…
+                </span>
               ) : (
-                'Join Session'
+                "Join Session"
               )}
             </button>
 
             <p className="text-center text-xs text-gray-500 mt-4">
-              {user.isAnonymous
-                ? 'Playing as guest — progress won\'t be saved'
-                : <>Joining as <span className="text-angular-300">{user.displayName || user.email}</span></>}
+              {user.isAnonymous ? (
+                "Playing as guest — progress won't be saved"
+              ) : (
+                <>
+                  Joining as{" "}
+                  <span className="text-angular-300">
+                    {user.displayName || user.email}
+                  </span>
+                </>
+              )}
             </p>
           </div>
         )}

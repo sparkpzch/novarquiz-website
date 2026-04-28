@@ -36,7 +36,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed top-4 right-4 z-100 flex flex-col gap-2">
+      <div className="fixed bottom-4 left-4 right-4 z-100 flex flex-col gap-2 sm:bottom-auto sm:top-4 sm:left-auto sm:right-4 sm:w-auto sm:items-end">
         <AnimatePresence>
           {toasts.map((toast) => (
             <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
@@ -69,10 +69,10 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 50, scale: 0.95 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0, x: 50, scale: 0.95 }}
-      className={`relative overflow-hidden flex items-center gap-3 rounded-2xl border px-4 py-3.5 shadow-xl min-w-[320px] max-w-sm ${s.bg}`}
+      initial={{ opacity: 0, y: 16, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 16, scale: 0.96 }}
+      className={`relative overflow-hidden flex items-center gap-3 rounded-2xl border px-4 py-3.5 shadow-xl w-full sm:min-w-[320px] sm:max-w-sm ${s.bg}`}
     >
       <div className={`absolute left-0 top-0 bottom-0 w-1 ${s.bar}`} />
       <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${s.icon}`}>

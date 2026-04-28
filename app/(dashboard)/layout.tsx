@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ReactNode, Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams, ReadonlyURLSearchParams } from 'next/navigation';
@@ -35,12 +35,12 @@ const mobileNavItems: NavItem[] = [
   {
     href: '/history',
     label: 'nav.history',
-    icon: 'M12 6v6l4 2m5-2a9 9 0 1 1-9-9',
+    icon: 'M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
   },
   {
     href: '/profile',
     label: 'nav.profile',
-    icon: 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm-7 10h6c2.761 0 5 2.239 5 5H4c0-2.761 2.239-5 5-5Z',
+    icon: 'M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0zM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632z',
   },
 ];
 
@@ -199,39 +199,21 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
                   );
                 })}
 
-                {/* Quizzes — featured gradient pill */}
+                {/* Quizzes */}
                 {(() => {
                   const active = isActive(quizzesNavItem.href);
                   return (
-                    <motion.div
-                      whileTap={reduceMotion ? undefined : { scale: 0.985, y: 1 }}
-                      transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+                    <Link
+                      href={quizzesNavItem.href}
+                      className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
+                        active
+                          ? 'bg-[#0460A9] text-[#F8FBFF] shadow-lg shadow-[#0460A9]/20'
+                          : 'text-[#4D6F93] hover:bg-white/60 hover:text-[#16324F]'
+                      }`}
                     >
-                      <Link
-                        href={quizzesNavItem.href}
-                        className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[#ffffff] transition-all ${
-                          active
-                            ? 'bg-gradient-to-r from-[#0460A9] to-[#55A0FF] shadow-lg shadow-[#0460A9]/25'
-                            : 'bg-gradient-to-r from-[#0460A9] to-[#3A8FE8] opacity-85 hover:opacity-100'
-                        }`}
-                      >
-                        <motion.div
-                          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-[#ffffff]"
-                          whileTap={reduceMotion ? undefined : { scale: 0.92, rotate: -10 }}
-                          transition={{ type: 'spring', stiffness: 420, damping: 24 }}
-                        >
-                          <Icon path={quizzesNavItem.icon} active={true} />
-                        </motion.div>
-                        <span className="font-semibold text-[#ffffff]">{t(quizzesNavItem.label)}</span>
-                        <motion.span
-                          className="ml-auto rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-[#ffffff]"
-                          whileTap={reduceMotion ? undefined : { scale: 0.94 }}
-                          transition={{ type: 'spring', stiffness: 420, damping: 24 }}
-                        >
-                          NEW
-                        </motion.span>
-                      </Link>
-                    </motion.div>
+                      <Icon path={quizzesNavItem.icon} active={active} />
+                      <span className="font-medium">{t(quizzesNavItem.label)}</span>
+                    </Link>
                   );
                 })()}
 
@@ -297,7 +279,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
           </aside>
 
           <div className="flex min-w-0 flex-1 flex-col">
-            <main className={`${isProfileDetail ? "px-4 pb-8 pt-8 md:px-6 lg:px-8" : "nq-bottom-safe px-4 pb-8 pt-5 md:px-6 lg:px-8"} flex-1`}>
+            <main className={`${isProfileDetail ? "px-4 pb-8 pt-8 md:px-6 lg:px-8" : "nq-bottom-safe px-4 pt-5 lg:pb-8! md:px-6 lg:px-8"} flex-1`}>
               <motion.div key={pathname} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
                 {children}
               </motion.div>

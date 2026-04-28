@@ -517,13 +517,13 @@ export async function deleteQuestion(questionId: string) {
   }
 }
 
-export async function deleteQuestionsByQuiz(sessionId: string) {
+export async function deleteQuestionsByQuiz(sessionId: string, preservePaths: Set<string> = new Set()) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const { rows } = await client.query('SELECT media_path FROM questions WHERE session_id = $1', [sessionId]);
     for (const row of rows) {
-      if (row.media_path) {
+      if (row.media_path && !preservePaths.has(row.media_path)) {
         await decrementMediaUsage(client, row.media_path);
       }
     }
