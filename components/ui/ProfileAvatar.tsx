@@ -25,7 +25,7 @@ export default function ProfileAvatar({
   if (photoURL && !imgFailed) {
     return (
       <div
-        className={`overflow-hidden rounded-full bg-white/40 ${ringClassName} ${className}`}
+        className={`shrink-0 overflow-hidden rounded-full bg-white/40 ${ringClassName} ${className}`}
         style={{ width: size, height: size }}
       >
         <img
@@ -40,7 +40,7 @@ export default function ProfileAvatar({
 
   return (
     <div
-      className={`flex items-center justify-center rounded-full bg-gradient-to-br from-[#92BFFF] via-[#4D92E4] to-[#055A9E] font-bold text-white ${ringClassName} ${className} ${textClassName}`}
+      className={`shrink-0 flex items-center justify-center rounded-full bg-gradient-to-br from-[#92BFFF] via-[#4D92E4] to-[#055A9E] font-bold text-white ${ringClassName} ${className} ${textClassName}`}
       style={{ width: size, height: size, fontSize: Math.max(14, size * 0.34) }}
     >
       {initial}

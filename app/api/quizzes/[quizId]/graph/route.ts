@@ -29,11 +29,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ qui
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ quizId: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
   try {
     const realId = await resolveQuizId(quizId);
-    await deleteQuestionsByQuiz(realId);
+    let preservePaths = new Set<string>();
+    try {
+      const body = await request.json();
+      if (Array.isArray(body?.preserve_paths)) {
+        preservePaths = new Set(body.preserve_paths.filter(Boolean));
+      }
+    } catch { /* body not provided or not JSON */ }
+    await deleteQuestionsByQuiz(realId, preservePaths);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

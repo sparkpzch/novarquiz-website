@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import {
+  getRoom,
   resolveJoinToken,
   watchUserSessions,
   type UserSessionEntry,
 } from "@/lib/firebase/rtdb";
+import { ROOM_STATUS } from "@/lib/constants/session";
 import { useToast } from "@/components/ui/Toast";
 import { useTranslation } from "react-i18next";
 import "@/lib/i18n";
@@ -21,6 +23,10 @@ type ParsedJoinInput =
   | { type: "token"; token: string }
   | { type: "team"; sessionId: string; roomId: string; pin: string }
   | null;
+
+type SessionResumeSnapshot = {
+  is_private?: boolean;
+};
 
 function parseJoinInput(input: string): ParsedJoinInput {
   const trimmed = input.trim();
@@ -55,6 +61,7 @@ function LiveSessionsWidget() {
   const { user } = useAuth();
   const router = useRouter();
   const [entries, setEntries] = useState<Record<string, UserSessionEntry>>({});
+  const [resuming, setResuming] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -66,15 +73,48 @@ function LiveSessionsWidget() {
 
   const entry = list[0];
 
-  const resume = () => {
+  const resume = async () => {
+    if (resuming) return;
+
+    setResuming(true);
+
     if (entry.mode === "team" && entry.roomId) {
       router.push(`/play/${entry.sessionId}/team/${entry.roomId}`);
       return;
     }
+
+    try {
+      const [sessionResponse, room] = await Promise.all([
+        fetch(`/api/sessions/${entry.sessionId}`),
+        getRoom(entry.sessionId),
+      ]);
+      const session = sessionResponse.ok
+        ? ((await sessionResponse.json()) as SessionResumeSnapshot)
+        : null;
+
+      if (room?.status === ROOM_STATUS.STARTED) {
+        router.push(`/play/${entry.sessionId}/question`);
+        return;
+      }
+
+      if (entry.mode === "solo" || session?.is_private) {
+        router.push(`/play/${entry.sessionId}/question`);
+        return;
+      }
+
+      if (room?.status === ROOM_STATUS.WAITING) {
+        router.push(`/play/${entry.sessionId}/lobby`);
+        return;
+      }
+    } catch {
+      // fall back to the local session index when live checks fail
+    }
+
     if (entry.mode === "solo") {
       router.push(`/play/${entry.sessionId}/question`);
       return;
     }
+
     router.push(`/play/${entry.sessionId}/lobby`);
   };
 
@@ -89,15 +129,37 @@ function LiveSessionsWidget() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <Card>
-        <Card.Header icon="🕹️" title="Pick up where you left off" />
-        <Card.Row
-          icon={icon}
-          title={entry.sessionName}
-          subtitle={`${modeLabel} · Resume now`}
-          trailing={<span className="nq-text-accent text-xs font-bold">→</span>}
+      <Card className="relative overflow-hidden">
+        <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(146,191,255,0.36),transparent_65%)] pointer-events-none" />
+
+        <div className="relative z-10 mb-4 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#70A2F9] text-lg text-white shadow-[0_14px_28px_rgba(17,87,145,0.18)]">
+            🕹️
+          </div>
+          <div>
+            <p className="nq-topic">Pick up where you left off</p>
+            <h2 className="nq-content">Your latest session is ready.</h2>
+            <p className="nq-content">Jump back into the most recent lobby or run in one tap.</p>
+          </div>
+        </div>
+
+        <button
+          type="button"
           onClick={resume}
-        />
+          disabled={resuming}
+          className="relative z-10 flex w-full items-center gap-4 rounded-[22px] border border-[#0460A9]/14 bg-white/78 p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition duration-200 hover:bg-white hover:border-[#0460A9]/30 hover:shadow-md active:scale-[0.98] disabled:cursor-wait disabled:opacity-80"
+        >
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-gradient-to-br from-[#8FC0FF] to-[#70A2F9] text-xl text-white shadow-lg shadow-[#70A2F9]/20">
+            {icon}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="nq-subject truncate font-bold text-[#16324F]">{entry.sessionName}</p>
+            <p className="nq-content mt-0.5 font-medium text-[#5D7EA1]">
+              {modeLabel} · {resuming ? "Checking session…" : "Resume now"}
+            </p>
+          </div>
+          <span className="nq-text-accent shrink-0 text-xs font-bold">→</span>
+        </button>
       </Card>
     </motion.div>
   );
@@ -247,10 +309,11 @@ export default function DashboardPage() {
     <div className="mx-auto max-w-6xl space-y-4 md:space-y-5">
 
       {/* ── Profile + Stats row ── */}
-      <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1.1fr_0.9fr]">
 
         {/* Profile card */}
         <motion.div
+          className="min-w-0"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -258,14 +321,14 @@ export default function DashboardPage() {
             <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(146,191,255,0.4),transparent_65%)] pointer-events-none" />
             <div className="absolute right-[-36px] top-[14px] h-full w-48 rounded-full border border-[#0460A9]/12 bg-[#70A2F9]/10 pointer-events-none" />
             <div className="absolute right-[18px] top-[-20px] h-full w-36 rounded-full border border-[#0460A9]/12 bg-[#70A2F9]/12 pointer-events-none" />
-            <div className="relative flex items-center gap-4">
+            <div className="relative flex items-center gap-4 overflow-hidden">
               <ProfileAvatar
                 displayName={user?.displayName}
                 photoURL={user?.photoURL}
                 size={64}
                 ringClassName="ring-2 ring-white/80 shadow-lg shadow-[#113D7A]/18"
               />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="nq-details mb-1 font-bold text-[#5D7EA1]">Welcome back,</p>
                 <h1 className="nq-header truncate text-xl sm:text-2xl font-display tracking-tight">{user?.displayName || "Player"}</h1>
               </div>
@@ -274,7 +337,7 @@ export default function DashboardPage() {
         </motion.div>
 
         {/* Stat summary card */}
-        <Card>
+        <Card className="min-w-0">
           <Card.Header icon="📊" title="Stat Summary" />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
             {statItems.map((item) => (
@@ -290,9 +353,32 @@ export default function DashboardPage() {
 
       </section>
 
-      <LiveSessionsWidget />
+      {/* Browse Quizzes */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
+        <button
+          onClick={() => router.push('/quizzes')}
+          className="w-full text-left"
+        >
+          <Card className="relative overflow-hidden transition hover:brightness-[0.97] active:scale-[0.99]">
+            <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(146,191,255,0.36),transparent_65%)] pointer-events-none" />
+            <div className="relative z-10 flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#70A2F9] text-lg text-white shadow-[0_14px_28px_rgba(17,87,145,0.18)]">
+                📚
+              </div>
+              <div>
+                <p className="nq-topic">Quizzes</p>
+                <h2 className="nq-content">Browse quizzes</h2>
+                <p className="nq-content">Find and join available quizzes.</p>
+              </div>
+              <span className="nq-text-accent ml-auto text-xs font-bold">→</span>
+            </div>
+          </Card>
+        </button>
+      </motion.div>
 
       <JoinByCodeCard />
+
+      <LiveSessionsWidget />
 
     </div>
   );

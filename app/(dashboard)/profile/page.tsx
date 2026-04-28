@@ -162,6 +162,24 @@ function LogoutIcon() {
   );
 }
 
+function ClearCacheIcon() {
+  return (
+    <svg
+      className="h-5 w-5 text-[#5D7EA1]"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+      />
+    </svg>
+  );
+}
+
 function DeleteAccountIcon() {
   return (
     <svg
@@ -359,6 +377,13 @@ export default function ProfilePage() {
     }
   };
 
+  const handleClearCache = () => {
+    const keys = Object.keys(window.localStorage).filter((k) => k.startsWith('novarquiz-'));
+    keys.forEach((k) => window.localStorage.removeItem(k));
+    showToast("Cache cleared", "success");
+    window.location.reload();
+  };
+
   const handleLogout = async () => {
     await fetch("/api/auth/session", { method: "DELETE" });
     await signOut(auth);
@@ -542,6 +567,17 @@ export default function ProfilePage() {
         className="nq-card rounded-[30px] p-6"
       >
         <div className="space-y-4">
+          <button
+            type="button"
+            onClick={handleClearCache}
+            className="flex w-full items-center gap-4 py-1 transition hover:opacity-85"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F3F8FF] shadow-sm">
+              <ClearCacheIcon />
+            </div>
+            <span className="text-[1.05rem] font-medium text-[#5D7EA1]">Clear Cache</span>
+          </button>
+
           <button
             type="button"
             onClick={handleLogout}

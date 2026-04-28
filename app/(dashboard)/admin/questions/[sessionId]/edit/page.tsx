@@ -170,9 +170,14 @@ export default function EditQuestionPage({
         router.replace(`/admin/questions/${sesData.slug}/edit`);
       }
 
-      // 2. Delete existing questions
+      // 2. Delete existing questions (preserve media paths that are still in use)
+      const preservePaths = nodes
+        .map((n) => (n.data as AppNodeData).media_path)
+        .filter((p): p is string => Boolean(p));
       const deleteGraphRes = await fetch(`/api/quizzes/${sessionId}/graph`, {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preserve_paths: preservePaths }),
       });
       if (!deleteGraphRes.ok) throw new Error(await getErrorMessage(deleteGraphRes));
 
