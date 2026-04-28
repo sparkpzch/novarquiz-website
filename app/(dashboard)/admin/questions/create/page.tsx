@@ -21,6 +21,39 @@ async function getErrorMessage(response: Response) {
   return payload?.error ?? `Request failed (${response.status})`;
 }
 
+function serializeGraph(nodes: AppNode[], edges: AppEdge[]) {
+  return {
+    questions: nodes.map((node, index) => {
+      const isNormal = node.type === "normalNode";
+      const isEnd = node.type === "endNode";
+      const data = node.data as AppNodeData;
+
+      return {
+        id: node.id,
+        question_order: index,
+        question_text: data.question_text,
+        node_name: data.node_name ?? null,
+        media_type: data.media_type,
+        media_url: data.media_url,
+        media_path: data.media_path,
+        is_entry_point: data.is_entry_point,
+        node_x: Math.round(node.position.x),
+        node_y: Math.round(node.position.y),
+        node_type: isNormal ? "normal" : isEnd ? "end" : "situation",
+        timer_override: isNormal ? null : undefined,
+        choices: isNormal ? (data as NormalNodeData).choices : [],
+      };
+    }),
+    connections: edges
+      .filter((edge) => edge.source && edge.target)
+      .map((edge) => ({
+        from_question_id: edge.source,
+        from_choice_label: edge.sourceHandle ?? "A",
+        to_question_id: edge.target,
+      })),
+  };
+}
+
 export default function CreateQuestionPage() {
   const { isAdmin, user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -66,58 +99,10 @@ export default function CreateQuestionPage() {
       const session = await sesRes.json();
       if (!sesRes.ok) throw new Error(session.error);
 
-      // 2. Create questions, map tempId → realId
-      const idMap: Record<string, string> = {};
-      for (let i = 0; i < nodes.length; i++) {
-        const node = nodes[i];
-        const isNormal = node.type === "normalNode";
-        const isEnd = node.type === "endNode";
-        const d = node.data as AppNodeData;
-
-        const body: Record<string, unknown> = {
-          session_id: session.id,
-          question_order: i,
-          question_text: d.question_text,
-          media_type: d.media_type,
-          media_url: d.media_url,
-          is_entry_point: d.is_entry_point,
-          node_x: Math.round(node.position.x),
-          node_y: Math.round(node.position.y),
-          node_type: isNormal ? "normal" : isEnd ? "end" : "situation",
-        };
-
-        if (isNormal) {
-          const nd = d as NormalNodeData;
-          body.timer_override = null;
-          body.choices = nd.choices;
-        }
-
-        const qRes = await fetch(
-          `/api/quizzes/${session.id}/graph`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          },
-        );
-        const q = await qRes.json();
-        if (!qRes.ok) throw new Error(q.error);
-        idMap[node.id] = q.id;
-      }
-
-      // 3. Save connections
-      const connections = edges
-        .filter((e) => idMap[e.source] && idMap[e.target])
-        .map((e) => ({
-          from_question_id: idMap[e.source],
-          from_choice_label: e.sourceHandle ?? "A",
-          to_question_id: idMap[e.target],
-        }));
-
       const graphRes = await fetch(`/api/quizzes/${session.id}/graph`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ connections }),
+        body: JSON.stringify(serializeGraph(nodes, edges)),
       });
       if (!graphRes.ok) throw new Error(await getErrorMessage(graphRes));
 

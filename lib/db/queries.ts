@@ -1,7 +1,7 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import pool, { queryWithRetry } from './postgres';
 import { SESSION_STATUS, SessionStatus } from '../constants/session';
-import { incrementMediaUsage, decrementMediaUsage } from './media';
+import { incrementMediaUsage, decrementMediaUsage, syncMediaUsage } from './media';
 
 // ===================== Quizzes =====================
 
@@ -91,10 +91,6 @@ export async function resolveQuizId(idOrSlug: string): Promise<string> {
   const quiz = await getQuizById(idOrSlug);
   if (!quiz) throw new Error('Quiz not found');
   return quiz.id;
-}
-
-function generatePinCode() {
-  return randomInt(0, 1_000_000).toString().padStart(6, '0');
 }
 
 // Removed: getSessionByShareToken — share tokens now live in Firebase RTDB (joinTokens/{token})
@@ -446,6 +442,143 @@ export async function createQuestion(data: {
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function normalizeChoiceScoreImpact(choice: {
+  score_impact?: number;
+  points?: number;
+}) {
+  const rawScoreImpact =
+    typeof choice.score_impact === 'number' && Number.isFinite(choice.score_impact)
+      ? choice.score_impact
+      : typeof choice.points === 'number' && Number.isFinite(choice.points)
+        ? choice.points
+        : 0;
+
+  return Math.trunc(rawScoreImpact);
+}
+
+type GraphQuestionInput = {
+  id?: string;
+  question_order: number;
+  question_text: string;
+  node_name?: string | null;
+  media_type?: 'image' | 'gif' | 'video' | null;
+  media_url?: string | null;
+  media_path?: string | null;
+  timer_override?: number | null;
+  is_entry_point?: boolean;
+  node_x?: number;
+  node_y?: number;
+  node_type?: string;
+  choices?: Array<{
+    label: string;
+    choice_text: string;
+    score_impact?: number;
+    points?: number;
+    explanation?: string | null;
+  }>;
+};
+
+type GraphConnectionInput = {
+  from_question_id: string;
+  from_choice_label: string;
+  to_question_id: string;
+};
+
+export async function replaceQuizGraph(
+  sessionId: string,
+  questions: GraphQuestionInput[],
+  connections: GraphConnectionInput[],
+) {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const { rows: oldRows } = await client.query(
+      'SELECT media_path FROM questions WHERE session_id = $1',
+      [sessionId],
+    );
+    const oldMediaPaths = oldRows.map((row) => row.media_path as string | null);
+
+    await client.query('DELETE FROM question_connections WHERE session_id = $1', [sessionId]);
+    await client.query(
+      'DELETE FROM choices WHERE question_id IN (SELECT id FROM questions WHERE session_id = $1)',
+      [sessionId],
+    );
+    await client.query('DELETE FROM questions WHERE session_id = $1', [sessionId]);
+
+    const idMap: Record<string, string> = {};
+    const newMediaPaths: Array<string | null> = [];
+
+    for (const question of questions) {
+      const sourceId = question.id ?? randomUUID();
+      const questionId = sourceId && UUID_RE.test(sourceId) ? sourceId : randomUUID();
+
+      await client.query(
+        `INSERT INTO questions (id, session_id, question_order, question_text, node_name, media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        [
+          questionId,
+          sessionId,
+          question.question_order,
+          question.question_text,
+          question.node_name ?? null,
+          question.media_type ?? null,
+          question.media_url ?? null,
+          question.media_path ?? null,
+          question.timer_override ?? null,
+          question.is_entry_point ?? false,
+          question.node_x ?? 0,
+          question.node_y ?? 0,
+          question.node_type ?? 'normal',
+        ],
+      );
+
+      idMap[sourceId] = questionId;
+      newMediaPaths.push(question.media_path ?? null);
+
+      for (const choice of question.choices ?? []) {
+        await client.query(
+          `INSERT INTO choices (question_id, label, choice_text, score_impact, explanation)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            questionId,
+            choice.label,
+            choice.choice_text,
+            normalizeChoiceScoreImpact(choice),
+            choice.explanation ?? null,
+          ],
+        );
+      }
+    }
+
+    for (const connection of connections) {
+      const fromQuestionId = idMap[connection.from_question_id];
+      const toQuestionId = idMap[connection.to_question_id];
+
+      if (!fromQuestionId || !toQuestionId) continue;
+
+      await client.query(
+        `INSERT INTO question_connections (session_id, from_question_id, from_choice_label, to_question_id)
+         VALUES ($1, $2, $3, $4)`,
+        [sessionId, fromQuestionId, connection.from_choice_label, toQuestionId],
+      );
+    }
+
+    await syncMediaUsage(client, oldMediaPaths, newMediaPaths);
+
+    await client.query('COMMIT');
+    return { idMap };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function updateQuestion(questionId: string, data: Partial<{
   question_text: string;
   node_name: string;
@@ -551,14 +684,6 @@ export async function upsertChoices(questionId: string, choices: Array<{
     allowWriteRetry: true,
   });
   for (const choice of choices) {
-    const rawScoreImpact =
-      typeof choice.score_impact === 'number' && Number.isFinite(choice.score_impact)
-        ? choice.score_impact
-        : typeof choice.points === 'number' && Number.isFinite(choice.points)
-          ? choice.points
-          : 0;
-    const scoreImpact = Math.trunc(rawScoreImpact);
-
     await queryWithRetry(
       `INSERT INTO choices (question_id, label, choice_text, score_impact, explanation)
        VALUES ($1, $2, $3, $4, $5)
@@ -566,7 +691,7 @@ export async function upsertChoices(questionId: string, choices: Array<{
          choice_text = EXCLUDED.choice_text,
          score_impact = EXCLUDED.score_impact,
          explanation = EXCLUDED.explanation`,
-      [questionId, choice.label, choice.choice_text, scoreImpact, choice.explanation ?? null],
+      [questionId, choice.label, choice.choice_text, normalizeChoiceScoreImpact(choice), choice.explanation ?? null],
       { allowWriteRetry: true }
     );
   }

@@ -57,20 +57,35 @@ export async function decrementMediaUsage(client: IDbClient, path: string | null
  * Increments new paths and decrements old paths that are no longer used.
  */
 export async function syncMediaUsage(client: IDbClient, oldPaths: (string | null)[], newPaths: (string | null)[]) {
-  const oldSet = new Set(oldPaths.filter(Boolean));
-  const newSet = new Set(newPaths.filter(Boolean));
+  const oldCounts = new Map<string, number>();
+  const newCounts = new Map<string, number>();
 
-  // Paths to increment: in new but not in old
-  for (const path of newSet) {
-    if (!oldSet.has(path)) {
-      await incrementMediaUsage(client, path);
-    }
+  for (const path of oldPaths) {
+    if (!path) continue;
+    oldCounts.set(path, (oldCounts.get(path) ?? 0) + 1);
   }
 
-  // Paths to decrement: in old but not in new
-  for (const path of oldSet) {
-    if (!newSet.has(path)) {
-      await decrementMediaUsage(client, path);
+  for (const path of newPaths) {
+    if (!path) continue;
+    newCounts.set(path, (newCounts.get(path) ?? 0) + 1);
+  }
+
+  const allPaths = new Set([...oldCounts.keys(), ...newCounts.keys()]);
+
+  for (const path of allPaths) {
+    const oldCount = oldCounts.get(path) ?? 0;
+    const newCount = newCounts.get(path) ?? 0;
+
+    if (newCount > oldCount) {
+      for (let i = 0; i < newCount - oldCount; i++) {
+        await incrementMediaUsage(client, path);
+      }
+    }
+
+    if (oldCount > newCount) {
+      for (let i = 0; i < oldCount - newCount; i++) {
+        await decrementMediaUsage(client, path);
+      }
     }
   }
 }
