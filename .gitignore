@@ -52,3 +52,7 @@ CLAUDE.md
 
 # Firebase json
 novartis-decisionlab-firebase-adminsdk-fbsvc-449068ab1a.json
+
+# Agent files
+.agents
+.claude
