@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
@@ -108,6 +109,18 @@ export default function QuizzesManager({
   const [quizPage, setQuizPage] = useState(1);
   const SESSION_ITEMS_PER_PAGE = 3;
   const QUIZ_ITEMS_PER_PAGE = 5;
+
+  useEffect(() => {
+    const hasOverlay = createSessionModal.isOpen || confirmModal.isOpen;
+    if (!hasOverlay) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [createSessionModal.isOpen, confirmModal.isOpen]);
 
   const filteredTemplates = allData.filter(q => {
     const ownerId = (q as any).created_by || (q as any).user_id;
@@ -266,7 +279,7 @@ export default function QuizzesManager({
   };
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-8 max-w-[1600px] mx-auto pb-12 h-full">
+    <div className="flex h-full w-full flex-col gap-6 pb-12 lg:gap-8">
       {/* Control Bar */}
       <div className="nq-card rounded-[34px] p-4 flex flex-col sm:flex-row items-center gap-4 justify-between">
         <div className="flex items-center gap-2">
@@ -309,7 +322,7 @@ export default function QuizzesManager({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-stretch flex-1">
         {/* LEFT COLUMN: Sessions */}
-        <div className="nq-card rounded-[34px] p-5 md:p-6 lg:p-8 flex h-[1400px] min-h-0 flex-col">
+        <div className="nq-card flex min-h-[720px] flex-col rounded-[34px] p-5 md:p-6 lg:min-h-[calc(100dvh-13rem)] lg:p-8">
           <div className="mb-6 lg:mb-8">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#5D7EA1]">Live instances</p>
             <h2 className="mt-2 text-2xl md:text-3xl font-bold text-[#16324F]">Sessions</h2>
@@ -533,7 +546,7 @@ export default function QuizzesManager({
         </div>
 
         {/* RIGHT COLUMN: Quizzes */}
-        <div className="nq-card rounded-[34px] p-5 md:p-6 lg:p-8 flex h-[1400px] min-h-0 flex-col">
+        <div className="nq-card flex min-h-[720px] flex-col rounded-[34px] p-5 md:p-6 lg:min-h-[calc(100dvh-13rem)] lg:p-8">
           <div className="mb-6 lg:mb-8 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#5D7EA1]">Templates</p>
@@ -665,8 +678,8 @@ export default function QuizzesManager({
       </div>
 
       {/* CREATE SESSION MODAL */}
-      {createSessionModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0460A9]/20 backdrop-blur-md px-4">
+      {createSessionModal.isOpen && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-[#0460A9]/20 px-4 backdrop-blur-md">
           <div className="w-full max-w-md nq-card rounded-[34px] p-8 shadow-2xl">
             <h3 className="text-2xl font-bold text-[#16324F] mb-3">New Session</h3>
             <p className="text-sm text-[#5D7EA1] mb-6">
@@ -722,12 +735,13 @@ export default function QuizzesManager({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* SAFETY CONFIRMATION MODAL */}
-      {confirmModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0460A9]/20 backdrop-blur-md px-4">
+      {confirmModal.isOpen && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-[#0460A9]/20 px-4 backdrop-blur-md">
           <div className={`w-full max-w-md nq-card rounded-[34px] p-8 shadow-2xl border-2 ${confirmModal.action === 'delete' ? 'border-[#E74C3C]/30' : 'border-[#E67E22]/30'}`}>
             <h3 className="text-2xl font-bold text-[#16324F] mb-3">
               {confirmModal.action === "delete" ? "Delete" : "Archive"} {confirmModal.type === "quiz" ? "Template" : "Session"}
@@ -776,7 +790,8 @@ export default function QuizzesManager({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <InvitationModal

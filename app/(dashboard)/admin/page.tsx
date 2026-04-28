@@ -345,7 +345,11 @@ function AdminDashboardContent() {
     : 1;
 
   return (
-    <div className="nq-admin-panel max-w-6xl mx-auto space-y-10">
+    <div
+      className={`nq-admin-panel mx-auto w-full space-y-10 ${
+        activeTab === "quizzes-manager" ? "max-w-[1600px]" : "max-w-6xl"
+      }`}
+    >
       <AnimatePresence mode="wait" initial={false}>
         {/* ── DASHBOARD TAB ── */}
         {activeTab === "dashboard" && (

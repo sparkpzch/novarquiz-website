@@ -16,6 +16,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ses
 export async function PATCH(request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
   try {
+    const session = await getSessionById(sessionId);
+    if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
     const data = await request.json();
     
     // Support both legacy 'pin' key and direct DB field names
@@ -25,7 +28,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ se
       delete updateData.pin;
     }
     
-    await updateSession(sessionId, updateData);
+    await updateSession(session.id, updateData);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error(`Failed to update session ${sessionId}:`, err);

@@ -49,15 +49,17 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
 
   // Only watch status for navigation — players don't need the full room object
   useEffect(() => {
-    return watchRoomStatus(sessionId, (status) => {
-      if (status === 'started') router.push(`/play/${sessionId}/question`);
+    if (!session?.id) return;
+    return watchRoomStatus(session.id, (status) => {
+      if (status === 'started') router.push(`/play/${session.id}/question`);
     });
-  }, [router, sessionId]);
+  }, [router, session?.id]);
 
   // Separate scoped listener for the player grid
   useEffect(() => {
-    return watchRoomPlayers(sessionId, setPlayers);
-  }, [sessionId]);
+    if (!session?.id) return;
+    return watchRoomPlayers(session.id, setPlayers);
+  }, [session?.id]);
 
   useEffect(() => {
     joinedUserIdRef.current = user?.uid ?? null;
@@ -74,53 +76,54 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
   useEffect(() => {
     return () => {
       const uid = joinedUserIdRef.current;
-      if (shouldLeaveOnUnmountRef.current && uid) {
-        leaveWaitingRoom(sessionId, uid);
+      if (shouldLeaveOnUnmountRef.current && uid && session?.id) {
+        leaveWaitingRoom(session.id, uid);
       }
     };
-  }, [sessionId]);
+  }, [session?.id]);
 
   const handleLeave = useCallback(async () => {
+    if (!session) return;
     shouldLeaveOnUnmountRef.current = false;
-    if (user) await leaveWaitingRoom(sessionId, user.uid);
+    if (user) await leaveWaitingRoom(session.id, user.uid);
     router.push('/');
-  }, [router, sessionId, user]);
+  }, [router, session, user]);
 
   if (loading || !user) return null;
 
   const playerEntries = Object.entries(players);
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-[#03305A] via-[#0460A9] to-[#055A9E]">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="w-full max-w-3xl space-y-4">
+    <div className="nq-sky min-h-screen">
+      <div className="nq-content flex min-h-screen items-center justify-center p-4">
+        <div className="w-full max-w-3xl space-y-6">
           <AnimatePresence>
             {showLeaveConfirm && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-center justify-center bg-[#03305A]/60 p-4 backdrop-blur-md"
+                className="fixed inset-0 z-50 flex items-center justify-center bg-[#03305A]/40 p-4 backdrop-blur-md"
               >
                 <motion.div
                   initial={{ opacity: 0, y: 18, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 18, scale: 0.98 }}
-                  className="w-full max-w-sm rounded-[30px] border border-[#92BFFF]/30 bg-linear-to-b from-[#0E2850] to-[#0A1B3E] p-6 text-center shadow-[0_30px_70px_rgba(7,16,43,0.35)] backdrop-blur-xl"
+                  className="w-full max-w-sm nq-card-dark rounded-[30px] p-8 text-center"
                 >
                   <div className="text-4xl">🚪</div>
-                  <h2 className="nq-on-dark mt-3 text-xl font-bold">Leave this lobby?</h2>
-                  <p className="mt-2 text-sm text-[#BCD7FF]">You&apos;ll be removed before the host starts the game.</p>
-                  <div className="mt-6 flex gap-3">
+                  <h2 className="nq-on-dark mt-4 text-2xl font-bold">Leave this lobby?</h2>
+                  <p className="mt-2 text-sm nq-on-dark-soft">You&apos;ll be removed before the host starts the game.</p>
+                  <div className="mt-8 flex gap-3">
                     <button
                       onClick={() => setShowLeaveConfirm(false)}
-                      className="flex-1 rounded-2xl border border-[#92BFFF]/35 bg-white/10 px-4 py-3 text-sm font-semibold text-[#F8FBFF] transition-colors hover:bg-white/20"
+                      className="flex-1 rounded-[22px] border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-white/20"
                     >
                       Stay
                     </button>
                     <button
                       onClick={handleLeave}
-                      className="flex-1 rounded-2xl bg-linear-to-r from-[#D84D63] to-[#BA2F54] px-4 py-3 text-sm font-semibold text-[#FFF8FA] transition-colors hover:brightness-105"
+                      className="flex-1 rounded-[22px] bg-linear-to-r from-[#D84D63] to-[#BA2F54] px-4 py-3 text-sm font-bold text-white transition-colors hover:brightness-110 shadow-lg shadow-rose-900/20"
                     >
                       Leave
                     </button>
@@ -136,37 +139,39 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
             animate={{ opacity: 1, y: 0 }}
             className="text-center"
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.32em] text-[#AFCFFF]">Waiting Lobby</p>
-            <h1 className="nq-on-dark mt-2 text-3xl font-bold">{session?.name || 'Loading…'}</h1>
+            <p className="nq-details nq-on-dark opacity-80">Waiting Lobby</p>
+            <h1 className="nq-on-dark mt-2 text-4xl font-bold tracking-tight">{session?.name || 'Loading…'}</h1>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-[34px] border border-[#92BFFF]/20 bg-white/10 p-6 backdrop-blur-xl md:p-7"
+            className="nq-card-dark rounded-[40px] p-8 md:p-10"
           >
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
-              <p className="text-sm text-[#BCD7FF]">
-                <span className="font-bold text-[#F8FBFF]">{playerEntries.length}</span> player{playerEntries.length !== 1 ? 's' : ''} joined
-                {' '}· The host will start the quiz when ready.
-              </p>
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
+              <div>
+                <p className="nq-on-dark-soft text-sm">
+                  <span className="font-bold nq-on-dark text-lg">{playerEntries.length}</span> players joined
+                </p>
+                <p className="nq-on-dark-soft text-xs mt-0.5 opacity-70">The host will start the quiz when ready.</p>
+              </div>
               <button
                 onClick={() => setShowLeaveConfirm(true)}
-                className="rounded-2xl border border-[#92BFFF]/35 bg-white/10 px-4 py-2.5 text-sm font-semibold text-[#F8FBFF] transition-colors hover:bg-white/20"
+                className="rounded-[18px] border border-white/15 bg-white/10 px-6 py-2.5 text-sm font-bold nq-on-dark transition-colors hover:bg-white/20"
               >
                 Leave
               </button>
             </div>
 
-            <div className="rounded-[28px] border border-[#92BFFF]/18 bg-[#0B2C57]/36 p-5">
+            <div className="rounded-[32px] bg-white/5 border border-white/10 p-6 md:p-8">
               {playerEntries.length === 0 ? (
-                <div className="flex min-h-40 flex-col items-center justify-center text-center">
-                  <div className="text-4xl">👥</div>
-                  <p className="mt-3 text-base font-semibold text-[#F8FBFF]">Waiting for players to join…</p>
-                  <p className="mt-1 text-sm text-[#BCD7FF]">Share the invite link to get started</p>
+                <div className="flex min-h-48 flex-col items-center justify-center text-center">
+                  <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-4xl mb-4">👥</div>
+                  <p className="text-xl font-bold nq-on-dark">Waiting for players…</p>
+                  <p className="mt-2 text-sm nq-on-dark-soft opacity-60">Share the invite link to get started</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4">
                   {playerEntries.map(([uid, player]) => (
                     <PlayerChip
                       key={uid}
@@ -179,17 +184,17 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
               )}
             </div>
 
-            <div className="mt-5 flex items-center justify-center gap-3 rounded-[22px] border border-[#92BFFF]/24 bg-[#055A9E]/68 px-4 py-3.5 text-sm text-[#EAF3FF] shadow-[0_18px_34px_rgba(7,16,43,0.2)]">
-              <div className="flex gap-1">
+            <div className="mt-8 flex items-center justify-center gap-4 rounded-[24px] bg-white/10 border border-white/20 px-6 py-5 shadow-xl shadow-blue-900/20">
+              <div className="flex gap-1.5">
                 {[0, 1, 2].map((index) => (
                   <div
                     key={index}
-                    className="h-2.5 w-2.5 animate-bounce rounded-full bg-[#92BFFF]"
-                    style={{ animationDelay: `${index * 0.12}s` }}
+                    className="h-3 w-3 animate-bounce rounded-full bg-white"
+                    style={{ animationDelay: `${index * 0.15}s` }}
                   />
                 ))}
               </div>
-              <span>Waiting for the host to start the quiz…</span>
+              <span className="font-bold nq-on-dark text-base">Waiting for the host to start…</span>
             </div>
           </motion.div>
         </div>
