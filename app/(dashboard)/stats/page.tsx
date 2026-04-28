@@ -83,7 +83,7 @@ export default function StatsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-5xl space-y-6">
+      <div className="mx-auto max-w-6xl space-y-6">
         {/* Hero skeleton */}
         <div className="nq-card animate-pulse rounded-[34px] p-6 md:p-8">
           <div className="h-3 w-32 rounded-full bg-[#70A2F9]/18 mb-3" />
@@ -103,7 +103,7 @@ export default function StatsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 md:space-y-7">
+    <div className="mx-auto max-w-6xl space-y-6 md:space-y-7">
 
       {/* ── Hero banner — same decoration as History & Dashboard ── */}
       <motion.section

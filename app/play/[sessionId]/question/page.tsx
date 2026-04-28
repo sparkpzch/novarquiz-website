@@ -186,7 +186,7 @@ function QuestionVisual({
         </div>
       )}
 
-      <div>
+      <div className={question.media_url ? "mt-4" : ""}>
         <p className="nq-details text-[#7A8EA7]">
           Question {question.question_order + 1}
           {typeof totalQuestions === 'number' && totalQuestions > 0 ? `/${totalQuestions}` : ''}
@@ -490,6 +490,8 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const userRef = useRef(user);
   const sessionStartRef = useRef<number>(0);
   const explanationTimerRef = useRef<number | null>(null);
+  const prefetchedNextRef = useRef<Question | null>(null);
+  const prefetchVideoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     fetch(`/api/sessions/${sessionId}`)
@@ -631,7 +633,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     explanationTimerRef.current = window.setTimeout(() => {
       setShowExplanationModal(true);
       explanationTimerRef.current = null;
-    }, 500);
+    }, 2500);
 
     const timeTaken = Math.max(0, Math.round(answeredAt - questionStartTime));
 
@@ -682,13 +684,42 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
         currentQuestionLabel: currentLabel,
       }).catch(() => {});
     }
+
+    // Prefetch next question + its video while user reads the explanation modal.
+    prefetchedNextRef.current = null;
+    prefetchVideoRef.current = null;
+    (async () => {
+      try {
+        const r = await fetch(`/api/play/${sessionId}/answer?fromQuestionId=${question.id}&choiceLabel=${label}`);
+        if (!r.ok) return;
+        const next: Question = await r.json();
+        if (!next?.id) return;
+        prefetchedNextRef.current = next;
+        if (next.media_type === 'video' && next.media_url) {
+          const vid = document.createElement('video');
+          vid.preload = 'auto';
+          vid.muted = true;
+          vid.playsInline = true;
+          vid.src = next.media_url;
+          prefetchVideoRef.current = vid;
+        }
+      } catch { /* non-fatal */ }
+    })();
   };
 
   const handleContinue = async () => {
     if (!question || !selectedLabel || nextLoading) return;
     setNextLoading(true);
-    await goToNext(question.id, selectedLabel);
-    setNextLoading(false);
+    const prefetched = prefetchedNextRef.current;
+    prefetchedNextRef.current = null;
+    prefetchVideoRef.current = null;
+    if (prefetched) {
+      applyQuestion(prefetched);
+      setNextLoading(false);
+    } else {
+      await goToNext(question.id, selectedLabel);
+      setNextLoading(false);
+    }
   };
 
   const handleSituationNext = async () => {
@@ -826,19 +857,35 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   return (
     <div className="nq-sky min-h-screen">
       <div className="nq-content mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-4 px-4 py-5">
-        <QuizHeader
-          elapsed={elapsed}
-          score={score}
-          streak={streak}
-          userName={user?.displayName}
-          photoURL={user?.photoURL}
-          lastDelta={lastDelta}
-          totalPlayers={Object.keys(scores).length}
-          topScores={topScores}
-          currentUserId={user?.uid}
-        />
+        {!selectedLabel && (
+          <QuizHeader
+            elapsed={elapsed}
+            score={score}
+            streak={streak}
+            userName={user?.displayName}
+            photoURL={user?.photoURL}
+            lastDelta={lastDelta}
+            totalPlayers={Object.keys(scores).length}
+            topScores={topScores}
+            currentUserId={user?.uid}
+          />
+        )}
 
-        <Card>
+        <Card className="relative overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-1 bg-[#EEF3F8]">
+            <AnimatePresence>
+              {selectedLabel && (
+                <motion.div
+                  key={`countdown-${question.id}`}
+                  initial={{ scaleX: 1 }}
+                  animate={{ scaleX: 0 }}
+                  transition={{ duration: 2.5, ease: 'linear' }}
+                  className="h-full origin-left bg-[#0460A9]"
+                />
+              )}
+            </AnimatePresence>
+          </div>
+
           <QuestionVisual question={question} totalQuestions={sessionMeta?.question_count} />
 
           <AnimatePresence mode="wait">
