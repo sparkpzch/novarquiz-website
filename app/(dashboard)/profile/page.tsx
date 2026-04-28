@@ -434,7 +434,8 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="mx-auto max-w-lg space-y-6">
+    <div className="mx-auto max-w-6xl">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_1fr]">
       <motion.section
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
@@ -492,11 +493,12 @@ export default function ProfilePage() {
         />
       </motion.section>
 
-      <motion.section
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-        className="nq-card rounded-[30px] p-6"
+        <div className="space-y-6">
+        <motion.section
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="nq-card rounded-[30px] p-6"
       >
         <h2 className="mb-5 text-2xl font-semibold text-[#202A3F]">{t("profile.general")}</h2>
         <div className="space-y-5">
@@ -572,10 +574,10 @@ export default function ProfilePage() {
             onClick={handleClearCache}
             className="flex w-full items-center gap-4 py-1 transition hover:opacity-85"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F3F8FF] shadow-sm">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 shadow-sm">
               <ClearCacheIcon />
             </div>
-            <span className="text-[1.05rem] font-medium text-[#5D7EA1]">Clear Cache</span>
+            <span className="text-[1.05rem] font-medium text-[#E85C5C]">Clear Cache</span>
           </button>
 
           <button
@@ -603,6 +605,8 @@ export default function ProfilePage() {
           </button>
         </div>
       </motion.section>
+        </div>
+      </div>
 
       <Modal
         isOpen={videoQualityModal}
