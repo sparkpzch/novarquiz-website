@@ -13,6 +13,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ref, deleteObject } from 'firebase/storage';
 import { storage } from '@/lib/firebase/config';
+import { useFFmpeg } from '@/lib/hooks/useFFmpeg';
 import AutoPlayVideo from '@/components/ui/AutoPlayVideo';
 import type { NormalNodeData } from './NormalNode';
 import type { SituationNodeData } from './SituationNode';
@@ -125,9 +126,27 @@ export function LeftInspector({
   const [panelWidth, setPanelWidth] = useState(340);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [imgLoadError, setImgLoadError] = useState(false);
+  const [compressing, setCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const handleFileUpload = (file: File) => {
+  const { load: loadFFmpeg, progress: ffmpegProgress, compressVideo } = useFFmpeg();
+
+  const handleFileUpload = async (file: File) => {
     if (!file || !selectedNode) return;
+
+    if (file.type.startsWith('video/')) {
+      setCompressing(true);
+      try {
+        await loadFFmpeg();
+        const blob = await compressVideo(file);
+        onUpload(new File([blob], file.name.replace(/\.[^.]+$/, '.mp4'), { type: 'video/mp4' }));
+      } catch {
+        onUpload(file);
+      } finally {
+        setCompressing(false);
+      }
+      return;
+    }
+
     onUpload(file);
   };
 
@@ -269,7 +288,7 @@ export function LeftInspector({
             onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ''; }}
           />
 
-          {!draft.media_url && !uploadStatus?.uploading && (
+          {!draft.media_url && !uploadStatus?.uploading && !compressing && (
             <button
               onClick={() => fileInputRef.current?.click()}
               style={{
@@ -282,6 +301,18 @@ export function LeftInspector({
             >
               {isDraggingOver ? 'Drop to upload!' : '+ Upload Image or Video'}
             </button>
+          )}
+
+          {compressing && (
+            <div style={{ padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(112,162,249,0.18)', marginTop: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#35527e', marginBottom: 6, fontWeight: 600 }}>
+                <span>{ffmpegProgress === 0 ? 'Loading FFmpeg…' : 'Compressing…'}</span>
+                <span>{ffmpegProgress > 0 ? `${ffmpegProgress}%` : ''}</span>
+              </div>
+              <div style={{ height: 4, background: 'rgba(112,162,249,0.12)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${ffmpegProgress}%`, background: '#22c55e', transition: 'width 0.2s' }} />
+              </div>
+            </div>
           )}
 
           {uploadStatus?.uploading && (

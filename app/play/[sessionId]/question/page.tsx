@@ -11,7 +11,7 @@ import { updateScore, watchScores, untrackAllUserSessionsFor, type PlayerScore }
 import { trackEvent } from '@/lib/firebase/analytics';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 import { Card } from '@/components/ui/Card';
-import AutoPlayVideo from '@/components/ui/AutoPlayVideo';
+import QuestionMediaPlayer from '@/components/ui/QuestionMediaPlayer';
 
 
 const IMPACT_THEME = {
@@ -125,19 +125,57 @@ function QuizHeader({
 }
 
 type VideoQuality = 'auto' | 'hd' | 'sd';
+type QuestionWithPoster = Question & {
+  poster_url?: string | null;
+  thumbnail_url?: string | null;
+};
 
 function useVideoQuality(): VideoQuality {
   if (typeof window === 'undefined') return 'auto';
   return (localStorage.getItem('novarquiz-video-quality') as VideoQuality) ?? 'auto';
 }
 
+function isSafariBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /safari/i.test(ua) && !/chrome|chromium|crios|fxios|android/i.test(ua);
+}
+
 function resolvePreload(quality: VideoQuality): 'auto' | 'metadata' {
   if (quality === 'hd') return 'auto';
   if (quality === 'sd') return 'metadata';
-  // auto: detect connection type
-  const conn = (navigator as Navigator & { connection?: { effectiveType?: string } }).connection;
+  if (isSafariBrowser()) return 'auto';
+  // auto: only preload aggressively when the browser exposes a clearly good network.
+  const conn = (navigator as Navigator & { connection?: { effectiveType?: string; saveData?: boolean } }).connection;
+  if (!conn || conn.saveData) return 'metadata';
   const type = conn?.effectiveType ?? '';
-  return type === '2g' || type === '3g' ? 'metadata' : 'auto';
+  return type === '4g' ? 'auto' : 'metadata';
+}
+
+function prepareInlineVideo(src: string, preload: 'auto' | 'metadata') {
+  const video = document.createElement('video');
+  video.preload = preload;
+  video.muted = true;
+  video.defaultMuted = true;
+  video.playsInline = true;
+  video.setAttribute('muted', '');
+  video.setAttribute('playsinline', '');
+  video.setAttribute('webkit-playsinline', '');
+  // iOS Safari ignores preload and video.load() on detached elements.
+  // Attaching to the DOM and calling play() is the only reliable trigger.
+  video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;pointer-events:none;';
+  video.src = src;
+  document.body.appendChild(video);
+  video.play().catch(() => {});
+  return video;
+}
+
+function releaseVideo(video: HTMLVideoElement | null) {
+  if (!video) return;
+  video.pause();
+  video.src = '';
+  video.load();
+  video.remove();
 }
 
 function QuestionVisual({
@@ -151,6 +189,8 @@ function QuestionVisual({
   const quality = useVideoQuality();
   const preload = resolvePreload(quality);
   const mediaError = failedMediaQuestionId === question.id;
+  const mediaQuestion = question as QuestionWithPoster;
+  const poster = mediaQuestion.poster_url ?? mediaQuestion.thumbnail_url ?? undefined;
 
   return (
     <>
@@ -161,16 +201,11 @@ function QuestionVisual({
               <p className="nq-details text-[#B0C4D8]">Media unavailable</p>
             </div>
           ) : question.media_type === 'video' ? (
-            <AutoPlayVideo
+            <QuestionMediaPlayer
               key={question.id}
               src={question.media_url}
-              controls
-              autoPlay
-              loop
-              muted
-              playsInline
               preload={preload}
-              className="h-44 w-full object-cover md:h-56"
+              poster={poster}
               onError={() => setFailedMediaQuestionId(question.id)}
             />
           ) : (
@@ -471,6 +506,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   useTranslation();
   const { user } = useAuth();
   const router = useRouter();
+  const videoQuality = useVideoQuality();
 
   const [question, setQuestion] = useState<Question | null>(null);
   const [sessionMeta, setSessionMeta] = useState<Quiz | null>(null);
@@ -493,6 +529,8 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const explanationTimerRef = useRef<number | null>(null);
   const prefetchedNextRef = useRef<Question | null>(null);
   const prefetchVideoRef = useRef<HTMLVideoElement | null>(null);
+  const currentVideoWarmupRef = useRef<HTMLVideoElement | null>(null);
+  const videoQualityRef = useRef(videoQuality);
 
   useEffect(() => {
     fetch(`/api/sessions/${sessionId}`)
@@ -510,6 +548,10 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   }, [user]);
 
   useEffect(() => {
+    videoQualityRef.current = videoQuality;
+  }, [videoQuality]);
+
+  useEffect(() => {
     if (!user || user.isAnonymous) return;
     return watchScores(sessionId, setScores);
   }, [sessionId, user]);
@@ -519,6 +561,10 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       if (explanationTimerRef.current !== null) {
         window.clearTimeout(explanationTimerRef.current);
       }
+      releaseVideo(currentVideoWarmupRef.current);
+      releaseVideo(prefetchVideoRef.current);
+      currentVideoWarmupRef.current = null;
+      prefetchVideoRef.current = null;
     };
   }, []);
 
@@ -539,6 +585,11 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       window.clearTimeout(explanationTimerRef.current);
       explanationTimerRef.current = null;
     }
+
+    releaseVideo(currentVideoWarmupRef.current);
+    currentVideoWarmupRef.current = nextQuestion.media_type === 'video' && nextQuestion.media_url
+      ? prepareInlineVideo(nextQuestion.media_url, resolvePreload(videoQualityRef.current))
+      : null;
 
     setQuestion(nextQuestion);
     setSelectedLabel(null);
@@ -697,12 +748,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
         if (!next?.id) return;
         prefetchedNextRef.current = next;
         if (next.media_type === 'video' && next.media_url) {
-          const vid = document.createElement('video');
-          vid.preload = 'auto';
-          vid.muted = true;
-          vid.playsInline = true;
-          vid.src = next.media_url;
-          prefetchVideoRef.current = vid;
+          prefetchVideoRef.current = prepareInlineVideo(next.media_url, resolvePreload(videoQualityRef.current));
         }
       } catch { /* non-fatal */ }
     })();
@@ -713,6 +759,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     setNextLoading(true);
     const prefetched = prefetchedNextRef.current;
     prefetchedNextRef.current = null;
+    releaseVideo(prefetchVideoRef.current);
     prefetchVideoRef.current = null;
     if (prefetched) {
       applyQuestion(prefetched);

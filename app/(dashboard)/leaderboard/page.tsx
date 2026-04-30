@@ -1,7 +1,8 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
@@ -91,6 +92,16 @@ function LeaderboardPageContent() {
             { entry: topThree[0], rank: 1, height: 'h-36', featured: true },
             { entry: topThree[2], rank: 3, height: 'h-24', featured: false },
           ];
+
+  const entriesBelow3 = sortedEntries.slice(3);
+  const entriesParentRef = useRef<HTMLDivElement>(null);
+  const entriesVirtualizer = useVirtualizer({
+    count: entriesBelow3.length,
+    getScrollElement: () => entriesParentRef.current,
+    estimateSize: () => 68,
+    overscan: 5,
+    gap: 12,
+  });
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -190,30 +201,48 @@ function LeaderboardPageContent() {
             </section>
           )}
 
-          <section className="rounded-[34px] bg-[#EEF6E4]/80 p-4 md:p-5">
-            <div className="space-y-3">
-              {sortedEntries.slice(3).map((entry, index) => {
-                const rank = index + 4;
-                const isMe = entry.user_id === user?.uid;
-                return (
-                  <div
-                    key={entry.user_id}
-                    className={`flex items-center gap-4 rounded-[22px] px-4 py-3 ${isMe ? 'bg-[#C9F258] text-[#16324F]' : 'bg-white text-[#16324F]'}`}
-                  >
-                    <span className="w-6 text-center text-lg font-semibold">{rank}</span>
-                    <ProfileAvatar displayName={entry.user_display_name} photoURL={entry.user_photo_url} size={40} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-lg font-semibold">{isMe ? 'You' : entry.user_display_name}</p>
-                      <p className="text-sm text-[#5D7EA1]">
-                        {entry.correct_count}/{entry.correct_count + entry.incorrect_count} correct · 🔥 {entry.streak}
-                      </p>
-                    </div>
-                    <span className="text-lg font-semibold">{entry.total_score} pts</span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+          {entriesBelow3.length > 0 && (
+            <section className="rounded-[34px] bg-[#EEF6E4]/80 p-4 md:p-5">
+              <div
+                ref={entriesParentRef}
+                style={{ height: Math.min(entriesBelow3.length * 80, 480), overflowY: 'auto' }}
+              >
+                <div style={{ height: entriesVirtualizer.getTotalSize(), position: 'relative' }}>
+                  {entriesVirtualizer.getVirtualItems().map((virtualItem) => {
+                    const entry = entriesBelow3[virtualItem.index];
+                    const rank = virtualItem.index + 4;
+                    const isMe = entry.user_id === user?.uid;
+                    return (
+                      <div
+                        key={virtualItem.key}
+                        data-index={virtualItem.index}
+                        ref={entriesVirtualizer.measureElement}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${virtualItem.start}px)`,
+                        }}
+                      >
+                        <div className={`flex items-center gap-4 rounded-[22px] px-4 py-3 ${isMe ? 'bg-[#C9F258] text-[#16324F]' : 'bg-white text-[#16324F]'}`}>
+                          <span className="w-6 text-center text-lg font-semibold">{rank}</span>
+                          <ProfileAvatar displayName={entry.user_display_name} photoURL={entry.user_photo_url} size={40} />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-lg font-semibold">{isMe ? 'You' : entry.user_display_name}</p>
+                            <p className="text-sm text-[#5D7EA1]">
+                              {entry.correct_count}/{entry.correct_count + entry.incorrect_count} correct · 🔥 {entry.streak}
+                            </p>
+                          </div>
+                          <span className="text-lg font-semibold">{entry.total_score} pts</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          )}
         </>
       )}
     </div>
