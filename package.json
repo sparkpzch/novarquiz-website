@@ -8,6 +8,7 @@
     "dev:docker": "dotenv -e .env.local -- next dev",
     "dev:neon": "dotenv -e .env.neon -- next dev",
     "build": "next build --webpack",
+    "analyze": "ANALYZE=true next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "set-admin": "npx tsx scripts/set-admin.ts",
@@ -19,8 +20,11 @@
     "db:down": "docker compose down"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@neondatabase/serverless": "^1.1.0",
     "@tanstack/react-query": "^5.100.6",
+    "@tanstack/react-virtual": "^3.13.24",
     "@xyflow/react": "^12.10.2",
     "dotenv": "^17.4.2",
     "firebase": "^12.12.1",
@@ -39,6 +43,7 @@
     "zod": "^4.4.1"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.2.4",
     "@tailwindcss/postcss": "^4",
     "@tanstack/react-query-devtools": "^5.100.6",
     "@types/node": "^20",

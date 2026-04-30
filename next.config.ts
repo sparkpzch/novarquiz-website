@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import NextBundleAnalyzer from "@next/bundle-analyzer";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.*"],
@@ -27,4 +28,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["pg", "@neondatabase/serverless", "ws"],
 };
 
-export default nextConfig;
+export default NextBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+  openAnalyzer: true,
+})(nextConfig);

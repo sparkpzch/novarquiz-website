@@ -1,6 +1,7 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
@@ -94,6 +95,18 @@ function HistoryPageContent() {
       : 0;
   const bestRank =
     mine && mine.length ? Math.min(...mine.map((row) => row.rank)) : 0;
+
+  const listParentRef = useRef<HTMLDivElement>(null);
+  const scrollMarginRef = useRef(0);
+  useLayoutEffect(() => {
+    scrollMarginRef.current = listParentRef.current?.offsetTop ?? 0;
+  });
+  const historyVirtualizer = useWindowVirtualizer({
+    count: mine?.length ?? 0,
+    estimateSize: () => 232,
+    overscan: 3,
+    scrollMargin: scrollMarginRef.current,
+  });
 
   // Handle Detail View
   if (sessionParam) {
@@ -255,50 +268,69 @@ function HistoryPageContent() {
               <p className="mt-2 text-sm text-[#5D7EA1] font-medium">Complete a quiz and this page will turn into your personal record board.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {mine.map((row, index) => (
-                <Card
-                  key={`${row.session_id}-${row.completed_at ?? index}`}
-                  onClick={() => router.push(`/history?session=${row.session_id}`)}
-                  variant="soft"
-                  className="w-full !p-5"
-                >
-                  <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-[#0460A9]/10 px-3 py-1 nq-details font-bold text-[#0460A9]">
-                          Attempt
-                        </span>
-                        <span className="text-sm font-bold text-[#5D7EA1]">{formatDate(row.completed_at)}</span>
+            <div
+              ref={listParentRef}
+              style={{ position: 'relative', height: `${historyVirtualizer.getTotalSize()}px` }}
+            >
+              {historyVirtualizer.getVirtualItems().map((virtualItem) => {
+                const row = mine![virtualItem.index];
+                return (
+                  <div
+                    key={virtualItem.key}
+                    data-index={virtualItem.index}
+                    ref={historyVirtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualItem.start - historyVirtualizer.options.scrollMargin}px)`,
+                      paddingBottom: '16px',
+                    }}
+                  >
+                    <Card
+                      onClick={() => router.push(`/history?session=${row.session_id}`)}
+                      variant="soft"
+                      className="w-full !p-5"
+                    >
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-[#0460A9]/10 px-3 py-1 nq-details font-bold text-[#0460A9]">
+                              Attempt
+                            </span>
+                            <span className="text-sm font-bold text-[#5D7EA1]">{formatDate(row.completed_at)}</span>
+                          </div>
+                          <h2 className="mt-3 truncate text-xl font-bold text-[#16324F] font-display">{row.session_name}</h2>
+                          <p className="mt-2 text-sm text-[#5D7EA1] font-medium line-clamp-2">
+                            {row.session_description || 'Completed session overview with your score, placement, and streak.'}
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[420px]">
+                          <Card.Tile label="Score" value={row.total_score} />
+                          <Card.Tile
+                            label="Rank"
+                            value={
+                              <span className="font-display">
+                                #{row.rank}
+                                <span className="text-sm font-medium text-[#5D7EA1]">/{row.total_players}</span>
+                              </span>
+                            }
+                          />
+                          <Card.Tile label="Correct" value={row.correct_count} className="[&_p:last-child]:text-[#0D8C6D]" />
+                          <Card.Tile label="Streak" value={row.streak} className="[&_p:last-child]:text-[#E67E22]" />
+                        </div>
                       </div>
-                      <h2 className="mt-3 truncate text-xl font-bold text-[#16324F] font-display">{row.session_name}</h2>
-                      <p className="mt-2 text-sm text-[#5D7EA1] font-medium line-clamp-2">
-                        {row.session_description || 'Completed session overview with your score, placement, and streak.'}
-                      </p>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[420px]">
-                      <Card.Tile label="Score" value={row.total_score} />
-                      <Card.Tile
-                        label="Rank"
-                        value={
-                          <span className="font-display">
-                            #{row.rank}
-                            <span className="text-sm font-medium text-[#5D7EA1]">/{row.total_players}</span>
-                          </span>
-                        }
-                      />
-                      <Card.Tile label="Correct" value={row.correct_count} className="[&_p:last-child]:text-[#0D8C6D]" />
-                      <Card.Tile label="Streak" value={row.streak} className="[&_p:last-child]:text-[#E67E22]" />
-                    </div>
+                      <div className="mt-5 flex items-center justify-between border-t border-[#0460A9]/10 pt-4">
+                        <p className="text-sm text-[#5D7EA1] font-medium">Completion time: {formatDuration(row.total_time_ms)}</p>
+                        <span className="text-sm font-bold text-[#0460A9] font-display">View Standings →</span>
+                      </div>
+                    </Card>
                   </div>
-
-                  <div className="mt-5 flex items-center justify-between border-t border-[#0460A9]/10 pt-4">
-                    <p className="text-sm text-[#5D7EA1] font-medium">Completion time: {formatDuration(row.total_time_ms)}</p>
-                    <span className="text-sm font-bold text-[#0460A9] font-display">View Standings →</span>
-                  </div>
-                </Card>
-              ))}
+                );
+              })}
             </div>
           )}
       </div>
