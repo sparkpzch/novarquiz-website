@@ -194,7 +194,6 @@ function QuestionVisual({
               src={question.media_url}
               preload={preload}
               poster={poster}
-              muxPlaybackId={question.mux_playback_id}
               onError={() => setFailedMediaQuestionId(question.id)}
             />
           ) : (

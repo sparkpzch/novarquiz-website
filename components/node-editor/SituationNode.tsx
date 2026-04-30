@@ -9,12 +9,6 @@ export type SituationNodeData = {
   media_type: string | null;
   media_url: string | null;
   media_path: string | null;
-  media_provider?: 'firebase' | 'mux' | null;
-  mux_upload_id?: string | null;
-  mux_asset_id?: string | null;
-  mux_playback_id?: string | null;
-  mux_status?: 'waiting' | 'preparing' | 'ready' | 'errored' | null;
-  mux_poster_url?: string | null;
   is_entry_point: boolean;
 };
 

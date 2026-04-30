@@ -12,7 +12,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ref, deleteObject } from 'firebase/storage';
-import MuxPlayer from '@mux/mux-player-react';
 import { storage } from '@/lib/firebase/config';
 import AutoPlayVideo from '@/components/ui/AutoPlayVideo';
 import type { NormalNodeData } from './NormalNode';
@@ -144,18 +143,7 @@ export function LeftInspector({
     if (!draft || !selectedNode) return;
     setImgLoadError(false);
     const path = draft.media_path;
-    const next = {
-      ...draft,
-      media_type: null,
-      media_url: null,
-      media_path: null,
-      media_provider: null,
-      mux_upload_id: null,
-      mux_asset_id: null,
-      mux_playback_id: null,
-      mux_status: null,
-      mux_poster_url: null,
-    } as NodeData;
+    const next = { ...draft, media_type: null, media_url: null, media_path: null } as NodeData;
     setDraft(next);
     onChange(selectedNode.id, next);
 
@@ -227,7 +215,6 @@ export function LeftInspector({
   const isNormal = type === 'normalNode';
   const isEnd = type === 'endNode';
   const nd = isNormal ? draft as NormalNodeData : null;
-  const hasMedia = Boolean(draft.media_url || draft.mux_upload_id || draft.mux_playback_id);
 
   const iconLabel = isNormal ? '❓ Question Node' : isEnd ? '🏁 End Node' : '🎬 Situation Node';
   const iconColor = isNormal ? '#bfdbfe' : isEnd ? '#fb7185' : '#c084fc';
@@ -282,7 +269,7 @@ export function LeftInspector({
             onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ''; }}
           />
 
-          {!hasMedia && !uploadStatus?.uploading && (
+          {!draft.media_url && !uploadStatus?.uploading && (
             <button
               onClick={() => fileInputRef.current?.click()}
               style={{
@@ -308,7 +295,7 @@ export function LeftInspector({
             </div>
           )}
 
-          {hasMedia && !uploadStatus?.uploading && (
+          {draft.media_url && !uploadStatus?.uploading && (
             <div style={{ 
               display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6,
               opacity: isDraggingOver ? 0.6 : 1,
@@ -347,28 +334,6 @@ export function LeftInspector({
                     onLoad={() => setImgLoadError(false)}
                     style={{ width: '100%', borderRadius: 8, objectFit: 'cover', border: '1px solid rgba(112,162,249,0.18)', display: 'block', minHeight: 80, background: 'rgba(112,162,249,0.04)' }}
                   />
-                )
-              ) : draft.media_provider === 'mux' ? (
-                draft.mux_playback_id ? (
-                  <MuxPlayer
-                    playbackId={draft.mux_playback_id}
-                    accentColor="#4f82e8"
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(112,162,249,0.18)' }}
-                  />
-                ) : (
-                  <div style={{
-                    width: '100%', minHeight: 112, borderRadius: 8, marginTop: 4,
-                    background: 'rgba(112,162,249,0.08)', border: '1px dashed rgba(112,162,249,0.3)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: 6, color: draft.mux_status === 'errored' ? '#fb7185' : '#35527e', fontSize: 11, fontWeight: 600,
-                  }}>
-                    <span>{draft.mux_status === 'errored' ? 'Video processing failed' : 'Mux is processing this video'}</span>
-                    <span style={{ fontSize: 9, color: '#6b7f9e' }}>{draft.mux_upload_id}</span>
-                  </div>
                 )
               ) : (
                 <AutoPlayVideo

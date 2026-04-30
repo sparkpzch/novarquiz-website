@@ -28,7 +28,6 @@ import {
 } from '@xyflow/react';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase/config';
-import { apiJson } from '@/lib/query/api';
 import type { Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -87,19 +86,6 @@ const nodeTypes: NodeTypes = {
   endNode: EndNode,
 };
 
-type MuxDirectUploadResponse = {
-  uploadId: string;
-  uploadUrl: string;
-  status: string;
-};
-
-type MuxUploadRecord = {
-  upload_id: string;
-  asset_id: string | null;
-  playback_id: string | null;
-  status: 'waiting' | 'preparing' | 'ready' | 'errored';
-};
-
 // ─── Default node data factories ─────────────────────────────────────────────
 
 export const defaultNormalData = (): NormalNodeData => ({
@@ -114,7 +100,6 @@ export const defaultNormalData = (): NormalNodeData => ({
   media_type: null,
   media_url: null,
   media_path: null,
-  media_provider: null,
   is_entry_point: false,
   timer_override: null,
 });
@@ -125,7 +110,6 @@ export const defaultSituationData = (): SituationNodeData => ({
   media_type: null,
   media_url: null,
   media_path: null,
-  media_provider: null,
   is_entry_point: false,
 });
 
@@ -135,7 +119,6 @@ export const defaultEndData = (): EndNodeData => ({
   media_type: null,
   media_url: null,
   media_path: null,
-  media_provider: null,
   is_entry_point: false,
 });
 
@@ -165,70 +148,6 @@ export function EditorCanvas({
   const [uploadStatus, setUploadStatus] = useState<{ nodeId: string; uploading: boolean; progress: number } | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  const patchNodeMedia = useCallback((nodeId: string, updateData: Partial<AppNodeData>) => {
-    setNodes(ns => ns.map(n => n.id === nodeId ? {
-      ...n,
-      data: { ...n.data, ...updateData },
-    } as AppNode : n));
-
-    setInspectedNode(prev => prev?.id === nodeId ? {
-      ...prev,
-      data: { ...prev.data, ...updateData },
-    } as AppNode : prev);
-  }, [setNodes]);
-
-  const uploadToMux = useCallback((
-    uploadUrl: string,
-    file: File,
-    onProgress: (progress: number) => void,
-  ) => new Promise<void>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', uploadUrl);
-    xhr.setRequestHeader('Content-Type', file.type);
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        onProgress(Math.round((event.loaded / event.total) * 100));
-      }
-    };
-    xhr.onerror = () => reject(new Error('Mux upload failed'));
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve();
-      } else {
-        reject(new Error(`Mux upload failed with status ${xhr.status}`));
-      }
-    };
-    xhr.send(file);
-  }), []);
-
-  const pollMuxUpload = useCallback(async (nodeId: string, uploadId: string) => {
-    for (let attempt = 0; attempt < 30; attempt++) {
-      await new Promise(resolve => window.setTimeout(resolve, 2000));
-      const record = await apiJson<MuxUploadRecord>(`/api/mux/uploads/${uploadId}`).catch(() => null);
-      if (!record) continue;
-
-      if (record.status === 'ready' && record.playback_id) {
-        const updateData = {
-          media_provider: 'mux' as const,
-          mux_asset_id: record.asset_id,
-          mux_playback_id: record.playback_id,
-          mux_status: record.status,
-          mux_poster_url: `https://image.mux.com/${record.playback_id}/thumbnail.webp`,
-          media_url: `https://stream.mux.com/${record.playback_id}.m3u8`,
-        };
-        patchNodeMedia(nodeId, updateData);
-        showToast('Video is ready to use', 'success');
-        return;
-      }
-
-      if (record.status === 'errored') {
-        patchNodeMedia(nodeId, { mux_status: 'errored' });
-        showToast('Mux could not process this video', 'error');
-        return;
-      }
-    }
-  }, [patchNodeMedia, showToast]);
-
   // ── Inspector helpers ──────────────────────────────────────────────────────
 
   const questionOptions = nodes.map((n, idx) => ({
@@ -255,10 +174,15 @@ export function EditorCanvas({
     const isGif = file.type === 'image/gif';
     const isImage = file.type.startsWith('image/');
     if (!isVideo && !isImage) return;
+    if (isVideo && file.type !== 'video/mp4') {
+      showToast('Use MP4 video for iOS Safari autoplay', 'error');
+      return;
+    }
+
     const MAX_IMAGE = 5 * 1024 * 1024;  // 5 MB
-    const MAX_VIDEO = 500 * 1024 * 1024; // 500 MB
+    const MAX_VIDEO = 50 * 1024 * 1024; // 50 MB
     if (isVideo && file.size > MAX_VIDEO) {
-      showToast('Video must be under 500 MB', 'error');
+      showToast('Video must be under 50 MB', 'error');
       return;
     }
     if (!isVideo && file.size > MAX_IMAGE) {
@@ -267,52 +191,13 @@ export function EditorCanvas({
     }
 
     const mediaType = isVideo ? 'video' : isGif ? 'gif' : 'image';
-    setUploadStatus({ nodeId, uploading: true, progress: 0 });
-
-    if (isVideo) {
-      try {
-        const upload = await apiJson<MuxDirectUploadResponse>('/api/mux/uploads', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            questionId: nodeId,
-            quizId: quizId && quizId !== 'draft' ? quizId : undefined,
-            fileName: file.name,
-          }),
-        });
-
-        await uploadToMux(upload.uploadUrl, file, progress => {
-          setUploadStatus({ nodeId, uploading: true, progress });
-        });
-
-        patchNodeMedia(nodeId, {
-          media_type: 'video',
-          media_url: null,
-          media_path: null,
-          media_provider: 'mux',
-          mux_upload_id: upload.uploadId,
-          mux_asset_id: null,
-          mux_playback_id: null,
-          mux_status: 'preparing',
-          mux_poster_url: null,
-        });
-
-        setUploadStatus(null);
-        showToast('Video uploaded. Mux is processing it now.', 'success');
-        void pollMuxUpload(nodeId, upload.uploadId);
-      } catch (error) {
-        console.error('Mux upload failed:', error);
-        setUploadStatus(null);
-        showToast('Video upload failed', 'error');
-      }
-      return;
-    }
-
     const folder = isVideo ? 'video' : isGif ? 'gif' : 'image';
     const ext = file.name.split('.').pop()?.toLowerCase() ?? (isVideo ? 'mp4' : 'bin');
     const storageBucket = quizId ?? sessionId;
     const path = `question-sessions/${storageBucket}/${folder}/${nodeId}_${Date.now()}.${ext}`;
     const storageRef = ref(storage, path);
+
+    setUploadStatus({ nodeId, uploading: true, progress: 0 });
 
     const safeFileName = file.name.replace(/[^\w.-]/g, '_');
     const task = uploadBytesResumable(storageRef, file, {
@@ -329,21 +214,23 @@ export function EditorCanvas({
         const updateData = {
           media_type: mediaType,
           media_url: url,
-          media_path: path,
-          media_provider: 'firebase' as const,
-          mux_upload_id: null,
-          mux_asset_id: null,
-          mux_playback_id: null,
-          mux_status: null,
-          mux_poster_url: null,
+          media_path: path
         };
 
-        patchNodeMedia(nodeId, updateData);
+        setNodes(ns => ns.map(n => n.id === nodeId ? {
+          ...n,
+          data: { ...n.data, ...updateData }
+        } as AppNode : n));
+
+        setInspectedNode(prev => prev?.id === nodeId ? {
+          ...prev,
+          data: { ...prev.data, ...updateData }
+        } as AppNode : prev);
 
         setUploadStatus(null);
       },
     );
-  }, [sessionId, quizId, patchNodeMedia, pollMuxUpload, showToast, uploadToMux]);
+  }, [sessionId, quizId, setNodes, showToast]);
 
   const handleConnectionChange = useCallback((choiceLabel: string, toQuestionId: string | null) => {
     if (!inspectedNode) return;

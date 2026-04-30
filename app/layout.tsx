@@ -4,7 +4,6 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/hooks/useAuth";
 import { ThemeProvider } from "@/lib/hooks/useTheme";
 import { ToastProvider } from "@/components/ui/Toast";
-import { Providers } from "./providers";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -47,15 +46,13 @@ export default function RootLayout({
               'linear-gradient(180deg, rgba(4,96,169,0.18), transparent 20%), radial-gradient(circle at bottom right, rgba(146,191,255,0.22), transparent 26%), linear-gradient(180deg, #70A2F9 0%, #92BFFF 50%, #c4deff 100%)',
           }}
         />
-        <Providers>
-          <AuthProvider>
-            <ThemeProvider>
-              <ToastProvider>
-                {children}
-              </ToastProvider>
-            </ThemeProvider>
-          </AuthProvider>
-        </Providers>
+        <AuthProvider>
+          <ThemeProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

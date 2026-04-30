@@ -19,7 +19,6 @@
     "db:down": "docker compose down"
   },
   "dependencies": {
-    "@mux/mux-data-react-native-video": "^0.19.20",
     "@mux/mux-node": "^14.0.1",
     "@mux/mux-player-react": "^3.13.0",
     "@mux/mux-uploader-react": "^1.5.0",

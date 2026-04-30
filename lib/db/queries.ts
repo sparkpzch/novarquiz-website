@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import pool, { queryWithRetry, type IDbClient } from './postgres';
+import pool, { queryWithRetry } from './postgres';
 import { SESSION_STATUS, SessionStatus } from '../constants/session';
 import { incrementMediaUsage, decrementMediaUsage, syncMediaUsage } from './media';
 
@@ -280,32 +280,9 @@ export async function duplicateQuiz(sourceIdOrSlug: string, createdBy: string, i
 
     for (const q of qRows) {
       const { rows: newQRows } = await client.query(
-        `INSERT INTO questions (
-           session_id, question_order, question_text,
-           media_type, media_url, media_path, media_provider,
-           mux_upload_id, mux_asset_id, mux_playback_id, mux_status, mux_poster_url,
-           timer_override, is_entry_point, node_x, node_y, node_type
-         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-         RETURNING id`,
-        [
-          newSession.id,
-          q.question_order,
-          q.question_text,
-          q.media_type,
-          q.media_url,
-          q.media_path,
-          q.media_provider,
-          q.mux_asset_id,
-          q.mux_playback_id,
-          q.mux_status,
-          q.mux_poster_url,
-          q.timer_override,
-          q.is_entry_point,
-          q.node_x,
-          q.node_y,
-          q.node_type,
-        ]
+        `INSERT INTO questions (session_id, question_order, question_text, media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+        [newSession.id, q.question_order, q.question_text, q.media_type, q.media_url, q.media_path, q.timer_override, q.is_entry_point, q.node_x, q.node_y, q.node_type]
       );
       if (q.media_path) {
         await incrementMediaUsage(client, q.media_path);
@@ -416,17 +393,11 @@ export async function createQuestion(data: {
   session_id: string;
   question_order: number;
   question_text: string;
-  node_name?: string | null;
-  media_type?: 'image' | 'gif' | 'video' | null;
-  media_url?: string | null;
-  media_path?: string | null;
-  media_provider?: 'firebase' | 'mux' | null;
-  mux_upload_id?: string | null;
-  mux_asset_id?: string | null;
-  mux_playback_id?: string | null;
-  mux_status?: string | null;
-  mux_poster_url?: string | null;
-  timer_override?: number | null;
+  node_name?: string;
+  media_type?: 'image' | 'gif' | 'video';
+  media_url?: string;
+  media_path?: string;
+  timer_override?: number;
   is_entry_point?: boolean;
   node_x?: number;
   node_y?: number;
@@ -436,15 +407,9 @@ export async function createQuestion(data: {
   try {
     await client.query('BEGIN');
     const questionId = data.id ?? randomUUID();
-    const muxMedia = await resolveMuxMediaFields(client, data);
     const result = await client.query(
-      `INSERT INTO questions (
-         id, session_id, question_order, question_text, node_name,
-         media_type, media_url, media_path, media_provider,
-         mux_upload_id, mux_asset_id, mux_playback_id, mux_status, mux_poster_url,
-         timer_override, is_entry_point, node_x, node_y, node_type
-       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+      `INSERT INTO questions (id, session_id, question_order, question_text, node_name, media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        ON CONFLICT (id) DO UPDATE SET
          session_id = EXCLUDED.session_id,
          question_order = EXCLUDED.question_order,
@@ -453,12 +418,6 @@ export async function createQuestion(data: {
          media_type = EXCLUDED.media_type,
          media_url = EXCLUDED.media_url,
          media_path = EXCLUDED.media_path,
-         media_provider = EXCLUDED.media_provider,
-         mux_upload_id = EXCLUDED.mux_upload_id,
-         mux_asset_id = EXCLUDED.mux_asset_id,
-         mux_playback_id = EXCLUDED.mux_playback_id,
-         mux_status = EXCLUDED.mux_status,
-         mux_poster_url = EXCLUDED.mux_poster_url,
          timer_override = EXCLUDED.timer_override,
          is_entry_point = EXCLUDED.is_entry_point,
          node_x = EXCLUDED.node_x,
@@ -466,27 +425,7 @@ export async function createQuestion(data: {
          node_type = EXCLUDED.node_type,
          updated_at = NOW()
        RETURNING *`,
-      [
-        questionId,
-        data.session_id,
-        data.question_order,
-        data.question_text,
-        data.node_name || null,
-        data.media_type || null,
-        muxMedia.media_url ?? data.media_url ?? null,
-        data.media_path || null,
-        muxMedia.media_provider ?? data.media_provider ?? (data.media_url ? 'firebase' : null),
-        muxMedia.mux_upload_id,
-        muxMedia.mux_asset_id,
-        muxMedia.mux_playback_id,
-        muxMedia.mux_status,
-        muxMedia.mux_poster_url,
-        data.timer_override || null,
-        data.is_entry_point || false,
-        data.node_x || 0,
-        data.node_y || 0,
-        data.node_type || 'normal',
-      ]
+      [questionId, data.session_id, data.question_order, data.question_text, data.node_name || null, data.media_type || null, data.media_url || null, data.media_path || null, data.timer_override || null, data.is_entry_point || false, data.node_x || 0, data.node_y || 0, data.node_type || 'normal']
     );
     
     if (data.media_path) {
@@ -504,194 +443,6 @@ export async function createQuestion(data: {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-type MuxMediaInput = {
-  media_type?: 'image' | 'gif' | 'video' | null;
-  media_url?: string | null;
-  media_provider?: 'firebase' | 'mux' | null;
-  mux_upload_id?: string | null;
-  mux_asset_id?: string | null;
-  mux_playback_id?: string | null;
-  mux_status?: string | null;
-  mux_poster_url?: string | null;
-};
-
-type MuxMediaFields = {
-  media_url: string | null;
-  media_provider: 'firebase' | 'mux' | null;
-  mux_upload_id: string | null;
-  mux_asset_id: string | null;
-  mux_playback_id: string | null;
-  mux_status: string | null;
-  mux_poster_url: string | null;
-};
-
-function muxPlaybackUrl(playbackId: string) {
-  return `https://stream.mux.com/${playbackId}.m3u8`;
-}
-
-function muxPosterUrl(playbackId: string) {
-  return `https://image.mux.com/${playbackId}/thumbnail.webp`;
-}
-
-async function resolveMuxMediaFields(client: IDbClient, input: MuxMediaInput): Promise<MuxMediaFields> {
-  const base: MuxMediaFields = {
-    media_url: input.media_url ?? null,
-    media_provider: input.media_provider ?? (input.media_type === 'video' && input.mux_upload_id ? 'mux' : null),
-    mux_upload_id: input.mux_upload_id ?? null,
-    mux_asset_id: input.mux_asset_id ?? null,
-    mux_playback_id: input.mux_playback_id ?? null,
-    mux_status: input.mux_status ?? null,
-    mux_poster_url: input.mux_poster_url ?? null,
-  };
-
-  if (!base.mux_upload_id) return base;
-
-  const { rows } = await client.query<{
-    asset_id: string | null;
-    playback_id: string | null;
-    status: string;
-  }>(
-    `SELECT asset_id, playback_id, status
-     FROM mux_video_uploads
-     WHERE upload_id = $1`,
-    [base.mux_upload_id],
-  );
-  const upload = rows[0];
-  if (!upload) return base;
-
-  const playbackId = base.mux_playback_id ?? upload.playback_id;
-  return {
-    media_url: playbackId ? muxPlaybackUrl(playbackId) : base.media_url,
-    media_provider: 'mux',
-    mux_upload_id: base.mux_upload_id,
-    mux_asset_id: base.mux_asset_id ?? upload.asset_id,
-    mux_playback_id: playbackId,
-    mux_status: base.mux_status ?? upload.status,
-    mux_poster_url: playbackId ? muxPosterUrl(playbackId) : base.mux_poster_url,
-  };
-}
-
-async function syncQuestionsForMuxUpload(uploadId: string) {
-  const { rows } = await queryWithRetry<{
-    playback_id: string | null;
-  }>('SELECT playback_id FROM mux_video_uploads WHERE upload_id = $1', [uploadId]);
-  const playbackId = rows[0]?.playback_id;
-
-  await queryWithRetry(
-    `UPDATE questions q
-     SET
-       media_provider = 'mux',
-       media_type = 'video',
-       media_url = CASE WHEN v.playback_id IS NULL THEN q.media_url ELSE $2 END,
-       mux_asset_id = v.asset_id,
-       mux_playback_id = v.playback_id,
-       mux_status = v.status,
-       mux_poster_url = CASE WHEN v.playback_id IS NULL THEN q.mux_poster_url ELSE $3 END,
-       updated_at = NOW()
-     FROM mux_video_uploads v
-     WHERE q.mux_upload_id = v.upload_id
-       AND v.upload_id = $1`,
-    [
-      uploadId,
-      playbackId ? muxPlaybackUrl(playbackId) : null,
-      playbackId ? muxPosterUrl(playbackId) : null,
-    ],
-    { allowWriteRetry: true },
-  );
-}
-
-export async function createMuxVideoUploadRecord(data: {
-  upload_id: string;
-  question_id: string;
-  quiz_id?: string | null;
-  file_name?: string | null;
-}) {
-  const result = await queryWithRetry(
-    `INSERT INTO mux_video_uploads (upload_id, question_id, quiz_id, file_name, status)
-     VALUES ($1, $2, $3, $4, 'waiting')
-     ON CONFLICT (upload_id) DO UPDATE SET
-       question_id = EXCLUDED.question_id,
-       quiz_id = EXCLUDED.quiz_id,
-       file_name = EXCLUDED.file_name,
-       updated_at = NOW()
-     RETURNING *`,
-    [data.upload_id, data.question_id, data.quiz_id ?? null, data.file_name ?? null],
-    { allowWriteRetry: true },
-  );
-
-  return result.rows[0];
-}
-
-export async function getMuxVideoUpload(uploadId: string) {
-  const result = await queryWithRetry(
-    'SELECT * FROM mux_video_uploads WHERE upload_id = $1',
-    [uploadId],
-  );
-
-  return result.rows[0] ?? null;
-}
-
-export async function markMuxUploadAssetCreated(data: {
-  upload_id: string;
-  asset_id: string;
-}) {
-  const result = await queryWithRetry(
-    `UPDATE mux_video_uploads
-     SET asset_id = $2, status = 'preparing', updated_at = NOW()
-     WHERE upload_id = $1
-     RETURNING *`,
-    [data.upload_id, data.asset_id],
-    { allowWriteRetry: true },
-  );
-
-  await syncQuestionsForMuxUpload(data.upload_id);
-  return result.rows[0] ?? null;
-}
-
-export async function markMuxAssetReady(data: {
-  asset_id: string;
-  playback_id: string;
-}) {
-  const result = await queryWithRetry<{ upload_id: string }>(
-    `UPDATE mux_video_uploads
-     SET playback_id = $2, status = 'ready', updated_at = NOW()
-     WHERE asset_id = $1
-     RETURNING upload_id`,
-    [data.asset_id, data.playback_id],
-    { allowWriteRetry: true },
-  );
-
-  for (const row of result.rows) {
-    await syncQuestionsForMuxUpload(row.upload_id);
-  }
-
-  return result.rows;
-}
-
-export async function markMuxAssetErrored(data: {
-  upload_id?: string | null;
-  asset_id?: string | null;
-  error_message?: string | null;
-}) {
-  const result = await queryWithRetry<{ upload_id: string }>(
-    `UPDATE mux_video_uploads
-     SET status = 'errored',
-         error_message = $3,
-         updated_at = NOW()
-     WHERE ($1::text IS NOT NULL AND upload_id = $1)
-        OR ($2::text IS NOT NULL AND asset_id = $2)
-     RETURNING upload_id`,
-    [data.upload_id ?? null, data.asset_id ?? null, data.error_message ?? null],
-    { allowWriteRetry: true },
-  );
-
-  for (const row of result.rows) {
-    await syncQuestionsForMuxUpload(row.upload_id);
-  }
-
-  return result.rows;
-}
 
 function normalizeChoiceScoreImpact(choice: {
   score_impact?: number;
@@ -715,12 +466,6 @@ type GraphQuestionInput = {
   media_type?: 'image' | 'gif' | 'video' | null;
   media_url?: string | null;
   media_path?: string | null;
-  media_provider?: 'firebase' | 'mux' | null;
-  mux_upload_id?: string | null;
-  mux_asset_id?: string | null;
-  mux_playback_id?: string | null;
-  mux_status?: string | null;
-  mux_poster_url?: string | null;
   timer_override?: number | null;
   is_entry_point?: boolean;
   node_x?: number;
@@ -770,16 +515,10 @@ export async function replaceQuizGraph(
     for (const question of questions) {
       const sourceId = question.id ?? randomUUID();
       const questionId = sourceId && UUID_RE.test(sourceId) ? sourceId : randomUUID();
-      const muxMedia = await resolveMuxMediaFields(client, question);
 
       await client.query(
-        `INSERT INTO questions (
-           id, session_id, question_order, question_text, node_name,
-           media_type, media_url, media_path, media_provider,
-           mux_upload_id, mux_asset_id, mux_playback_id, mux_status, mux_poster_url,
-           timer_override, is_entry_point, node_x, node_y, node_type
-         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+        `INSERT INTO questions (id, session_id, question_order, question_text, node_name, media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
         [
           questionId,
           sessionId,
@@ -787,14 +526,8 @@ export async function replaceQuizGraph(
           question.question_text,
           question.node_name ?? null,
           question.media_type ?? null,
-          muxMedia.media_url ?? question.media_url ?? null,
+          question.media_url ?? null,
           question.media_path ?? null,
-          muxMedia.media_provider ?? question.media_provider ?? (question.media_url ? 'firebase' : null),
-          muxMedia.mux_upload_id,
-          muxMedia.mux_asset_id,
-          muxMedia.mux_playback_id,
-          muxMedia.mux_status,
-          muxMedia.mux_poster_url,
           question.timer_override ?? null,
           question.is_entry_point ?? false,
           question.node_x ?? 0,
@@ -852,12 +585,6 @@ export async function updateQuestion(questionId: string, data: Partial<{
   media_type: string;
   media_url: string;
   media_path: string;
-  media_provider: string;
-  mux_upload_id: string;
-  mux_asset_id: string;
-  mux_playback_id: string;
-  mux_status: string;
-  mux_poster_url: string;
   timer_override: number;
   is_entry_point: boolean;
   node_x: number;
@@ -950,7 +677,7 @@ export async function upsertChoices(questionId: string, choices: Array<{
   choice_text: string;
   score_impact?: number;
   points?: number;
-  explanation?: string | null;
+  explanation?: string;
 }>) {
   // Delete existing choices and insert new ones
   await queryWithRetry('DELETE FROM choices WHERE question_id = $1', [questionId], {
