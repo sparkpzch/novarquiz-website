@@ -34,9 +34,14 @@ export function useFFmpeg() {
     await ffmpeg.writeFile("input.mp4", await fetchFile(file));
     await ffmpeg.exec([
       "-i", "input.mp4",
-      "-vcodec", "libx264",
+      "-c:v", "libx264",
+      "-profile:v", "main",    // iOS hardware decoder supports Baseline/Main/High up to L4.0
+      "-level", "4.0",
+      "-pix_fmt", "yuv420p",   // required for iOS hardware decode; without this, iOS falls back to software (~7s delay)
       "-crf", "28",
       "-preset", "fast",
+      "-c:a", "aac",
+      "-b:a", "128k",
       "-vf", "scale=-2:720",
       "-movflags", "+faststart",
       "output.mp4",

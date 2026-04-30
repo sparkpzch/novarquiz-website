@@ -161,9 +161,21 @@ function prepareInlineVideo(src: string, preload: 'auto' | 'metadata') {
   video.setAttribute('muted', '');
   video.setAttribute('playsinline', '');
   video.setAttribute('webkit-playsinline', '');
+  // iOS Safari ignores preload and video.load() on detached elements.
+  // Attaching to the DOM and calling play() is the only reliable trigger.
+  video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;pointer-events:none;';
   video.src = src;
-  video.load();
+  document.body.appendChild(video);
+  video.play().catch(() => {});
   return video;
+}
+
+function releaseVideo(video: HTMLVideoElement | null) {
+  if (!video) return;
+  video.pause();
+  video.src = '';
+  video.load();
+  video.remove();
 }
 
 function QuestionVisual({
@@ -549,6 +561,10 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       if (explanationTimerRef.current !== null) {
         window.clearTimeout(explanationTimerRef.current);
       }
+      releaseVideo(currentVideoWarmupRef.current);
+      releaseVideo(prefetchVideoRef.current);
+      currentVideoWarmupRef.current = null;
+      prefetchVideoRef.current = null;
     };
   }, []);
 
@@ -570,6 +586,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       explanationTimerRef.current = null;
     }
 
+    releaseVideo(currentVideoWarmupRef.current);
     currentVideoWarmupRef.current = nextQuestion.media_type === 'video' && nextQuestion.media_url
       ? prepareInlineVideo(nextQuestion.media_url, resolvePreload(videoQualityRef.current))
       : null;
@@ -742,6 +759,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     setNextLoading(true);
     const prefetched = prefetchedNextRef.current;
     prefetchedNextRef.current = null;
+    releaseVideo(prefetchVideoRef.current);
     prefetchVideoRef.current = null;
     if (prefetched) {
       applyQuestion(prefetched);
