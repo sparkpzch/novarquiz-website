@@ -11,6 +11,7 @@ import { updateScore, watchScores, untrackAllUserSessionsFor, type PlayerScore }
 import { trackEvent } from '@/lib/firebase/analytics';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 import { Card } from '@/components/ui/Card';
+import AutoPlayVideo from '@/components/ui/AutoPlayVideo';
 
 
 const IMPACT_THEME = {
@@ -130,13 +131,13 @@ function useVideoQuality(): VideoQuality {
   return (localStorage.getItem('novarquiz-video-quality') as VideoQuality) ?? 'auto';
 }
 
-function resolvePreload(quality: VideoQuality): 'none' | 'metadata' {
-  if (quality === 'hd') return 'metadata';
-  if (quality === 'sd') return 'none';
+function resolvePreload(quality: VideoQuality): 'auto' | 'metadata' {
+  if (quality === 'hd') return 'auto';
+  if (quality === 'sd') return 'metadata';
   // auto: detect connection type
   const conn = (navigator as Navigator & { connection?: { effectiveType?: string } }).connection;
   const type = conn?.effectiveType ?? '';
-  return type === '2g' || type === '3g' ? 'none' : 'metadata';
+  return type === '2g' || type === '3g' ? 'metadata' : 'auto';
 }
 
 function QuestionVisual({
@@ -160,7 +161,7 @@ function QuestionVisual({
               <p className="nq-details text-[#B0C4D8]">Media unavailable</p>
             </div>
           ) : question.media_type === 'video' ? (
-            <video
+            <AutoPlayVideo
               key={question.id}
               src={question.media_url}
               controls

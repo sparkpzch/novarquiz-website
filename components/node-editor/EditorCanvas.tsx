@@ -23,6 +23,8 @@ import {
   type Connection,
   type Node,
   type NodeTypes,
+  type OnEdgesChange,
+  type OnNodesChange,
 } from '@xyflow/react';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase/config';
@@ -56,8 +58,8 @@ export interface EditorCanvasProps {
   edges: AppEdge[];
   setNodes: React.Dispatch<React.SetStateAction<AppNode[]>>;
   setEdges: React.Dispatch<React.SetStateAction<AppEdge[]>>;
-  onNodesChange: any;
-  onEdgesChange: any;
+  onNodesChange: OnNodesChange<AppNode>;
+  onEdgesChange: OnEdgesChange<AppEdge>;
   /** Called when the Save button is clicked */
   onSave: () => void;
   saving: boolean;
@@ -172,6 +174,10 @@ export function EditorCanvas({
     const isGif = file.type === 'image/gif';
     const isImage = file.type.startsWith('image/');
     if (!isVideo && !isImage) return;
+    if (isVideo && file.type !== 'video/mp4') {
+      showToast('Use MP4 video for iOS Safari autoplay', 'error');
+      return;
+    }
 
     const MAX_IMAGE = 5 * 1024 * 1024;  // 5 MB
     const MAX_VIDEO = 50 * 1024 * 1024; // 50 MB
@@ -186,14 +192,19 @@ export function EditorCanvas({
 
     const mediaType = isVideo ? 'video' : isGif ? 'gif' : 'image';
     const folder = isVideo ? 'video' : isGif ? 'gif' : 'image';
-    const ext = file.name.split('.').pop();
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? (isVideo ? 'mp4' : 'bin');
     const storageBucket = quizId ?? sessionId;
     const path = `question-sessions/${storageBucket}/${folder}/${nodeId}_${Date.now()}.${ext}`;
     const storageRef = ref(storage, path);
 
     setUploadStatus({ nodeId, uploading: true, progress: 0 });
 
-    const task = uploadBytesResumable(storageRef, file);
+    const safeFileName = file.name.replace(/[^\w.-]/g, '_');
+    const task = uploadBytesResumable(storageRef, file, {
+      contentType: file.type,
+      cacheControl: 'public,max-age=31536000',
+      contentDisposition: `inline; filename="${safeFileName}"`,
+    });
     task.on(
       'state_changed',
       snap => setUploadStatus({ nodeId, uploading: true, progress: Math.round((snap.bytesTransferred / snap.totalBytes) * 100) }),
@@ -219,7 +230,7 @@ export function EditorCanvas({
         setUploadStatus(null);
       },
     );
-  }, [sessionId, quizId, setNodes]);
+  }, [sessionId, quizId, setNodes, showToast]);
 
   const handleConnectionChange = useCallback((choiceLabel: string, toQuestionId: string | null) => {
     if (!inspectedNode) return;

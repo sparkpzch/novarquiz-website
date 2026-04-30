@@ -11,8 +11,9 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, deleteObject } from 'firebase/storage';
 import { storage } from '@/lib/firebase/config';
+import AutoPlayVideo from '@/components/ui/AutoPlayVideo';
 import type { NormalNodeData } from './NormalNode';
 import type { SituationNodeData } from './SituationNode';
 import type { EndNodeData } from './EndNode';
@@ -68,12 +69,6 @@ const SCORE_PRESETS = [
   { label: '-10', value: -10, color: '#fb7185' },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function isNormalData(type: NodeType, data: NodeData): data is NormalNodeData {
-  return type === 'normalNode';
-}
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function FieldLabel({ children, hint }: { children: React.ReactNode; hint?: string }) {
@@ -122,7 +117,6 @@ export function LeftInspector({
   onSave,
   connections,
   onConnectionChange,
-  sessionId,
   onUpload,
   uploadStatus,
 }: LeftInspectorProps) {
@@ -270,7 +264,7 @@ export function LeftInspector({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,video/*"
+            accept="image/*,video/mp4"
             style={{ display: 'none' }}
             onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ''; }}
           />
@@ -342,7 +336,16 @@ export function LeftInspector({
                   />
                 )
               ) : (
-                <video src={draft.media_url ?? ''} controls style={{ width: '100%', borderRadius: 8, border: '1px solid rgba(112,162,249,0.18)' }} />
+                <AutoPlayVideo
+                  src={draft.media_url ?? ''}
+                  controls
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="metadata"
+                  style={{ width: '100%', borderRadius: 8, border: '1px solid rgba(112,162,249,0.18)' }}
+                />
               )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button

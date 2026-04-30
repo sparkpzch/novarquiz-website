@@ -3,7 +3,7 @@ import { adminStorage } from '@/lib/firebase/admin';
 
 const ALLOWED_TYPES = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-  'video/mp4', 'video/webm', 'video/ogg',
+  'video/mp4',
 ];
 const MAX_BYTES = 50 * 1024 * 1024; // 50 MB
 
@@ -26,10 +26,17 @@ export async function POST(req: NextRequest) {
 
     const ext = file.name.split('.').pop() ?? 'bin';
     const dest = `quiz-media/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const safeFileName = file.name.replace(/[^\w.-]/g, '_');
 
     const bucket = adminStorage.bucket();
     const fileRef = bucket.file(dest);
-    await fileRef.save(buffer, { contentType: file.type });
+    await fileRef.save(buffer, {
+      metadata: {
+        contentType: file.type,
+        cacheControl: 'public,max-age=31536000',
+        contentDisposition: `inline; filename="${safeFileName}"`,
+      },
+    });
     await fileRef.makePublic();
 
     const url = `https://storage.googleapis.com/${bucket.name}/${dest}`;

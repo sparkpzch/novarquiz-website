@@ -6,15 +6,14 @@ import { signInAnonymously, updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { useAuth } from "@/lib/hooks/useAuth";
 import {
-  joinWaitingRoom,
   claimLeaderIfEmpty,
   resolveJoinToken,
-  trackUserSession,
   getRoom,
 } from "@/lib/firebase/rtdb";
 import { trackEvent } from "@/lib/firebase/analytics";
 import { ROOM_STATUS } from "@/lib/constants/session";
 import { motion } from "motion/react";
+import { getVideoSourceType } from "@/components/ui/AutoPlayVideo";
 
 type SessionInfo = {
   id: string;
@@ -280,14 +279,18 @@ export default function JoinPage({
             {firstVideoUrl && (
               <video
                 key={firstVideoUrl}
-                src={firstVideoUrl}
                 preload="auto"
                 muted
                 playsInline
-                className="hidden"
+                aria-hidden="true"
+                style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+                onLoadedData={() => setVideoReady(true)}
+                onCanPlay={() => setVideoReady(true)}
                 onCanPlayThrough={() => setVideoReady(true)}
                 onError={() => setVideoReady(true)}
-              />
+              >
+                <source src={firstVideoUrl} type={getVideoSourceType(firstVideoUrl)} />
+              </video>
             )}
 
             <button
