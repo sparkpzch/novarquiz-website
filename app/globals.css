@@ -94,6 +94,13 @@ body {
   font-family: var(--font-jakarta), var(--font-inter), sans-serif;
 }
 
+.nq-question-player video,
+.nq-question-player iframe {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
 h1, h2, h3, .nq-header, .nq-topic {
   font-family: var(--font-lexend), sans-serif;
 }
