@@ -3,12 +3,13 @@ import {
   createQuestion,
   upsertChoices,
   getQuestionsByQuiz,
-  saveConnections,
   getConnectionsByQuiz,
   deleteQuestionsByQuiz,
   resolveQuizId,
   replaceQuizGraph,
 } from '@/lib/db/queries';
+import { parseJsonBody } from '@/lib/validation/api';
+import { graphQuestionSchema, replaceQuizGraphBodySchema } from '@/lib/validation/media';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
@@ -27,7 +28,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ qui
   const { quizId } = await params;
   try {
     const realId = await resolveQuizId(quizId);
-    const body = await request.json();
+    const body = await parseJsonBody(request, graphQuestionSchema);
+    if (body instanceof NextResponse) return body;
+
     const question = await createQuestion({ ...body, session_id: realId });
     if (body.choices?.length) {
       await upsertChoices(question.id, body.choices);
@@ -60,15 +63,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ quiz
   const { quizId } = await params;
   try {
     const realId = await resolveQuizId(quizId);
-    const body = await request.json();
-    if (Array.isArray(body.questions) && Array.isArray(body.connections)) {
-      const result = await replaceQuizGraph(realId, body.questions, body.connections);
-      return NextResponse.json({ ok: true, idMap: result.idMap });
-    }
-    if (body.connections) {
-      await saveConnections(realId, body.connections);
-    }
-    return NextResponse.json({ ok: true });
+    const body = await parseJsonBody(request, replaceQuizGraphBodySchema);
+    if (body instanceof NextResponse) return body;
+
+    const result = await replaceQuizGraph(realId, body.questions, body.connections);
+    return NextResponse.json({ ok: true, idMap: result.idMap });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

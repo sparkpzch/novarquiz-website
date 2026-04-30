@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { motion } from "motion/react";
 import { Card } from "@/components/ui/Card";
+import { useQuery } from "@tanstack/react-query";
+import { apiJson } from "@/lib/query/api";
 
 
 type HistoryEntry = {
@@ -50,20 +51,13 @@ function ScoreBar({ score, max }: { score: number; max: number }) {
 
 export default function StatsPage() {
   const { user } = useAuth();
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user || user.isAnonymous) {
-      setLoading(false);
-      return;
-    }
-    fetch(`/api/users/${user.uid}/history`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: HistoryEntry[]) => setHistory(data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [user]);
+  const historyQuery = useQuery({
+    queryKey: ["users", user?.uid, "history"],
+    queryFn: () => apiJson<HistoryEntry[]>(`/api/users/${user?.uid}/history`),
+    enabled: Boolean(user?.uid && !user.isAnonymous),
+  });
+  const history = historyQuery.data ?? [];
+  const loading = Boolean(user?.uid && !user.isAnonymous && historyQuery.isLoading);
 
   const totalPlayed = history.length;
   const bestScore = totalPlayed ? Math.max(...history.map((h) => h.total_score)) : 0;

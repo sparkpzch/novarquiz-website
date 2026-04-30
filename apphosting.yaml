@@ -15,8 +15,16 @@ env:
     secret: DATABASE_URL
   - variable: SESSION_SECRET
     secret: SESSION_SECRET
+  - variable: MUX_TOKEN_ID
+    secret: MUX_TOKEN_ID
+  - variable: MUX_TOKEN_SECRET
+    secret: MUX_TOKEN_SECRET
+  - variable: MUX_WEBHOOK_SECRET
+    secret: MUX_WEBHOOK_SECRET
   - variable: DB_PROVIDER
     value: neon
+  - variable: NEXT_PUBLIC_APP_ORIGIN
+    value: https://novarquiz-website--novartis-decisionlab.us-east4.hosted.app
 
   # Firebase client config (public — safe to hardcode)
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
