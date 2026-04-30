@@ -1,6 +1,6 @@
 'use client';
 
-import ReactPlayer from 'react-player';
+import AutoPlayVideo from './AutoPlayVideo';
 
 type QuestionMediaPlayerProps = {
   src: string;
@@ -17,18 +17,16 @@ export default function QuestionMediaPlayer({
 }: QuestionMediaPlayerProps) {
   return (
     <div className="nq-question-player h-44 w-full md:h-56">
-      <ReactPlayer
+      <AutoPlayVideo
         key={src}
         src={src}
         controls
-        playing
+        autoPlay
         loop
         muted
         playsInline
         preload={preload}
         poster={poster}
-        width="100%"
-        height="100%"
         onError={onError}
       />
     </div>
