@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAllSessions, createSession } from "@/lib/db/queries";
 import { getSessionUser } from "@/lib/auth";
 
-export async function GET(request: Request) {
+export async function GET(_request: Request) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const sessions = await getAllSessions();
-    return NextResponse.json(sessions);
+    const visible = user.isAdmin
+      ? sessions
+      : sessions.filter((s: { is_private: boolean; user_id: string }) => !s.is_private || s.user_id === user.uid);
+    return NextResponse.json(visible);
   } catch (error) {
     console.error("Failed to load sessions:", error);
     return NextResponse.json([], { status: 500 });
@@ -29,6 +35,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(session, { status: 201 });
   } catch (error) {
     console.error("Failed to create session:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

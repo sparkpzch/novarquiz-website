@@ -7,10 +7,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ses
   try {
     const session = await getSessionById(sessionId);
     if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    const user = await getSessionUser();
+    const isOwnerOrAdmin = user && (user.isAdmin || session.user_id === user.uid);
+    if (!isOwnerOrAdmin) {
+      const { pin_code: _pin, user_id: _uid, ...publicFields } = session;
+      return NextResponse.json(publicFields);
+    }
+
     return NextResponse.json(session);
   } catch (err) {
     console.error(`Failed to load session instance ${sessionId}:`, err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -40,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error(`Failed to update session ${sessionId}:`, err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -61,6 +69,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error(`Failed to delete session ${sessionId}:`, err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

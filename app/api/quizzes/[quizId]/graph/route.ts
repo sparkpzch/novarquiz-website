@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
   createQuestion,
   upsertChoices,
@@ -8,7 +8,18 @@ import {
   deleteQuestionsByQuiz,
   resolveQuizId,
   replaceQuizGraph,
+  getQuizById,
 } from '@/lib/db/queries';
+import { getSessionUser } from '@/lib/auth';
+
+async function requireQuizOwnership(quizId: string) {
+  const user = await getSessionUser();
+  if (!user) return { error: 'Unauthorized', status: 401 } as const;
+  const quiz = await getQuizById(quizId);
+  if (!quiz) return { error: 'Not found', status: 404 } as const;
+  if (!user.isAdmin && quiz.created_by !== user.uid) return { error: 'Forbidden', status: 403 } as const;
+  return null;
+}
 
 export async function GET(_request: Request, { params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
@@ -19,12 +30,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ qui
     return NextResponse.json({ questions, connections });
   } catch (err) {
     console.error(`Failed to load graph for quiz ${quizId}:`, err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
-export async function POST(request: Request, { params }: { params: Promise<{ quizId: string }> }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
+  const denied = await requireQuizOwnership(quizId);
+  if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status });
+
   try {
     const realId = await resolveQuizId(quizId);
     const body = await request.json();
@@ -34,12 +48,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ qui
     }
     return NextResponse.json(question, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error(`Failed to create question for quiz ${quizId}:`, err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ quizId: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
+  const denied = await requireQuizOwnership(quizId);
+  if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status });
+
   try {
     const realId = await resolveQuizId(quizId);
     let preservePaths = new Set<string>();
@@ -52,12 +70,16 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ q
     await deleteQuestionsByQuiz(realId, preservePaths);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error(`Failed to delete questions for quiz ${quizId}:`, err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
-export async function PUT(request: Request, { params }: { params: Promise<{ quizId: string }> }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
+  const denied = await requireQuizOwnership(quizId);
+  if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status });
+
   try {
     const realId = await resolveQuizId(quizId);
     const body = await request.json();
@@ -70,6 +92,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ quiz
     }
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error(`Failed to update graph for quiz ${quizId}:`, err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

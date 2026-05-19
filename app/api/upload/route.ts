@@ -3,7 +3,7 @@ import { adminStorage } from '@/lib/firebase/admin';
 import { getSessionUser } from '@/lib/auth';
 
 const ALLOWED_TYPES = [
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
   'video/mp4',
 ];
 const MAX_BYTES = 50 * 1024 * 1024; // 50 MB

@@ -20,6 +20,6 @@ export async function POST(request: NextRequest) {
     await adminAuth.setCustomUserClaims(user.uid, { admin: true });
     return NextResponse.json({ success: true, uid: user.uid });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

@@ -916,7 +916,7 @@ export async function updateSessionPin(id: string, pin: string | null) {
 
 const ALLOWED_SESSION_FIELDS: ReadonlySet<string> = new Set([
   'current_question_id', 'current_score', 'current_streak', 'finished_at',
-  'status', 'pin_code', 'name', 'slug',
+  'status', 'pin_code', 'name',
 ]);
 
 export async function updateSession(playSessionId: string, data: Partial<{
