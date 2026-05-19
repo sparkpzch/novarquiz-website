@@ -10,7 +10,7 @@ export async function GET(_request: Request) {
     const sessions = await getAllSessions();
     const visible = user.isAdmin
       ? sessions
-      : sessions.filter((s: { is_private: boolean; user_id: string }) => !s.is_private || s.user_id === user.uid);
+      : sessions.filter((s) => !(s as { is_private: boolean }).is_private || (s as { user_id: string }).user_id === user.uid);
     return NextResponse.json(visible);
   } catch (error) {
     console.error("Failed to load sessions:", error);
