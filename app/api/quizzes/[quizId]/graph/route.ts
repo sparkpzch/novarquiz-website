@@ -23,6 +23,9 @@ async function requireQuizOwnership(quizId: string) {
 
 export async function GET(_request: Request, { params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
+  const denied = await requireQuizOwnership(quizId);
+  if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status });
+
   try {
     const realId = await resolveQuizId(quizId);
     const questions = await getQuestionsByQuiz(realId);
