@@ -1,13 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import { motion } from 'motion/react';
+import { confirmPasswordReset } from 'firebase/auth';
+import { auth } from '@/lib/firebase/config';
 
-export default function NewPasswordPage() {
+function NewPasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const oobCode = searchParams.get('oobCode');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNew, setShowNew] = useState(false);
@@ -19,6 +23,10 @@ export default function NewPasswordPage() {
     e.preventDefault();
     setError('');
 
+    if (!oobCode) {
+      setError('Invalid or expired reset link. Please request a new one.');
+      return;
+    }
     if (newPassword.length < 8) {
       setError('Password must be at least 8 characters.');
       return;
@@ -29,10 +37,21 @@ export default function NewPasswordPage() {
     }
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await confirmPasswordReset(auth, oobCode, newPassword);
       router.push('/sign-in');
-    }, 1000);
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      const msgs: Record<string, string> = {
+        'auth/expired-action-code': 'This reset link has expired. Please request a new one.',
+        'auth/invalid-action-code': 'This reset link is invalid or has already been used.',
+        'auth/user-disabled': 'This account has been suspended.',
+        'auth/weak-password': 'Password is too weak. Please choose a stronger password.',
+      };
+      setError(msgs[code ?? ''] ?? 'Failed to reset password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -144,5 +163,13 @@ export default function NewPasswordPage() {
         </Button>
       </form>
     </>
+  );
+}
+
+export default function NewPasswordPage() {
+  return (
+    <Suspense>
+      <NewPasswordForm />
+    </Suspense>
   );
 }

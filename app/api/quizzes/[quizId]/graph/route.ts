@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import {
   createQuestion,
   upsertChoices,
@@ -11,6 +12,52 @@ import {
   getQuizById,
 } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
+
+const ALLOWED_MEDIA_ORIGINS = new Set([
+  'storage.googleapis.com',
+  'firebasestorage.googleapis.com',
+]);
+
+function isAllowedMediaUrl(url: string): boolean {
+  try {
+    const { hostname, protocol } = new URL(url);
+    return protocol === 'https:' && ALLOWED_MEDIA_ORIGINS.has(hostname);
+  } catch {
+    return false;
+  }
+}
+
+const ChoiceSchema = z.object({
+  label: z.string().min(1).max(10),
+  choice_text: z.string().max(1000),
+  score_impact: z.number().finite().min(-10000).max(10000).optional(),
+  explanation: z.string().max(2000).optional(),
+});
+
+const QuestionSchema = z.object({
+  question_text: z.string().max(5000),
+  question_order: z.number().int().min(0),
+  node_type: z.enum(['question', 'situation', 'end']).optional(),
+  media_url: z.string().max(500).optional().nullable().refine(
+    (v) => !v || isAllowedMediaUrl(v),
+    { message: 'media_url must be an https URL from an allowed storage domain' },
+  ),
+  media_type: z.enum(['image', 'video']).optional().nullable(),
+  node_x: z.number().finite().optional(),
+  node_y: z.number().finite().optional(),
+  choices: z.array(ChoiceSchema).max(20).optional(),
+});
+
+const ConnectionSchema = z.object({
+  from_question_id: z.string(),
+  to_question_id: z.string(),
+  choice_label: z.string().max(10),
+});
+
+const GraphBody = z.object({
+  questions: z.array(QuestionSchema).max(500),
+  connections: z.array(ConnectionSchema).max(2000),
+});
 
 async function requireQuizOwnership(quizId: string) {
   const user = await getSessionUser();
@@ -44,10 +91,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   try {
     const realId = await resolveQuizId(quizId);
-    const body = await request.json();
-    const question = await createQuestion({ ...body, session_id: realId });
-    if (body.choices?.length) {
-      await upsertChoices(question.id, body.choices);
+    const parsed = QuestionSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid request', details: parsed.error.flatten() }, { status: 400 });
+    }
+    const { choices, ...questionData } = parsed.data;
+    const question = await createQuestion({ ...questionData, session_id: realId });
+    if (choices?.length) {
+      await upsertChoices(question.id, choices);
     }
     return NextResponse.json(question, { status: 201 });
   } catch (err) {
@@ -91,13 +142,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     const realId = await resolveQuizId(quizId);
-    const body = await request.json();
-    if (Array.isArray(body.questions) && Array.isArray(body.connections)) {
-      const result = await replaceQuizGraph(realId, body.questions, body.connections);
+    const raw = await request.json();
+    if (Array.isArray(raw.questions) && Array.isArray(raw.connections)) {
+      const parsed = GraphBody.safeParse(raw);
+      if (!parsed.success) {
+        return NextResponse.json({ error: 'Invalid request', details: parsed.error.flatten() }, { status: 400 });
+      }
+      const result = await replaceQuizGraph(realId, parsed.data.questions, parsed.data.connections);
       return NextResponse.json({ ok: true, idMap: result.idMap });
     }
-    if (body.connections) {
-      await saveConnections(realId, body.connections);
+    if (raw.connections) {
+      const connParsed = z.array(ConnectionSchema).max(2000).safeParse(raw.connections);
+      if (!connParsed.success) {
+        return NextResponse.json({ error: 'Invalid connections' }, { status: 400 });
+      }
+      await saveConnections(realId, connParsed.data);
     }
     return NextResponse.json({ ok: true });
   } catch (err) {

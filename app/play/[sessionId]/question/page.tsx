@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Choice, LeaderboardEntry, Question, Quiz } from '@/lib/types';
-import { updateScore, watchScores, untrackAllUserSessionsFor, type PlayerScore } from '@/lib/firebase/rtdb';
+import { updatePlayerMetadata, watchScores, untrackAllUserSessionsFor, type PlayerScore } from '@/lib/firebase/rtdb';
 import { trackEvent } from '@/lib/firebase/analytics';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 import { Card } from '@/components/ui/Card';
@@ -600,7 +600,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     const activeUser = userRef.current;
     if (activeUser && !activeUser.isAnonymous) {
       const currentLabel = nextQuestion.question_text?.slice(0, 40) || `Q${nextQuestion.question_order + 1}`;
-      updateScore(sessionId, activeUser, scoreRef.current, {
+      updatePlayerMetadata(sessionId, activeUser.uid, {
         currentQuestionId: nextQuestion.id,
         currentQuestionLabel: currentLabel,
       }).catch(() => {});
@@ -729,13 +729,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       time_taken_ms: timeTaken,
     });
 
-    if (user && !user.isAnonymous) {
-      const currentLabel = question.question_text?.slice(0, 40) || `Q${question.question_order + 1}`;
-      updateScore(sessionId, user, nextScore, {
-        currentQuestionId: question.id,
-        currentQuestionLabel: currentLabel,
-      }).catch(() => {});
-    }
+    // Score is written server-side by the answer route via Admin SDK.
 
     // Prefetch next question + its video while user reads the explanation modal.
     prefetchedNextRef.current = null;
@@ -783,7 +777,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
 
     void (async () => {
       if (!user.isAnonymous) {
-        updateScore(sessionId, user, score, {
+        updatePlayerMetadata(sessionId, user.uid, {
           finished: true,
           currentQuestionId: null,
         }).catch(() => {});

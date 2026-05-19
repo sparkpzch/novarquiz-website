@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession } from '@/lib/db/queries';
+import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
+import { adminRtdb } from '@/lib/firebase/admin';
 
-const StartBody = z.object({ action: z.literal('start'), is_guest: z.boolean().optional() });
+const StartBody = z.object({
+  action: z.literal('start'),
+  is_guest: z.boolean().optional(),
+  display_name: z.string().max(100).optional(),
+  photo_url: z.string().url().max(500).optional().nullable(),
+});
 const AnswerBody = z.object({
   question_id: z.string().uuid(),
   chosen_label: z.string().min(1).max(10),
   time_taken_ms: z.number().int().min(0).max(300_000),
   is_guest: z.boolean().optional(),
+  display_name: z.string().max(100).optional(),
+  photo_url: z.string().url().max(500).optional().nullable(),
 });
 
 // Strip score_impact and explanation from choices so the answer key is never
@@ -23,6 +31,9 @@ function sanitizeQuestion(question: Record<string, unknown> | null) {
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const { sessionId } = await params;
   const searchParams = request.nextUrl.searchParams;
 
@@ -84,6 +95,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       chosen_label: parsed.data.chosen_label,
       time_taken_ms: parsed.data.time_taken_ms,
     });
+
+    // Fire-and-forget: server writes authoritative score to RTDB so clients
+    // cannot spoof the live leaderboard by writing arbitrary values directly.
+    void (async () => {
+      try {
+        const cumScore = await getUserCumulativeScore(sessionId, user.uid);
+        const displayName = parsed.data.display_name?.replace(/<[^>]*>/g, '').trim().slice(0, 100) || 'Anonymous';
+        const label = ''; // currentQuestionLabel not needed server-side
+        await adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).update({
+          score: cumScore,
+          displayName,
+          currentQuestionId: parsed.data.question_id,
+          currentQuestionLabel: label,
+          updatedAt: Date.now(),
+        });
+      } catch { /* non-fatal — live leaderboard degrades gracefully */ }
+    })();
 
     return NextResponse.json(result);
   } catch {

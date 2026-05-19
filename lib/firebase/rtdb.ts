@@ -201,6 +201,21 @@ export async function updateScore(
   } satisfies PlayerScore);
 }
 
+export async function updatePlayerMetadata(
+  sessionId: string,
+  uid: string,
+  metadata: {
+    currentQuestionId?: string | null;
+    currentQuestionLabel?: string | null;
+    finished?: boolean;
+  },
+): Promise<void> {
+  await update(ref(rtdb, `sessions/${sessionId}/scores/${uid}`), {
+    ...metadata,
+    updatedAt: Date.now(),
+  });
+}
+
 export function watchScores(
   sessionId: string,
   callback: (scores: Record<string, PlayerScore>) => void,

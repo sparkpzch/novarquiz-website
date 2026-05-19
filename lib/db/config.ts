@@ -31,7 +31,7 @@ export function getDatabaseProvider(): DatabaseProvider {
 }
 
 export function getDatabaseSslConfig() {
-  return getDatabaseProvider() === 'neon' ? { rejectUnauthorized: false } : false;
+  return getDatabaseProvider() === 'neon' ? { rejectUnauthorized: true } : false;
 }
 
 export function getDatabaseConnectionOptions() {
