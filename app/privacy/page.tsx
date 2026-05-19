@@ -1,41 +1,70 @@
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-[#0a0a1a] text-gray-300 p-8 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold text-white mb-8">Privacy Policy</h1>
+      <h1 className="text-3xl font-bold text-white mb-2">Privacy Policy</h1>
+      <p className="text-gray-500 text-sm mb-4">Last updated: May 19, 2026 · Version 2026-05-19</p>
+      <div className="rounded-xl p-4 mb-8 text-sm" style={{ background: 'rgba(59,91,212,0.15)', border: '1px solid rgba(59,91,212,0.4)' }}>
+        <p className="font-semibold text-blue-300 mb-1">PDPA Compliance Notice</p>
+        <p className="text-blue-200 text-xs leading-relaxed">
+          This Privacy Policy complies with Thailand&apos;s Personal Data Protection Act B.E. 2562 (PDPA).
+          NovarQuiz is the Data Controller for all personal data processed through this Service.
+          Contact: <span className="font-medium">privacy@novarquiz.com</span>
+        </p>
+      </div>
+
       <div className="space-y-6 text-sm leading-relaxed">
         <section>
-          <h2 className="text-lg font-semibold text-white mb-2">1. Information We Collect</h2>
-          <p><strong>Account Information:</strong> When you create an account, we collect your name, email address, and profile picture. <strong>Usage Data:</strong> We collect information about how you use the Service, including quiz responses, scores, and session participation.</p>
+          <h2 className="text-lg font-semibold text-white mb-2">1. Personal Data We Collect</h2>
+          <p><strong className="text-white">Account Data:</strong> Email address, display name, profile picture.</p>
+          <p className="mt-1"><strong className="text-white">Usage Data:</strong> Quiz responses, scores, session participation, streak counts.</p>
+          <p className="mt-1"><strong className="text-white">Technical Data:</strong> IP address (stored only in consent records for legal proof), browser type, session cookies.</p>
+          <p className="mt-1"><strong className="text-white">Legal Basis:</strong> Your explicit consent given at registration (PDPA §19).</p>
         </section>
         <section>
-          <h2 className="text-lg font-semibold text-white mb-2">2. How We Use Your Information</h2>
-          <p>We use the information to: (a) provide and maintain the Service; (b) authenticate your identity; (c) calculate scores and maintain leaderboards; (d) improve the Service; (e) communicate with you about updates or changes.</p>
+          <h2 className="text-lg font-semibold text-white mb-2">2. How We Use Your Data</h2>
+          <p>We use your data to: (a) authenticate your identity; (b) calculate scores and leaderboards; (c) provide quiz history and statistics; (d) improve the Service through aggregate analytics; (e) comply with PDPA obligations.</p>
         </section>
         <section>
-          <h2 className="text-lg font-semibold text-white mb-2">3. Data Storage &amp; Security</h2>
-          <p>Your data is stored securely using Firebase (Google Cloud) and PostgreSQL databases. We implement appropriate security measures including encryption in transit and at rest.</p>
+          <h2 className="text-lg font-semibold text-white mb-2">3. Data Retention</h2>
+          <p>Personal data is kept while your account is active. Upon deletion, data is permanently removed within 30 days. Consent records are retained for 3 years as required by PDPA for legal proof of consent.</p>
         </section>
         <section>
-          <h2 className="text-lg font-semibold text-white mb-2">4. Data Sharing</h2>
-          <p>We do not sell, trade, or otherwise transfer your personal information to third parties. Your quiz scores and display name may be visible to other users via leaderboards.</p>
+          <h2 className="text-lg font-semibold text-white mb-2">4. Data Sharing &amp; International Transfers</h2>
+          <p>We do not sell your data. Processors used (with possible cross-border transfers under PDPA Chapter 7):</p>
+          <ul className="list-disc list-inside mt-2 space-y-1">
+            <li><strong className="text-white">Google Firebase</strong> — Authentication, real-time database, file storage</li>
+            <li><strong className="text-white">Neon / PostgreSQL</strong> — Quiz data and user profiles</li>
+          </ul>
         </section>
         <section>
-          <h2 className="text-lg font-semibold text-white mb-2">5. Your Rights</h2>
-          <p>You have the right to: (a) access your personal data; (b) correct inaccurate data; (c) delete your account and associated data; (d) export your data; (e) opt out of non-essential communications.</p>
+          <h2 className="text-lg font-semibold text-white mb-2">5. Your Rights Under PDPA</h2>
+          <ul className="list-disc list-inside space-y-1">
+            <li><strong className="text-white">Access</strong> — request a copy of your data</li>
+            <li><strong className="text-white">Rectification</strong> — correct inaccurate data</li>
+            <li><strong className="text-white">Erasure</strong> — request deletion (right to be forgotten)</li>
+            <li><strong className="text-white">Portability</strong> — receive data in machine-readable format</li>
+            <li><strong className="text-white">Restriction</strong> — limit how we process your data</li>
+            <li><strong className="text-white">Objection</strong> — object to processing based on legitimate interests</li>
+            <li><strong className="text-white">Withdraw Consent</strong> — via Profile → Delete Account, effective immediately</li>
+          </ul>
+          <p className="mt-2">Contact <span className="text-blue-400">privacy@novarquiz.com</span> to exercise these rights. We respond within 30 days.</p>
         </section>
         <section>
           <h2 className="text-lg font-semibold text-white mb-2">6. Cookies</h2>
-          <p>We use essential cookies for authentication and session management. We do not use tracking cookies for advertising purposes.</p>
+          <p>One essential cookie only: <code className="bg-gray-800 px-1 rounded">session</code> (HttpOnly, Secure, SameSite=Lax) for authentication. No advertising or tracking cookies.</p>
         </section>
         <section>
-          <h2 className="text-lg font-semibold text-white mb-2">7. Children&apos;s Privacy</h2>
-          <p>The Service is not intended for children under 13. We do not knowingly collect personal information from children under 13 years of age.</p>
+          <h2 className="text-lg font-semibold text-white mb-2">7. Security</h2>
+          <p>TLS encryption in transit, encryption at rest via Firebase and Neon, role-based access controls, HttpOnly session cookies. Passwords are never stored.</p>
         </section>
         <section>
-          <h2 className="text-lg font-semibold text-white mb-2">8. Changes to This Policy</h2>
-          <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.</p>
+          <h2 className="text-lg font-semibold text-white mb-2">8. Children&apos;s Privacy</h2>
+          <p>Not intended for children under 13. Contact us immediately if you believe a child has provided personal data.</p>
         </section>
-        <p className="text-gray-500 mt-8">Last updated: April 2026</p>
+        <section>
+          <h2 className="text-lg font-semibold text-white mb-2">9. Policy Changes</h2>
+          <p>Material changes notified via email or in-app notice at least 30 days in advance, as required by PDPA.</p>
+        </section>
       </div>
     </div>
   );

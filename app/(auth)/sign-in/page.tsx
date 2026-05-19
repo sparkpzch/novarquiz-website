@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, Suspense } from 'react';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
+import TermsModal from '@/components/ui/TermsModal';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion } from 'motion/react';
@@ -21,6 +22,8 @@ function SignInForm() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Holds the pending ID token for new Google OAuth users until they accept ToS
+  const [consentPending, setConsentPending] = useState<string | null>(null);
 
   const createSession = async (idToken: string) => {
     const res = await fetch('/api/auth/session', {
@@ -63,6 +66,20 @@ function SignInForm() {
     }
   };
 
+  const handleConsentAccepted = async () => {
+    if (!consentPending) return;
+    setConsentPending(null);
+    setLoading(true);
+    try {
+      await createSession(consentPending);
+      await fetch('/api/auth/consent', { method: 'POST' });
+    } catch (err) {
+      setError('Sign in failed after consent. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     setError('');
     setLoading(true);
@@ -70,6 +87,12 @@ function SignInForm() {
       const provider = new GoogleAuthProvider();
       const credential = await signInWithPopup(auth, provider);
       const idToken = await credential.user.getIdToken();
+      // New Google OAuth users must accept ToS + PDPA before session is created
+      if (getAdditionalUserInfo(credential)?.isNewUser) {
+        setConsentPending(idToken);
+        setLoading(false);
+        return;
+      }
       await createSession(idToken);
     } catch (err) {
       console.error('Google sign-in failed:', err);
@@ -205,6 +228,17 @@ function SignInForm() {
           {t('auth.sign_up')}
         </Link>
       </p>
+
+      {/* PDPA consent gate for new Google OAuth users */}
+      {consentPending && (
+        <TermsModal
+          onClose={() => {
+            setConsentPending(null);
+            setError('You must accept the Terms of Service to continue.');
+          }}
+          onAccept={handleConsentAccepted}
+        />
+      )}
     </>
   );
 }

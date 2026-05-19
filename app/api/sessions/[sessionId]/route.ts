@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { deleteSession, getSessionById, updateSession } from '@/lib/db/queries';
+import { getSessionUser } from '@/lib/auth';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
@@ -13,21 +14,28 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ses
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const { sessionId } = await params;
   try {
     const session = await getSessionById(sessionId);
     if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+    if (!user.isAdmin && session.user_id !== user.uid) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const data = await request.json();
-    
+
     // Support both legacy 'pin' key and direct DB field names
-    const updateData: any = { ...data };
+    const updateData: Record<string, unknown> = { ...data };
     if ('pin' in data) {
       updateData.pin_code = data.pin;
       delete updateData.pin;
     }
-    
+
     await updateSession(session.id, updateData);
     return NextResponse.json({ ok: true });
   } catch (err) {
@@ -36,9 +44,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ se
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const { sessionId } = await params;
   try {
+    const session = await getSessionById(sessionId);
+    if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    if (!user.isAdmin && session.user_id !== user.uid) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     await deleteSession(sessionId);
     return NextResponse.json({ ok: true });
   } catch (err) {
