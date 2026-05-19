@@ -7,6 +7,7 @@ import { syncUserProfile } from '@/lib/db/queries';
 const COOKIE_NAME = 'session';
 const DEFAULT_MAX_AGE = 60 * 60 * 24 * 5;   // 5 days — session-scoped default
 const REMEMBER_MAX_AGE = 60 * 60 * 24 * 30; // 30 days when user checks "remember me"
+const ADMIN_MAX_AGE = 60 * 60 * 24;          // 24 h max for admins so claim revocation takes effect within a day
 
 function getSecret() {
   const secret = process.env.SESSION_SECRET;
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     await syncUserProfile(decoded.uid, decoded.name || null, decoded.picture || null);
 
     const isAdmin = !!decoded.admin;
-    const maxAge = rememberMe ? REMEMBER_MAX_AGE : DEFAULT_MAX_AGE;
+    const maxAge = isAdmin ? ADMIN_MAX_AGE : (rememberMe ? REMEMBER_MAX_AGE : DEFAULT_MAX_AGE);
 
     const token = await new SignJWT({ uid: decoded.uid, isAdmin })
       .setProtectedHeader({ alg: 'HS256' })
