@@ -51,7 +51,7 @@ const QuestionSchema = z.object({
 const ConnectionSchema = z.object({
   from_question_id: z.string(),
   to_question_id: z.string(),
-  choice_label: z.string().max(10),
+  from_choice_label: z.string().max(10),
 });
 
 const GraphBody = z.object({
@@ -96,7 +96,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Invalid request', details: parsed.error.flatten() }, { status: 400 });
     }
     const { choices, ...questionData } = parsed.data;
-    const question = await createQuestion({ ...questionData, session_id: realId });
+    const question = await createQuestion({
+      ...questionData,
+      session_id: realId,
+      media_type: questionData.media_type ?? undefined,
+      media_url: questionData.media_url ?? undefined,
+    });
     if (choices?.length) {
       await upsertChoices(question.id, choices);
     }
