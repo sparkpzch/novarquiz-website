@@ -10,7 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ qui
     return NextResponse.json(quiz);
   } catch (err) {
     console.error(`Failed to load quiz ${quizId}:`, err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -32,7 +32,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json(updated);
   } catch (err) {
     console.error(`Failed to update quiz ${quizId}:`, err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -53,6 +53,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error(`Failed to delete quiz ${quizId}:`, err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
