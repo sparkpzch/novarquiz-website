@@ -1,0 +1,25 @@
+rules_version = '2';
+  service firebase.storage {
+    match /b/{bucket}/o {
+
+      // Profile pictures: Users/<any-folder>/<uid>
+      // "Profile Pictures" has a space so we can't write it literally — use a wildcard
+      match /Users/{folder}/{uid} {
+        allow read: if true;
+        allow write: if request.auth != null
+                     && request.auth.uid == uid
+                     && request.resource.size < 5 * 1024 * 1024
+                     && request.resource.contentType.matches('image/.*');
+      }
+
+      // Quiz media uploaded from the editor: authenticated users only
+      match /question-sessions/{allPaths=**} {
+        allow read: if true;
+        allow write: if request.auth != null
+                     && request.resource.size < 50 * 1024 * 1024
+                     && (request.resource.contentType.matches('image/.*')
+                         || request.resource.contentType.matches('video/.*'));
+        allow delete: if request.auth != null;
+      }
+    }
+  }
