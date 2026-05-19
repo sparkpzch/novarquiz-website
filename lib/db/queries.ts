@@ -141,6 +141,10 @@ export async function createQuiz(data: {
   }
 }
 
+const ALLOWED_QUIZ_FIELDS: ReadonlySet<string> = new Set([
+  'name', 'description', 'cover_image_url', 'cover_image_path', 'timer_seconds', 'is_published',
+]);
+
 export async function updateQuiz(sessionId: string, data: Partial<{
   name: string;
   description: string;
@@ -152,9 +156,9 @@ export async function updateQuiz(sessionId: string, data: Partial<{
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
+
     const realId = await resolveQuizId(sessionId);
-    
+
     // Get old path
     const { rows: oldRows } = await client.query('SELECT cover_image_path FROM quizzes WHERE id = $1', [realId]);
     const oldPath = oldRows[0]?.cover_image_path;
@@ -164,6 +168,7 @@ export async function updateQuiz(sessionId: string, data: Partial<{
     let paramIdx = 1;
 
     for (const [key, value] of Object.entries(data)) {
+      if (!ALLOWED_QUIZ_FIELDS.has(key)) continue;
       fields.push(`${key} = $${paramIdx}`);
       values.push(value);
       paramIdx++;
@@ -579,6 +584,11 @@ export async function replaceQuizGraph(
   }
 }
 
+const ALLOWED_QUESTION_FIELDS: ReadonlySet<string> = new Set([
+  'question_text', 'node_name', 'media_type', 'media_url', 'media_path',
+  'timer_override', 'is_entry_point', 'node_x', 'node_y', 'question_order',
+]);
+
 export async function updateQuestion(questionId: string, data: Partial<{
   question_text: string;
   node_name: string;
@@ -594,7 +604,7 @@ export async function updateQuestion(questionId: string, data: Partial<{
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
+
     // Get old data
     const { rows: oldRows } = await client.query('SELECT media_path FROM questions WHERE id = $1', [questionId]);
     const oldPath = oldRows[0]?.media_path;
@@ -604,6 +614,7 @@ export async function updateQuestion(questionId: string, data: Partial<{
     let paramIdx = 1;
 
     for (const [key, value] of Object.entries(data)) {
+      if (!ALLOWED_QUESTION_FIELDS.has(key)) continue;
       fields.push(`${key} = $${paramIdx}`);
       values.push(value);
       paramIdx++;
@@ -903,6 +914,11 @@ export async function updateSessionPin(id: string, pin: string | null) {
   );
 }
 
+const ALLOWED_SESSION_FIELDS: ReadonlySet<string> = new Set([
+  'current_question_id', 'current_score', 'current_streak', 'finished_at',
+  'status', 'pin_code', 'name', 'slug',
+]);
+
 export async function updateSession(playSessionId: string, data: Partial<{
   current_question_id: string;
   current_score: number;
@@ -918,6 +934,7 @@ export async function updateSession(playSessionId: string, data: Partial<{
   let paramIdx = 1;
 
   for (const [key, value] of Object.entries(data)) {
+    if (!ALLOWED_SESSION_FIELDS.has(key)) continue;
     fields.push(`${key} = $${paramIdx}`);
     values.push(value);
     paramIdx++;

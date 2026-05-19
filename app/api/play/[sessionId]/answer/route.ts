@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession } from '@/lib/db/queries';
+import { getSessionUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
@@ -41,18 +42,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     if (body.action === 'start') {
       // Guests skip play_session persistence — no analytics trail.
       if (body.is_guest) return NextResponse.json({ is_guest: true });
-      const playSession = await getOrCreateSession(sessionId, body.user_id);
+      const user = await getSessionUser();
+      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      const playSession = await getOrCreateSession(sessionId, user.uid);
       return NextResponse.json(playSession);
     }
 
     // Guests: no per-answer persistence (score stays client-side only).
     if (body.is_guest) return NextResponse.json({ is_guest: true });
 
+    const user = await getSessionUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     // Server computes points from the choice's stored value — clients never
     // submit their own score, which would be trivially exploitable.
+    // user_id always comes from the verified session, never from the request body.
     const result = await saveUserAnswer({
       session_id: sessionId,
-      user_id: body.user_id,
+      user_id: user.uid,
       question_id: body.question_id,
       chosen_label: body.chosen_label,
       time_taken_ms: body.time_taken_ms || 0,

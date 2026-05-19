@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
+import TermsModal from '@/components/ui/TermsModal';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion } from 'motion/react';
@@ -18,6 +18,9 @@ export default function SignUpPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [agreePdpa, setAgreePdpa] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [showTermsTab, setShowTermsTab] = useState<'terms' | 'privacy'>('terms');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [verified, setVerified] = useState(false);
@@ -35,7 +38,11 @@ export default function SignUpPage() {
       return;
     }
     if (!agreeTerms) {
-      setError('You must agree to the Terms and Conditions.');
+      setError('You must agree to the Terms of Service.');
+      return;
+    }
+    if (!agreePdpa) {
+      setError('You must consent to personal data processing under PDPA.');
       return;
     }
 
@@ -50,6 +57,8 @@ export default function SignUpPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
       });
+      // Record PDPA consent in Firebase after session is established
+      await fetch('/api/auth/consent', { method: 'POST' });
       setVerified(true);
     } catch (err: unknown) {
       const firebaseError = err as { code?: string };
@@ -115,11 +124,24 @@ export default function SignUpPage() {
           required
         />
 
-        {/* Terms checkbox */}
-        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+        {/* Terms of Service checkbox — clicking when unchecked opens modal first */}
+        <label className="flex items-start gap-2.5 cursor-pointer select-none">
           <div
-            onClick={() => setAgreeTerms(!agreeTerms)}
-            className="flex-shrink-0 flex items-center justify-center cursor-pointer"
+            role="checkbox"
+            aria-checked={agreeTerms}
+            tabIndex={0}
+            onClick={() => {
+              if (agreeTerms) { setAgreeTerms(false); return; }
+              setShowTermsTab('terms');
+              setShowTerms(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== ' ') return;
+              if (agreeTerms) { setAgreeTerms(false); return; }
+              setShowTermsTab('terms');
+              setShowTerms(true);
+            }}
+            className="flex-shrink-0 flex items-center justify-center cursor-pointer mt-0.5"
             style={{
               width: '17px',
               height: '17px',
@@ -136,10 +158,72 @@ export default function SignUpPage() {
             )}
           </div>
           <span className="text-sm text-gray-600 md:text-gray-400">
-            I agree to the{' '}
-            <Link href="/terms" className="font-medium underline" style={{ color: '#3b5fd4' }}>
-              Terms and Conditions
-            </Link>
+            I have read and agree to the{' '}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowTermsTab('terms'); setShowTerms(true); }}
+              className="font-medium underline underline-offset-2 transition-opacity hover:opacity-70"
+              style={{ color: '#3b5fd4' }}
+            >
+              Terms of Service
+            </button>
+            {' '}and{' '}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowTermsTab('privacy'); setShowTerms(true); }}
+              className="font-medium underline underline-offset-2 transition-opacity hover:opacity-70"
+              style={{ color: '#3b5fd4' }}
+            >
+              Privacy Policy
+            </button>
+          </span>
+        </label>
+
+        {/* PDPA consent checkbox — clicking when unchecked opens modal on Privacy tab */}
+        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+          <div
+            role="checkbox"
+            aria-checked={agreePdpa}
+            tabIndex={0}
+            onClick={() => {
+              if (agreePdpa) { setAgreePdpa(false); return; }
+              setShowTermsTab('privacy');
+              setShowTerms(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== ' ') return;
+              if (agreePdpa) { setAgreePdpa(false); return; }
+              setShowTermsTab('privacy');
+              setShowTerms(true);
+            }}
+            className="flex-shrink-0 flex items-center justify-center cursor-pointer mt-0.5"
+            style={{
+              width: '17px',
+              height: '17px',
+              borderRadius: '4px',
+              border: `1.5px solid ${agreePdpa ? '#3b5fd4' : '#d1d5db'}`,
+              background: agreePdpa ? '#3b5fd4' : 'transparent',
+              transition: 'all 0.2s',
+            }}
+          >
+            {agreePdpa && (
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
+          <span className="text-sm text-gray-600 md:text-gray-400">
+            I consent to the collection and processing of my personal data as described in the{' '}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowTermsTab('privacy'); setShowTerms(true); }}
+              className="font-medium underline underline-offset-2 transition-opacity hover:opacity-70"
+              style={{ color: '#3b5fd4' }}
+            >
+              Privacy Policy
+            </button>
+            {' '}
+            <span className="text-xs text-gray-400">(required under PDPA)</span>
           </span>
         </label>
 
@@ -157,10 +241,22 @@ export default function SignUpPage() {
       {/* Desktop: sign-in link */}
       <p className="hidden md:block text-center text-sm text-gray-400 mt-6">
         {t('auth.have_account')}{' '}
-        <Link href="/sign-in" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
+        <a href="/sign-in" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
           {t('auth.sign_in')}
-        </Link>
+        </a>
       </p>
+
+      {showTerms && (
+        <TermsModal
+          initialTab={showTermsTab}
+          onClose={() => setShowTerms(false)}
+          onAccept={() => {
+            setAgreeTerms(true);
+            setAgreePdpa(true);
+            setShowTerms(false);
+          }}
+        />
+      )}
     </>
   );
 }

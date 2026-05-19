@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getAllSessions, createSession } from "@/lib/db/queries";
+import { getSessionUser } from "@/lib/auth";
 
 export async function GET(request: Request) {
   try {
@@ -11,16 +12,20 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const body = await request.json();
-    const { quizId, userId, isPrivate, name } = body;
+    const { quizId, isPrivate, name } = body;
 
-    if (!quizId || !userId) {
-      return NextResponse.json({ error: "quizId and userId are required" }, { status: 400 });
+    if (!quizId) {
+      return NextResponse.json({ error: "quizId is required" }, { status: 400 });
     }
 
-    const session = await createSession(quizId, userId, isPrivate, name);
+    // user.uid comes from the verified session cookie, never from the request body.
+    const session = await createSession(quizId, user.uid, isPrivate, name);
     return NextResponse.json(session, { status: 201 });
   } catch (error) {
     console.error("Failed to create session:", error);

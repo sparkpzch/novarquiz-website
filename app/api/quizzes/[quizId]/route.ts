@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getQuizById, updateQuiz, deleteQuiz } from '@/lib/db/queries';
+import { getSessionUser } from '@/lib/auth';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
@@ -13,21 +14,41 @@ export async function GET(_request: Request, { params }: { params: Promise<{ qui
   }
 }
 
-export async function PUT(request: Request, { params }: { params: Promise<{ quizId: string }> }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ quizId: string }> }) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const { quizId } = await params;
   try {
+    const quiz = await getQuizById(quizId);
+    if (!quiz) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    if (!user.isAdmin && quiz.created_by !== user.uid) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const body = await request.json();
-    const quiz = await updateQuiz(quizId, body);
-    return NextResponse.json(quiz);
+    const updated = await updateQuiz(quizId, body);
+    return NextResponse.json(updated);
   } catch (err) {
     console.error(`Failed to update quiz ${quizId}:`, err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ quizId: string }> }) {
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ quizId: string }> }) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const { quizId } = await params;
   try {
+    const quiz = await getQuizById(quizId);
+    if (!quiz) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    if (!user.isAdmin && quiz.created_by !== user.uid) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     await deleteQuiz(quizId);
     return NextResponse.json({ ok: true });
   } catch (err) {
