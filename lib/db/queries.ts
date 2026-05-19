@@ -783,6 +783,14 @@ export async function saveUserAnswer(data: {
   return { id: result.rows[0].id, points_earned: points };
 }
 
+export async function getUserCumulativeScore(sessionId: string, userId: string): Promise<number> {
+  const result = await pool.query(
+    `SELECT COALESCE(SUM(utility_score), 0)::int AS total FROM user_answers WHERE session_id = $1 AND user_id = $2`,
+    [sessionId, userId],
+  );
+  return (result.rows[0]?.total as number) ?? 0;
+}
+
 // Aggregates a player's user_answers into a single leaderboard_entries row.
 // Called when a player reaches the end of their path (or runs out of time).
 // Idempotent — re-running for the same user just refreshes the snapshot.

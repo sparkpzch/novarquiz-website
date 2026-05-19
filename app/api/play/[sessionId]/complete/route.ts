@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { completeSession } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
+import { adminRtdb } from '@/lib/firebase/admin';
 
 const TRUSTED_PHOTO_ORIGINS = new Set([
   'lh3.googleusercontent.com',
@@ -41,6 +42,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       user_display_name: sanitizeDisplayName(body.user_display_name),
       user_photo_url: sanitizePhotoUrl(body.user_photo_url),
     });
+
+    void adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).update({
+      finished: true,
+      currentQuestionId: null,
+      updatedAt: Date.now(),
+    }).catch(() => {});
+
     return NextResponse.json(result);
   } catch (err) {
     console.error('complete failed:', err);

@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getEntryQuestion } from '@/lib/db/queries';
+import { getSessionUser } from '@/lib/auth';
 
 export async function GET(_: Request, { params }: { params: Promise<{ sessionId: string }> }) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const { sessionId } = await params;
   try {
     const question = await getEntryQuestion(sessionId);

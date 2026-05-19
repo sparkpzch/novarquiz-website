@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionByToken } from '@/lib/db/queries';
+import { getSessionUser } from '@/lib/auth';
 
 // Join tokens are resolved via Firebase RTDB (resolveJoinToken).
 // The client resolves the token to a sessionId client-side, then fetches
@@ -8,6 +9,9 @@ export async function GET(
   _: Request,
   { params }: { params: Promise<{ token: string }> },
 ) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const { token } = await params;
   try {
     const session = await getSessionByToken(token);

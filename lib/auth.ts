@@ -26,7 +26,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       isAdmin: !!payload.isAdmin,
     };
   } catch (err) {
-    console.error('Session verification failed:', err);
+    console.error('Session verification failed:', err instanceof Error ? err.message : 'Unknown error');
     return null;
   }
 }

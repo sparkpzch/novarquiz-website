@@ -25,6 +25,9 @@ function SignInForm() {
   // Holds the pending ID token for new Google OAuth users until they accept ToS
   const [consentPending, setConsentPending] = useState<string | null>(null);
 
+  const safeNextUrl =
+    nextUrl && /^\/(?!\/)/.test(nextUrl) ? nextUrl : '/';
+
   const createSession = async (idToken: string) => {
     const res = await fetch('/api/auth/session', {
       method: 'POST',
@@ -33,7 +36,7 @@ function SignInForm() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Session creation failed');
-    router.push(nextUrl ?? '/');
+    router.push(safeNextUrl);
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
