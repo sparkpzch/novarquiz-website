@@ -1,25 +1,30 @@
 rules_version = '2';
-  service firebase.storage {
-    match /b/{bucket}/o {
+service firebase.storage {
+  match /b/{bucket}/o {
 
-      // Profile pictures: Users/<any-folder>/<uid>
-      // "Profile Pictures" has a space so we can't write it literally — use a wildcard
-      match /Users/{folder}/{uid} {
-        allow read: if true;
-        allow write: if request.auth != null
-                     && request.auth.uid == uid
-                     && request.resource.size < 5 * 1024 * 1024
-                     && request.resource.contentType.matches('image/.*');
-      }
+    // Profile pictures: owner can write/delete, public read
+    match /Users/{folder}/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
 
-      // Quiz media uploaded from the editor: authenticated users only
-      match /question-sessions/{allPaths=**} {
-        allow read: if true;
-        allow write: if request.auth != null
-                     && request.resource.size < 50 * 1024 * 1024
-                     && (request.resource.contentType.matches('image/.*')
-                         || request.resource.contentType.matches('video/.*'));
-        allow delete: if request.auth != null;
-      }
+    // Quiz media uploaded via the server API (Admin SDK only).
+    // Clients may read (public CDN); all writes and deletes are server-side.
+    match /quiz-media/{fileName} {
+      allow read: if true;
+      allow write: if false;
+      allow delete: if false;
+    }
+
+    // Legacy path — same policy as quiz-media
+    match /question-sessions/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+      allow delete: if false;
     }
   }
+}

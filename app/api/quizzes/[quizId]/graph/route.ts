@@ -56,6 +56,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 }
 
+const MEDIA_PATH_RE = /^quiz-media\/[\w.-]+$/;
+
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
   const denied = await requireQuizOwnership(quizId);
@@ -67,7 +69,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     try {
       const body = await request.json();
       if (Array.isArray(body?.preserve_paths)) {
-        preservePaths = new Set(body.preserve_paths.filter(Boolean));
+        preservePaths = new Set(
+          (body.preserve_paths as unknown[]).filter(
+            (p): p is string => typeof p === 'string' && MEDIA_PATH_RE.test(p),
+          ),
+        );
       }
     } catch { /* body not provided or not JSON */ }
     await deleteQuestionsByQuiz(realId, preservePaths);

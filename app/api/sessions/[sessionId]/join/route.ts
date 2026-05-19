@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { adminRtdb } from '@/lib/firebase/admin';
 import { getSessionById } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { ROOM_STATUS } from '@/lib/constants/session';
+
+const JoinBody = z.object({
+  displayName: z.string().max(100).optional(),
+  photoURL: z.string().url().max(500).optional().nullable(),
+});
 
 export async function POST(
   request: NextRequest,
@@ -37,12 +43,13 @@ export async function POST(
     }
 
     // 4. Join the room (Admin SDK write)
-    const { displayName, photoURL } = await request.json();
-    
+    const rawBody = await request.json().catch(() => ({}));
+    const { data: body } = JoinBody.safeParse(rawBody);
+
     const playerRef = adminRtdb.ref(`sessions/${sessionId}/players/${user.uid}`);
     await playerRef.set({
-      displayName: displayName || 'Anonymous',
-      photoURL: photoURL || null,
+      displayName: body?.displayName?.trim() || 'Anonymous',
+      photoURL: body?.photoURL ?? null,
       joinedAt: Date.now(),
     });
 

@@ -7,11 +7,10 @@ export async function GET(_request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const sessions = await getAllSessions();
-    const visible = user.isAdmin
-      ? sessions
-      : sessions.filter((s) => !(s as { is_private: boolean }).is_private || (s as { user_id: string }).user_id === user.uid);
-    return NextResponse.json(visible);
+    const sessions = user.isAdmin
+      ? await getAllSessions()
+      : await getAllSessions(user.uid);
+    return NextResponse.json(sessions);
   } catch (error) {
     console.error("Failed to load sessions:", error);
     return NextResponse.json([], { status: 500 });

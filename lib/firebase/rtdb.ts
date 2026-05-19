@@ -220,11 +220,9 @@ export function watchScores(
 
 function generateJoinToken(length = 12): string {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let out = '';
-  for (let i = 0; i < length; i++) {
-    out += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return out;
+  const arr = new Uint8Array(length);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (b) => chars[b % chars.length]).join('');
 }
 
 // Mints a new join token (or reuses the existing one if the lobby is already open).
@@ -338,8 +336,12 @@ export async function createTeamRoom(
   sessionId: string,
   host: { uid: string; displayName: string | null; photoURL: string | null },
 ): Promise<{ roomId: string; pin: string }> {
-  const roomId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-  const pin = Math.floor(100000 + Math.random() * 900000).toString();
+  const randBytes = new Uint8Array(6);
+  crypto.getRandomValues(randBytes);
+  const roomId = Array.from(randBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  const pinArr = new Uint32Array(1);
+  crypto.getRandomValues(pinArr);
+  const pin = (100000 + (pinArr[0] % 900000)).toString();
   const playerRef = ref(rtdb, `teamRooms/${roomId}/players/${host.uid}`);
   onDisconnect(playerRef).remove();
   await set(ref(rtdb, `teamRooms/${roomId}`), {
@@ -358,22 +360,25 @@ export async function createTeamRoom(
   return { roomId, pin };
 }
 
-// Returns false if PIN is wrong or room is no longer waiting
+// PIN is validated server-side; the API writes the player entry via Admin SDK.
 export async function joinTeamRoom(
   roomId: string,
   pin: string,
   user: { uid: string; displayName: string | null; photoURL: string | null },
 ): Promise<boolean> {
-  const snap = await get(ref(rtdb, `teamRooms/${roomId}`));
-  const room = snap.val() as TeamRoom | null;
-  if (!room || room.pin !== pin || room.status !== ROOM_STATUS.WAITING) return false;
+  const res = await fetch(`/api/team-rooms/${roomId}/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      pin,
+      displayName: user.displayName,
+      photoURL: user.photoURL,
+    }),
+  });
+  if (!res.ok) return false;
+  // Register disconnect cleanup so the player is removed if the tab closes
   const playerRef = ref(rtdb, `teamRooms/${roomId}/players/${user.uid}`);
   onDisconnect(playerRef).remove();
-  await set(playerRef, {
-    displayName: user.displayName || 'Anonymous',
-    photoURL: user.photoURL,
-    joinedAt: Date.now(),
-  } satisfies WaitingPlayer);
   return true;
 }
 

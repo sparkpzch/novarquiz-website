@@ -7,7 +7,9 @@ const WINDOW_MS = 60_000;
 // Route-specific limits (requests per window). First match wins.
 const ROUTE_LIMITS: Array<[string, number]> = [
   ['/api/auth/session', 10],
+  ['/api/auth/rehydrate', 5],
   ['/api/upload', 5],
+  ['/api/join', 20],
   ['/api/play', 60],
 ];
 const DEFAULT_LIMIT = 100;
