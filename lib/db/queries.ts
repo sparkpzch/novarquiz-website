@@ -25,10 +25,12 @@ export async function getAllQuizzes() {
   return result.rows;
 }
 
-export async function getAllSessions() {
+export async function getAllSessions(visibleToUid?: string) {
+  const where = visibleToUid ? `WHERE (s.is_private = FALSE OR s.user_id = $1)` : '';
+  const params = visibleToUid ? [visibleToUid] : [];
   const result = await queryWithRetry(
-    `SELECT s.*, 
-      q.name as quiz_name, 
+    `SELECT s.*,
+      q.name as quiz_name,
       s.name as raw_session_name,
       COALESCE(s.name, q.name) as name,
       q.description as description,
@@ -41,7 +43,9 @@ export async function getAllSessions() {
      FROM sessions s
      JOIN quizzes q ON s.session_id = q.id
      LEFT JOIN profiles p ON s.user_id = p.uid
-     ORDER BY s.started_at DESC`
+     ${where}
+     ORDER BY s.started_at DESC`,
+    params,
   );
   return result.rows;
 }

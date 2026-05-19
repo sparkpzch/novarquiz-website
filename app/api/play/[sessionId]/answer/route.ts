@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
+
+const StartBody = z.object({ action: z.literal('start'), is_guest: z.boolean().optional() });
+const AnswerBody = z.object({
+  question_id: z.string().uuid(),
+  chosen_label: z.string().min(1).max(10),
+  time_taken_ms: z.number().int().min(0).max(300_000),
+  is_guest: z.boolean().optional(),
+});
 
 // Strip score_impact and explanation from choices so the answer key is never
 // exposed to clients. The server computes scores in saveUserAnswer using the
@@ -48,32 +57,32 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function POST(request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
   try {
-    const body = await request.json();
+    const raw = await request.json();
 
-    if (body.action === 'start') {
-      // Guests skip play_session persistence — no analytics trail.
-      if (body.is_guest) return NextResponse.json({ is_guest: true });
+    if (raw?.action === 'start') {
+      const parsed = StartBody.safeParse(raw);
+      if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+      if (parsed.data.is_guest) return NextResponse.json({ is_guest: true });
       const user = await getSessionUser();
       if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       const playSession = await getOrCreateSession(sessionId, user.uid);
       return NextResponse.json(playSession);
     }
 
-    // Guests: no per-answer persistence (score stays client-side only).
-    if (body.is_guest) return NextResponse.json({ is_guest: true });
+    const parsed = AnswerBody.safeParse(raw);
+    if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+
+    if (parsed.data.is_guest) return NextResponse.json({ is_guest: true });
 
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Server computes points from the choice's stored value — clients never
-    // submit their own score, which would be trivially exploitable.
-    // user_id always comes from the verified session, never from the request body.
     const result = await saveUserAnswer({
       session_id: sessionId,
       user_id: user.uid,
-      question_id: body.question_id,
-      chosen_label: body.chosen_label,
-      time_taken_ms: body.time_taken_ms || 0,
+      question_id: parsed.data.question_id,
+      chosen_label: parsed.data.chosen_label,
+      time_taken_ms: parsed.data.time_taken_ms,
     });
 
     return NextResponse.json(result);

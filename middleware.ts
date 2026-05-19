@@ -1,5 +1,4 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 import { checkRateLimit } from '@/lib/ratelimit';
 
@@ -12,67 +11,64 @@ function getSecret() {
   return new TextEncoder().encode(secret);
 }
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Rate-limit all API routes
   if (pathname.startsWith('/api')) {
     const ip =
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+      request.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
       request.headers.get('x-real-ip') ??
-      'unknown';
+      '127.0.0.1';
 
     const { allowed, retryAfter } = await checkRateLimit(ip, pathname);
     if (!allowed) {
-      return NextResponse.json(
-        { error: 'Too many requests' },
-        { status: 429, headers: { 'Retry-After': String(retryAfter) } },
-      );
+      return new NextResponse('Too Many Requests', {
+        status: 429,
+        headers: { 'Retry-After': String(retryAfter) },
+      });
     }
+    return NextResponse.next();
   }
 
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon') ||
-    pathname.startsWith('/api') ||
-    pathname.includes('.')
-  ) {
+  // Pass through static assets
+  if (pathname.startsWith('/_next') || pathname.startsWith('/favicon') || pathname.includes('.')) {
     return NextResponse.next();
   }
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   const session = request.cookies.get(COOKIE_NAME)?.value;
 
+  // Authenticated users are redirected away from auth pages
   if (isPublic) {
     if (session) {
       try {
         const { payload } = await jwtVerify(session, getSecret());
-        return NextResponse.redirect(
-          new URL(payload.isAdmin ? '/admin' : '/', request.url)
-        );
+        return NextResponse.redirect(new URL(payload.isAdmin ? '/admin' : '/', request.url));
       } catch {
-        // Expired/invalid — let them through to sign-in
+        // Expired / invalid — let through to sign-in
       }
     }
     return NextResponse.next();
   }
 
+  // Unauthenticated → sign-in
   if (!session) {
-    return NextResponse.redirect(new URL('/sign-in', request.url));
+    return NextResponse.redirect(
+      new URL(`/sign-in?next=${encodeURIComponent(pathname)}`, request.url),
+    );
   }
 
   try {
     const { payload } = await jwtVerify(session, getSecret());
-    const isAdmin = !!payload.isAdmin;
-
-    if (pathname.startsWith('/admin') && !isAdmin) {
+    if (pathname.startsWith('/admin') && !payload.isAdmin) {
       return NextResponse.redirect(new URL('/', request.url));
     }
-
     return NextResponse.next();
   } catch {
-    const response = NextResponse.redirect(new URL('/sign-in', request.url));
-    response.cookies.delete(COOKIE_NAME);
-    return response;
+    const res = NextResponse.redirect(new URL('/sign-in', request.url));
+    res.cookies.delete(COOKIE_NAME);
+    return res;
   }
 }
 
