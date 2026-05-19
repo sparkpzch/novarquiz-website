@@ -1,25 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
+import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebase/admin';
 import { queryWithRetry } from '@/lib/db/postgres';
+import { getSessionUser } from '@/lib/auth';
 
-function getSecret() {
-  return new TextEncoder().encode(process.env.SESSION_SECRET!);
-}
-
-async function verifyAdmin(request: NextRequest) {
-  const session = request.cookies.get('session')?.value;
-  if (!session) return false;
-  try {
-    const { payload } = await jwtVerify(session, getSecret());
-    return !!payload.isAdmin;
-  } catch {
-    return false;
-  }
-}
-
-export async function GET(request: NextRequest) {
-  if (!(await verifyAdmin(request))) {
+export async function GET() {
+  const user = await getSessionUser();
+  if (!user?.isAdmin) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 

@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminStorage } from '@/lib/firebase/admin';
 import { getSessionUser } from '@/lib/auth';
 
-const ALLOWED_TYPES = [
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-  'video/mp4',
-];
+const MIME_TO_EXT: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'video/mp4': 'mp4',
+};
+const ALLOWED_TYPES = Object.keys(MIME_TO_EXT);
 const MAX_BYTES = 50 * 1024 * 1024; // 50 MB
 
 export async function POST(req: NextRequest) {
@@ -28,9 +32,9 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const ext = file.name.split('.').pop() ?? 'bin';
+    // Extension derived from the validated MIME type, not the client-supplied filename.
+    const ext = MIME_TO_EXT[file.type];
     const dest = `quiz-media/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const safeFileName = file.name.replace(/[^\w.-]/g, '_');
 
     const bucket = adminStorage.bucket();
     const fileRef = bucket.file(dest);
@@ -38,7 +42,7 @@ export async function POST(req: NextRequest) {
       metadata: {
         contentType: file.type,
         cacheControl: 'public,max-age=31536000',
-        contentDisposition: `inline; filename="${safeFileName}"`,
+        contentDisposition: 'inline',
       },
     });
     await fileRef.makePublic();

@@ -7,6 +7,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ qui
   try {
     const quiz = await getQuizById(quizId);
     if (!quiz) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    const user = await getSessionUser();
+    const isOwnerOrAdmin = user && (user.isAdmin || quiz.created_by === user.uid);
+    if (!isOwnerOrAdmin && !quiz.is_published) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
     return NextResponse.json(quiz);
   } catch (err) {
     console.error(`Failed to load quiz ${quizId}:`, err);

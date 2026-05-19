@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 
+// Strip score_impact and explanation from choices so the answer key is never
+// exposed to clients. The server computes scores in saveUserAnswer using the
+// DB value; clients never need to see score_impact.
+function sanitizeQuestion(question: Record<string, unknown> | null) {
+  if (!question) return question;
+  const choices = Array.isArray(question.choices)
+    ? question.choices.map(({ score_impact: _, explanation: __, ...rest }: Record<string, unknown>) => rest)
+    : question.choices;
+  return { ...question, choices };
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
   const searchParams = request.nextUrl.searchParams;
@@ -10,7 +21,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (searchParams.get('entry') === 'true') {
       const question = await getEntryQuestion(sessionId);
       if (!question) return NextResponse.json(null, { status: 404 });
-      return NextResponse.json(question);
+      return NextResponse.json(sanitizeQuestion(question));
     }
 
     const fromQuestionId = searchParams.get('fromQuestionId');
@@ -18,14 +29,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (fromQuestionId && choiceLabel) {
       const next = await getNextQuestion(fromQuestionId, choiceLabel);
       if (!next) return NextResponse.json(null, { status: 404 });
-      return NextResponse.json(next);
+      return NextResponse.json(sanitizeQuestion(next));
     }
 
     const questionId = searchParams.get('questionId');
     if (questionId) {
       const question = await getQuestionById(questionId);
       if (!question) return NextResponse.json(null, { status: 404 });
-      return NextResponse.json(question);
+      return NextResponse.json(sanitizeQuestion(question));
     }
 
     return NextResponse.json({ error: 'Missing params' }, { status: 400 });
