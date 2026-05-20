@@ -21,13 +21,15 @@
         },
         "players": {
           "$uid": {
-            ".write": "auth != null && auth.uid === $uid",
+            "//": "Client writes restricted to self-removal. Joining is mediated by POST /api/sessions/[sessionId]/join (rate-limited + sanitised); the Admin SDK in that route bypasses these rules.",
+            ".write": "auth != null && auth.uid === $uid && !newData.exists()",
             ".validate": "newData.hasChildren(['displayName', 'joinedAt']) || !newData.exists()"
           }
         },
         "scores": {
           "$uid": {
-            ".write": "auth != null && auth.uid === $uid",
+            "//": "Server is the only legitimate writer; clients may only delete their own row (used during account deletion).",
+            ".write": "auth != null && auth.uid === $uid && !newData.exists()",
             ".validate": "!newData.exists() || newData.hasChildren(['displayName', 'updatedAt'])",
             "score": {
               ".validate": "data.exists() ? newData.val() === data.val() : (newData.val() === 0)"
@@ -69,12 +71,13 @@
         },
         "players": {
           "$uid": {
-            ".write": "auth != null && auth.uid === $uid"
+            "//": "Server-only writes via POST /api/team-rooms/[roomId]/join (PIN + rate limit + sanitisation). Clients may only self-remove.",
+            ".write": "auth != null && auth.uid === $uid && !newData.exists()"
           }
         },
         "scores": {
           "$uid": {
-            ".write": "auth != null && auth.uid === $uid",
+            ".write": "auth != null && auth.uid === $uid && !newData.exists()",
             "score": {
               ".validate": "data.exists() ? newData.val() === data.val() : (newData.val() === 0)"
             }
