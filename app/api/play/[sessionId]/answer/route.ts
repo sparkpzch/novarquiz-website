@@ -93,6 +93,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const session = await getSessionById(sessionId);
+    if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    if (session.user_id !== user.uid) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
     const result = await saveUserAnswer({
       session_id: sessionId,
       user_id: user.uid,

@@ -17,14 +17,10 @@ export async function middleware(request: NextRequest) {
   // Rate-limit all API routes
   if (pathname.startsWith('/api')) {
     // On Cloud Run / Firebase App Hosting the platform appends the real client
-    // IP as the LAST entry in x-forwarded-for. Prefer x-real-ip (set by the
-    // infrastructure) and fall back to the last x-forwarded-for value so an
-    // attacker cannot spoof the IP by injecting a forged first entry.
+    // IP as the LAST entry in x-forwarded-for. We never trust x-real-ip from
+    // the client since it can be spoofed to bypass per-IP rate limits.
     const xff = request.headers.get('x-forwarded-for');
-    const ip =
-      request.headers.get('x-real-ip') ??
-      (xff ? xff.split(',').at(-1)!.trim() : null) ??
-      '127.0.0.1';
+    const ip = xff ? xff.split(',').at(-1)!.trim() : '127.0.0.1';
 
     const { allowed, retryAfter } = await checkRateLimit(ip, pathname);
     if (!allowed) {
