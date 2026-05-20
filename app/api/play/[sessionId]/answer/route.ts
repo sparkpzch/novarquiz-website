@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore } from '@/lib/db/queries';
+import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getSessionById } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
 
@@ -44,17 +44,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json(sanitizeQuestion(question));
     }
 
+    // Resolve the quiz ID so question lookups are scoped to this session's quiz.
+    const session = await getSessionById(sessionId);
+    if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    const quizId: string = session.session_id;
+
     const fromQuestionId = searchParams.get('fromQuestionId');
     const choiceLabel = searchParams.get('choiceLabel');
     if (fromQuestionId && choiceLabel) {
-      const next = await getNextQuestion(fromQuestionId, choiceLabel);
+      const next = await getNextQuestion(fromQuestionId, choiceLabel, quizId);
       if (!next) return NextResponse.json(null, { status: 404 });
       return NextResponse.json(sanitizeQuestion(next));
     }
 
     const questionId = searchParams.get('questionId');
     if (questionId) {
-      const question = await getQuestionById(questionId);
+      const question = await getQuestionById(questionId, quizId);
       if (!question) return NextResponse.json(null, { status: 404 });
       return NextResponse.json(sanitizeQuestion(question));
     }

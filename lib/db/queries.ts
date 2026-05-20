@@ -369,15 +369,15 @@ export async function getQuestionsByQuiz(sessionId: string) {
   return result.rows;
 }
 
-export async function getQuestionById(questionId: string) {
+export async function getQuestionById(questionId: string, quizId: string) {
   const result = await queryWithRetry(
-    `SELECT q.*, 
+    `SELECT q.*,
       json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
      FROM questions q
      LEFT JOIN choices c ON c.question_id = q.id
-     WHERE q.id = $1
+     WHERE q.id = $1 AND q.session_id = $2
      GROUP BY q.id`,
-    [questionId]
+    [questionId, quizId]
   );
   return result.rows[0] || null;
 }
@@ -741,7 +741,7 @@ export async function saveConnections(sessionId: string, connections: Array<{ fr
   }
 }
 
-export async function getNextQuestion(fromQuestionId: string, choiceLabel: string) {
+export async function getNextQuestion(fromQuestionId: string, choiceLabel: string, quizId: string) {
   const result = await queryWithRetry(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
       json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
@@ -749,9 +749,9 @@ export async function getNextQuestion(fromQuestionId: string, choiceLabel: strin
      JOIN questions q ON q.id = qc.to_question_id
      JOIN quizzes qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
-     WHERE qc.from_question_id = $1 AND qc.from_choice_label = $2
+     WHERE qc.from_question_id = $1 AND qc.from_choice_label = $2 AND qs.id = $3
      GROUP BY q.id, qs.timer_seconds`,
-    [fromQuestionId, choiceLabel]
+    [fromQuestionId, choiceLabel, quizId]
   );
   return result.rows[0] || null;
 }
@@ -761,6 +761,8 @@ export async function getNextQuestion(fromQuestionId: string, choiceLabel: strin
 // Persists one answer + computes the points server-side from the chosen
 // choice's `points` column. Returns the points awarded so the caller can
 // surface them in the response (and clients can update RTDB live score).
+// Idempotent: a second call for the same (session, user, question) returns
+// the existing record without inserting a new row (prevents replay attacks).
 export async function saveUserAnswer(data: {
   session_id: string;
   user_id: string;
@@ -768,7 +770,14 @@ export async function saveUserAnswer(data: {
   chosen_label: string;
   time_taken_ms: number;
 }): Promise<{ id: string; points_earned: number }> {
-  // Look up the canonical points for the chosen choice
+  const existing = await pool.query(
+    `SELECT id, utility_score FROM user_answers WHERE session_id = $1 AND user_id = $2 AND question_id = $3 LIMIT 1`,
+    [data.session_id, data.user_id, data.question_id],
+  );
+  if (existing.rows[0]) {
+    return { id: existing.rows[0].id as string, points_earned: existing.rows[0].utility_score as number };
+  }
+
   const choiceResult = await pool.query(
     `SELECT score_impact FROM choices WHERE question_id = $1 AND label = $2`,
     [data.question_id, data.chosen_label],

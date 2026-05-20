@@ -37,10 +37,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const data = await request.json();
 
-    // Support both legacy 'pin' key and direct DB field names
-    const updateData: Record<string, unknown> = { ...data };
-    if ('pin' in data) {
-      updateData.pin_code = data.pin;
+    // Only allow user-editable fields; server-managed fields (status,
+    // finished_at, current_question_id, current_score, current_streak)
+    // must never be writable by the session owner.
+    const USER_EDITABLE_FIELDS = new Set(['pin', 'pin_code', 'name']);
+    const updateData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+      if (USER_EDITABLE_FIELDS.has(key)) updateData[key] = value;
+    }
+    if ('pin' in updateData) {
+      updateData.pin_code = updateData.pin;
       delete updateData.pin;
     }
 
