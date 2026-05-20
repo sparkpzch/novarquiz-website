@@ -5,11 +5,16 @@ import { getSessionUser } from '@/lib/auth';
 export async function GET(_request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
   try {
+    // Require auth even for the "public fields" response. Anonymous metadata
+    // disclosure lets unauthenticated callers enumerate session existence via
+    // slug guessing and harvest names/descriptions/quiz IDs.
+    const user = await getSessionUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const session = await getSessionById(sessionId);
     if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const user = await getSessionUser();
-    const isOwnerOrAdmin = user && (user.isAdmin || session.user_id === user.uid);
+    const isOwnerOrAdmin = user.isAdmin || session.user_id === user.uid;
     if (!isOwnerOrAdmin) {
       const { pin_code: _pin, user_id: _uid, ...publicFields } = session;
       return NextResponse.json(publicFields);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getSessionUser } from '@/lib/auth';
 import { adminDb } from '@/lib/firebase/admin';
+import { getClientIp } from '@/lib/security';
 import { TOS_VERSION, PRIVACY_VERSION } from '@/components/ui/TermsModal';
 
 export async function POST(request: NextRequest) {
@@ -11,11 +12,10 @@ export async function POST(request: NextRequest) {
   }
 
   // IP is personal data under PDPA but required for legal proof of consent.
-  // Stored only in this consent record, not propagated elsewhere.
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
-    request.headers.get('x-real-ip') ??
-    'unknown';
+  // Stored only in this consent record, not propagated elsewhere. Only the
+  // proxy-attested last hop is trusted (see getClientIp) — accepting the
+  // first XFF entry would let a malicious client forge the "IP of record".
+  const ip = getClientIp(request);
   const userAgent = request.headers.get('user-agent') ?? 'unknown';
 
   try {

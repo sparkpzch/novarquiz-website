@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 import { checkRateLimit } from '@/lib/ratelimit';
+import { getClientIp } from '@/lib/security';
 
 const COOKIE_NAME = 'session';
 const PUBLIC_PATHS = ['/sign-in', '/sign-up', '/forgot-password'];
@@ -16,12 +17,7 @@ export async function middleware(request: NextRequest) {
 
   // Rate-limit all API routes
   if (pathname.startsWith('/api')) {
-    // On Cloud Run / Firebase App Hosting the platform appends the real client
-    // IP as the LAST entry in x-forwarded-for. We never trust x-real-ip from
-    // the client since it can be spoofed to bypass per-IP rate limits.
-    const xff = request.headers.get('x-forwarded-for');
-    const ip = xff ? xff.split(',').at(-1)!.trim() : '127.0.0.1';
-
+    const ip = getClientIp(request);
     const { allowed, retryAfter } = await checkRateLimit(ip, pathname);
     if (!allowed) {
       return new NextResponse('Too Many Requests', {

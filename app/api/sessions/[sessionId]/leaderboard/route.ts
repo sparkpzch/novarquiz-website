@@ -14,10 +14,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ses
     }
 
     const leaderboard = await getLeaderboard(sessionId);
-    if (!session.is_private) {
-      return NextResponse.json(leaderboard.map(({ user_id: _, ...rest }) => rest));
-    }
-    return NextResponse.json(leaderboard);
+    const isOwnerOrAdmin = !!user && (user.isAdmin || session.user_id === user.uid);
+    if (isOwnerOrAdmin) return NextResponse.json(leaderboard);
+
+    const viewerUid = user?.uid;
+    return NextResponse.json(
+      leaderboard.map(({ user_id, ...rest }) =>
+        viewerUid && user_id === viewerUid ? { ...rest, user_id } : rest,
+      ),
+    );
   } catch (err) {
     console.error(`Failed to load leaderboard for session ${sessionId}:`, err);
     return NextResponse.json([], { status: 500 });

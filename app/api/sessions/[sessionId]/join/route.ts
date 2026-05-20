@@ -5,6 +5,7 @@ import { getSessionById } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { ROOM_STATUS } from '@/lib/constants/session';
 import { checkCustomRateLimit } from '@/lib/ratelimit';
+import { sanitizeDisplayName, sanitizePhotoUrl } from '@/lib/security';
 
 const JoinBody = z.object({
   displayName: z.string().max(100).optional(),
@@ -54,8 +55,8 @@ export async function POST(
 
     const playerRef = adminRtdb.ref(`sessions/${sessionId}/players/${user.uid}`);
     await playerRef.set({
-      displayName: body?.displayName?.trim() || 'Anonymous',
-      photoURL: body?.photoURL ?? null,
+      displayName: sanitizeDisplayName(body?.displayName),
+      photoURL: sanitizePhotoUrl(body?.photoURL),
       joinedAt: Date.now(),
     });
 
