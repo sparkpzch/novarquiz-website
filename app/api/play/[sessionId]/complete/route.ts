@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { completeSession, getSessionById } from '@/lib/db/queries';
+import { completeSession } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
 import { sanitizeDisplayName, sanitizePhotoUrl } from '@/lib/security';
@@ -17,10 +17,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-
-    const session = await getSessionById(sessionId);
-    if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    if (session.user_id !== user.uid) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const result = await completeSession({
       session_id: sessionId,

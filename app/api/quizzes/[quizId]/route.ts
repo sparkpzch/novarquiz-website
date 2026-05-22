@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getQuizById, updateQuiz, deleteQuiz } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
+
+const UpdateQuizBody = z.object({
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).optional(),
+  cover_image_url: z.string().url().max(500).optional(),
+  cover_image_path: z.string().max(500).optional(),
+  timer_seconds: z.number().int().min(5).max(600).optional(),
+  is_published: z.boolean().optional(),
+});
 
 export async function GET(_request: Request, { params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
@@ -34,8 +44,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = await request.json();
-    const updated = await updateQuiz(quizId, body);
+    const raw = await request.json();
+    const parsed = UpdateQuizBody.safeParse(raw);
+    if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+    const updated = await updateQuiz(quizId, parsed.data);
     return NextResponse.json(updated);
   } catch (err) {
     console.error(`Failed to update quiz ${quizId}:`, err);
