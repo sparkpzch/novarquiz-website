@@ -50,24 +50,37 @@ export async function getAllSessions(visibleToUid?: string) {
   return result.rows;
 }
 
+const SESSION_TOKEN_SELECT = `
+  SELECT s.*,
+    q.name as quiz_name,
+    s.name as raw_session_name,
+    COALESCE(s.name, q.name) as name,
+    q.description as description,
+    q.cover_image_url as cover_image_url,
+    q.share_token as share_token,
+    q.timer_seconds as timer_seconds,
+    (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count,
+    p.display_name as user_name
+  FROM sessions s
+  JOIN quizzes q ON s.session_id = q.id
+  LEFT JOIN profiles p ON s.user_id = p.uid`;
+
+// Accepting UUID and PIN in a single OR query conflates two fundamentally
+// different identifier types (high-entropy UUID vs. short numeric PIN) and
+// makes the PIN brute-forceable via the same rate-limited endpoint. Route each
+// token type to its own lookup so the two surfaces cannot be cross-exploited.
 export async function getSessionByToken(token: string) {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
+  if (isUuid) {
+    const result = await queryWithRetry(
+      `${SESSION_TOKEN_SELECT} WHERE s.id::text = $1 LIMIT 1`,
+      [token],
+    );
+    return result.rows[0];
+  }
   const result = await queryWithRetry(
-    `SELECT s.*, 
-       q.name as quiz_name, 
-       s.name as raw_session_name,
-       COALESCE(s.name, q.name) as name,
-       q.description as description,
-       q.cover_image_url as cover_image_url,
-       q.share_token as share_token,
-       q.timer_seconds as timer_seconds,
-       (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count,
-       p.display_name as user_name
-     FROM sessions s
-     JOIN quizzes q ON s.session_id = q.id
-     LEFT JOIN profiles p ON s.user_id = p.uid
-     WHERE s.id::text = $1 OR s.pin_code = $1
-     LIMIT 1`,
-    [token]
+    `${SESSION_TOKEN_SELECT} WHERE s.pin_code = $1 LIMIT 1`,
+    [token],
   );
   return result.rows[0];
 }

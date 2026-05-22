@@ -103,13 +103,12 @@ function SignInForm() {
       const provider = new GoogleAuthProvider();
       const credential = await signInWithPopup(auth, provider);
       const idToken = await credential.user.getIdToken();
-      // New Google OAuth users must accept ToS + PDPA before session is created
-      if (getAdditionalUserInfo(credential)?.isNewUser) {
-        setConsentPending(idToken);
-        setLoading(false);
-        return;
-      }
-      await createSession(idToken);
+      // All Google OAuth users must pass the ToS + PDPA consent gate before a
+      // session cookie is issued. Gating only on isNewUser skips consent for
+      // accounts created before the consent requirement was introduced, leaving
+      // those users without a consent record (PDPA violation).
+      setConsentPending(idToken);
+      setLoading(false);
     } catch (err) {
       console.error('Google sign-in failed:', err);
       const code = (err as { code?: string }).code;

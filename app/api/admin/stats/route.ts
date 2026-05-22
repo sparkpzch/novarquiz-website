@@ -68,13 +68,16 @@ export async function GET() {
     `),
     queryWithRetry(`
       SELECT
-        user_display_name,
+        user_id,
+        (SELECT user_display_name FROM leaderboard_entries le2
+         WHERE le2.user_id = le.user_id
+         ORDER BY completed_at DESC LIMIT 1) AS user_display_name,
         COUNT(*)::int AS total_sessions,
         MAX(total_score)::int AS best_score,
         ROUND(AVG(total_score))::int AS avg_score
-      FROM leaderboard_entries
+      FROM leaderboard_entries le
       WHERE completed_at IS NOT NULL
-      GROUP BY user_display_name
+      GROUP BY user_id
       ORDER BY best_score DESC
       LIMIT 8
     `),
