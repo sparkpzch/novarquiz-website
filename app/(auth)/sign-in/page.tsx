@@ -25,8 +25,21 @@ function SignInForm() {
   // Holds the pending ID token for new Google OAuth users until they accept ToS
   const [consentPending, setConsentPending] = useState<string | null>(null);
 
-  const safeNextUrl =
-    nextUrl && /^\/(?!\/)/.test(nextUrl) ? nextUrl : '/';
+  // Parse against a placeholder origin so any input that resolves cross-origin
+  // (including backslash tricks like `/\evil.com`, which WHATWG normalises to
+  // `//evil.com` for special schemes) is rejected. A regex on the leading
+  // characters is not sufficient — Next.js' router parses with `new URL` and
+  // will hard-navigate to a different origin via `location.assign`.
+  const safeNextUrl = (() => {
+    if (!nextUrl) return '/';
+    try {
+      const parsed = new URL(nextUrl, 'https://placeholder.invalid');
+      if (parsed.origin !== 'https://placeholder.invalid') return '/';
+      return parsed.pathname + parsed.search + parsed.hash;
+    } catch {
+      return '/';
+    }
+  })();
 
   const createSession = async (idToken: string) => {
     const res = await fetch('/api/auth/session', {
