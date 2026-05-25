@@ -17,6 +17,31 @@ import {
   type HcpVectorMap,
 } from '../analytics/hcp';
 
+let layeredAnalyticsSchemaPromise: Promise<boolean> | null = null;
+
+async function hasLayeredAnalyticsSchema() {
+  if (!layeredAnalyticsSchemaPromise) {
+    layeredAnalyticsSchemaPromise = (async () => {
+      const result = await pool.query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND (
+             (table_name = 'quizzes' AND column_name = 'intended_audience') OR
+             (table_name = 'questions' AND column_name = 'intended_audience') OR
+             (table_name = 'choices' AND column_name = 'behavior_meaning') OR
+             (table_name = 'user_answers' AND column_name = 'vector_scores') OR
+             (table_name = 'leaderboard_entries' AND column_name = 'profile_vector_scores')
+           )`,
+      );
+
+      return Number(result.rows[0]?.count ?? 0) === 5;
+    })().catch(() => false);
+  }
+
+  return layeredAnalyticsSchemaPromise;
+}
+
 // ===================== Quizzes =====================
 
 export async function getAllQuizzes() {
@@ -65,6 +90,7 @@ export async function getAllSessions(visibleToUid?: string) {
 }
 
 export async function getSessionByToken(token: string) {
+  const layered = await hasLayeredAnalyticsSchema();
   const result = await queryWithRetry(
     `SELECT s.*, 
        q.name as quiz_name, 
@@ -74,12 +100,12 @@ export async function getSessionByToken(token: string) {
        q.cover_image_url as cover_image_url,
        q.share_token as share_token,
        q.timer_seconds as timer_seconds,
-       q.intended_audience as intended_audience,
-       q.presentation_mode as presentation_mode,
-       q.reading_level as reading_level,
-       q.jurisdiction_tags as jurisdiction_tags,
-       q.medical_review_version as medical_review_version,
-       q.legal_document_versions_required as legal_document_versions_required,
+       ${layered ? "q.intended_audience" : "'public'"} as intended_audience,
+       ${layered ? "q.presentation_mode" : "'shared'"} as presentation_mode,
+       ${layered ? 'q.reading_level' : 'NULL'} as reading_level,
+       ${layered ? 'q.jurisdiction_tags' : "'[]'::jsonb"} as jurisdiction_tags,
+       ${layered ? 'q.medical_review_version' : 'NULL'} as medical_review_version,
+       ${layered ? 'q.legal_document_versions_required' : "'{}'::jsonb"} as legal_document_versions_required,
        (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count,
        p.display_name as user_name
      FROM sessions s
@@ -282,6 +308,7 @@ export async function duplicateQuiz(sourceIdOrSlug: string, createdBy: string, i
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const layered = await hasLayeredAnalyticsSchema();
     const sourceId = await resolveQuizId(sourceIdOrSlug);
 
     // 1. Get original session
@@ -309,32 +336,50 @@ export async function duplicateQuiz(sourceIdOrSlug: string, createdBy: string, i
 
     for (const q of qRows) {
       const { rows: newQRows } = await client.query(
-        `INSERT INTO questions (
-           session_id, question_order, question_text, node_name, intended_audience, presentation_mode,
-           reading_level, jurisdiction_tags, medical_review_version, legal_document_versions_required,
-           media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
-         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id`,
-        [
-          newSession.id,
-          q.question_order,
-          q.question_text,
-          q.node_name,
-          q.intended_audience ?? DEFAULT_QUESTION_METADATA.intended_audience,
-          q.presentation_mode ?? DEFAULT_QUESTION_METADATA.presentation_mode,
-          q.reading_level ?? null,
-          JSON.stringify(q.jurisdiction_tags ?? []),
-          q.medical_review_version ?? null,
-          JSON.stringify(q.legal_document_versions_required ?? {}),
-          q.media_type,
-          q.media_url,
-          q.media_path,
-          q.timer_override,
-          q.is_entry_point,
-          q.node_x,
-          q.node_y,
-          q.node_type,
-        ]
+        layered
+          ? `INSERT INTO questions (
+               session_id, question_order, question_text, node_name, intended_audience, presentation_mode,
+               reading_level, jurisdiction_tags, medical_review_version, legal_document_versions_required,
+               media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id`
+          : `INSERT INTO questions (session_id, question_order, question_text, node_name, media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+        layered
+          ? [
+              newSession.id,
+              q.question_order,
+              q.question_text,
+              q.node_name,
+              q.intended_audience ?? DEFAULT_QUESTION_METADATA.intended_audience,
+              q.presentation_mode ?? DEFAULT_QUESTION_METADATA.presentation_mode,
+              q.reading_level ?? null,
+              JSON.stringify(q.jurisdiction_tags ?? []),
+              q.medical_review_version ?? null,
+              JSON.stringify(q.legal_document_versions_required ?? {}),
+              q.media_type,
+              q.media_url,
+              q.media_path,
+              q.timer_override,
+              q.is_entry_point,
+              q.node_x,
+              q.node_y,
+              q.node_type,
+            ]
+          : [
+              newSession.id,
+              q.question_order,
+              q.question_text,
+              q.node_name,
+              q.media_type,
+              q.media_url,
+              q.media_path,
+              q.timer_override,
+              q.is_entry_point,
+              q.node_x,
+              q.node_y,
+              q.node_type,
+            ]
       );
       if (q.media_path) {
         await incrementMediaUsage(client, q.media_path);
@@ -346,26 +391,31 @@ export async function duplicateQuiz(sourceIdOrSlug: string, createdBy: string, i
       const { rows: cRows } = await client.query('SELECT * FROM choices WHERE question_id = $1', [q.id]);
       for (const c of cRows) {
         await client.query(
-          `INSERT INTO choices (
-             question_id, label, choice_text, score_impact, explanation,
-             behavior_meaning, vector_deltas, clinical_tags, confidence_weight,
-             allowed_usage, requires_hcp_version, review_status
-           )
-           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12)`,
-          [
-            newQId,
-            c.label,
-            c.choice_text,
-            c.score_impact,
-            c.explanation,
-            c.behavior_meaning ?? null,
-            JSON.stringify(c.vector_deltas ?? {}),
-            JSON.stringify(c.clinical_tags ?? []),
-            c.confidence_weight ?? 1,
-            c.allowed_usage ?? DEFAULT_CHOICE_METADATA.allowed_usage,
-            c.requires_hcp_version ?? false,
-            c.review_status ?? DEFAULT_CHOICE_METADATA.review_status,
-          ]
+          layered
+            ? `INSERT INTO choices (
+                 question_id, label, choice_text, score_impact, explanation,
+                 behavior_meaning, vector_deltas, clinical_tags, confidence_weight,
+                 allowed_usage, requires_hcp_version, review_status
+               )
+               VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12)`
+            : `INSERT INTO choices (question_id, label, choice_text, score_impact, explanation)
+               VALUES ($1, $2, $3, $4, $5)`,
+          layered
+            ? [
+                newQId,
+                c.label,
+                c.choice_text,
+                c.score_impact,
+                c.explanation,
+                c.behavior_meaning ?? null,
+                JSON.stringify(c.vector_deltas ?? {}),
+                JSON.stringify(c.clinical_tags ?? []),
+                c.confidence_weight ?? 1,
+                c.allowed_usage ?? DEFAULT_CHOICE_METADATA.allowed_usage,
+                c.requires_hcp_version ?? false,
+                c.review_status ?? DEFAULT_CHOICE_METADATA.review_status,
+              ]
+            : [newQId, c.label, c.choice_text, c.score_impact, c.explanation]
         );
       }
     }
@@ -415,9 +465,17 @@ export async function deleteUserData(uid: string) {
 // ===================== Questions =====================
 
 export async function getQuestionsByQuiz(sessionId: string) {
+  const layered = await hasLayeredAnalyticsSchema();
+  const choiceJson = layered ? buildChoiceJsonSql('c') : buildLegacyChoiceJsonSql('c');
   const result = await queryWithRetry(
     `SELECT q.*, 
-      COALESCE(json_agg(${buildChoiceJsonSql('c')} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
+      ${layered ? "q.intended_audience" : "'public'"} as intended_audience,
+      ${layered ? "q.presentation_mode" : "'shared'"} as presentation_mode,
+      ${layered ? 'q.reading_level' : 'NULL'} as reading_level,
+      ${layered ? 'q.jurisdiction_tags' : "'[]'::jsonb"} as jurisdiction_tags,
+      ${layered ? 'q.medical_review_version' : 'NULL'} as medical_review_version,
+      ${layered ? 'q.legal_document_versions_required' : "'{}'::jsonb"} as legal_document_versions_required,
+      COALESCE(json_agg(${choiceJson} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
      FROM questions q
      JOIN quizzes qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
@@ -430,9 +488,17 @@ export async function getQuestionsByQuiz(sessionId: string) {
 }
 
 export async function getQuestionById(questionId: string) {
+  const layered = await hasLayeredAnalyticsSchema();
+  const choiceJson = layered ? buildChoiceJsonSql('c') : buildLegacyChoiceJsonSql('c');
   const result = await queryWithRetry(
     `SELECT q.*, 
-      COALESCE(json_agg(${buildChoiceJsonSql('c')} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
+      ${layered ? "q.intended_audience" : "'public'"} as intended_audience,
+      ${layered ? "q.presentation_mode" : "'shared'"} as presentation_mode,
+      ${layered ? 'q.reading_level' : 'NULL'} as reading_level,
+      ${layered ? 'q.jurisdiction_tags' : "'[]'::jsonb"} as jurisdiction_tags,
+      ${layered ? 'q.medical_review_version' : 'NULL'} as medical_review_version,
+      ${layered ? 'q.legal_document_versions_required' : "'{}'::jsonb"} as legal_document_versions_required,
+      COALESCE(json_agg(${choiceJson} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
      FROM questions q
      LEFT JOIN choices c ON c.question_id = q.id
      WHERE q.id = $1
@@ -443,9 +509,17 @@ export async function getQuestionById(questionId: string) {
 }
 
 export async function getEntryQuestion(id: string) {
+  const layered = await hasLayeredAnalyticsSchema();
+  const choiceJson = layered ? buildChoiceJsonSql('c') : buildLegacyChoiceJsonSql('c');
   const result = await queryWithRetry(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
-      COALESCE(json_agg(${buildChoiceJsonSql('c')} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
+      ${layered ? "q.intended_audience" : "'public'"} as intended_audience,
+      ${layered ? "q.presentation_mode" : "'shared'"} as presentation_mode,
+      ${layered ? 'q.reading_level' : 'NULL'} as reading_level,
+      ${layered ? 'q.jurisdiction_tags' : "'[]'::jsonb"} as jurisdiction_tags,
+      ${layered ? 'q.medical_review_version' : 'NULL'} as medical_review_version,
+      ${layered ? 'q.legal_document_versions_required' : "'{}'::jsonb"} as legal_document_versions_required,
+      COALESCE(json_agg(${choiceJson} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
      FROM questions q
      JOIN quizzes qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
@@ -481,58 +555,96 @@ export async function createQuestion(data: {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const layered = await hasLayeredAnalyticsSchema();
     const questionId = data.id ?? randomUUID();
     const metadata = normalizeQuestionMetadata(data);
     const result = await client.query(
-      `INSERT INTO questions (
-         id, session_id, question_order, question_text, node_name,
-         intended_audience, presentation_mode, reading_level, jurisdiction_tags,
-         medical_review_version, legal_document_versions_required,
-         media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
-       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11::jsonb, $12, $13, $14, $15, $16, $17, $18, $19)
-       ON CONFLICT (id) DO UPDATE SET
-         session_id = EXCLUDED.session_id,
-         question_order = EXCLUDED.question_order,
-         question_text = EXCLUDED.question_text,
-         node_name = EXCLUDED.node_name,
-         intended_audience = EXCLUDED.intended_audience,
-         presentation_mode = EXCLUDED.presentation_mode,
-         reading_level = EXCLUDED.reading_level,
-         jurisdiction_tags = EXCLUDED.jurisdiction_tags,
-         medical_review_version = EXCLUDED.medical_review_version,
-         legal_document_versions_required = EXCLUDED.legal_document_versions_required,
-         media_type = EXCLUDED.media_type,
-         media_url = EXCLUDED.media_url,
-         media_path = EXCLUDED.media_path,
-         timer_override = EXCLUDED.timer_override,
-         is_entry_point = EXCLUDED.is_entry_point,
-         node_x = EXCLUDED.node_x,
-         node_y = EXCLUDED.node_y,
-         node_type = EXCLUDED.node_type,
-         updated_at = NOW()
-       RETURNING *`,
-      [
-        questionId,
-        data.session_id,
-        data.question_order,
-        data.question_text,
-        data.node_name || null,
-        metadata.intended_audience,
-        metadata.presentation_mode,
-        metadata.reading_level,
-        JSON.stringify(metadata.jurisdiction_tags),
-        metadata.medical_review_version,
-        JSON.stringify(metadata.legal_document_versions_required),
-        data.media_type || null,
-        data.media_url || null,
-        data.media_path || null,
-        data.timer_override || null,
-        data.is_entry_point || false,
-        data.node_x || 0,
-        data.node_y || 0,
-        data.node_type || 'normal',
-      ]
+      layered
+        ? `INSERT INTO questions (
+             id, session_id, question_order, question_text, node_name,
+             intended_audience, presentation_mode, reading_level, jurisdiction_tags,
+             medical_review_version, legal_document_versions_required,
+             media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
+           )
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11::jsonb, $12, $13, $14, $15, $16, $17, $18, $19)
+           ON CONFLICT (id) DO UPDATE SET
+             session_id = EXCLUDED.session_id,
+             question_order = EXCLUDED.question_order,
+             question_text = EXCLUDED.question_text,
+             node_name = EXCLUDED.node_name,
+             intended_audience = EXCLUDED.intended_audience,
+             presentation_mode = EXCLUDED.presentation_mode,
+             reading_level = EXCLUDED.reading_level,
+             jurisdiction_tags = EXCLUDED.jurisdiction_tags,
+             medical_review_version = EXCLUDED.medical_review_version,
+             legal_document_versions_required = EXCLUDED.legal_document_versions_required,
+             media_type = EXCLUDED.media_type,
+             media_url = EXCLUDED.media_url,
+             media_path = EXCLUDED.media_path,
+             timer_override = EXCLUDED.timer_override,
+             is_entry_point = EXCLUDED.is_entry_point,
+             node_x = EXCLUDED.node_x,
+             node_y = EXCLUDED.node_y,
+             node_type = EXCLUDED.node_type,
+             updated_at = NOW()
+           RETURNING *`
+        : `INSERT INTO questions (
+             id, session_id, question_order, question_text, node_name,
+             media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
+           )
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           ON CONFLICT (id) DO UPDATE SET
+             session_id = EXCLUDED.session_id,
+             question_order = EXCLUDED.question_order,
+             question_text = EXCLUDED.question_text,
+             node_name = EXCLUDED.node_name,
+             media_type = EXCLUDED.media_type,
+             media_url = EXCLUDED.media_url,
+             media_path = EXCLUDED.media_path,
+             timer_override = EXCLUDED.timer_override,
+             is_entry_point = EXCLUDED.is_entry_point,
+             node_x = EXCLUDED.node_x,
+             node_y = EXCLUDED.node_y,
+             node_type = EXCLUDED.node_type,
+             updated_at = NOW()
+           RETURNING *`,
+      layered
+        ? [
+            questionId,
+            data.session_id,
+            data.question_order,
+            data.question_text,
+            data.node_name || null,
+            metadata.intended_audience,
+            metadata.presentation_mode,
+            metadata.reading_level,
+            JSON.stringify(metadata.jurisdiction_tags),
+            metadata.medical_review_version,
+            JSON.stringify(metadata.legal_document_versions_required),
+            data.media_type || null,
+            data.media_url || null,
+            data.media_path || null,
+            data.timer_override || null,
+            data.is_entry_point || false,
+            data.node_x || 0,
+            data.node_y || 0,
+            data.node_type || 'normal',
+          ]
+        : [
+            questionId,
+            data.session_id,
+            data.question_order,
+            data.question_text,
+            data.node_name || null,
+            data.media_type || null,
+            data.media_url || null,
+            data.media_path || null,
+            data.timer_override || null,
+            data.is_entry_point || false,
+            data.node_x || 0,
+            data.node_y || 0,
+            data.node_type || 'normal',
+          ],
     );
     
     if (data.media_path) {
@@ -594,6 +706,17 @@ function buildChoiceJsonSql(alias: string) {
     'allowed_usage', ${alias}.allowed_usage,
     'requires_hcp_version', ${alias}.requires_hcp_version,
     'review_status', ${alias}.review_status
+  )`;
+}
+
+function buildLegacyChoiceJsonSql(alias: string) {
+  return `json_build_object(
+    'id', ${alias}.id,
+    'label', ${alias}.label,
+    'choice_text', ${alias}.choice_text,
+    'score_impact', ${alias}.score_impact,
+    'points', ${alias}.score_impact,
+    'explanation', ${alias}.explanation
   )`;
 }
 
@@ -696,6 +819,7 @@ export async function replaceQuizGraph(
 
   try {
     await client.query('BEGIN');
+    const layered = await hasLayeredAnalyticsSchema();
 
     const { rows: oldRows } = await client.query(
       'SELECT media_path FROM questions WHERE session_id = $1',
@@ -719,34 +843,56 @@ export async function replaceQuizGraph(
       const questionMetadata = normalizeQuestionMetadata(question);
 
       await client.query(
-        `INSERT INTO questions (
-           id, session_id, question_order, question_text, node_name,
-           intended_audience, presentation_mode, reading_level, jurisdiction_tags,
-           medical_review_version, legal_document_versions_required,
-           media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
-         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11::jsonb, $12, $13, $14, $15, $16, $17, $18, $19)`,
-        [
-          questionId,
-          sessionId,
-          question.question_order,
-          question.question_text,
-          question.node_name ?? null,
-          questionMetadata.intended_audience,
-          questionMetadata.presentation_mode,
-          questionMetadata.reading_level,
-          JSON.stringify(questionMetadata.jurisdiction_tags),
-          questionMetadata.medical_review_version,
-          JSON.stringify(questionMetadata.legal_document_versions_required),
-          question.media_type ?? null,
-          question.media_url ?? null,
-          question.media_path ?? null,
-          question.timer_override ?? null,
-          question.is_entry_point ?? false,
-          question.node_x ?? 0,
-          question.node_y ?? 0,
-          question.node_type ?? 'normal',
-        ],
+        layered
+          ? `INSERT INTO questions (
+               id, session_id, question_order, question_text, node_name,
+               intended_audience, presentation_mode, reading_level, jurisdiction_tags,
+               medical_review_version, legal_document_versions_required,
+               media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11::jsonb, $12, $13, $14, $15, $16, $17, $18, $19)`
+          : `INSERT INTO questions (
+               id, session_id, question_order, question_text, node_name,
+               media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        layered
+          ? [
+              questionId,
+              sessionId,
+              question.question_order,
+              question.question_text,
+              question.node_name ?? null,
+              questionMetadata.intended_audience,
+              questionMetadata.presentation_mode,
+              questionMetadata.reading_level,
+              JSON.stringify(questionMetadata.jurisdiction_tags),
+              questionMetadata.medical_review_version,
+              JSON.stringify(questionMetadata.legal_document_versions_required),
+              question.media_type ?? null,
+              question.media_url ?? null,
+              question.media_path ?? null,
+              question.timer_override ?? null,
+              question.is_entry_point ?? false,
+              question.node_x ?? 0,
+              question.node_y ?? 0,
+              question.node_type ?? 'normal',
+            ]
+          : [
+              questionId,
+              sessionId,
+              question.question_order,
+              question.question_text,
+              question.node_name ?? null,
+              question.media_type ?? null,
+              question.media_url ?? null,
+              question.media_path ?? null,
+              question.timer_override ?? null,
+              question.is_entry_point ?? false,
+              question.node_x ?? 0,
+              question.node_y ?? 0,
+              question.node_type ?? 'normal',
+            ],
       );
 
       idMap[sourceId] = questionId;
@@ -755,26 +901,37 @@ export async function replaceQuizGraph(
       for (const choice of question.choices ?? []) {
         const choiceMetadata = normalizeChoiceMetadata(choice);
         await client.query(
-          `INSERT INTO choices (
-             question_id, label, choice_text, score_impact, explanation,
-             behavior_meaning, vector_deltas, clinical_tags, confidence_weight,
-             allowed_usage, requires_hcp_version, review_status
-           )
-           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12)`,
-          [
-            questionId,
-            choice.label,
-            choice.choice_text,
-            normalizeChoiceScoreImpact(choice),
-            choice.explanation ?? null,
-            choiceMetadata.behavior_meaning,
-            JSON.stringify(choiceMetadata.vector_deltas),
-            JSON.stringify(choiceMetadata.clinical_tags),
-            choiceMetadata.confidence_weight,
-            choiceMetadata.allowed_usage,
-            choiceMetadata.requires_hcp_version,
-            choiceMetadata.review_status,
-          ],
+          layered
+            ? `INSERT INTO choices (
+                 question_id, label, choice_text, score_impact, explanation,
+                 behavior_meaning, vector_deltas, clinical_tags, confidence_weight,
+                 allowed_usage, requires_hcp_version, review_status
+               )
+               VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12)`
+            : `INSERT INTO choices (question_id, label, choice_text, score_impact, explanation)
+               VALUES ($1, $2, $3, $4, $5)`,
+          layered
+            ? [
+                questionId,
+                choice.label,
+                choice.choice_text,
+                normalizeChoiceScoreImpact(choice),
+                choice.explanation ?? null,
+                choiceMetadata.behavior_meaning,
+                JSON.stringify(choiceMetadata.vector_deltas),
+                JSON.stringify(choiceMetadata.clinical_tags),
+                choiceMetadata.confidence_weight,
+                choiceMetadata.allowed_usage,
+                choiceMetadata.requires_hcp_version,
+                choiceMetadata.review_status,
+              ]
+            : [
+                questionId,
+                choice.label,
+                choice.choice_text,
+                normalizeChoiceScoreImpact(choice),
+                choice.explanation ?? null,
+              ],
         );
       }
     }
@@ -917,6 +1074,7 @@ export async function upsertChoices(questionId: string, choices: Array<{
   requires_hcp_version?: boolean;
   review_status?: string;
 }>) {
+  const layered = await hasLayeredAnalyticsSchema();
   // Delete existing choices and insert new ones
   await queryWithRetry('DELETE FROM choices WHERE question_id = $1', [questionId], {
     allowWriteRetry: true,
@@ -924,37 +1082,52 @@ export async function upsertChoices(questionId: string, choices: Array<{
   for (const choice of choices) {
     const metadata = normalizeChoiceMetadata(choice);
     await queryWithRetry(
-      `INSERT INTO choices (
-         question_id, label, choice_text, score_impact, explanation,
-         behavior_meaning, vector_deltas, clinical_tags, confidence_weight,
-         allowed_usage, requires_hcp_version, review_status
-       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12)
-       ON CONFLICT (question_id, label) DO UPDATE SET
-         choice_text = EXCLUDED.choice_text,
-         score_impact = EXCLUDED.score_impact,
-         explanation = EXCLUDED.explanation,
-         behavior_meaning = EXCLUDED.behavior_meaning,
-         vector_deltas = EXCLUDED.vector_deltas,
-         clinical_tags = EXCLUDED.clinical_tags,
-         confidence_weight = EXCLUDED.confidence_weight,
-         allowed_usage = EXCLUDED.allowed_usage,
-         requires_hcp_version = EXCLUDED.requires_hcp_version,
-         review_status = EXCLUDED.review_status`,
-      [
-        questionId,
-        choice.label,
-        choice.choice_text,
-        normalizeChoiceScoreImpact(choice),
-        choice.explanation ?? null,
-        metadata.behavior_meaning,
-        JSON.stringify(metadata.vector_deltas),
-        JSON.stringify(metadata.clinical_tags),
-        metadata.confidence_weight,
-        metadata.allowed_usage,
-        metadata.requires_hcp_version,
-        metadata.review_status,
-      ],
+      layered
+        ? `INSERT INTO choices (
+             question_id, label, choice_text, score_impact, explanation,
+             behavior_meaning, vector_deltas, clinical_tags, confidence_weight,
+             allowed_usage, requires_hcp_version, review_status
+           )
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12)
+           ON CONFLICT (question_id, label) DO UPDATE SET
+             choice_text = EXCLUDED.choice_text,
+             score_impact = EXCLUDED.score_impact,
+             explanation = EXCLUDED.explanation,
+             behavior_meaning = EXCLUDED.behavior_meaning,
+             vector_deltas = EXCLUDED.vector_deltas,
+             clinical_tags = EXCLUDED.clinical_tags,
+             confidence_weight = EXCLUDED.confidence_weight,
+             allowed_usage = EXCLUDED.allowed_usage,
+             requires_hcp_version = EXCLUDED.requires_hcp_version,
+             review_status = EXCLUDED.review_status`
+        : `INSERT INTO choices (question_id, label, choice_text, score_impact, explanation)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (question_id, label) DO UPDATE SET
+             choice_text = EXCLUDED.choice_text,
+             score_impact = EXCLUDED.score_impact,
+             explanation = EXCLUDED.explanation`,
+      layered
+        ? [
+            questionId,
+            choice.label,
+            choice.choice_text,
+            normalizeChoiceScoreImpact(choice),
+            choice.explanation ?? null,
+            metadata.behavior_meaning,
+            JSON.stringify(metadata.vector_deltas),
+            JSON.stringify(metadata.clinical_tags),
+            metadata.confidence_weight,
+            metadata.allowed_usage,
+            metadata.requires_hcp_version,
+            metadata.review_status,
+          ]
+        : [
+            questionId,
+            choice.label,
+            choice.choice_text,
+            normalizeChoiceScoreImpact(choice),
+            choice.explanation ?? null,
+          ],
       { allowWriteRetry: true }
     );
   }
@@ -990,9 +1163,17 @@ export async function saveConnections(sessionId: string, connections: Array<{ fr
 }
 
 export async function getNextQuestion(fromQuestionId: string, choiceLabel: string) {
+  const layered = await hasLayeredAnalyticsSchema();
+  const choiceJson = layered ? buildChoiceJsonSql('c') : buildLegacyChoiceJsonSql('c');
   const result = await queryWithRetry(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
-      COALESCE(json_agg(${buildChoiceJsonSql('c')} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
+      ${layered ? "q.intended_audience" : "'public'"} as intended_audience,
+      ${layered ? "q.presentation_mode" : "'shared'"} as presentation_mode,
+      ${layered ? 'q.reading_level' : 'NULL'} as reading_level,
+      ${layered ? 'q.jurisdiction_tags' : "'[]'::jsonb"} as jurisdiction_tags,
+      ${layered ? 'q.medical_review_version' : 'NULL'} as medical_review_version,
+      ${layered ? 'q.legal_document_versions_required' : "'{}'::jsonb"} as legal_document_versions_required,
+      COALESCE(json_agg(${choiceJson} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
      FROM question_connections qc
      JOIN questions q ON q.id = qc.to_question_id
      JOIN quizzes qs ON qs.id = q.session_id
@@ -1022,11 +1203,14 @@ export async function saveUserAnswer(data: {
   behavior_meaning: string | null;
   allowed_usage: AllowedUsage;
 }> {
+  const layered = await hasLayeredAnalyticsSchema();
   // Look up the canonical points for the chosen choice
   const choiceResult = await pool.query(
-    `SELECT score_impact, vector_deltas, behavior_meaning, allowed_usage, confidence_weight
-     FROM choices
-     WHERE question_id = $1 AND label = $2`,
+    layered
+      ? `SELECT score_impact, vector_deltas, behavior_meaning, allowed_usage, confidence_weight
+         FROM choices
+         WHERE question_id = $1 AND label = $2`
+      : `SELECT score_impact FROM choices WHERE question_id = $1 AND label = $2`,
     [data.question_id, data.chosen_label],
   );
   const choice = choiceResult.rows[0] ?? {};
@@ -1048,22 +1232,34 @@ export async function saveUserAnswer(data: {
       : DEFAULT_CHOICE_METADATA.allowed_usage;
 
   const result = await pool.query(
-    `INSERT INTO user_answers (
-       session_id, user_id, question_id, chosen_label, time_taken_ms,
-       utility_score, vector_scores, behavior_meaning_snapshot, allowed_usage_snapshot
-     )
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9) RETURNING id`,
-    [
-      data.session_id,
-      data.user_id,
-      data.question_id,
-      data.chosen_label,
-      data.time_taken_ms,
-      points,
-      JSON.stringify(weightedVector),
-      behaviorMeaning,
-      allowedUsage,
-    ]
+    layered
+      ? `INSERT INTO user_answers (
+           session_id, user_id, question_id, chosen_label, time_taken_ms,
+           utility_score, vector_scores, behavior_meaning_snapshot, allowed_usage_snapshot
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9) RETURNING id`
+      : `INSERT INTO user_answers (session_id, user_id, question_id, chosen_label, time_taken_ms, utility_score)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+    layered
+      ? [
+          data.session_id,
+          data.user_id,
+          data.question_id,
+          data.chosen_label,
+          data.time_taken_ms,
+          points,
+          JSON.stringify(weightedVector),
+          behaviorMeaning,
+          allowedUsage,
+        ]
+      : [
+          data.session_id,
+          data.user_id,
+          data.question_id,
+          data.chosen_label,
+          data.time_taken_ms,
+          points,
+        ]
   );
   return {
     id: result.rows[0].id,
@@ -1091,6 +1287,7 @@ export async function completeSession(data: {
   user_display_name: string;
   user_photo_url?: string | null;
 }) {
+  const layered = await hasLayeredAnalyticsSchema();
   const agg = await pool.query(
     `SELECT
        COALESCE(SUM(utility_score), 0)::int            AS total_score,
@@ -1126,67 +1323,96 @@ export async function completeSession(data: {
     else streak = 0;
   }
 
-  const vectorsResult = await pool.query(
-    `SELECT vector_scores, allowed_usage_snapshot FROM (
-       SELECT DISTINCT ON (question_id) vector_scores, allowed_usage_snapshot, answered_at
-       FROM user_answers
-       WHERE session_id = $1 AND user_id = $2
-       ORDER BY question_id, answered_at DESC
-     ) latest_answers`,
-    [data.session_id, data.user_id],
-  );
+  const rawVector = emptyHcpVectorMap();
+  const normalizedVector = emptyHcpVectorMap();
+  let archetypeId: string | null = null;
+  let insightClassification: 'aggregate' | 'pseudonymous' | 'identified' = 'aggregate';
 
-  const rawVector = accumulateVectors(
-    vectorsResult.rows.map((row) =>
-      row.vector_scores && typeof row.vector_scores === 'object'
-        ? (row.vector_scores as Partial<Record<string, number>>)
-        : undefined,
-    ),
-  );
-  const normalizedVector = normalizeProfileVectors(rawVector);
-  const archetypeId = classifyArchetype(normalizedVector);
-  const usageSet = new Set(
-    vectorsResult.rows.map((row) =>
-      typeof row.allowed_usage_snapshot === 'string'
-        ? row.allowed_usage_snapshot
-        : DEFAULT_CHOICE_METADATA.allowed_usage,
-    ),
-  );
-  const insightClassification = usageSet.has('crm_eligible')
-    ? 'identified'
-    : usageSet.has('pseudonymous_profile')
-      ? 'pseudonymous'
-      : 'aggregate';
+  if (layered) {
+    const vectorsResult = await pool.query(
+      `SELECT vector_scores, allowed_usage_snapshot FROM (
+         SELECT DISTINCT ON (question_id) vector_scores, allowed_usage_snapshot, answered_at
+         FROM user_answers
+         WHERE session_id = $1 AND user_id = $2
+         ORDER BY question_id, answered_at DESC
+       ) latest_answers`,
+      [data.session_id, data.user_id],
+    );
+
+    const accumulated = accumulateVectors(
+      vectorsResult.rows.map((row) =>
+        row.vector_scores && typeof row.vector_scores === 'object'
+          ? (row.vector_scores as Partial<Record<string, number>>)
+          : undefined,
+      ),
+    );
+    Object.assign(rawVector, accumulated);
+    Object.assign(normalizedVector, normalizeProfileVectors(rawVector));
+    archetypeId = classifyArchetype(normalizedVector);
+    const usageSet = new Set(
+      vectorsResult.rows.map((row) =>
+        typeof row.allowed_usage_snapshot === 'string'
+          ? row.allowed_usage_snapshot
+          : DEFAULT_CHOICE_METADATA.allowed_usage,
+      ),
+    );
+    insightClassification = usageSet.has('crm_eligible')
+      ? 'identified'
+      : usageSet.has('pseudonymous_profile')
+        ? 'pseudonymous'
+        : 'aggregate';
+  }
 
   await pool.query(
-    `INSERT INTO leaderboard_entries
-       (session_id, user_id, user_display_name, user_photo_url,
-        total_score, correct_count, incorrect_count, unanswered_count, streak, total_time_ms,
-        profile_vector_scores, normalized_vector_scores, archetype_id, insight_classification)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10::jsonb, $11::jsonb, $12, $13)
-     ON CONFLICT (session_id, user_id)
-     DO UPDATE SET
-       user_display_name = EXCLUDED.user_display_name,
-       user_photo_url    = EXCLUDED.user_photo_url,
-       total_score       = EXCLUDED.total_score,
-       correct_count     = EXCLUDED.correct_count,
-       incorrect_count   = EXCLUDED.incorrect_count,
-       unanswered_count  = EXCLUDED.unanswered_count,
-       streak            = EXCLUDED.streak,
-       total_time_ms     = EXCLUDED.total_time_ms,
-       profile_vector_scores = EXCLUDED.profile_vector_scores,
-       normalized_vector_scores = EXCLUDED.normalized_vector_scores,
-       archetype_id = EXCLUDED.archetype_id,
-       insight_classification = EXCLUDED.insight_classification,
-       completed_at      = NOW()`,
-    [
-      data.session_id, data.user_id, data.user_display_name, data.user_photo_url ?? null,
-      row.total_score, row.positive_count, row.nonpositive_count, best, row.total_time_ms,
-      JSON.stringify(rawVector),
-      JSON.stringify(normalizedVector),
-      archetypeId,
-      insightClassification,
-    ],
+    layered
+      ? `INSERT INTO leaderboard_entries
+           (session_id, user_id, user_display_name, user_photo_url,
+            total_score, correct_count, incorrect_count, unanswered_count, streak, total_time_ms,
+            profile_vector_scores, normalized_vector_scores, archetype_id, insight_classification)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10::jsonb, $11::jsonb, $12, $13)
+         ON CONFLICT (session_id, user_id)
+         DO UPDATE SET
+           user_display_name = EXCLUDED.user_display_name,
+           user_photo_url    = EXCLUDED.user_photo_url,
+           total_score       = EXCLUDED.total_score,
+           correct_count     = EXCLUDED.correct_count,
+           incorrect_count   = EXCLUDED.incorrect_count,
+           unanswered_count  = EXCLUDED.unanswered_count,
+           streak            = EXCLUDED.streak,
+           total_time_ms     = EXCLUDED.total_time_ms,
+           profile_vector_scores = EXCLUDED.profile_vector_scores,
+           normalized_vector_scores = EXCLUDED.normalized_vector_scores,
+           archetype_id = EXCLUDED.archetype_id,
+           insight_classification = EXCLUDED.insight_classification,
+           completed_at      = NOW()`
+      : `INSERT INTO leaderboard_entries
+           (session_id, user_id, user_display_name, user_photo_url,
+            total_score, correct_count, incorrect_count, unanswered_count, streak, total_time_ms)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9)
+         ON CONFLICT (session_id, user_id)
+         DO UPDATE SET
+           user_display_name = EXCLUDED.user_display_name,
+           user_photo_url    = EXCLUDED.user_photo_url,
+           total_score       = EXCLUDED.total_score,
+           correct_count     = EXCLUDED.correct_count,
+           incorrect_count   = EXCLUDED.incorrect_count,
+           unanswered_count  = EXCLUDED.unanswered_count,
+           streak            = EXCLUDED.streak,
+           total_time_ms     = EXCLUDED.total_time_ms,
+           completed_at      = NOW()`,
+    layered
+      ? [
+          data.session_id, data.user_id, data.user_display_name, data.user_photo_url ?? null,
+          row.total_score, row.positive_count, row.nonpositive_count, best, row.total_time_ms,
+          JSON.stringify(rawVector),
+          JSON.stringify(normalizedVector),
+          archetypeId,
+          insightClassification,
+        ]
+      : [
+          data.session_id, data.user_id, data.user_display_name, data.user_photo_url ?? null,
+          row.total_score, row.positive_count, row.nonpositive_count, best, row.total_time_ms,
+        ],
   );
 
   // Mark the play_session finished so the dashboard live widget can stop
@@ -1202,8 +1428,8 @@ export async function completeSession(data: {
     total_score: row.total_score as number,
     streak: best,
     total_time_ms: row.total_time_ms as number,
-    profile_vector_scores: rawVector,
-    normalized_vector_scores: normalizedVector,
+    profile_vector_scores: layered ? rawVector : undefined,
+    normalized_vector_scores: layered ? normalizedVector : undefined,
     archetype_id: archetypeId,
     insight_classification: insightClassification,
   };
@@ -1325,48 +1551,69 @@ export async function upsertLeaderboardEntry(data: {
   archetype_id?: string | null;
   insight_classification?: 'aggregate' | 'pseudonymous' | 'identified';
 }) {
+  const layered = await hasLayeredAnalyticsSchema();
   const result = await pool.query(
-    `INSERT INTO leaderboard_entries (
-       session_id, user_id, user_display_name, user_photo_url, total_score,
-       correct_count, incorrect_count, unanswered_count, streak, total_time_ms,
-       profile_vector_scores, normalized_vector_scores, archetype_id, insight_classification
-     )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, $13, $14)
-     ON CONFLICT (session_id, user_id) 
-     DO UPDATE SET
-       total_score = $5,
-       correct_count = $6,
-       incorrect_count = $7,
-       unanswered_count = $8,
-       streak = $9,
-       total_time_ms = $10,
-       profile_vector_scores = $11::jsonb,
-       normalized_vector_scores = $12::jsonb,
-       archetype_id = $13,
-       insight_classification = $14,
-       completed_at = NOW()
-     RETURNING *`,
-    [
-      data.session_id,
-      data.user_id,
-      data.user_display_name,
-      data.user_photo_url || null,
-      data.total_score,
-      data.correct_count,
-      data.incorrect_count,
-      data.unanswered_count,
-      data.streak,
-      data.total_time_ms,
-      JSON.stringify(data.profile_vector_scores ?? emptyHcpVectorMap()),
-      JSON.stringify(data.normalized_vector_scores ?? emptyHcpVectorMap()),
-      data.archetype_id ?? null,
-      data.insight_classification ?? 'aggregate',
-    ]
+    layered
+      ? `INSERT INTO leaderboard_entries (
+           session_id, user_id, user_display_name, user_photo_url, total_score,
+           correct_count, incorrect_count, unanswered_count, streak, total_time_ms,
+           profile_vector_scores, normalized_vector_scores, archetype_id, insight_classification
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, $13, $14)
+         ON CONFLICT (session_id, user_id) 
+         DO UPDATE SET
+           total_score = $5,
+           correct_count = $6,
+           incorrect_count = $7,
+           unanswered_count = $8,
+           streak = $9,
+           total_time_ms = $10,
+           profile_vector_scores = $11::jsonb,
+           normalized_vector_scores = $12::jsonb,
+           archetype_id = $13,
+           insight_classification = $14,
+           completed_at = NOW()
+         RETURNING *`
+      : `INSERT INTO leaderboard_entries (session_id, user_id, user_display_name, user_photo_url, total_score, correct_count, incorrect_count, unanswered_count, streak, total_time_ms)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         ON CONFLICT (session_id, user_id)
+         DO UPDATE SET total_score = $5, correct_count = $6, incorrect_count = $7, unanswered_count = $8, streak = $9, total_time_ms = $10, completed_at = NOW()
+         RETURNING *`,
+    layered
+      ? [
+          data.session_id,
+          data.user_id,
+          data.user_display_name,
+          data.user_photo_url || null,
+          data.total_score,
+          data.correct_count,
+          data.incorrect_count,
+          data.unanswered_count,
+          data.streak,
+          data.total_time_ms,
+          JSON.stringify(data.profile_vector_scores ?? emptyHcpVectorMap()),
+          JSON.stringify(data.normalized_vector_scores ?? emptyHcpVectorMap()),
+          data.archetype_id ?? null,
+          data.insight_classification ?? 'aggregate',
+        ]
+      : [
+          data.session_id,
+          data.user_id,
+          data.user_display_name,
+          data.user_photo_url || null,
+          data.total_score,
+          data.correct_count,
+          data.incorrect_count,
+          data.unanswered_count,
+          data.streak,
+          data.total_time_ms,
+        ]
   );
   return result.rows[0];
 }
 
 export async function getSessionById(id: string) {
+  const layered = await hasLayeredAnalyticsSchema();
   const result = await queryWithRetry(
     `SELECT s.*, 
        q.name as quiz_name, 
@@ -1376,6 +1623,12 @@ export async function getSessionById(id: string) {
        q.cover_image_url as cover_image_url,
        q.share_token as share_token,
        q.timer_seconds as timer_seconds,
+       ${layered ? "q.intended_audience" : "'public'"} as intended_audience,
+       ${layered ? "q.presentation_mode" : "'shared'"} as presentation_mode,
+       ${layered ? 'q.reading_level' : 'NULL'} as reading_level,
+       ${layered ? 'q.jurisdiction_tags' : "'[]'::jsonb"} as jurisdiction_tags,
+       ${layered ? 'q.medical_review_version' : 'NULL'} as medical_review_version,
+       ${layered ? 'q.legal_document_versions_required' : "'{}'::jsonb"} as legal_document_versions_required,
        (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count,
        p.display_name as user_name
      FROM sessions s
@@ -1403,6 +1656,7 @@ export async function getSessionAnalytics(sessionId: string) {
   const session = await getSessionById(sessionId);
   if (!session) return null;
 
+  const layered = await hasLayeredAnalyticsSchema();
   const actualId = session.id;
 
   const leaderboardResult = await pool.query(
@@ -1420,12 +1674,12 @@ export async function getSessionAnalytics(sessionId: string) {
        q.question_text,
        q.question_order,
        q.node_type,
-       q.intended_audience,
-       q.presentation_mode,
-       q.reading_level,
-       q.jurisdiction_tags,
-       q.medical_review_version,
-       q.legal_document_versions_required,
+       ${layered ? "q.intended_audience" : "'public'"} as intended_audience,
+       ${layered ? "q.presentation_mode" : "'shared'"} as presentation_mode,
+       ${layered ? 'q.reading_level' : 'NULL'} as reading_level,
+       ${layered ? 'q.jurisdiction_tags' : "'[]'::jsonb"} as jurisdiction_tags,
+       ${layered ? 'q.medical_review_version' : 'NULL'} as medical_review_version,
+       ${layered ? 'q.legal_document_versions_required' : "'{}'::jsonb"} as legal_document_versions_required,
        (SELECT COUNT(*) FROM user_answers WHERE question_id = q.id AND session_id = $1)::int as total_responses,
        (SELECT COALESCE(AVG(time_taken_ms), 0)::int FROM user_answers WHERE question_id = q.id AND session_id = $1) as avg_time_ms,
        COALESCE((
@@ -1433,12 +1687,8 @@ export async function getSessionAnalytics(sessionId: string) {
            'label', c.label,
            'text', c.choice_text,
            'is_correct', (c.score_impact > 0),
-           'count', (SELECT COUNT(*) FROM user_answers WHERE question_id = q.id AND session_id = $1 AND chosen_label = c.label)::int,
-           'behavior_meaning', c.behavior_meaning,
-           'vector_deltas', c.vector_deltas,
-           'clinical_tags', c.clinical_tags,
-           'allowed_usage', c.allowed_usage,
-           'review_status', c.review_status
+           'count', (SELECT COUNT(*) FROM user_answers WHERE question_id = q.id AND session_id = $1 AND chosen_label = c.label)::int
+           ${layered ? ", 'behavior_meaning', c.behavior_meaning, 'vector_deltas', c.vector_deltas, 'clinical_tags', c.clinical_tags, 'allowed_usage', c.allowed_usage, 'review_status', c.review_status" : ''}
          ) ORDER BY c.label)
          FROM choices c
          WHERE c.question_id = q.id
@@ -1452,12 +1702,12 @@ export async function getSessionAnalytics(sessionId: string) {
   const leaderboard = leaderboardResult.rows.map((row) => ({
     ...row,
     profile_vector_scores: normalizeVectorMap(
-      row.profile_vector_scores && typeof row.profile_vector_scores === 'object'
+      layered && row.profile_vector_scores && typeof row.profile_vector_scores === 'object'
         ? (row.profile_vector_scores as Partial<Record<string, number>>)
         : undefined,
     ),
     normalized_vector_scores: normalizeVectorMap(
-      row.normalized_vector_scores && typeof row.normalized_vector_scores === 'object'
+      layered && row.normalized_vector_scores && typeof row.normalized_vector_scores === 'object'
         ? (row.normalized_vector_scores as Partial<Record<string, number>>)
         : undefined,
     ),
@@ -1499,13 +1749,15 @@ export async function getSessionAnalytics(sessionId: string) {
   const vectorSummary = emptyHcpVectorMap();
   const archetypeCounts: Record<string, number> = {};
 
-  for (const entry of leaderboard) {
-    const vectors = normalizeVectorMap(entry.normalized_vector_scores);
-    for (const key of Object.keys(vectorSummary) as Array<keyof HcpVectorMap>) {
-      vectorSummary[key] += vectors[key];
+  if (layered) {
+    for (const entry of leaderboard) {
+      const vectors = normalizeVectorMap(entry.normalized_vector_scores);
+      for (const key of Object.keys(vectorSummary) as Array<keyof HcpVectorMap>) {
+        vectorSummary[key] += vectors[key];
+      }
+      const archetype = typeof entry.archetype_id === 'string' ? entry.archetype_id : 'unclassified';
+      archetypeCounts[archetype] = (archetypeCounts[archetype] ?? 0) + 1;
     }
-    const archetype = typeof entry.archetype_id === 'string' ? entry.archetype_id : 'unclassified';
-    archetypeCounts[archetype] = (archetypeCounts[archetype] ?? 0) + 1;
   }
 
   const playerCount = leaderboard.length || 1;
@@ -1523,7 +1775,7 @@ export async function getSessionAnalytics(sessionId: string) {
       .map(([archetype_id, count]) => ({ archetype_id, count }))
       .sort((a, b) => b.count - a.count),
     vector_summary: vectorSummary,
-    dominant_vector: mostExpressiveVector(vectorSummary),
+    dominant_vector: layered ? mostExpressiveVector(vectorSummary) : 'legacy_score_mode',
     highest_friction_nodes: questions
       .map((question) => ({
         question_id: question.id,

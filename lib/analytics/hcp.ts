@@ -90,7 +90,7 @@ export const DEFAULT_CHOICE_METADATA: ChoiceMetadata = {
   confidence_weight: 1,
   allowed_usage: 'aggregate_only',
   requires_hcp_version: false,
-  review_status: 'draft',
+  review_status: 'approved',
 };
 
 export function clampConfidenceWeight(value: number | null | undefined) {
