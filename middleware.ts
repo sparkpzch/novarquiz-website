@@ -1,18 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 import { checkRateLimit } from '@/lib/ratelimit';
-import { getClientIp } from '@/lib/security';
 
 const COOKIE_NAME = 'session';
 const PUBLIC_PATHS = ['/sign-in', '/sign-up', '/forgot-password'];
-
-function addSecurityHeaders(response: NextResponse): NextResponse {
-  response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  return response;
-}
 
 function getSecret() {
   const secret = process.env.SESSION_SECRET;
@@ -20,31 +11,29 @@ function getSecret() {
   return new TextEncoder().encode(secret);
 }
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Rate-limit all API routes. Key on uid when a valid session cookie is
-  // present so that the limit is per-user, not per-IP. Per-IP keying collapses
-  // to a single bucket for all users when TRUST_PROXY is unset (the default in
-  // most environments), enabling a single account to exhaust the login limit
-  // for every user on the platform.
+  // Rate-limit all API routes
   if (pathname.startsWith('/api')) {
-    let rateLimitKey = getClientIp(request);
-    const sessionCookie = request.cookies.get(COOKIE_NAME)?.value;
-    if (sessionCookie) {
-      try {
-        const { payload } = await jwtVerify(sessionCookie, getSecret());
-        if (typeof payload.uid === 'string') rateLimitKey = `uid:${payload.uid}`;
-      } catch { /* invalid/expired cookie — fall back to IP key */ }
-    }
-    const { allowed, retryAfter } = await checkRateLimit(rateLimitKey, pathname);
+    // On Cloud Run / Firebase App Hosting the platform appends the real client
+    // IP as the LAST entry in x-forwarded-for. Prefer x-real-ip (set by the
+    // infrastructure) and fall back to the last x-forwarded-for value so an
+    // attacker cannot spoof the IP by injecting a forged first entry.
+    const xff = request.headers.get('x-forwarded-for');
+    const ip =
+      request.headers.get('x-real-ip') ??
+      (xff ? xff.split(',').at(-1)!.trim() : null) ??
+      '127.0.0.1';
+
+    const { allowed, retryAfter } = await checkRateLimit(ip, pathname);
     if (!allowed) {
       return new NextResponse('Too Many Requests', {
         status: 429,
         headers: { 'Retry-After': String(retryAfter) },
       });
     }
-    return addSecurityHeaders(NextResponse.next());
+    return NextResponse.next();
   }
 
   // Pass through static assets
@@ -65,7 +54,7 @@ export async function proxy(request: NextRequest) {
         // Expired / invalid — let through to sign-in
       }
     }
-    return addSecurityHeaders(NextResponse.next());
+    return NextResponse.next();
   }
 
   // Unauthenticated → sign-in
@@ -80,7 +69,7 @@ export async function proxy(request: NextRequest) {
     if (pathname.startsWith('/admin') && !payload.isAdmin) {
       return NextResponse.redirect(new URL('/', request.url));
     }
-    return addSecurityHeaders(NextResponse.next());
+    return NextResponse.next();
   } catch {
     const res = NextResponse.redirect(new URL('/sign-in', request.url));
     res.cookies.delete(COOKIE_NAME);

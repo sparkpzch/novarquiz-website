@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { adminRtdb } from '@/lib/firebase/admin';
 import { getSessionUser } from '@/lib/auth';
-import { checkCustomRateLimit } from '@/lib/ratelimit';
-import { sanitizeDisplayName, sanitizePhotoUrl } from '@/lib/security';
 
 const JoinBody = z.object({
   pin: z.string().min(1).max(10).optional(),
@@ -20,24 +18,6 @@ export async function POST(
 
   const { roomId } = await params;
 
-  // Two-axis rate limit: per-user caps a single account's PIN attempts across
-  // all rooms; per-room caps total guess rate against any single PIN. Either
-  // tripping returns 429 — together they make 10⁴ brute force impractical.
-  const userLimit = await checkCustomRateLimit(`teamjoin:user:${user.uid}`, 10);
-  if (!userLimit.allowed) {
-    return NextResponse.json(
-      { error: 'Too many requests' },
-      { status: 429, headers: { 'Retry-After': String(userLimit.retryAfter) } },
-    );
-  }
-  const roomLimit = await checkCustomRateLimit(`teamjoin:room:${roomId}`, 20);
-  if (!roomLimit.allowed) {
-    return NextResponse.json(
-      { error: 'Too many requests' },
-      { status: 429, headers: { 'Retry-After': String(roomLimit.retryAfter) } },
-    );
-  }
-
   const parsed = JoinBody.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 
@@ -46,7 +26,7 @@ export async function POST(
   if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 });
   if (room.status !== 'waiting') return NextResponse.json({ error: 'Room is not open' }, { status: 400 });
 
-  // Host can rejoin without PIN; players must supply the correct PIN.
+  // Host can rejoin without PIN; players must supply the correct PIN
   if (room.hostId !== user.uid) {
     if (!parsed.data.pin || room.pin !== parsed.data.pin) {
       return NextResponse.json({ error: 'Invalid PIN' }, { status: 403 });
@@ -54,8 +34,8 @@ export async function POST(
   }
 
   await adminRtdb.ref(`teamRooms/${roomId}/players/${user.uid}`).set({
-    displayName: sanitizeDisplayName(parsed.data.displayName),
-    photoURL: sanitizePhotoUrl(parsed.data.photoURL),
+    displayName: parsed.data.displayName?.trim() || 'Anonymous',
+    photoURL: parsed.data.photoURL ?? null,
     joinedAt: Date.now(),
   });
 

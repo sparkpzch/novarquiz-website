@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getSessionById } from '@/lib/db/queries';
+import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
-import { sanitizeDisplayName } from '@/lib/security';
 
 const StartBody = z.object({
   action: z.literal('start'),
@@ -64,22 +63,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json(sanitizeQuestion(question));
     }
 
-    // Resolve the quiz ID so question lookups are scoped to this session's quiz.
-    const session = await getSessionById(sessionId);
-    if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    const quizId: string = session.session_id;
-
     const fromQuestionId = searchParams.get('fromQuestionId');
     const choiceLabel = searchParams.get('choiceLabel');
     if (fromQuestionId && choiceLabel) {
-      const next = await getNextQuestion(fromQuestionId, choiceLabel, quizId);
+      const next = await getNextQuestion(fromQuestionId, choiceLabel);
       if (!next) return NextResponse.json(null, { status: 404 });
       return NextResponse.json(sanitizeQuestion(next));
     }
 
     const questionId = searchParams.get('questionId');
     if (questionId) {
-      const question = await getQuestionById(questionId, quizId);
+      const question = await getQuestionById(questionId);
       if (!question) return NextResponse.json(null, { status: 404 });
       return NextResponse.json(sanitizeQuestion(question));
     }
@@ -95,23 +89,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
   try {
     const raw = await request.json();
 
-    // Always authenticate first. The previous order checked `is_guest` before
-    // auth, which (a) created a public branch in an otherwise authenticated
-    // route — a reviewer footgun — and (b) meant any side-effect added above
-    // the auth check in future would inherit the bypass. Guest play, if
-    // re-introduced, should live in a dedicated endpoint.
-    const user = await getSessionUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
     if (raw?.action === 'start') {
       const parsed = StartBody.safeParse(raw);
       if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+      if (parsed.data.is_guest) return NextResponse.json({ is_guest: true });
+      const user = await getSessionUser();
+      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       const playSession = await getOrCreateSession(sessionId, user.uid);
       return NextResponse.json(playSession);
     }
 
     const parsed = AnswerBody.safeParse(raw);
     if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+
+    if (parsed.data.is_guest) return NextResponse.json({ is_guest: true });
+
+    const user = await getSessionUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const result = await saveUserAnswer({
       session_id: sessionId,
@@ -126,12 +120,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     void (async () => {
       try {
         const cumScore = await getUserCumulativeScore(sessionId, user.uid);
-        const displayName = sanitizeDisplayName(parsed.data.display_name);
+        const displayName = parsed.data.display_name?.replace(/<[^>]*>/g, '').trim().slice(0, 100) || 'Anonymous';
+        const label = ''; // currentQuestionLabel not needed server-side
         await adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).update({
           score: cumScore,
           displayName,
           currentQuestionId: parsed.data.question_id,
-          currentQuestionLabel: '',
+          currentQuestionLabel: label,
           updatedAt: Date.now(),
         });
       } catch { /* non-fatal — live leaderboard degrades gracefully */ }

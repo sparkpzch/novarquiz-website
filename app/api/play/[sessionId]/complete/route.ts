@@ -2,7 +2,27 @@ import { NextResponse } from 'next/server';
 import { completeSession } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
-import { sanitizeDisplayName, sanitizePhotoUrl } from '@/lib/security';
+
+const TRUSTED_PHOTO_ORIGINS = new Set([
+  'lh3.googleusercontent.com',
+  'firebasestorage.googleapis.com',
+  'storage.googleapis.com',
+]);
+
+function sanitizeDisplayName(raw: unknown): string {
+  if (typeof raw !== 'string') return 'Anonymous';
+  return raw.replace(/<[^>]*>/g, '').trim().slice(0, 100) || 'Anonymous';
+}
+
+function sanitizePhotoUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  try {
+    const { hostname } = new URL(raw);
+    return TRUSTED_PHOTO_ORIGINS.has(hostname) ? raw : null;
+  } catch {
+    return null;
+  }
+}
 
 // Called by the play page when the player reaches the end of their path
 // (or runs out of time on the last question). Aggregates user_answers into
@@ -10,13 +30,11 @@ import { sanitizeDisplayName, sanitizePhotoUrl } from '@/lib/security';
 export async function POST(request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
   try {
-    // Authenticate before reading the body. The previous order short-circuited
-    // on a client-controlled `is_guest` flag; reviewers would assume the route
-    // was authenticated when it wasn't for that branch.
+    const body = await request.json();
+    if (body.is_guest) return NextResponse.json({ is_guest: true });
+
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const body = await request.json();
 
     const result = await completeSession({
       session_id: sessionId,

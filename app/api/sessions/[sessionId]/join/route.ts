@@ -4,8 +4,6 @@ import { adminRtdb } from '@/lib/firebase/admin';
 import { getSessionById } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { ROOM_STATUS } from '@/lib/constants/session';
-import { checkCustomRateLimit } from '@/lib/ratelimit';
-import { sanitizeDisplayName, sanitizePhotoUrl } from '@/lib/security';
 
 const JoinBody = z.object({
   displayName: z.string().max(100).optional(),
@@ -23,11 +21,6 @@ export async function POST(
     const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { allowed, retryAfter } = await checkCustomRateLimit(`join:${user.uid}`, 5);
-    if (!allowed) {
-      return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(retryAfter) } });
     }
 
     // 2. Validate session in DB
@@ -55,8 +48,8 @@ export async function POST(
 
     const playerRef = adminRtdb.ref(`sessions/${sessionId}/players/${user.uid}`);
     await playerRef.set({
-      displayName: sanitizeDisplayName(body?.displayName),
-      photoURL: sanitizePhotoUrl(body?.photoURL),
+      displayName: body?.displayName?.trim() || 'Anonymous',
+      photoURL: body?.photoURL ?? null,
       joinedAt: Date.now(),
     });
 
