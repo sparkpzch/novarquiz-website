@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { deleteSession, getSessionById, updateSession } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
+import { SESSION_STATUS } from '@/lib/constants/session';
+
+const SessionPatchSchema = z.object({
+  pin: z.string().min(1).max(10).nullable().optional(),
+  pin_code: z.string().min(1).max(10).nullable().optional(),
+  status: z
+    .enum([
+      SESSION_STATUS.CLOSED,
+      SESSION_STATUS.OPENED,
+      SESSION_STATUS.STARTED,
+      SESSION_STATUS.ARCHIVED,
+    ])
+    .optional(),
+  current_question_id: z.string().uuid().nullable().optional(),
+  current_score: z.number().int().optional(),
+  current_streak: z.number().int().min(0).optional(),
+  finished_at: z.string().datetime().nullable().optional(),
+  name: z.string().max(200).nullable().optional(),
+});
 
 export async function GET(_request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
@@ -35,14 +55,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const data = await request.json();
+    const raw = await request.json().catch(() => null);
+    const parsed = SessionPatchSchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+    }
 
     // Support both legacy 'pin' key and direct DB field names
-    const updateData: Record<string, unknown> = { ...data };
-    if ('pin' in data) {
-      updateData.pin_code = data.pin;
-      delete updateData.pin;
-    }
+    const { pin, ...rest } = parsed.data;
+    const updateData: Record<string, unknown> = { ...rest };
+    if (pin !== undefined) updateData.pin_code = pin;
 
     await updateSession(session.id, updateData);
     return NextResponse.json({ ok: true });

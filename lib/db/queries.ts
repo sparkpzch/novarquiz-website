@@ -487,6 +487,24 @@ export async function getQuestionsByQuiz(sessionId: string) {
   return result.rows.map(hydrateQuestionRow);
 }
 
+// Resolves the parent quiz of a question for authorization checks.
+// Returns null if the question doesn't exist.
+export async function getQuizForQuestion(
+  questionId: string,
+): Promise<{ quiz_id: string; is_published: boolean; created_by: string } | null> {
+  const result = await pool.query(
+    `SELECT qs.id AS quiz_id, qs.is_published, qs.created_by
+       FROM questions q
+       JOIN quizzes qs ON qs.id = q.session_id
+      WHERE q.id = $1
+      LIMIT 1`,
+    [questionId],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  return { quiz_id: row.quiz_id, is_published: !!row.is_published, created_by: row.created_by };
+}
+
 export async function getQuestionById(questionId: string) {
   const layered = await hasLayeredAnalyticsSchema();
   const choiceJson = layered ? buildChoiceJsonSql('c') : buildLegacyChoiceJsonSql('c');

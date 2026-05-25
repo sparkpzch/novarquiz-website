@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore } from '@/lib/db/queries';
+import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getQuizForQuestion } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
 import { DEFAULT_CHOICE_METADATA } from '@/lib/analytics/hcp';
@@ -72,6 +72,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const questionId = searchParams.get('questionId');
     if (questionId) {
+      // Authorize: the question's parent quiz must be published, or the
+      // caller must own/admin it. Prevents enumeration of draft quizzes.
+      const access = await getQuizForQuestion(questionId);
+      if (!access) return NextResponse.json(null, { status: 404 });
+      if (!access.is_published && !user.isAdmin && access.created_by !== user.uid) {
+        return NextResponse.json(null, { status: 404 });
+      }
       const question = await getQuestionById(questionId);
       if (!question) return NextResponse.json(null, { status: 404 });
       return NextResponse.json(sanitizeQuestion(question));
@@ -102,6 +109,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 
     if (parsed.data.is_guest) {
+      // Authorize: guest answer outcomes are only returned for questions
+      // belonging to a published quiz. Without this, an unauthenticated
+      // caller could enumerate the answer key (score_impact/explanation)
+      // for any question UUID in the database, including drafts.
+      const access = await getQuizForQuestion(parsed.data.question_id);
+      if (!access || !access.is_published) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      }
       const question = await getQuestionById(parsed.data.question_id);
       const selectedChoice = question?.choices?.find(
         (choice: Choice) => choice.label === parsed.data.chosen_label,

@@ -23,7 +23,19 @@ export async function POST(request: NextRequest) {
     }
 
     const decoded = await adminAuth.verifyIdToken(idToken);
-    
+
+    // Password sign-ups must verify their email before we issue a session
+    // cookie. OAuth providers deliver verified emails by construction, so
+    // only the password provider is gated. Without this, anyone can
+    // pre-create an account on an email they don't own.
+    const provider = decoded.firebase?.sign_in_provider;
+    if (provider === 'password' && !decoded.email_verified) {
+      return NextResponse.json(
+        { error: 'Email not verified', code: 'email-not-verified' },
+        { status: 403 },
+      );
+    }
+
     // Sync profile to Postgres
     await syncUserProfile(decoded.uid, decoded.name || null, decoded.picture || null);
 
