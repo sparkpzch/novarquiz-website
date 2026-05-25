@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
+  ALLOWED_USAGE_OPTIONS,
+  AUDIENCE_OPTIONS,
+  HCP_VECTOR_KEYS,
+  PRESENTATION_MODES,
+  REVIEW_STATUS_OPTIONS,
+} from '@/lib/analytics/hcp';
+import {
   createQuestion,
   upsertChoices,
   getQuestionsByQuiz,
@@ -32,12 +39,25 @@ const ChoiceSchema = z.object({
   choice_text: z.string().max(1000),
   score_impact: z.number().finite().min(-10000).max(10000).optional(),
   explanation: z.string().max(2000).optional(),
+  behavior_meaning: z.string().max(2000).nullable().optional(),
+  vector_deltas: z.record(z.enum(HCP_VECTOR_KEYS), z.number().finite()).optional(),
+  clinical_tags: z.array(z.string().max(120)).max(20).optional(),
+  confidence_weight: z.number().finite().min(0).max(3).optional(),
+  allowed_usage: z.enum(ALLOWED_USAGE_OPTIONS).optional(),
+  requires_hcp_version: z.boolean().optional(),
+  review_status: z.enum(REVIEW_STATUS_OPTIONS).optional(),
 });
 
 const QuestionSchema = z.object({
   question_text: z.string().max(5000),
   question_order: z.number().int().min(0),
-  node_type: z.enum(['question', 'situation', 'end']).optional(),
+  node_type: z.enum(['normal', 'question', 'situation', 'end']).optional(),
+  intended_audience: z.enum(AUDIENCE_OPTIONS).optional(),
+  presentation_mode: z.enum(PRESENTATION_MODES).optional(),
+  reading_level: z.string().max(120).nullable().optional(),
+  jurisdiction_tags: z.array(z.string().max(80)).max(20).optional(),
+  medical_review_version: z.string().max(120).nullable().optional(),
+  legal_document_versions_required: z.record(z.string().max(80), z.string().max(120)).optional(),
   media_url: z.string().max(500).optional().nullable().refine(
     (v) => !v || isAllowedMediaUrl(v),
     { message: 'media_url must be an https URL from an allowed storage domain' },

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionByToken } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
-import { checkCustomRateLimit } from '@/lib/ratelimit';
 
 // Join tokens are resolved via Firebase RTDB (resolveJoinToken).
 // The client resolves the token to a sessionId client-side, then fetches
@@ -12,11 +11,6 @@ export async function GET(
 ) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const { allowed, retryAfter } = await checkCustomRateLimit(`join:${user.uid}`, 5);
-  if (!allowed) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(retryAfter) } });
-  }
 
   const { token } = await params;
   try {

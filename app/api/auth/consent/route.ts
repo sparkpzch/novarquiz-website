@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getSessionUser } from '@/lib/auth';
 import { adminDb } from '@/lib/firebase/admin';
-import { getClientIp } from '@/lib/security';
-import { TOS_VERSION, PRIVACY_VERSION } from '@/components/ui/TermsModal';
+import {
+  ANALYTICS_NOTICE_VERSION,
+  PRIVACY_VERSION,
+  PROFILING_NOTICE_VERSION,
+  TOS_VERSION,
+} from '@/components/ui/TermsModal';
+import { DEFAULT_CONSENT_PURPOSES } from '@/lib/analytics/hcp';
 
 export async function POST(request: NextRequest) {
   const user = await getSessionUser();
@@ -12,11 +17,19 @@ export async function POST(request: NextRequest) {
   }
 
   // IP is personal data under PDPA but required for legal proof of consent.
-  // Stored only in this consent record, not propagated elsewhere. Only the
-  // proxy-attested last hop is trusted (see getClientIp) — accepting the
-  // first XFF entry would let a malicious client forge the "IP of record".
-  const ip = getClientIp(request);
+  // Stored only in this consent record, not propagated elsewhere.
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
+    request.headers.get('x-real-ip') ??
+    'unknown';
   const userAgent = request.headers.get('user-agent') ?? 'unknown';
+  const body = await request.json().catch(() => ({}));
+  const consentPurposes = {
+    platform_account: body?.consent_purposes?.platform_account !== false,
+    analytics_profiling: body?.consent_purposes?.analytics_profiling !== false,
+    crm_linkage: body?.consent_purposes?.crm_linkage === true,
+    marketing_follow_up: body?.consent_purposes?.marketing_follow_up === true,
+  };
 
   try {
     const consentRef = adminDb.collection('userConsents').doc(user.uid);
@@ -25,7 +38,10 @@ export async function POST(request: NextRequest) {
         uid: user.uid,
         tos_version: TOS_VERSION,
         privacy_version: PRIVACY_VERSION,
+        analytics_notice_version: ANALYTICS_NOTICE_VERSION,
+        profiling_notice_version: PROFILING_NOTICE_VERSION,
         pdpa_consent: true,
+        consent_purposes: consentPurposes,
         consented_at: FieldValue.serverTimestamp(),
         ip_address: ip,
         user_agent: userAgent,
@@ -54,6 +70,15 @@ export async function GET() {
       consented: data?.pdpa_consent === true,
       tos_version: data?.tos_version ?? null,
       privacy_version: data?.privacy_version ?? null,
+      analytics_notice_version: data?.analytics_notice_version ?? null,
+      profiling_notice_version: data?.profiling_notice_version ?? null,
+      consent_purposes:
+        data?.consent_purposes && typeof data.consent_purposes === 'object'
+          ? {
+              ...DEFAULT_CONSENT_PURPOSES,
+              ...data.consent_purposes,
+            }
+          : DEFAULT_CONSENT_PURPOSES,
     });
   } catch (err) {
     console.error('Failed to check consent:', err);

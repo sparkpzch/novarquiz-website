@@ -15,6 +15,7 @@ import {
   type AppNodeData,
 } from "@/components/node-editor/EditorCanvas";
 import type { NormalNodeData } from "@/components/node-editor/NormalNode";
+import { HCP_VECTOR_KEYS } from "@/lib/analytics/hcp";
 import type {
   Question,
   QuestionConnection,
@@ -33,6 +34,29 @@ async function getErrorMessage(response: Response) {
   return payload?.error ?? `Request failed (${response.status})`;
 }
 
+function validateGraph(nodes: AppNode[]) {
+  for (const node of nodes) {
+    const data = node.data as AppNodeData;
+    // Basic validation only
+    if (!data.question_text?.trim()) {
+      return `Node "${data.node_name || node.id}" needs question or display text.`;
+    }
+
+    if (node.type === "normalNode") {
+      const choices = (data as NormalNodeData).choices ?? [];
+      if (choices.length === 0) {
+        return `Question node "${data.node_name || node.id}" needs at least one choice.`;
+      }
+      for (const choice of choices) {
+        if (!choice.choice_text?.trim()) {
+          return `Choice ${choice.label} on "${data.node_name || node.id}" needs text.`;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 function serializeGraph(nodes: AppNode[], edges: AppEdge[]) {
   return {
     questions: nodes.map((node, index) => {
@@ -45,6 +69,15 @@ function serializeGraph(nodes: AppNode[], edges: AppEdge[]) {
         question_order: index,
         question_text: data.question_text,
         node_name: data.node_name ?? null,
+        // Sensible defaults for enterprise fields
+        intended_audience: data.intended_audience || "public",
+        presentation_mode: data.presentation_mode || "shared",
+        reading_level: data.reading_level || null,
+        jurisdiction_tags: (data.jurisdiction_tags?.length) ? data.jurisdiction_tags : ["GLOBAL"],
+        medical_review_version: data.medical_review_version || null,
+        legal_document_versions_required: (data.legal_document_versions_required && Object.keys(data.legal_document_versions_required).length) 
+          ? data.legal_document_versions_required 
+          : { "terms": "v1.0" },
         media_type: data.media_type,
         media_url: data.media_url,
         media_path: data.media_path,
@@ -95,6 +128,12 @@ function toFlowNodes(questions: Question[]): AppNode[] {
     const common = {
       node_name: q.node_name ?? null,
       question_text: q.question_text,
+      intended_audience: q.intended_audience ?? "public",
+      presentation_mode: q.presentation_mode ?? "shared",
+      reading_level: q.reading_level ?? null,
+      jurisdiction_tags: q.jurisdiction_tags ?? [],
+      medical_review_version: q.medical_review_version ?? null,
+      legal_document_versions_required: q.legal_document_versions_required ?? {},
       media_type: q.media_type,
       media_url: q.media_url,
       media_path: q.media_path,
@@ -194,6 +233,11 @@ export default function EditQuestionPage({
     }
     if (nodes.length === 0) {
       showToast("Add at least one node", "error");
+      return;
+    }
+    const validationError = validateGraph(nodes);
+    if (validationError) {
+      showToast(validationError, "error");
       return;
     }
 

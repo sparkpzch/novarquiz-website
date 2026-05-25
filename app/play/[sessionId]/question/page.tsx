@@ -129,6 +129,10 @@ type QuestionWithPoster = Question & {
   poster_url?: string | null;
   thumbnail_url?: string | null;
 };
+type AnswerFeedback = {
+  points_earned: number;
+  explanation: string | null;
+};
 
 function useVideoQuality(): VideoQuality {
   if (typeof window === 'undefined') return 'auto';
@@ -260,34 +264,27 @@ function ChoiceButton({
 function ResultChoice({
   choice,
   selected,
-  maxImpact,
+  feedback,
 }: {
   choice: Choice;
   selected: boolean;
-  maxImpact: number;
+  feedback: AnswerFeedback | null;
 }) {
-  const tone = getImpactTone(choice.score_impact);
-  const fillWidth = Math.max(14, (Math.abs(choice.score_impact) / maxImpact) * 100);
+  const tone = selected && feedback ? getImpactTone(feedback.points_earned) : IMPACT_THEME.neutral;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`relative overflow-hidden rounded-[22px] border bg-white px-5 py-4 ${tone.border} ${selected ? 'shadow-[0_18px_36px_rgba(17,87,145,0.16)]' : 'shadow-[0_12px_28px_rgba(17,87,145,0.08)]'}`}
+      className={`relative overflow-hidden rounded-[22px] border bg-white px-5 py-4 ${selected ? tone.border : 'border-[#DCE7F5]'} ${selected ? 'shadow-[0_18px_36px_rgba(17,87,145,0.16)]' : 'shadow-[0_12px_28px_rgba(17,87,145,0.08)] opacity-75'}`}
     >
-      <div className="absolute inset-x-0 top-0 h-1.5 bg-[#EEF3F8]">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${fillWidth}%` }}
-          transition={{ duration: 0.55, ease: 'easeOut' }}
-          className={`h-full ${tone.fill}`}
-        />
-      </div>
       <div className="flex items-center justify-between gap-4">
         <p className="text-base font-semibold text-[#202832] text-wrap-balance">{choice.choice_text}</p>
-        <span className={`rounded-full px-3 py-1 text-sm font-semibold ${tone.badge}`}>
-          {formatImpact(choice.score_impact)}
-        </span>
+        {selected && feedback && (
+          <span className={`rounded-full px-3 py-1 text-sm font-semibold ${tone.badge}`}>
+            {formatImpact(feedback.points_earned)}
+          </span>
+        )}
       </div>
     </motion.div>
   );
@@ -451,14 +448,16 @@ function FinishedLeaderboard({
 
 function ExplanationModal({
   selectedChoice,
+  feedback,
   nextLoading,
   onContinue,
 }: {
   selectedChoice: Choice;
+  feedback: AnswerFeedback | null;
   nextLoading: boolean;
   onContinue: () => void;
 }) {
-  const tone = getImpactTone(selectedChoice.score_impact);
+  const tone = getImpactTone(feedback?.points_earned ?? 0);
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -475,16 +474,16 @@ function ExplanationModal({
       >
         <div className={`flex items-center gap-3 rounded-[18px] border px-4 py-3 ${tone.border}`}>
           <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${tone.badge}`}>
-            {formatImpact(selectedChoice.score_impact)}
+            {formatImpact(feedback?.points_earned ?? 0)}
           </span>
           <p className="font-semibold text-[#202832]">{selectedChoice.choice_text}</p>
         </div>
 
-        {selectedChoice.explanation && (
+        {feedback?.explanation && (
           <>
             <p className="mb-2 text-sm font-medium text-[#7A8EA7]">Explanation</p>
             <div className="rounded-[20px] bg-[#F0F6FF] p-4">
-              <p className="text-base leading-relaxed text-[#202832]">{selectedChoice.explanation}</p>
+              <p className="text-base leading-relaxed text-[#202832]">{feedback.explanation}</p>
             </div>
           </>
         )}
@@ -514,6 +513,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [answerFeedback, setAnswerFeedback] = useState<AnswerFeedback | null>(null);
   const [lastDelta, setLastDelta] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -593,6 +593,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
 
     setQuestion(nextQuestion);
     setSelectedLabel(null);
+    setAnswerFeedback(null);
     setLastDelta(null);
     setShowExplanationModal(false);
     setQuestionStartTime(typeof performance !== 'undefined' ? performance.now() : 0);
@@ -706,13 +707,13 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
         if (response.ok) {
           const data = await response.json();
           pointsAwarded = (data?.points_earned as number | undefined) ?? 0;
+          setAnswerFeedback({
+            points_earned: (data?.points_earned as number | undefined) ?? 0,
+            explanation: (data?.explanation as string | null | undefined) ?? null,
+          });
         }
       } catch {
         // keep offline-tolerant fallback below
-      }
-
-      if (user.isAnonymous) {
-        pointsAwarded = question.choices.find((choice) => choice.label === label)?.score_impact ?? 0;
       }
     }
 
@@ -894,8 +895,6 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
 
-  const maxImpact = Math.max(...question.choices.map((choice) => Math.abs(choice.score_impact || 0)), 1);
-
   return (
     <div className="nq-sky min-h-screen">
       <div className="nq-content mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-4 px-4 py-5">
@@ -963,7 +962,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
                     key={choice.label}
                     choice={choice}
                     selected={choice.label === selectedLabel}
-                    maxImpact={maxImpact}
+                    feedback={choice.label === selectedLabel ? answerFeedback : null}
                   />
                 ))}
               </motion.div>
@@ -978,6 +977,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
           <ExplanationModal
             key="explanation-modal"
             selectedChoice={selectedChoice}
+            feedback={answerFeedback}
             nextLoading={nextLoading}
             onContinue={handleContinue}
           />

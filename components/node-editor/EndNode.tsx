@@ -1,7 +1,8 @@
 'use client';
 
-import { memo, useState, useCallback } from 'react';
-import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react';
+import { memo } from 'react';
+import { Handle, Position, type NodeProps } from '@xyflow/react';
+import type { IntendedAudience, PresentationMode } from '@/lib/analytics/hcp';
 
 // End nodes terminate a branch. They render an optional final message/media
 // to the player, then finish the session. Target handle only — no outgoing
@@ -9,6 +10,12 @@ import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react';
 export type EndNodeData = {
   node_name: string | null;
   question_text: string;
+  intended_audience: IntendedAudience;
+  presentation_mode: PresentationMode;
+  reading_level: string | null;
+  jurisdiction_tags: string[];
+  medical_review_version: string | null;
+  legal_document_versions_required: Record<string, string>;
   media_type: string | null;
   media_url: string | null;
   media_path: string | null;
@@ -17,9 +24,8 @@ export type EndNodeData = {
 
 const H_HEADER = 36;
 
-export const EndNode = memo(({ id, data, selected }: NodeProps) => {
+export const EndNode = memo(({ data, selected }: NodeProps) => {
   const d = data as EndNodeData;
-  const { updateNodeData } = useReactFlow();
 
   const totalH = H_HEADER + 52 + 28;
 

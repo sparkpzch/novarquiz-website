@@ -15,6 +15,42 @@ import {
   type AppNodeData,
 } from "@/components/node-editor/EditorCanvas";
 import type { NormalNodeData } from "@/components/node-editor/NormalNode";
+import { HCP_VECTOR_KEYS } from "@/lib/analytics/hcp";
+
+function validateGraph(nodes: AppNode[]) {
+  for (const node of nodes) {
+    const data = node.data as AppNodeData;
+    if (!data.intended_audience || !(data.jurisdiction_tags?.length)) {
+      return "Every node needs an audience and at least one jurisdiction tag.";
+    }
+    if (!data.legal_document_versions_required || Object.keys(data.legal_document_versions_required).length === 0) {
+      return "Every node needs legal document version references.";
+    }
+    if (
+      (data.intended_audience === "hcp" || data.presentation_mode === "distinct") &&
+      !data.medical_review_version
+    ) {
+      return "HCP or distinct nodes need a medical review version.";
+    }
+
+    if (node.type === "normalNode") {
+      const choices = (data as NormalNodeData).choices ?? [];
+      for (const choice of choices) {
+        if (!choice.behavior_meaning?.trim()) {
+          return `Choice ${choice.label} on "${data.node_name || data.question_text.slice(0, 24) || node.id}" needs a behavior meaning.`;
+        }
+        if (!choice.allowed_usage || !choice.review_status) {
+          return `Choice ${choice.label} needs usage and review metadata.`;
+        }
+        const hasVector = HCP_VECTOR_KEYS.some((key) => Math.abs(choice.vector_deltas?.[key] ?? 0) > 0);
+        if (!hasVector) {
+          return `Choice ${choice.label} needs at least one non-zero vector delta.`;
+        }
+      }
+    }
+  }
+  return null;
+}
 
 async function getErrorMessage(response: Response) {
   const payload = await response.json().catch(() => null);
@@ -33,6 +69,12 @@ function serializeGraph(nodes: AppNode[], edges: AppEdge[]) {
         question_order: index,
         question_text: data.question_text,
         node_name: data.node_name ?? null,
+        intended_audience: data.intended_audience,
+        presentation_mode: data.presentation_mode,
+        reading_level: data.reading_level,
+        jurisdiction_tags: data.jurisdiction_tags,
+        medical_review_version: data.medical_review_version,
+        legal_document_versions_required: data.legal_document_versions_required,
         media_type: data.media_type,
         media_url: data.media_url,
         media_path: data.media_path,
@@ -79,6 +121,11 @@ export default function CreateQuestionPage() {
     }
     if (nodes.length === 0) {
       showToast("Add at least one node", "error");
+      return;
+    }
+    const validationError = validateGraph(nodes);
+    if (validationError) {
+      showToast(validationError, "error");
       return;
     }
 

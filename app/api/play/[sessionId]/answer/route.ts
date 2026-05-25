@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getSessionById } from '@/lib/db/queries';
+import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getQuizForQuestion } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
-import { sanitizeDisplayName } from '@/lib/security';
+import { DEFAULT_CHOICE_METADATA } from '@/lib/analytics/hcp';
+import type { Choice } from '@/lib/types';
 
 const StartBody = z.object({
   action: z.literal('start'),
@@ -16,19 +17,35 @@ const AnswerBody = z.object({
   chosen_label: z.string().min(1).max(10),
   time_taken_ms: z.number().int().min(0).max(300_000),
   is_guest: z.boolean().optional(),
-  display_name: z.string().max(100).optional(),
-  photo_url: z.string().url().max(500).optional().nullable(),
 });
 
-// Strip score_impact and explanation from choices so the answer key is never
-// exposed to clients. The server computes scores in saveUserAnswer using the
-// DB value; clients never need to see score_impact.
+// Strip answer-key and profiling fields from player-facing question payloads.
+// Choice outcomes are returned only after a player answers via POST.
 function sanitizeQuestion(question: Record<string, unknown> | null) {
   if (!question) return question;
   const choices = Array.isArray(question.choices)
-    ? question.choices.map(({ score_impact: _, explanation: __, ...rest }: Record<string, unknown>) => rest)
+    ? question.choices.map((choice) => {
+        const rest = { ...(choice as Record<string, unknown>) };
+        delete rest.score_impact;
+        delete rest.explanation;
+        delete rest.behavior_meaning;
+        delete rest.vector_deltas;
+        delete rest.clinical_tags;
+        delete rest.confidence_weight;
+        delete rest.allowed_usage;
+        delete rest.requires_hcp_version;
+        delete rest.review_status;
+        return rest;
+      })
     : question.choices;
-  return { ...question, choices };
+  const restQuestion = { ...question };
+  delete restQuestion.intended_audience;
+  delete restQuestion.presentation_mode;
+  delete restQuestion.reading_level;
+  delete restQuestion.jurisdiction_tags;
+  delete restQuestion.medical_review_version;
+  delete restQuestion.legal_document_versions_required;
+  return { ...restQuestion, choices };
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
@@ -45,22 +62,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json(sanitizeQuestion(question));
     }
 
-    // Resolve the quiz ID so question lookups are scoped to this session's quiz.
-    const session = await getSessionById(sessionId);
-    if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    const quizId: string = session.session_id;
-
     const fromQuestionId = searchParams.get('fromQuestionId');
     const choiceLabel = searchParams.get('choiceLabel');
     if (fromQuestionId && choiceLabel) {
-      const next = await getNextQuestion(fromQuestionId, choiceLabel, quizId);
+      const next = await getNextQuestion(fromQuestionId, choiceLabel);
       if (!next) return NextResponse.json(null, { status: 404 });
       return NextResponse.json(sanitizeQuestion(next));
     }
 
     const questionId = searchParams.get('questionId');
     if (questionId) {
-      const question = await getQuestionById(questionId, quizId);
+      // Authorize: the question's parent quiz must be published, or the
+      // caller must own/admin it. Prevents enumeration of draft quizzes.
+      const access = await getQuizForQuestion(questionId);
+      if (!access) return NextResponse.json(null, { status: 404 });
+      if (!access.is_published && !user.isAdmin && access.created_by !== user.uid) {
+        return NextResponse.json(null, { status: 404 });
+      }
+      const question = await getQuestionById(questionId);
       if (!question) return NextResponse.json(null, { status: 404 });
       return NextResponse.json(sanitizeQuestion(question));
     }
@@ -76,23 +95,43 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
   try {
     const raw = await request.json();
 
-    // Always authenticate first. The previous order checked `is_guest` before
-    // auth, which (a) created a public branch in an otherwise authenticated
-    // route — a reviewer footgun — and (b) meant any side-effect added above
-    // the auth check in future would inherit the bypass. Guest play, if
-    // re-introduced, should live in a dedicated endpoint.
-    const user = await getSessionUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
     if (raw?.action === 'start') {
       const parsed = StartBody.safeParse(raw);
       if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+      if (parsed.data.is_guest) return NextResponse.json({ is_guest: true });
+      const user = await getSessionUser();
+      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       const playSession = await getOrCreateSession(sessionId, user.uid);
       return NextResponse.json(playSession);
     }
 
     const parsed = AnswerBody.safeParse(raw);
     if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+
+    if (parsed.data.is_guest) {
+      // Authorize: guest answer outcomes are only returned for questions
+      // belonging to a published quiz. Without this, an unauthenticated
+      // caller could enumerate the answer key (score_impact/explanation)
+      // for any question UUID in the database, including drafts.
+      const access = await getQuizForQuestion(parsed.data.question_id);
+      if (!access || !access.is_published) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      }
+      const question = await getQuestionById(parsed.data.question_id);
+      const selectedChoice = question?.choices?.find(
+        (choice: Choice) => choice.label === parsed.data.chosen_label,
+      );
+      return NextResponse.json({
+        is_guest: true,
+        points_earned: selectedChoice?.score_impact ?? 0,
+        explanation: selectedChoice?.explanation ?? null,
+        behavior_meaning: selectedChoice?.behavior_meaning ?? null,
+        allowed_usage: selectedChoice?.allowed_usage ?? DEFAULT_CHOICE_METADATA.allowed_usage,
+      });
+    }
+
+    const user = await getSessionUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const result = await saveUserAnswer({
       session_id: sessionId,
@@ -107,10 +146,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     void (async () => {
       try {
         const cumScore = await getUserCumulativeScore(sessionId, user.uid);
-        const displayName = sanitizeDisplayName(parsed.data.display_name);
         await adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).update({
           score: cumScore,
-          displayName,
+          displayName: 'Player',
           currentQuestionId: parsed.data.question_id,
           currentQuestionLabel: '',
           updatedAt: Date.now(),

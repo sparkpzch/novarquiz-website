@@ -80,25 +80,6 @@ function fallbackCheck(key: string, limit: number): { allowed: boolean; retryAft
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
-// For route-level rate limiting keyed on something other than IP (e.g., user UID).
-export async function checkCustomRateLimit(
-  key: string,
-  limit: number,
-): Promise<{ allowed: boolean; retryAfter: number }> {
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    try {
-      const { success, reset } = await getLimiter(limit).limit(key);
-      return {
-        allowed: success,
-        retryAfter: success ? 0 : Math.ceil((reset - Date.now()) / 1000),
-      };
-    } catch {
-      // Redis unavailable — fall through to in-process fallback
-    }
-  }
-  return fallbackCheck(key, limit);
-}
-
 export async function checkRateLimit(
   ip: string,
   pathname: string,

@@ -1,11 +1,25 @@
 'use client';
 
 import { memo } from 'react';
-import { Handle, Position, useNodeConnections, useReactFlow, type NodeProps } from '@xyflow/react';
+import { Handle, Position, useNodeConnections, type NodeProps } from '@xyflow/react';
+import {
+  DEFAULT_CHOICE_METADATA,
+  type AllowedUsage,
+  type HcpVectorMap,
+  type IntendedAudience,
+  type PresentationMode,
+  type ReviewStatus,
+} from '@/lib/analytics/hcp';
 
 export type NormalNodeData = {
   node_name: string | null;
   question_text: string;
+  intended_audience: IntendedAudience;
+  presentation_mode: PresentationMode;
+  reading_level: string | null;
+  jurisdiction_tags: string[];
+  medical_review_version: string | null;
+  legal_document_versions_required: Record<string, string>;
   // score_impact: signed integer for utility scoring (positive = healthy, negative = risk/danger).
   // explanation: narrative/medical feedback shown after the player picks this choice.
   choices: Array<{
@@ -13,6 +27,13 @@ export type NormalNodeData = {
     choice_text: string;
     score_impact: number;
     explanation: string;
+    behavior_meaning: string | null;
+    vector_deltas: HcpVectorMap;
+    clinical_tags: string[];
+    confidence_weight: number;
+    allowed_usage: AllowedUsage;
+    requires_hcp_version: boolean;
+    review_status: ReviewStatus;
   }>;
   media_type: string | null;
   media_url: string | null;
@@ -31,18 +52,15 @@ const CHOICE_CFG = {
 const QUESTION_NODE_ACCENT = '#70A2F9';
 const QUESTION_NODE_ACCENT_SOFT = '#92BFFF';
 const QUESTION_NODE_HEADER_BG = 'rgba(112,162,249,0.2)';
-const QUESTION_NODE_SURFACE_GLOW = 'rgba(112,162,249,0.18)';
-
 const H_HEADER = 36;
 const H_TEXT = 52;
 const H_CHOICE = 32;
 
-export const NormalNode = memo(({ id, data, selected }: NodeProps) => {
+export const NormalNode = memo(({ data, selected }: NodeProps) => {
   const d = data as NormalNodeData;
-  const { updateNodeData } = useReactFlow();
   const choices = d.choices?.length
     ? d.choices
-    : ['A', 'B', 'C', 'D'].map(l => ({ label: l, choice_text: '', score_impact: 0, explanation: '' }));
+    : ['A', 'B', 'C', 'D'].map(l => ({ label: l, choice_text: '', score_impact: 0, explanation: '', ...DEFAULT_CHOICE_METADATA }));
 
   // Track which choice handles already have outgoing connections — used to hide the
   // white "connect all" handle once every choice is wired up.

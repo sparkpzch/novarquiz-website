@@ -18,22 +18,8 @@ export async function POST(request: NextRequest) {
 
     const user = await adminAuth.getUserByEmail(email);
     await adminAuth.setCustomUserClaims(user.uid, { admin: true });
-
-    // Structured audit trail. Stdout is captured by Cloud Logging on Firebase
-    // App Hosting. If this surfaces a real ops need, promote to a dedicated
-    // `admin_audit_log` table.
-    console.warn(
-      JSON.stringify({
-        event: 'admin.promote',
-        actor_uid: requester.uid,
-        target_uid: user.uid,
-        target_email: email,
-        at: new Date().toISOString(),
-      }),
-    );
-
     return NextResponse.json({ success: true, uid: user.uid });
-  } catch {
+  } catch (err) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

@@ -1,4 +1,12 @@
 import { SessionStatus } from '../constants/session';
+import type {
+  AllowedUsage,
+  ConsentPurposes,
+  HcpVectorMap,
+  IntendedAudience,
+  PresentationMode,
+  ReviewStatus,
+} from '../analytics/hcp';
 
 // ===================== Database Types =====================
 
@@ -18,6 +26,12 @@ export interface Quiz {
   play_count?: number;
   avg_score?: number;
   creator_name?: string;
+  intended_audience?: IntendedAudience;
+  presentation_mode?: PresentationMode;
+  reading_level?: string | null;
+  jurisdiction_tags?: string[];
+  medical_review_version?: string | null;
+  legal_document_versions_required?: Record<string, string>;
 }
 
 export interface Question {
@@ -38,6 +52,12 @@ export interface Question {
   created_at: string;
   updated_at: string;
   choices: Choice[];
+  intended_audience?: IntendedAudience;
+  presentation_mode?: PresentationMode;
+  reading_level?: string | null;
+  jurisdiction_tags?: string[];
+  medical_review_version?: string | null;
+  legal_document_versions_required?: Record<string, string>;
 }
 
 
@@ -49,6 +69,13 @@ export interface Choice {
   explanation: string;
   /** @deprecated use score_impact */
   points?: number;
+  behavior_meaning?: string | null;
+  vector_deltas?: HcpVectorMap;
+  clinical_tags?: string[];
+  confidence_weight?: number;
+  allowed_usage?: AllowedUsage;
+  requires_hcp_version?: boolean;
+  review_status?: ReviewStatus;
 }
 
 export interface QuestionConnection {
@@ -71,6 +98,9 @@ export interface UserAnswer {
   // Equal to the picked choice's `points` value. Can be negative.
   points_earned: number;
   answered_at: string;
+  vector_scores?: HcpVectorMap;
+  behavior_meaning_snapshot?: string | null;
+  allowed_usage_snapshot?: AllowedUsage;
 }
 
 export interface LeaderboardEntry {
@@ -86,6 +116,10 @@ export interface LeaderboardEntry {
   streak: number;
   total_time_ms: number;
   completed_at: string;
+  profile_vector_scores?: HcpVectorMap;
+  normalized_vector_scores?: HcpVectorMap;
+  archetype_id?: string | null;
+  insight_classification?: 'aggregate' | 'pseudonymous' | 'identified';
 }
 
 export interface Session {
@@ -121,6 +155,15 @@ export interface UserProfile {
   theme: 'light' | 'dark';
   language: 'en' | 'th';
   createdAt: string;
+}
+
+export interface UserConsentProfile {
+  consented: boolean;
+  tos_version: string | null;
+  privacy_version: string | null;
+  analytics_notice_version?: string | null;
+  profiling_notice_version?: string | null;
+  consent_purposes?: ConsentPurposes;
 }
 
 // ===================== Node Graph Editor Types =====================

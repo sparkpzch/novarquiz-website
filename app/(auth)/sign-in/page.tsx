@@ -25,21 +25,8 @@ function SignInForm() {
   // Holds the pending ID token for new Google OAuth users until they accept ToS
   const [consentPending, setConsentPending] = useState<string | null>(null);
 
-  // Parse against a placeholder origin so any input that resolves cross-origin
-  // (including backslash tricks like `/\evil.com`, which WHATWG normalises to
-  // `//evil.com` for special schemes) is rejected. A regex on the leading
-  // characters is not sufficient — Next.js' router parses with `new URL` and
-  // will hard-navigate to a different origin via `location.assign`.
-  const safeNextUrl = (() => {
-    if (!nextUrl) return '/';
-    try {
-      const parsed = new URL(nextUrl, 'https://placeholder.invalid');
-      if (parsed.origin !== 'https://placeholder.invalid') return '/';
-      return parsed.pathname + parsed.search + parsed.hash;
-    } catch {
-      return '/';
-    }
-  })();
+  const safeNextUrl =
+    nextUrl && /^\/(?!\/)/.test(nextUrl) ? nextUrl : '/';
 
   const createSession = async (idToken: string) => {
     const res = await fetch('/api/auth/session', {
@@ -103,12 +90,13 @@ function SignInForm() {
       const provider = new GoogleAuthProvider();
       const credential = await signInWithPopup(auth, provider);
       const idToken = await credential.user.getIdToken();
-      // All Google OAuth users must pass the ToS + PDPA consent gate before a
-      // session cookie is issued. Gating only on isNewUser skips consent for
-      // accounts created before the consent requirement was introduced, leaving
-      // those users without a consent record (PDPA violation).
-      setConsentPending(idToken);
-      setLoading(false);
+      // New Google OAuth users must accept ToS + PDPA before session is created
+      if (getAdditionalUserInfo(credential)?.isNewUser) {
+        setConsentPending(idToken);
+        setLoading(false);
+        return;
+      }
+      await createSession(idToken);
     } catch (err) {
       console.error('Google sign-in failed:', err);
       const code = (err as { code?: string }).code;
