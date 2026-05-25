@@ -64,7 +64,34 @@ export async function getAllSessions(visibleToUid?: string) {
   return result.rows;
 }
 
+const SESSION_TOKEN_SELECT = `
+  SELECT s.*,
+    q.name as quiz_name,
+    s.name as raw_session_name,
+    COALESCE(s.name, q.name) as name,
+    q.description as description,
+    q.cover_image_url as cover_image_url,
+    q.share_token as share_token,
+    q.timer_seconds as timer_seconds,
+    (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count,
+    p.display_name as user_name
+  FROM sessions s
+  JOIN quizzes q ON s.session_id = q.id
+  LEFT JOIN profiles p ON s.user_id = p.uid`;
+
+// Accepting UUID and PIN in a single OR query conflates two fundamentally
+// different identifier types (high-entropy UUID vs. short numeric PIN) and
+// makes the PIN brute-forceable via the same rate-limited endpoint. Route each
+// token type to its own lookup so the two surfaces cannot be cross-exploited.
 export async function getSessionByToken(token: string) {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
+  if (isUuid) {
+    const result = await queryWithRetry(
+      `${SESSION_TOKEN_SELECT} WHERE s.id::text = $1 LIMIT 1`,
+      [token],
+    );
+    return result.rows[0];
+  }
   const result = await queryWithRetry(
     `SELECT s.*, 
        q.name as quiz_name, 
@@ -85,7 +112,7 @@ export async function getSessionByToken(token: string) {
      FROM sessions s
      JOIN quizzes q ON s.session_id = q.id
      LEFT JOIN profiles p ON s.user_id = p.uid
-     WHERE s.id::text = $1 OR s.pin_code = $1
+     WHERE s.pin_code = $1
      LIMIT 1`,
     [token]
   );
@@ -429,15 +456,15 @@ export async function getQuestionsByQuiz(sessionId: string) {
   return result.rows.map(hydrateQuestionRow);
 }
 
-export async function getQuestionById(questionId: string) {
+export async function getQuestionById(questionId: string, quizId: string) {
   const result = await queryWithRetry(
     `SELECT q.*, 
       COALESCE(json_agg(${buildChoiceJsonSql('c')} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
      FROM questions q
      LEFT JOIN choices c ON c.question_id = q.id
-     WHERE q.id = $1
+     WHERE q.id = $1 AND q.session_id = $2
      GROUP BY q.id`,
-    [questionId]
+    [questionId, quizId]
   );
   return result.rows[0] ? hydrateQuestionRow(result.rows[0]) : null;
 }
@@ -989,7 +1016,7 @@ export async function saveConnections(sessionId: string, connections: Array<{ fr
   }
 }
 
-export async function getNextQuestion(fromQuestionId: string, choiceLabel: string) {
+export async function getNextQuestion(fromQuestionId: string, choiceLabel: string, quizId: string) {
   const result = await queryWithRetry(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
       COALESCE(json_agg(${buildChoiceJsonSql('c')} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
@@ -997,9 +1024,9 @@ export async function getNextQuestion(fromQuestionId: string, choiceLabel: strin
      JOIN questions q ON q.id = qc.to_question_id
      JOIN quizzes qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
-     WHERE qc.from_question_id = $1 AND qc.from_choice_label = $2
+     WHERE qc.from_question_id = $1 AND qc.from_choice_label = $2 AND qs.id = $3
      GROUP BY q.id, qs.timer_seconds`,
-    [fromQuestionId, choiceLabel]
+    [fromQuestionId, choiceLabel, quizId]
   );
   return result.rows[0] ? hydrateQuestionRow(result.rows[0]) : null;
 }
@@ -1009,6 +1036,8 @@ export async function getNextQuestion(fromQuestionId: string, choiceLabel: strin
 // Persists one answer + computes the points server-side from the chosen
 // choice's `points` column. Returns the points awarded so the caller can
 // surface them in the response (and clients can update RTDB live score).
+// Idempotent: a second call for the same (session, user, question) returns
+// the existing record without inserting a new row (prevents replay attacks).
 export async function saveUserAnswer(data: {
   session_id: string;
   user_id: string;
@@ -1022,6 +1051,19 @@ export async function saveUserAnswer(data: {
   behavior_meaning: string | null;
   allowed_usage: AllowedUsage;
 }> {
+  const existing = await pool.query(
+    `SELECT id, utility_score as points_earned, vector_scores, behavior_meaning_snapshot as behavior_meaning, allowed_usage_snapshot as allowed_usage 
+     FROM user_answers 
+     WHERE session_id = $1 AND user_id = $2 AND question_id = $3 LIMIT 1`,
+    [data.session_id, data.user_id, data.question_id],
+  );
+  if (existing.rows[0]) {
+    return {
+      ...existing.rows[0],
+      vector_scores: normalizeVectorMap(existing.rows[0].vector_scores),
+    } as any;
+  }
+
   // Look up the canonical points for the chosen choice
   const choiceResult = await pool.query(
     `SELECT score_impact, vector_deltas, behavior_meaning, allowed_usage, confidence_weight
