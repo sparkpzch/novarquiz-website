@@ -302,7 +302,7 @@ function GeneralRow({
 export default function ProfilePage() {
   const { t, i18n } = useTranslation();
   const { user, refreshUser } = useAuth();
-  const { theme } = useTheme();
+  const { theme, toggleTheme } = useTheme();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -526,8 +526,7 @@ export default function ProfilePage() {
           <GeneralRow
             icon={<MoonIcon />}
             label={t("profile.dark_mode")}
-            description={t("profile.maintenance")}
-            trailing={<Toggle enabled={theme === "dark"} disabled />}
+            trailing={<Toggle enabled={theme === "dark"} onToggle={toggleTheme} />}
           />
 
           <GeneralRow

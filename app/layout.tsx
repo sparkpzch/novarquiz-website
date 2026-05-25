@@ -40,11 +40,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-sans antialiased">
         <div
           aria-hidden="true"
-          className="fixed inset-0 -z-10"
-          style={{
-            background:
-              'linear-gradient(180deg, rgba(4,96,169,0.18), transparent 20%), radial-gradient(circle at bottom right, rgba(146,191,255,0.22), transparent 26%), linear-gradient(180deg, #70A2F9 0%, #92BFFF 50%, #c4deff 100%)',
-          }}
+          className="nq-root-bg fixed inset-0 -z-10"
         />
         <AuthProvider>
           <ThemeProvider>
