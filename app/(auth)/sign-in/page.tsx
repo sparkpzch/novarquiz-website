@@ -192,7 +192,7 @@ function SignInForm() {
           <div className="w-full border-t border-gray-200" />
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="bg-white px-4 text-gray-400">Or</span>
+          <span className="nq-auth-divider-bg px-4 text-gray-400">Or</span>
         </div>
       </div>
 
@@ -201,7 +201,7 @@ function SignInForm() {
         type="button"
         onClick={handleGoogleSignIn}
         disabled={loading}
-        className="w-full flex items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 transition-all py-2.5 text-sm font-medium text-gray-700 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+        className="nq-auth-google-btn w-full flex items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 transition-all py-2.5 text-sm font-medium text-gray-700 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
         style={{ minHeight: '44px' }}
       >
         <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
