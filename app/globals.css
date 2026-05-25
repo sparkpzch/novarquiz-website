@@ -387,8 +387,316 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Transition for theme changes */
-html,
-body {
-  transition: background-color 0.3s ease, color 0.3s ease;
+/* ─── Root background ──────────────────────────────────────────── */
+.nq-root-bg {
+  background:
+    linear-gradient(180deg, rgba(4,96,169,0.18), transparent 20%),
+    radial-gradient(circle at bottom right, rgba(146,191,255,0.22), transparent 26%),
+    linear-gradient(180deg, #70A2F9 0%, #92BFFF 50%, #c4deff 100%);
+}
+
+/* ─── Dark mode ────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --background: #0d1526;
+  --foreground: #d4e3f5;
+  --accent: #5aadff;
+  --accent-hover: #7bc0ff;
+  --surface: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 255, 255, 0.08);
+  --sidebar: #111b30;
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --muted: #7a9abf;
+}
+
+html[data-theme="dark"] {
+  background-color: #0a1428;
+}
+
+[data-theme="dark"] .nq-root-bg {
+  background: linear-gradient(180deg, #060e20 0%, #0a1428 50%, #0d1a38 100%);
+}
+
+/* Sky background — dark variant */
+[data-theme="dark"] .nq-sky {
+  background:
+    linear-gradient(180deg, rgba(4, 16, 56, 0.98), rgba(8, 20, 52, 0.98) 100%);
+}
+
+[data-theme="dark"] .nq-sky::before {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1.5px, transparent 1.5px);
+  opacity: 0.35;
+}
+
+[data-theme="dark"] .nq-sky::after {
+  background:
+    linear-gradient(135deg, transparent 0 66%, rgba(255, 255, 255, 0.03) 66%, transparent 82%),
+    radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.05), transparent 20%);
+}
+
+/* Cards */
+[data-theme="dark"] .nq-card {
+  background: linear-gradient(180deg, rgba(20, 35, 68, 0.96), rgba(12, 22, 50, 0.98));
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .nq-card-soft {
+  background: linear-gradient(180deg, rgba(18, 30, 60, 0.92), rgba(12, 22, 50, 0.96));
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="dark"] .nq-chip {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(90, 173, 255, 0.2);
+  color: #7bc0ff;
+}
+
+/* Typography classes */
+[data-theme="dark"] .nq-text-title,
+[data-theme="dark"] .nq-header,
+[data-theme="dark"] .nq-topic,
+[data-theme="dark"] .nq-subject {
+  color: #d4e3f5;
+}
+
+[data-theme="dark"] .nq-text-muted,
+[data-theme="dark"] .nq-content,
+[data-theme="dark"] .nq-details {
+  color: #7a9abf;
+}
+
+[data-theme="dark"] .nq-text-accent {
+  color: #5aadff;
+}
+
+[data-theme="dark"] .nq-text-deep {
+  color: #c2d4ea;
+}
+
+/* Dashboard hardcoded text colors — primary (dark blue → light) */
+[data-theme="dark"] .text-\[\#16324F\],
+[data-theme="dark"] .text-\[\#192246\],
+[data-theme="dark"] .text-\[\#202A3F\],
+[data-theme="dark"] .text-\[\#111827\] {
+  color: #d4e3f5 !important;
+}
+
+/* Secondary / muted text */
+[data-theme="dark"] .text-\[\#5D7EA1\],
+[data-theme="dark"] .text-\[\#6D7D95\],
+[data-theme="dark"] .text-\[\#67758D\],
+[data-theme="dark"] .text-\[\#7F8BA0\],
+[data-theme="dark"] .text-\[\#6A7485\],
+[data-theme="dark"] .text-\[\#8FA3BD\],
+[data-theme="dark"] .text-\[\#9BAFC6\],
+[data-theme="dark"] .text-\[\#A7B3C3\],
+[data-theme="dark"] .text-\[\#B3BFCE\] {
+  color: #94a9c5 !important;
+}
+
+[data-theme="dark"] .text-\[\#4D6F93\] { color: #a8c0d8 !important; }
+[data-theme="dark"] .text-\[\#8B8B8B\] { color: #8a96a4 !important; }
+[data-theme="dark"] .text-\[\#294867\] { color: #a8c4e0 !important; }
+
+/* Accent blues — brighten for visibility on dark backgrounds */
+[data-theme="dark"] .text-\[\#0460A9\],
+[data-theme="dark"] .text-\[\#03508C\],
+[data-theme="dark"] .text-\[\#234C8F\],
+[data-theme="dark"] .text-\[\#3A66C1\],
+[data-theme="dark"] .text-\[\#0B4F85\] {
+  color: #5aadff !important;
+}
+
+/* text-[#70A2F9] and text-[#6EA2FF] kept at original — they're light blues
+   that read well on both white buttons and dark glass cards. */
+
+/* Preserve original dark/colored text when sitting on a bg-white surface
+   (Edit Profile button, play page answer cards, etc.) so they don't go
+   light-on-light. Higher specificity wins against the universal overrides. */
+[data-theme="dark"] .bg-white.text-\[\#16324F\],
+[data-theme="dark"] .bg-white .text-\[\#16324F\] { color: #16324F !important; }
+[data-theme="dark"] .bg-white.text-\[\#0460A9\],
+[data-theme="dark"] .bg-white .text-\[\#0460A9\] { color: #0460A9 !important; }
+[data-theme="dark"] .bg-white.text-\[\#5D7EA1\],
+[data-theme="dark"] .bg-white .text-\[\#5D7EA1\] { color: #5D7EA1 !important; }
+[data-theme="dark"] .bg-white.text-\[\#192246\],
+[data-theme="dark"] .bg-white .text-\[\#192246\] { color: #192246 !important; }
+[data-theme="dark"] .bg-white.text-\[\#202A3F\],
+[data-theme="dark"] .bg-white .text-\[\#202A3F\] { color: #202A3F !important; }
+[data-theme="dark"] .bg-white.text-\[\#234C8F\],
+[data-theme="dark"] .bg-white .text-\[\#234C8F\] { color: #234C8F !important; }
+[data-theme="dark"] .bg-white.text-\[\#4D6F93\],
+[data-theme="dark"] .bg-white .text-\[\#4D6F93\] { color: #4D6F93 !important; }
+[data-theme="dark"] .bg-white.text-\[\#3A66C1\],
+[data-theme="dark"] .bg-white .text-\[\#3A66C1\] { color: #3A66C1 !important; }
+
+/* Dashboard hardcoded bg colors — light surfaces → dark tinted */
+[data-theme="dark"] .bg-\[\#EAF5FF\],
+[data-theme="dark"] .bg-\[\#EEF3FB\],
+[data-theme="dark"] .bg-\[\#EEF6E4\],
+[data-theme="dark"] .bg-\[\#F1F5F9\],
+[data-theme="dark"] .bg-\[\#F3F8FF\],
+[data-theme="dark"] .bg-\[\#F4F9FF\],
+[data-theme="dark"] .bg-\[\#F8FAFC\] {
+  background-color: rgba(90, 173, 255, 0.08) !important;
+}
+
+[data-theme="dark"] .bg-\[\#FDEDEC\] { background-color: rgba(231, 76, 60, 0.1) !important; }
+[data-theme="dark"] .bg-\[\#FDF3E9\] { background-color: rgba(230, 126, 34, 0.1) !important; }
+[data-theme="dark"] .bg-\[\#D9E1EE\] { background-color: rgba(255, 255, 255, 0.12) !important; }
+[data-theme="dark"] .bg-\[\#92BFFF\] { background-color: #4d7acf !important; }
+[data-theme="dark"] .bg-\[\#0460A9\]\/05 { background-color: rgba(90, 173, 255, 0.08) !important; }
+
+/* Borders */
+[data-theme="dark"] .border-\[\#D9E1EE\],
+[data-theme="dark"] .border-\[\#DCE6F3\],
+[data-theme="dark"] .border-\[\#C2D4E8\],
+[data-theme="dark"] .border-\[\#92BFFF\] {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Edit Profile button — keep white but more opaque so the button reads as a button */
+html[data-theme="dark"] .bg-white { background-color: rgba(255, 255, 255, 0.92) !important; }
+
+/* All translucent-white surfaces become solid dark navy tiles in dark mode,
+   matching the profile card's tile look. Using attribute selector so it
+   beats Tailwind v4's utility cascade regardless of opacity variant. */
+html[data-theme="dark"] [class*="bg-white/"] {
+  background-color: #1f2f55 !important;
+  box-shadow: none !important;
+}
+
+/* The Edit Profile button uses bare bg-white (no /opacity) and must stay opaque white,
+   so the attribute-selector override above intentionally does NOT match it. */
+
+/* Neutralize the bright inset highlight shadow that gives tiles a pale top edge */
+html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Darker variant of the blue profile card */
+[data-theme="dark"] .nq-card-blue {
+  background:
+    linear-gradient(135deg, #1a3370, #0d1d4a),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.55);
+}
+
+/* Inside .nq-card-blue, force bright/white text for legibility */
+[data-theme="dark"] .nq-card-blue .text-\[\#5D7EA1\] {
+  color: rgba(255, 255, 255, 0.78) !important;
+}
+[data-theme="dark"] .nq-card-blue .nq-text-accent {
+  color: #ffffff !important;
+}
+[data-theme="dark"] .nq-card-blue .bg-white\/14 {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+}
+[data-theme="dark"] .nq-card-blue .bg-white\/72 {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+/* Novartis logo — invert dark text so it shows on dark backgrounds */
+[data-theme="dark"] img[src*="novartis-logo"] {
+  filter: brightness(0) invert(0.92);
+}
+
+/* Hover white backgrounds */
+[data-theme="dark"] .hover\:bg-white:hover { background-color: rgba(255, 255, 255, 0.1) !important; }
+[data-theme="dark"] .hover\:bg-white\/60:hover { background-color: rgba(255, 255, 255, 0.1) !important; }
+[data-theme="dark"] .hover\:bg-white\/70:hover { background-color: rgba(255, 255, 255, 0.11) !important; }
+[data-theme="dark"] .hover\:bg-white\/40:hover { background-color: rgba(255, 255, 255, 0.08) !important; }
+
+/* Border colors */
+[data-theme="dark"] .border-white\/50 { border-color: rgba(255, 255, 255, 0.1) !important; }
+[data-theme="dark"] .border-\[\#0460A9\]\/10 { border-color: rgba(255, 255, 255, 0.09) !important; }
+[data-theme="dark"] .border-\[\#0460A9\]\/12 { border-color: rgba(255, 255, 255, 0.09) !important; }
+[data-theme="dark"] .border-\[\#0460A9\]\/14 { border-color: rgba(255, 255, 255, 0.09) !important; }
+[data-theme="dark"] .border-\[\#0460A9\]\/08 { border-color: rgba(255, 255, 255, 0.07) !important; }
+[data-theme="dark"] .border-\[\#0460A9\]\/05 { border-color: rgba(255, 255, 255, 0.05) !important; }
+
+/* Scrollbar */
+[data-theme="dark"] * {
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+/* Admin panel — use dark glass styles in dark mode */
+[data-theme="dark"] .nq-admin-panel {
+  --nq-admin-title: #d4e3f5;
+  --nq-admin-body: #a8c4e0;
+  --nq-admin-muted: #7a9abf;
+  --nq-admin-soft: #5a86a8;
+  --nq-admin-border: rgba(255, 255, 255, 0.08);
+  --nq-admin-surface: rgba(255, 255, 255, 0.05);
+  --nq-admin-surface-strong: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .nq-admin-panel .bg-white\/5,
+[data-theme="dark"] .nq-admin-panel .bg-white\/\[0\.03\],
+[data-theme="dark"] .nq-admin-panel .bg-white\/\[0\.04\] {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-theme="dark"] .nq-admin-panel .bg-black\/20,
+[data-theme="dark"] .nq-admin-panel .bg-black\/50 {
+  background-color: rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme="dark"] .nq-admin-panel :not(button).text-white {
+  color: var(--nq-admin-title) !important;
+}
+
+[data-theme="dark"] .nq-admin-panel .text-gray-300,
+[data-theme="dark"] .nq-admin-panel .text-gray-400 {
+  color: var(--nq-admin-body) !important;
+}
+
+[data-theme="dark"] .nq-admin-panel .text-gray-500 {
+  color: var(--nq-admin-muted) !important;
+}
+
+/* ─── Auth layout dark mode ─────────────────────────────────── */
+.nq-auth-card {
+  background-color: #ffffff;
+}
+[data-theme="dark"] .nq-auth-card {
+  background-color: #0f1c35;
+}
+
+.nq-auth-divider-bg {
+  background-color: #ffffff;
+}
+[data-theme="dark"] .nq-auth-divider-bg {
+  background-color: #0f1c35;
+}
+
+[data-theme="dark"] .nq-auth-card input {
+  background-color: #162040 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #d4e3f5 !important;
+}
+[data-theme="dark"] .nq-auth-card input::placeholder {
+  color: rgba(255, 255, 255, 0.32) !important;
+}
+[data-theme="dark"] .nq-auth-card .text-gray-700 { color: #94a9c5 !important; }
+[data-theme="dark"] .nq-auth-card .text-gray-600 { color: #94a9c5 !important; }
+[data-theme="dark"] .nq-auth-card .text-gray-500 { color: #7a9abf !important; }
+[data-theme="dark"] .nq-auth-card .text-gray-400 { color: #6a8dab !important; }
+[data-theme="dark"] .nq-auth-card .border-gray-200 { border-color: rgba(255, 255, 255, 0.1) !important; }
+[data-theme="dark"] .nq-auth-card .bg-red-50 { background-color: rgba(220, 38, 38, 0.12) !important; }
+[data-theme="dark"] .nq-auth-card .border-red-200 { border-color: rgba(220, 38, 38, 0.25) !important; }
+[data-theme="dark"] .nq-auth-card .text-red-500 { color: #fc8080 !important; }
+
+[data-theme="dark"] .nq-auth-google-btn {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: #c8dcf0 !important;
+}
+[data-theme="dark"] .nq-auth-google-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.11) !important;
+}
+[data-theme="dark"] .nq-auth-google-btn:active:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.14) !important;
 }

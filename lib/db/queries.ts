@@ -143,6 +143,62 @@ export async function resolveQuizId(idOrSlug: string): Promise<string> {
   return quiz.id;
 }
 
+// Resolves the URL `[sessionId]` segment to its underlying quiz_id.
+// The play API accepts both a play-session row id (sessions.id) and a quiz id
+// (quizzes.id) in the URL. To authorize answer submissions we need the
+// canonical quiz id so we can verify the question belongs to that quiz.
+export async function resolveSessionToQuizId(sessionId: string): Promise<string | null> {
+  const quiz = await pool.query('SELECT id FROM quizzes WHERE id = $1', [sessionId]);
+  if (quiz.rows[0]) return quiz.rows[0].id as string;
+  const sess = await pool.query('SELECT session_id FROM sessions WHERE id = $1', [sessionId]);
+  return (sess.rows[0]?.session_id as string | undefined) ?? null;
+}
+
+// Returns the earliest existing user_answers row for (session, user, question).
+// Used to make POST /api/play/.../answer idempotent so a player cannot probe
+// every choice and resubmit the highest-scoring one last.
+export async function getExistingAnswer(
+  sessionId: string,
+  userId: string,
+  questionId: string,
+): Promise<{
+  id: string;
+  points_earned: number;
+  explanation: string | null;
+  behavior_meaning: string | null;
+  allowed_usage: AllowedUsage;
+} | null> {
+  const layered = await hasLayeredAnalyticsSchema();
+  const result = await pool.query(
+    layered
+      ? `SELECT ua.id, ua.utility_score, ua.behavior_meaning_snapshot, ua.allowed_usage_snapshot,
+                c.explanation
+         FROM user_answers ua
+         LEFT JOIN choices c ON c.question_id = ua.question_id AND c.label = ua.chosen_label
+         WHERE ua.session_id = $1 AND ua.user_id = $2 AND ua.question_id = $3
+         ORDER BY ua.answered_at ASC LIMIT 1`
+      : `SELECT ua.id, ua.utility_score, c.explanation
+         FROM user_answers ua
+         LEFT JOIN choices c ON c.question_id = ua.question_id AND c.label = ua.chosen_label
+         WHERE ua.session_id = $1 AND ua.user_id = $2 AND ua.question_id = $3
+         ORDER BY ua.answered_at ASC LIMIT 1`,
+    [sessionId, userId, questionId],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    id: row.id as string,
+    points_earned: (row.utility_score as number | undefined) ?? 0,
+    explanation: typeof row.explanation === 'string' ? row.explanation : null,
+    behavior_meaning:
+      typeof row.behavior_meaning_snapshot === 'string' ? row.behavior_meaning_snapshot : null,
+    allowed_usage:
+      typeof row.allowed_usage_snapshot === 'string'
+        ? (row.allowed_usage_snapshot as AllowedUsage)
+        : DEFAULT_CHOICE_METADATA.allowed_usage,
+  };
+}
+
 // Removed: getSessionByShareToken — share tokens now live in Firebase RTDB (joinTokens/{token})
 export async function createQuiz(data: {
   id?: string;

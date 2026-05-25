@@ -4,6 +4,7 @@ import { ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useTheme } from '@/lib/hooks/useTheme';
 
 const AUTH_TABS = [
   { label: 'Login', href: '/sign-in' },
@@ -12,7 +13,20 @@ const AUTH_TABS = [
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const isTabPage = pathname === '/sign-in' || pathname === '/sign-up';
+
+  const headerGradient = isDark
+    ? 'linear-gradient(135deg, #223870 0%, #182a5e 40%, #0e1e48 100%)'
+    : 'linear-gradient(135deg, #6ba3f5 0%, #4f82e8 40%, #3b5fd4 100%)';
+  const cardShadow = isDark
+    ? '0 -6px 32px rgba(0,0,0,0.5)'
+    : '0 -6px 32px rgba(0,0,0,0.13)';
+  const tabsBg = isDark ? '#1a2740' : '#f0f0f0';
+  const tabPillBg = isDark ? '#2a3f6a' : '#ffffff';
+  const activeTabColor = isDark ? '#d4e3f5' : '#111';
+  const inactiveTabColor = isDark ? '#7a9abf' : '#6b7280';
 
   return (
     <>
@@ -24,7 +38,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           style={{
             minHeight: '180px',
             height: '30vh',
-            background: 'linear-gradient(135deg, #6ba3f5 0%, #4f82e8 40%, #3b5fd4 100%)',
+            background: headerGradient,
           }}
         >
           {/* Dot grid pattern */}
@@ -70,11 +84,11 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.45, ease: 'easeOut', delay: 0.1 }}
-          className="relative z-10 flex-1 bg-white overflow-y-auto"
+          className="relative z-10 flex-1 nq-auth-card overflow-y-auto"
           style={{
             marginTop: '-28px',
             borderRadius: '28px 28px 0 0',
-            boxShadow: '0 -6px 32px rgba(0,0,0,0.13)',
+            boxShadow: cardShadow,
           }}
         >
           <div style={{ padding: '24px 22px 32px' }}>
@@ -83,7 +97,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
               <div
                 className="flex mb-5 relative"
                 style={{
-                  background: '#f0f0f0',
+                  background: tabsBg,
                   borderRadius: '12px',
                   padding: '4px',
                 }}
@@ -100,7 +114,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
                         padding: '8px 0',
                         fontSize: '14px',
                         fontWeight: isActive ? 700 : 500,
-                        color: isActive ? '#111' : '#6b7280',
+                        color: isActive ? activeTabColor : inactiveTabColor,
                         textDecoration: 'none',
                       }}
                     >
@@ -110,9 +124,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
                           layoutId="auth-tab-pill"
                           className="absolute inset-0"
                           style={{
-                            background: '#ffffff',
+                            background: tabPillBg,
                             borderRadius: '9px',
-                            boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
+                            boxShadow: isDark ? '0 1px 4px rgba(0,0,0,0.3)' : '0 1px 4px rgba(0,0,0,0.10)',
                             zIndex: -1,
                           }}
                           transition={{ type: 'spring', stiffness: 500, damping: 38 }}
@@ -140,7 +154,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           style={{
             minHeight: '220px',
             height: '32vh',
-            background: 'linear-gradient(135deg, #6ba3f5 0%, #4f82e8 40%, #3b5fd4 100%)',
+            background: headerGradient,
           }}
         >
           {/* Dot grid pattern */}
@@ -185,11 +199,11 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.45, ease: 'easeOut', delay: 0.1 }}
-          className="relative z-10 flex-1 bg-white overflow-y-auto"
+          className="relative z-10 flex-1 nq-auth-card overflow-y-auto"
           style={{
             marginTop: '-28px',
             borderRadius: '28px 28px 0 0',
-            boxShadow: '0 -6px 32px rgba(0,0,0,0.13)',
+            boxShadow: cardShadow,
           }}
         >
           <div className="w-full max-w-md mx-auto" style={{ padding: '24px 22px 40px' }}>
@@ -198,7 +212,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
               <div
                 className="flex mb-6 relative"
                 style={{
-                  background: '#f0f0f0',
+                  background: tabsBg,
                   borderRadius: '12px',
                   padding: '4px',
                 }}
@@ -215,7 +229,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
                         padding: '9px 0',
                         fontSize: '15px',
                         fontWeight: isActive ? 700 : 500,
-                        color: isActive ? '#111' : '#6b7280',
+                        color: isActive ? activeTabColor : inactiveTabColor,
                         textDecoration: 'none',
                       }}
                     >
@@ -224,9 +238,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
                           layoutId="auth-tab-pill-desktop"
                           className="absolute inset-0"
                           style={{
-                            background: '#ffffff',
+                            background: tabPillBg,
                             borderRadius: '9px',
-                            boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
+                            boxShadow: isDark ? '0 1px 4px rgba(0,0,0,0.3)' : '0 1px 4px rgba(0,0,0,0.10)',
                             zIndex: -1,
                           }}
                           transition={{ type: 'spring', stiffness: 500, damping: 38 }}
