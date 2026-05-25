@@ -41,8 +41,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Pass through static assets
-  if (pathname.startsWith('/_next') || pathname.startsWith('/favicon') || pathname.includes('.')) {
+  // Pass through static assets. The previous `pathname.includes('.')` check
+  // skipped the auth gate for ANY path containing a dot (e.g.
+  // /admin/sessions/foo.bar/analytics), which let unauthenticated traffic
+  // reach protected dynamic routes. Limit the bypass to file paths that end
+  // in a known static-asset extension.
+  const STATIC_FILE_RE = /\.(?:svg|png|jpe?g|gif|webp|avif|ico|css|js|mjs|map|woff2?|ttf|otf|eot|json|txt|xml|webmanifest)$/i;
+  if (pathname.startsWith('/_next') || pathname.startsWith('/favicon') || STATIC_FILE_RE.test(pathname)) {
     return NextResponse.next();
   }
 

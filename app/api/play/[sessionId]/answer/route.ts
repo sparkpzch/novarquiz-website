@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getQuizForQuestion } from '@/lib/db/queries';
+import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getQuizForQuestion, resolveSessionToQuizId, getExistingAnswer } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
 import { DEFAULT_CHOICE_METADATA } from '@/lib/analytics/hcp';
@@ -110,11 +110,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
 
     if (parsed.data.is_guest) {
       // Authorize: guest answer outcomes are only returned for questions
-      // belonging to a published quiz. Without this, an unauthenticated
-      // caller could enumerate the answer key (score_impact/explanation)
-      // for any question UUID in the database, including drafts.
+      // belonging to the SAME published quiz as the URL session. Without
+      // the quiz-match check, the endpoint became an answer-key oracle:
+      // any unauthenticated caller could POST a question UUID and learn
+      // its score_impact/explanation, dumping the key for every published
+      // quiz one row at a time.
       const access = await getQuizForQuestion(parsed.data.question_id);
       if (!access || !access.is_published) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      }
+      const sessionQuizId = await resolveSessionToQuizId(sessionId);
+      if (!sessionQuizId || sessionQuizId !== access.quiz_id) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
       }
       const question = await getQuestionById(parsed.data.question_id);
@@ -132,6 +138,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
 
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Authorize: the question must belong to the same quiz this play session
+    // is for. Without this, an authenticated user could inject answers from
+    // unrelated (or draft) quizzes into their session_id row and inflate
+    // their leaderboard score.
+    const access = await getQuizForQuestion(parsed.data.question_id);
+    if (!access) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    const sessionQuizId = await resolveSessionToQuizId(sessionId);
+    if (!sessionQuizId || sessionQuizId !== access.quiz_id) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    // One answer per (session, user, question). The leaderboard aggregator
+    // takes the LATEST row per question, so without this guard a player can
+    // probe every label, observe points_earned, and resubmit the best label
+    // last to walk away with a perfect score.
+    const existing = await getExistingAnswer(sessionId, user.uid, parsed.data.question_id);
+    if (existing) {
+      return NextResponse.json(existing, { status: 200 });
+    }
 
     const result = await saveUserAnswer({
       session_id: sessionId,
