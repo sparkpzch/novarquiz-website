@@ -19,6 +19,9 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreePdpa, setAgreePdpa] = useState(false);
+  const [agreeAnalytics, setAgreeAnalytics] = useState(true);
+  const [agreeCrmLinkage, setAgreeCrmLinkage] = useState(false);
+  const [agreeMarketing, setAgreeMarketing] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showTermsTab, setShowTermsTab] = useState<'terms' | 'privacy'>('terms');
   const [error, setError] = useState('');
@@ -58,7 +61,18 @@ export default function SignUpPage() {
         body: JSON.stringify({ idToken }),
       });
       // Record PDPA consent in Firebase after session is established
-      await fetch('/api/auth/consent', { method: 'POST' });
+      await fetch('/api/auth/consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          consent_purposes: {
+            platform_account: true,
+            analytics_profiling: agreeAnalytics,
+            crm_linkage: agreeCrmLinkage,
+            marketing_follow_up: agreeMarketing,
+          },
+        }),
+      });
       setVerified(true);
     } catch (err: unknown) {
       const firebaseError = err as { code?: string };
@@ -179,6 +193,42 @@ export default function SignUpPage() {
           </span>
         </label>
 
+        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={agreeAnalytics}
+            onChange={(e) => setAgreeAnalytics(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span className="text-sm text-gray-600 md:text-gray-400">
+            I agree to analytics and profiling that improve quiz insights and aggregate reporting.
+          </span>
+        </label>
+
+        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={agreeCrmLinkage}
+            onChange={(e) => setAgreeCrmLinkage(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span className="text-sm text-gray-600 md:text-gray-400">
+            I allow my profile to be linked to CRM or professional follow-up systems when applicable.
+          </span>
+        </label>
+
+        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={agreeMarketing}
+            onChange={(e) => setAgreeMarketing(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span className="text-sm text-gray-600 md:text-gray-400">
+            I would like to receive optional educational or marketing follow-up.
+          </span>
+        </label>
+
         {/* PDPA consent checkbox — clicking when unchecked opens modal on Privacy tab */}
         <label className="flex items-start gap-2.5 cursor-pointer select-none">
           <div
@@ -253,6 +303,7 @@ export default function SignUpPage() {
           onAccept={() => {
             setAgreeTerms(true);
             setAgreePdpa(true);
+            setAgreeAnalytics(true);
             setShowTerms(false);
           }}
         />

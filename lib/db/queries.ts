@@ -2,6 +2,20 @@ import { randomUUID } from 'node:crypto';
 import pool, { queryWithRetry } from './postgres';
 import { SESSION_STATUS, SessionStatus } from '../constants/session';
 import { incrementMediaUsage, decrementMediaUsage, syncMediaUsage } from './media';
+import {
+  accumulateVectors,
+  classifyArchetype,
+  DEFAULT_CHOICE_METADATA,
+  DEFAULT_QUESTION_METADATA,
+  emptyHcpVectorMap,
+  mostExpressiveVector,
+  normalizeChoiceMetadata,
+  normalizeProfileVectors,
+  normalizeQuestionMetadata,
+  normalizeVectorMap,
+  type AllowedUsage,
+  type HcpVectorMap,
+} from '../analytics/hcp';
 
 // ===================== Quizzes =====================
 
@@ -60,6 +74,12 @@ export async function getSessionByToken(token: string) {
        q.cover_image_url as cover_image_url,
        q.share_token as share_token,
        q.timer_seconds as timer_seconds,
+       q.intended_audience as intended_audience,
+       q.presentation_mode as presentation_mode,
+       q.reading_level as reading_level,
+       q.jurisdiction_tags as jurisdiction_tags,
+       q.medical_review_version as medical_review_version,
+       q.legal_document_versions_required as legal_document_versions_required,
        (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count,
        p.display_name as user_name
      FROM sessions s
@@ -289,9 +309,32 @@ export async function duplicateQuiz(sourceIdOrSlug: string, createdBy: string, i
 
     for (const q of qRows) {
       const { rows: newQRows } = await client.query(
-        `INSERT INTO questions (session_id, question_order, question_text, media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-        [newSession.id, q.question_order, q.question_text, q.media_type, q.media_url, q.media_path, q.timer_override, q.is_entry_point, q.node_x, q.node_y, q.node_type]
+        `INSERT INTO questions (
+           session_id, question_order, question_text, node_name, intended_audience, presentation_mode,
+           reading_level, jurisdiction_tags, medical_review_version, legal_document_versions_required,
+           media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id`,
+        [
+          newSession.id,
+          q.question_order,
+          q.question_text,
+          q.node_name,
+          q.intended_audience ?? DEFAULT_QUESTION_METADATA.intended_audience,
+          q.presentation_mode ?? DEFAULT_QUESTION_METADATA.presentation_mode,
+          q.reading_level ?? null,
+          JSON.stringify(q.jurisdiction_tags ?? []),
+          q.medical_review_version ?? null,
+          JSON.stringify(q.legal_document_versions_required ?? {}),
+          q.media_type,
+          q.media_url,
+          q.media_path,
+          q.timer_override,
+          q.is_entry_point,
+          q.node_x,
+          q.node_y,
+          q.node_type,
+        ]
       );
       if (q.media_path) {
         await incrementMediaUsage(client, q.media_path);
@@ -303,9 +346,26 @@ export async function duplicateQuiz(sourceIdOrSlug: string, createdBy: string, i
       const { rows: cRows } = await client.query('SELECT * FROM choices WHERE question_id = $1', [q.id]);
       for (const c of cRows) {
         await client.query(
-          `INSERT INTO choices (question_id, label, choice_text, score_impact, explanation)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [newQId, c.label, c.choice_text, c.score_impact, c.explanation]
+          `INSERT INTO choices (
+             question_id, label, choice_text, score_impact, explanation,
+             behavior_meaning, vector_deltas, clinical_tags, confidence_weight,
+             allowed_usage, requires_hcp_version, review_status
+           )
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12)`,
+          [
+            newQId,
+            c.label,
+            c.choice_text,
+            c.score_impact,
+            c.explanation,
+            c.behavior_meaning ?? null,
+            JSON.stringify(c.vector_deltas ?? {}),
+            JSON.stringify(c.clinical_tags ?? []),
+            c.confidence_weight ?? 1,
+            c.allowed_usage ?? DEFAULT_CHOICE_METADATA.allowed_usage,
+            c.requires_hcp_version ?? false,
+            c.review_status ?? DEFAULT_CHOICE_METADATA.review_status,
+          ]
         );
       }
     }
@@ -357,7 +417,7 @@ export async function deleteUserData(uid: string) {
 export async function getQuestionsByQuiz(sessionId: string) {
   const result = await queryWithRetry(
     `SELECT q.*, 
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
+      COALESCE(json_agg(${buildChoiceJsonSql('c')} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
      FROM questions q
      JOIN quizzes qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
@@ -366,26 +426,26 @@ export async function getQuestionsByQuiz(sessionId: string) {
      ORDER BY q.question_order`,
     [sessionId]
   );
-  return result.rows;
+  return result.rows.map(hydrateQuestionRow);
 }
 
 export async function getQuestionById(questionId: string) {
   const result = await queryWithRetry(
     `SELECT q.*, 
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
+      COALESCE(json_agg(${buildChoiceJsonSql('c')} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
      FROM questions q
      LEFT JOIN choices c ON c.question_id = q.id
      WHERE q.id = $1
      GROUP BY q.id`,
     [questionId]
   );
-  return result.rows[0] || null;
+  return result.rows[0] ? hydrateQuestionRow(result.rows[0]) : null;
 }
 
 export async function getEntryQuestion(id: string) {
   const result = await queryWithRetry(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
+      COALESCE(json_agg(${buildChoiceJsonSql('c')} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
      FROM questions q
      JOIN quizzes qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
@@ -394,7 +454,7 @@ export async function getEntryQuestion(id: string) {
      GROUP BY q.id, qs.timer_seconds`,
     [id]
   );
-  return result.rows[0] || null;
+  return result.rows[0] ? hydrateQuestionRow(result.rows[0]) : null;
 }
 
 export async function createQuestion(data: {
@@ -403,6 +463,12 @@ export async function createQuestion(data: {
   question_order: number;
   question_text: string;
   node_name?: string;
+  intended_audience?: string;
+  presentation_mode?: string;
+  reading_level?: string | null;
+  jurisdiction_tags?: string[];
+  medical_review_version?: string | null;
+  legal_document_versions_required?: Record<string, string>;
   media_type?: 'image' | 'gif' | 'video';
   media_url?: string;
   media_path?: string;
@@ -416,14 +482,26 @@ export async function createQuestion(data: {
   try {
     await client.query('BEGIN');
     const questionId = data.id ?? randomUUID();
+    const metadata = normalizeQuestionMetadata(data);
     const result = await client.query(
-      `INSERT INTO questions (id, session_id, question_order, question_text, node_name, media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      `INSERT INTO questions (
+         id, session_id, question_order, question_text, node_name,
+         intended_audience, presentation_mode, reading_level, jurisdiction_tags,
+         medical_review_version, legal_document_versions_required,
+         media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11::jsonb, $12, $13, $14, $15, $16, $17, $18, $19)
        ON CONFLICT (id) DO UPDATE SET
          session_id = EXCLUDED.session_id,
          question_order = EXCLUDED.question_order,
          question_text = EXCLUDED.question_text,
          node_name = EXCLUDED.node_name,
+         intended_audience = EXCLUDED.intended_audience,
+         presentation_mode = EXCLUDED.presentation_mode,
+         reading_level = EXCLUDED.reading_level,
+         jurisdiction_tags = EXCLUDED.jurisdiction_tags,
+         medical_review_version = EXCLUDED.medical_review_version,
+         legal_document_versions_required = EXCLUDED.legal_document_versions_required,
          media_type = EXCLUDED.media_type,
          media_url = EXCLUDED.media_url,
          media_path = EXCLUDED.media_path,
@@ -434,7 +512,27 @@ export async function createQuestion(data: {
          node_type = EXCLUDED.node_type,
          updated_at = NOW()
        RETURNING *`,
-      [questionId, data.session_id, data.question_order, data.question_text, data.node_name || null, data.media_type || null, data.media_url || null, data.media_path || null, data.timer_override || null, data.is_entry_point || false, data.node_x || 0, data.node_y || 0, data.node_type || 'normal']
+      [
+        questionId,
+        data.session_id,
+        data.question_order,
+        data.question_text,
+        data.node_name || null,
+        metadata.intended_audience,
+        metadata.presentation_mode,
+        metadata.reading_level,
+        JSON.stringify(metadata.jurisdiction_tags),
+        metadata.medical_review_version,
+        JSON.stringify(metadata.legal_document_versions_required),
+        data.media_type || null,
+        data.media_url || null,
+        data.media_path || null,
+        data.timer_override || null,
+        data.is_entry_point || false,
+        data.node_x || 0,
+        data.node_y || 0,
+        data.node_type || 'normal',
+      ]
     );
     
     if (data.media_path) {
@@ -467,11 +565,98 @@ function normalizeChoiceScoreImpact(choice: {
   return Math.trunc(rawScoreImpact);
 }
 
+function parseStringArray(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((item): item is string => typeof item === 'string');
+}
+
+function parseRecord(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return Object.fromEntries(
+    Object.entries(raw).filter(
+      ([key, value]) => key.trim() && typeof value === 'string' && value.trim(),
+    ),
+  );
+}
+
+function buildChoiceJsonSql(alias: string) {
+  return `json_build_object(
+    'id', ${alias}.id,
+    'label', ${alias}.label,
+    'choice_text', ${alias}.choice_text,
+    'score_impact', ${alias}.score_impact,
+    'points', ${alias}.score_impact,
+    'explanation', ${alias}.explanation,
+    'behavior_meaning', ${alias}.behavior_meaning,
+    'vector_deltas', ${alias}.vector_deltas,
+    'clinical_tags', ${alias}.clinical_tags,
+    'confidence_weight', ${alias}.confidence_weight,
+    'allowed_usage', ${alias}.allowed_usage,
+    'requires_hcp_version', ${alias}.requires_hcp_version,
+    'review_status', ${alias}.review_status
+  )`;
+}
+
+function hydrateQuestionRow<T extends Record<string, unknown>>(row: T): T {
+  return {
+    ...row,
+    intended_audience:
+      typeof row.intended_audience === 'string'
+        ? row.intended_audience
+        : DEFAULT_QUESTION_METADATA.intended_audience,
+    presentation_mode:
+      typeof row.presentation_mode === 'string'
+        ? row.presentation_mode
+        : DEFAULT_QUESTION_METADATA.presentation_mode,
+    reading_level: typeof row.reading_level === 'string' ? row.reading_level : null,
+    jurisdiction_tags: parseStringArray(row.jurisdiction_tags),
+    medical_review_version:
+      typeof row.medical_review_version === 'string' ? row.medical_review_version : null,
+    legal_document_versions_required: parseRecord(row.legal_document_versions_required),
+    choices: Array.isArray(row.choices)
+      ? row.choices.map((choice) => {
+          const rawChoice = (choice ?? {}) as Record<string, unknown>;
+          const metadata = normalizeChoiceMetadata({
+            behavior_meaning:
+              typeof rawChoice.behavior_meaning === 'string' ? rawChoice.behavior_meaning : null,
+            vector_deltas:
+              rawChoice.vector_deltas && typeof rawChoice.vector_deltas === 'object'
+                ? (rawChoice.vector_deltas as Partial<Record<string, number>>)
+                : undefined,
+            clinical_tags: parseStringArray(rawChoice.clinical_tags),
+            confidence_weight:
+              typeof rawChoice.confidence_weight === 'number' ? rawChoice.confidence_weight : 1,
+            allowed_usage:
+              typeof rawChoice.allowed_usage === 'string'
+                ? (rawChoice.allowed_usage as AllowedUsage)
+                : DEFAULT_CHOICE_METADATA.allowed_usage,
+            requires_hcp_version: Boolean(rawChoice.requires_hcp_version),
+            review_status:
+              typeof rawChoice.review_status === 'string'
+                ? rawChoice.review_status
+                : DEFAULT_CHOICE_METADATA.review_status,
+          });
+
+          return {
+            ...rawChoice,
+            ...metadata,
+          };
+        })
+      : row.choices,
+  };
+}
+
 type GraphQuestionInput = {
   id?: string;
   question_order: number;
   question_text: string;
   node_name?: string | null;
+  intended_audience?: string;
+  presentation_mode?: string;
+  reading_level?: string | null;
+  jurisdiction_tags?: string[];
+  medical_review_version?: string | null;
+  legal_document_versions_required?: Record<string, string>;
   media_type?: 'image' | 'gif' | 'video' | null;
   media_url?: string | null;
   media_path?: string | null;
@@ -486,6 +671,13 @@ type GraphQuestionInput = {
     score_impact?: number;
     points?: number;
     explanation?: string | null;
+    behavior_meaning?: string | null;
+    vector_deltas?: Partial<Record<string, number>>;
+    clinical_tags?: string[];
+    confidence_weight?: number;
+    allowed_usage?: string;
+    requires_hcp_version?: boolean;
+    review_status?: string;
   }>;
 };
 
@@ -524,16 +716,28 @@ export async function replaceQuizGraph(
     for (const question of questions) {
       const sourceId = question.id ?? randomUUID();
       const questionId = sourceId && UUID_RE.test(sourceId) ? sourceId : randomUUID();
+      const questionMetadata = normalizeQuestionMetadata(question);
 
       await client.query(
-        `INSERT INTO questions (id, session_id, question_order, question_text, node_name, media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        `INSERT INTO questions (
+           id, session_id, question_order, question_text, node_name,
+           intended_audience, presentation_mode, reading_level, jurisdiction_tags,
+           medical_review_version, legal_document_versions_required,
+           media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11::jsonb, $12, $13, $14, $15, $16, $17, $18, $19)`,
         [
           questionId,
           sessionId,
           question.question_order,
           question.question_text,
           question.node_name ?? null,
+          questionMetadata.intended_audience,
+          questionMetadata.presentation_mode,
+          questionMetadata.reading_level,
+          JSON.stringify(questionMetadata.jurisdiction_tags),
+          questionMetadata.medical_review_version,
+          JSON.stringify(questionMetadata.legal_document_versions_required),
           question.media_type ?? null,
           question.media_url ?? null,
           question.media_path ?? null,
@@ -549,15 +753,27 @@ export async function replaceQuizGraph(
       newMediaPaths.push(question.media_path ?? null);
 
       for (const choice of question.choices ?? []) {
+        const choiceMetadata = normalizeChoiceMetadata(choice);
         await client.query(
-          `INSERT INTO choices (question_id, label, choice_text, score_impact, explanation)
-           VALUES ($1, $2, $3, $4, $5)`,
+          `INSERT INTO choices (
+             question_id, label, choice_text, score_impact, explanation,
+             behavior_meaning, vector_deltas, clinical_tags, confidence_weight,
+             allowed_usage, requires_hcp_version, review_status
+           )
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12)`,
           [
             questionId,
             choice.label,
             choice.choice_text,
             normalizeChoiceScoreImpact(choice),
             choice.explanation ?? null,
+            choiceMetadata.behavior_meaning,
+            JSON.stringify(choiceMetadata.vector_deltas),
+            JSON.stringify(choiceMetadata.clinical_tags),
+            choiceMetadata.confidence_weight,
+            choiceMetadata.allowed_usage,
+            choiceMetadata.requires_hcp_version,
+            choiceMetadata.review_status,
           ],
         );
       }
@@ -693,20 +909,52 @@ export async function upsertChoices(questionId: string, choices: Array<{
   score_impact?: number;
   points?: number;
   explanation?: string;
+  behavior_meaning?: string | null;
+  vector_deltas?: Partial<Record<string, number>>;
+  clinical_tags?: string[];
+  confidence_weight?: number;
+  allowed_usage?: string;
+  requires_hcp_version?: boolean;
+  review_status?: string;
 }>) {
   // Delete existing choices and insert new ones
   await queryWithRetry('DELETE FROM choices WHERE question_id = $1', [questionId], {
     allowWriteRetry: true,
   });
   for (const choice of choices) {
+    const metadata = normalizeChoiceMetadata(choice);
     await queryWithRetry(
-      `INSERT INTO choices (question_id, label, choice_text, score_impact, explanation)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO choices (
+         question_id, label, choice_text, score_impact, explanation,
+         behavior_meaning, vector_deltas, clinical_tags, confidence_weight,
+         allowed_usage, requires_hcp_version, review_status
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12)
        ON CONFLICT (question_id, label) DO UPDATE SET
          choice_text = EXCLUDED.choice_text,
          score_impact = EXCLUDED.score_impact,
-         explanation = EXCLUDED.explanation`,
-      [questionId, choice.label, choice.choice_text, normalizeChoiceScoreImpact(choice), choice.explanation ?? null],
+         explanation = EXCLUDED.explanation,
+         behavior_meaning = EXCLUDED.behavior_meaning,
+         vector_deltas = EXCLUDED.vector_deltas,
+         clinical_tags = EXCLUDED.clinical_tags,
+         confidence_weight = EXCLUDED.confidence_weight,
+         allowed_usage = EXCLUDED.allowed_usage,
+         requires_hcp_version = EXCLUDED.requires_hcp_version,
+         review_status = EXCLUDED.review_status`,
+      [
+        questionId,
+        choice.label,
+        choice.choice_text,
+        normalizeChoiceScoreImpact(choice),
+        choice.explanation ?? null,
+        metadata.behavior_meaning,
+        JSON.stringify(metadata.vector_deltas),
+        JSON.stringify(metadata.clinical_tags),
+        metadata.confidence_weight,
+        metadata.allowed_usage,
+        metadata.requires_hcp_version,
+        metadata.review_status,
+      ],
       { allowWriteRetry: true }
     );
   }
@@ -744,7 +992,7 @@ export async function saveConnections(sessionId: string, connections: Array<{ fr
 export async function getNextQuestion(fromQuestionId: string, choiceLabel: string) {
   const result = await queryWithRetry(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
-      json_agg(json_build_object('id', c.id, 'label', c.label, 'choice_text', c.choice_text, 'score_impact', c.score_impact, 'points', c.score_impact, 'explanation', c.explanation) ORDER BY c.label) as choices
+      COALESCE(json_agg(${buildChoiceJsonSql('c')} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
      FROM question_connections qc
      JOIN questions q ON q.id = qc.to_question_id
      JOIN quizzes qs ON qs.id = q.session_id
@@ -753,7 +1001,7 @@ export async function getNextQuestion(fromQuestionId: string, choiceLabel: strin
      GROUP BY q.id, qs.timer_seconds`,
     [fromQuestionId, choiceLabel]
   );
-  return result.rows[0] || null;
+  return result.rows[0] ? hydrateQuestionRow(result.rows[0]) : null;
 }
 
 // ===================== User Answers =====================
@@ -767,20 +1015,63 @@ export async function saveUserAnswer(data: {
   question_id: string;
   chosen_label: string;
   time_taken_ms: number;
-}): Promise<{ id: string; points_earned: number }> {
+}): Promise<{
+  id: string;
+  points_earned: number;
+  vector_scores: HcpVectorMap;
+  behavior_meaning: string | null;
+  allowed_usage: AllowedUsage;
+}> {
   // Look up the canonical points for the chosen choice
   const choiceResult = await pool.query(
-    `SELECT score_impact FROM choices WHERE question_id = $1 AND label = $2`,
+    `SELECT score_impact, vector_deltas, behavior_meaning, allowed_usage, confidence_weight
+     FROM choices
+     WHERE question_id = $1 AND label = $2`,
     [data.question_id, data.chosen_label],
   );
-  const points = (choiceResult.rows[0]?.score_impact as number | undefined) ?? 0;
+  const choice = choiceResult.rows[0] ?? {};
+  const points = (choice.score_impact as number | undefined) ?? 0;
+  const confidence = typeof choice.confidence_weight === 'number' ? choice.confidence_weight : 1;
+  const baseVector = normalizeVectorMap(
+    choice.vector_deltas && typeof choice.vector_deltas === 'object'
+      ? (choice.vector_deltas as Partial<Record<string, number>>)
+      : undefined,
+  );
+  const weightedVector = emptyHcpVectorMap();
+  for (const key of Object.keys(baseVector) as Array<keyof HcpVectorMap>) {
+    weightedVector[key] = Number((baseVector[key] * confidence).toFixed(4));
+  }
+  const behaviorMeaning = typeof choice.behavior_meaning === 'string' ? choice.behavior_meaning : null;
+  const allowedUsage =
+    typeof choice.allowed_usage === 'string'
+      ? (choice.allowed_usage as AllowedUsage)
+      : DEFAULT_CHOICE_METADATA.allowed_usage;
 
   const result = await pool.query(
-    `INSERT INTO user_answers (session_id, user_id, question_id, chosen_label, time_taken_ms, utility_score)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-    [data.session_id, data.user_id, data.question_id, data.chosen_label, data.time_taken_ms, points]
+    `INSERT INTO user_answers (
+       session_id, user_id, question_id, chosen_label, time_taken_ms,
+       utility_score, vector_scores, behavior_meaning_snapshot, allowed_usage_snapshot
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9) RETURNING id`,
+    [
+      data.session_id,
+      data.user_id,
+      data.question_id,
+      data.chosen_label,
+      data.time_taken_ms,
+      points,
+      JSON.stringify(weightedVector),
+      behaviorMeaning,
+      allowedUsage,
+    ]
   );
-  return { id: result.rows[0].id, points_earned: points };
+  return {
+    id: result.rows[0].id,
+    points_earned: points,
+    vector_scores: weightedVector,
+    behavior_meaning: behaviorMeaning,
+    allowed_usage: allowedUsage,
+  };
 }
 
 export async function getUserCumulativeScore(sessionId: string, userId: string): Promise<number> {
@@ -835,11 +1126,44 @@ export async function completeSession(data: {
     else streak = 0;
   }
 
+  const vectorsResult = await pool.query(
+    `SELECT vector_scores, allowed_usage_snapshot FROM (
+       SELECT DISTINCT ON (question_id) vector_scores, allowed_usage_snapshot, answered_at
+       FROM user_answers
+       WHERE session_id = $1 AND user_id = $2
+       ORDER BY question_id, answered_at DESC
+     ) latest_answers`,
+    [data.session_id, data.user_id],
+  );
+
+  const rawVector = accumulateVectors(
+    vectorsResult.rows.map((row) =>
+      row.vector_scores && typeof row.vector_scores === 'object'
+        ? (row.vector_scores as Partial<Record<string, number>>)
+        : undefined,
+    ),
+  );
+  const normalizedVector = normalizeProfileVectors(rawVector);
+  const archetypeId = classifyArchetype(normalizedVector);
+  const usageSet = new Set(
+    vectorsResult.rows.map((row) =>
+      typeof row.allowed_usage_snapshot === 'string'
+        ? row.allowed_usage_snapshot
+        : DEFAULT_CHOICE_METADATA.allowed_usage,
+    ),
+  );
+  const insightClassification = usageSet.has('crm_eligible')
+    ? 'identified'
+    : usageSet.has('pseudonymous_profile')
+      ? 'pseudonymous'
+      : 'aggregate';
+
   await pool.query(
     `INSERT INTO leaderboard_entries
        (session_id, user_id, user_display_name, user_photo_url,
-        total_score, correct_count, incorrect_count, unanswered_count, streak, total_time_ms)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9)
+        total_score, correct_count, incorrect_count, unanswered_count, streak, total_time_ms,
+        profile_vector_scores, normalized_vector_scores, archetype_id, insight_classification)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10::jsonb, $11::jsonb, $12, $13)
      ON CONFLICT (session_id, user_id)
      DO UPDATE SET
        user_display_name = EXCLUDED.user_display_name,
@@ -850,10 +1174,18 @@ export async function completeSession(data: {
        unanswered_count  = EXCLUDED.unanswered_count,
        streak            = EXCLUDED.streak,
        total_time_ms     = EXCLUDED.total_time_ms,
+       profile_vector_scores = EXCLUDED.profile_vector_scores,
+       normalized_vector_scores = EXCLUDED.normalized_vector_scores,
+       archetype_id = EXCLUDED.archetype_id,
+       insight_classification = EXCLUDED.insight_classification,
        completed_at      = NOW()`,
     [
       data.session_id, data.user_id, data.user_display_name, data.user_photo_url ?? null,
       row.total_score, row.positive_count, row.nonpositive_count, best, row.total_time_ms,
+      JSON.stringify(rawVector),
+      JSON.stringify(normalizedVector),
+      archetypeId,
+      insightClassification,
     ],
   );
 
@@ -866,7 +1198,15 @@ export async function completeSession(data: {
     [data.session_id, data.user_id],
   );
 
-  return { total_score: row.total_score as number, streak: best, total_time_ms: row.total_time_ms as number };
+  return {
+    total_score: row.total_score as number,
+    streak: best,
+    total_time_ms: row.total_time_ms as number,
+    profile_vector_scores: rawVector,
+    normalized_vector_scores: normalizedVector,
+    archetype_id: archetypeId,
+    insight_classification: insightClassification,
+  };
 }
 
 // Personal history across all sessions a user has played. Used by the
@@ -980,14 +1320,48 @@ export async function upsertLeaderboardEntry(data: {
   unanswered_count: number;
   streak: number;
   total_time_ms: number;
+  profile_vector_scores?: HcpVectorMap;
+  normalized_vector_scores?: HcpVectorMap;
+  archetype_id?: string | null;
+  insight_classification?: 'aggregate' | 'pseudonymous' | 'identified';
 }) {
   const result = await pool.query(
-    `INSERT INTO leaderboard_entries (session_id, user_id, user_display_name, user_photo_url, total_score, correct_count, incorrect_count, unanswered_count, streak, total_time_ms)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    `INSERT INTO leaderboard_entries (
+       session_id, user_id, user_display_name, user_photo_url, total_score,
+       correct_count, incorrect_count, unanswered_count, streak, total_time_ms,
+       profile_vector_scores, normalized_vector_scores, archetype_id, insight_classification
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, $13, $14)
      ON CONFLICT (session_id, user_id) 
-     DO UPDATE SET total_score = $5, correct_count = $6, incorrect_count = $7, unanswered_count = $8, streak = $9, total_time_ms = $10, completed_at = NOW()
+     DO UPDATE SET
+       total_score = $5,
+       correct_count = $6,
+       incorrect_count = $7,
+       unanswered_count = $8,
+       streak = $9,
+       total_time_ms = $10,
+       profile_vector_scores = $11::jsonb,
+       normalized_vector_scores = $12::jsonb,
+       archetype_id = $13,
+       insight_classification = $14,
+       completed_at = NOW()
      RETURNING *`,
-    [data.session_id, data.user_id, data.user_display_name, data.user_photo_url || null, data.total_score, data.correct_count, data.incorrect_count, data.unanswered_count, data.streak, data.total_time_ms]
+    [
+      data.session_id,
+      data.user_id,
+      data.user_display_name,
+      data.user_photo_url || null,
+      data.total_score,
+      data.correct_count,
+      data.incorrect_count,
+      data.unanswered_count,
+      data.streak,
+      data.total_time_ms,
+      JSON.stringify(data.profile_vector_scores ?? emptyHcpVectorMap()),
+      JSON.stringify(data.normalized_vector_scores ?? emptyHcpVectorMap()),
+      data.archetype_id ?? null,
+      data.insight_classification ?? 'aggregate',
+    ]
   );
   return result.rows[0];
 }
@@ -1046,6 +1420,12 @@ export async function getSessionAnalytics(sessionId: string) {
        q.question_text,
        q.question_order,
        q.node_type,
+       q.intended_audience,
+       q.presentation_mode,
+       q.reading_level,
+       q.jurisdiction_tags,
+       q.medical_review_version,
+       q.legal_document_versions_required,
        (SELECT COUNT(*) FROM user_answers WHERE question_id = q.id AND session_id = $1)::int as total_responses,
        (SELECT COALESCE(AVG(time_taken_ms), 0)::int FROM user_answers WHERE question_id = q.id AND session_id = $1) as avg_time_ms,
        COALESCE((
@@ -1053,7 +1433,12 @@ export async function getSessionAnalytics(sessionId: string) {
            'label', c.label,
            'text', c.choice_text,
            'is_correct', (c.score_impact > 0),
-           'count', (SELECT COUNT(*) FROM user_answers WHERE question_id = q.id AND session_id = $1 AND chosen_label = c.label)::int
+           'count', (SELECT COUNT(*) FROM user_answers WHERE question_id = q.id AND session_id = $1 AND chosen_label = c.label)::int,
+           'behavior_meaning', c.behavior_meaning,
+           'vector_deltas', c.vector_deltas,
+           'clinical_tags', c.clinical_tags,
+           'allowed_usage', c.allowed_usage,
+           'review_status', c.review_status
          ) ORDER BY c.label)
          FROM choices c
          WHERE c.question_id = q.id
@@ -1064,9 +1449,95 @@ export async function getSessionAnalytics(sessionId: string) {
     [actualId]
   );
 
+  const leaderboard = leaderboardResult.rows.map((row) => ({
+    ...row,
+    profile_vector_scores: normalizeVectorMap(
+      row.profile_vector_scores && typeof row.profile_vector_scores === 'object'
+        ? (row.profile_vector_scores as Partial<Record<string, number>>)
+        : undefined,
+    ),
+    normalized_vector_scores: normalizeVectorMap(
+      row.normalized_vector_scores && typeof row.normalized_vector_scores === 'object'
+        ? (row.normalized_vector_scores as Partial<Record<string, number>>)
+        : undefined,
+    ),
+  }));
+
+  const questions = questionsResult.rows.map((row) => {
+    const hydrated = hydrateQuestionRow({
+      ...row,
+      choices: Array.isArray(row.choices) ? row.choices : [],
+    });
+    const totalResponses = (row.total_responses as number) ?? 0;
+    const maxChoiceCount = Array.isArray(hydrated.choices)
+      ? Math.max(
+          0,
+          ...hydrated.choices.map((choice: Record<string, unknown>) => Number(choice.count ?? 0)),
+        )
+      : 0;
+    const divergenceRate =
+      totalResponses > 0 ? Number((1 - maxChoiceCount / totalResponses).toFixed(4)) : 0;
+    const nodeFrictionScore = Math.round(
+      Math.min(100, divergenceRate * 60 + Math.min(40, ((row.avg_time_ms as number) ?? 0) / 1500)),
+    );
+
+    return {
+      ...hydrated,
+      total_responses: totalResponses,
+      avg_time_ms: (row.avg_time_ms as number) ?? 0,
+      divergence_rate: divergenceRate,
+      node_friction_score: nodeFrictionScore,
+      content_quality_flag:
+        hydrated.presentation_mode === 'distinct'
+          ? 'distinct'
+          : hydrated.intended_audience === 'hcp' && !hydrated.medical_review_version
+            ? 'needs_medical_review'
+            : 'shared_ready',
+    };
+  });
+
+  const vectorSummary = emptyHcpVectorMap();
+  const archetypeCounts: Record<string, number> = {};
+
+  for (const entry of leaderboard) {
+    const vectors = normalizeVectorMap(entry.normalized_vector_scores);
+    for (const key of Object.keys(vectorSummary) as Array<keyof HcpVectorMap>) {
+      vectorSummary[key] += vectors[key];
+    }
+    const archetype = typeof entry.archetype_id === 'string' ? entry.archetype_id : 'unclassified';
+    archetypeCounts[archetype] = (archetypeCounts[archetype] ?? 0) + 1;
+  }
+
+  const playerCount = leaderboard.length || 1;
+  for (const key of Object.keys(vectorSummary) as Array<keyof HcpVectorMap>) {
+    vectorSummary[key] = Math.round(vectorSummary[key] / playerCount);
+  }
+
+  const insights = {
+    audience_mode_summary: {
+      shared: questions.filter((q) => q.presentation_mode === 'shared').length,
+      adapted: questions.filter((q) => q.presentation_mode === 'adapted').length,
+      distinct: questions.filter((q) => q.presentation_mode === 'distinct').length,
+    },
+    archetype_distribution: Object.entries(archetypeCounts)
+      .map(([archetype_id, count]) => ({ archetype_id, count }))
+      .sort((a, b) => b.count - a.count),
+    vector_summary: vectorSummary,
+    dominant_vector: mostExpressiveVector(vectorSummary),
+    highest_friction_nodes: questions
+      .map((question) => ({
+        question_id: question.id,
+        question_text: question.question_text,
+        node_friction_score: question.node_friction_score,
+      }))
+      .sort((a, b) => b.node_friction_score - a.node_friction_score)
+      .slice(0, 5),
+  };
+
   return {
     session,
-    leaderboard: leaderboardResult.rows,
-    questions: questionsResult.rows
+    leaderboard,
+    questions,
+    insights,
   };
 }

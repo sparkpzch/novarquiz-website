@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export const TOS_VERSION = '2026-05-19';
 export const PRIVACY_VERSION = '2026-05-19';
+export const ANALYTICS_NOTICE_VERSION = '2026-05-25';
+export const PROFILING_NOTICE_VERSION = '2026-05-25';
 
 type Tab = 'terms' | 'privacy';
 

@@ -25,9 +25,28 @@ const AnswerBody = z.object({
 function sanitizeQuestion(question: Record<string, unknown> | null) {
   if (!question) return question;
   const choices = Array.isArray(question.choices)
-    ? question.choices.map(({ score_impact: _, explanation: __, ...rest }: Record<string, unknown>) => rest)
+    ? question.choices.map((choice) => {
+        const rest = { ...(choice as Record<string, unknown>) };
+        delete rest.score_impact;
+        delete rest.explanation;
+        delete rest.behavior_meaning;
+        delete rest.vector_deltas;
+        delete rest.clinical_tags;
+        delete rest.confidence_weight;
+        delete rest.allowed_usage;
+        delete rest.requires_hcp_version;
+        delete rest.review_status;
+        return rest;
+      })
     : question.choices;
-  return { ...question, choices };
+  const restQuestion = { ...question };
+  delete restQuestion.intended_audience;
+  delete restQuestion.presentation_mode;
+  delete restQuestion.reading_level;
+  delete restQuestion.jurisdiction_tags;
+  delete restQuestion.medical_review_version;
+  delete restQuestion.legal_document_versions_required;
+  return { ...restQuestion, choices };
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {

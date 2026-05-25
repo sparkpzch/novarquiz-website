@@ -15,6 +15,13 @@ import { ref, deleteObject } from 'firebase/storage';
 import { storage } from '@/lib/firebase/config';
 import { useFFmpeg } from '@/lib/hooks/useFFmpeg';
 import AutoPlayVideo from '@/components/ui/AutoPlayVideo';
+import {
+  ALLOWED_USAGE_OPTIONS,
+  HCP_VECTOR_KEYS,
+  PRESENTATION_MODES,
+  REVIEW_STATUS_OPTIONS,
+  AUDIENCE_OPTIONS,
+} from '@/lib/analytics/hcp';
 import type { NormalNodeData } from './NormalNode';
 import type { SituationNodeData } from './SituationNode';
 import type { EndNodeData } from './EndNode';
@@ -69,6 +76,33 @@ const SCORE_PRESETS = [
   { label: '-5', value: -5, color: '#fca5a5' },
   { label: '-10', value: -10, color: '#fb7185' },
 ];
+
+function parseCommaSeparated(value: string) {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function formatKeyValueLines(value: Record<string, string> | undefined) {
+  return Object.entries(value ?? {})
+    .map(([key, val]) => `${key}:${val}`)
+    .join('\n');
+}
+
+function parseKeyValueLines(value: string) {
+  return Object.fromEntries(
+    value
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [key, ...rest] = line.split(':');
+        return [key?.trim() ?? '', rest.join(':').trim()];
+      })
+      .filter(([key, val]) => key && val),
+  );
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -419,6 +453,78 @@ export function LeftInspector({
           />
         </div>
 
+        <Divider />
+
+        <div style={{ marginBottom: 12 }}>
+          <FieldLabel hint="Public vs HCP audience">Intended Audience</FieldLabel>
+          <select
+            value={draft.intended_audience ?? 'public'}
+            onChange={e => patch({ intended_audience: e.target.value as NodeData['intended_audience'] })}
+            style={selectStyle}
+          >
+            {AUDIENCE_OPTIONS.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <FieldLabel hint="How this question is shown">Presentation Mode</FieldLabel>
+          <select
+            value={draft.presentation_mode ?? 'shared'}
+            onChange={e => patch({ presentation_mode: e.target.value as NodeData['presentation_mode'] })}
+            style={selectStyle}
+          >
+            {PRESENTATION_MODES.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <FieldLabel hint="Optional">Reading Level</FieldLabel>
+          <input
+            type="text"
+            value={draft.reading_level ?? ''}
+            onChange={e => patch({ reading_level: e.target.value || null })}
+            placeholder="e.g. general public / clinician"
+            style={inputStyle}
+          />
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <FieldLabel hint="Comma separated">Jurisdiction Tags</FieldLabel>
+          <input
+            type="text"
+            value={(draft.jurisdiction_tags ?? []).join(', ')}
+            onChange={e => patch({ jurisdiction_tags: parseCommaSeparated(e.target.value) })}
+            placeholder="GLOBAL, TH"
+            style={inputStyle}
+          />
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <FieldLabel hint="Required for HCP/distinct content">Medical Review Version</FieldLabel>
+          <input
+            type="text"
+            value={draft.medical_review_version ?? ''}
+            onChange={e => patch({ medical_review_version: e.target.value || null })}
+            placeholder="e.g. med-2026-01"
+            style={inputStyle}
+          />
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <FieldLabel hint="One per line: doc:version">Legal Document Versions</FieldLabel>
+          <textarea
+            rows={3}
+            value={formatKeyValueLines(draft.legal_document_versions_required)}
+            onChange={e => patch({ legal_document_versions_required: parseKeyValueLines(e.target.value) })}
+            placeholder={'terms:2026-05-19\nprivacy:2026-05-19'}
+            style={{ ...textareaStyle, fontSize: 10 }}
+          />
+        </div>
+
         {/* ── Entry point toggle ── */}
         {!isEnd && (
           <>
@@ -560,6 +666,115 @@ export function LeftInspector({
                         placeholder="Why does this choice matter? (Thai or English)"
                         style={{ ...textareaStyle, fontSize: 10, resize: 'none', overflow: 'hidden' }}
                       />
+                    </div>
+
+                    <div style={{ marginBottom: 6 }}>
+                      <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                        Behavior Meaning
+                      </div>
+                      <textarea
+                        rows={2}
+                        value={c.behavior_meaning ?? ''}
+                        onChange={e => updateChoice({ behavior_meaning: e.target.value || null })}
+                        placeholder="What does this choice represent clinically or behaviorally?"
+                        style={{ ...textareaStyle, fontSize: 10 }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 6 }}>
+                      <div>
+                        <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                          Allowed Usage
+                        </div>
+                        <select
+                          value={c.allowed_usage ?? 'aggregate_only'}
+                          onChange={e => updateChoice({ allowed_usage: e.target.value as typeof c.allowed_usage })}
+                          style={selectStyle}
+                        >
+                          {ALLOWED_USAGE_OPTIONS.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                          Review Status
+                        </div>
+                        <select
+                          value={c.review_status ?? 'draft'}
+                          onChange={e => updateChoice({ review_status: e.target.value as typeof c.review_status })}
+                          style={selectStyle}
+                        >
+                          {REVIEW_STATUS_OPTIONS.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 6 }}>
+                      <div>
+                        <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                          Confidence Weight
+                        </div>
+                        <input
+                          type="number"
+                          min={0}
+                          max={3}
+                          step={0.1}
+                          value={c.confidence_weight ?? 1}
+                          onChange={e => updateChoice({ confidence_weight: Number(e.target.value) || 0 })}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'end' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#35527e', fontSize: 10, fontWeight: 600 }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(c.requires_hcp_version)}
+                            onChange={e => updateChoice({ requires_hcp_version: e.target.checked })}
+                          />
+                          Requires HCP version
+                        </label>
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: 6 }}>
+                      <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                        Clinical Tags
+                      </div>
+                      <input
+                        type="text"
+                        value={(c.clinical_tags ?? []).join(', ')}
+                        onChange={e => updateChoice({ clinical_tags: parseCommaSeparated(e.target.value) })}
+                        placeholder="guideline, access, adherence"
+                        style={inputStyle}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: 6 }}>
+                      <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                        Vector Deltas
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        {HCP_VECTOR_KEYS.map((key) => (
+                          <label key={key} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <span style={{ fontSize: 9, color: '#35527e', fontWeight: 700 }}>{key}</span>
+                            <input
+                              type="number"
+                              step={0.1}
+                              value={c.vector_deltas?.[key] ?? 0}
+                              onChange={e => updateChoice({
+                                vector_deltas: {
+                                  ...(c.vector_deltas ?? {}),
+                                  [key]: Number(e.target.value) || 0,
+                                },
+                              })}
+                              style={inputStyle}
+                            />
+                          </label>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Routing */}
