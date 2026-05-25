@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
+import { DEFAULT_CHOICE_METADATA } from '@/lib/analytics/hcp';
+import type { Choice } from '@/lib/types';
 
 const StartBody = z.object({
   action: z.literal('start'),
@@ -15,13 +17,10 @@ const AnswerBody = z.object({
   chosen_label: z.string().min(1).max(10),
   time_taken_ms: z.number().int().min(0).max(300_000),
   is_guest: z.boolean().optional(),
-  display_name: z.string().max(100).optional(),
-  photo_url: z.string().url().max(500).optional().nullable(),
 });
 
-// Strip score_impact and explanation from choices so the answer key is never
-// exposed to clients. The server computes scores in saveUserAnswer using the
-// DB value; clients never need to see score_impact.
+// Strip answer-key and profiling fields from player-facing question payloads.
+// Choice outcomes are returned only after a player answers via POST.
 function sanitizeQuestion(question: Record<string, unknown> | null) {
   if (!question) return question;
   const choices = Array.isArray(question.choices)
@@ -102,7 +101,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     const parsed = AnswerBody.safeParse(raw);
     if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 
-    if (parsed.data.is_guest) return NextResponse.json({ is_guest: true });
+    if (parsed.data.is_guest) {
+      const question = await getQuestionById(parsed.data.question_id);
+      const selectedChoice = question?.choices?.find(
+        (choice: Choice) => choice.label === parsed.data.chosen_label,
+      );
+      return NextResponse.json({
+        is_guest: true,
+        points_earned: selectedChoice?.score_impact ?? 0,
+        explanation: selectedChoice?.explanation ?? null,
+        behavior_meaning: selectedChoice?.behavior_meaning ?? null,
+        allowed_usage: selectedChoice?.allowed_usage ?? DEFAULT_CHOICE_METADATA.allowed_usage,
+      });
+    }
 
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -120,13 +131,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     void (async () => {
       try {
         const cumScore = await getUserCumulativeScore(sessionId, user.uid);
-        const displayName = parsed.data.display_name?.replace(/<[^>]*>/g, '').trim().slice(0, 100) || 'Anonymous';
-        const label = ''; // currentQuestionLabel not needed server-side
         await adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).update({
           score: cumScore,
-          displayName,
+          displayName: 'Player',
           currentQuestionId: parsed.data.question_id,
-          currentQuestionLabel: label,
+          currentQuestionLabel: '',
           updatedAt: Date.now(),
         });
       } catch { /* non-fatal — live leaderboard degrades gracefully */ }

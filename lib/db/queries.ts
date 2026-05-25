@@ -1200,6 +1200,7 @@ export async function saveUserAnswer(data: {
   id: string;
   points_earned: number;
   vector_scores: HcpVectorMap;
+  explanation: string | null;
   behavior_meaning: string | null;
   allowed_usage: AllowedUsage;
 }> {
@@ -1207,14 +1208,15 @@ export async function saveUserAnswer(data: {
   // Look up the canonical points for the chosen choice
   const choiceResult = await pool.query(
     layered
-      ? `SELECT score_impact, vector_deltas, behavior_meaning, allowed_usage, confidence_weight
+      ? `SELECT score_impact, explanation, vector_deltas, behavior_meaning, allowed_usage, confidence_weight
          FROM choices
          WHERE question_id = $1 AND label = $2`
-      : `SELECT score_impact FROM choices WHERE question_id = $1 AND label = $2`,
+      : `SELECT score_impact, explanation FROM choices WHERE question_id = $1 AND label = $2`,
     [data.question_id, data.chosen_label],
   );
   const choice = choiceResult.rows[0] ?? {};
   const points = (choice.score_impact as number | undefined) ?? 0;
+  const explanation = typeof choice.explanation === 'string' ? choice.explanation : null;
   const confidence = typeof choice.confidence_weight === 'number' ? choice.confidence_weight : 1;
   const baseVector = normalizeVectorMap(
     choice.vector_deltas && typeof choice.vector_deltas === 'object'
@@ -1265,6 +1267,7 @@ export async function saveUserAnswer(data: {
     id: result.rows[0].id,
     points_earned: points,
     vector_scores: weightedVector,
+    explanation,
     behavior_meaning: behaviorMeaning,
     allowed_usage: allowedUsage,
   };
@@ -1686,9 +1689,9 @@ export async function getSessionAnalytics(sessionId: string) {
          SELECT json_agg(json_build_object(
            'label', c.label,
            'text', c.choice_text,
-           'is_correct', (c.score_impact > 0),
+           'score_impact', c.score_impact,
            'count', (SELECT COUNT(*) FROM user_answers WHERE question_id = q.id AND session_id = $1 AND chosen_label = c.label)::int
-           ${layered ? ", 'behavior_meaning', c.behavior_meaning, 'vector_deltas', c.vector_deltas, 'clinical_tags', c.clinical_tags, 'allowed_usage', c.allowed_usage, 'review_status', c.review_status" : ''}
+           ${layered ? ", 'behavior_meaning', c.behavior_meaning, 'vector_deltas', c.vector_deltas, 'clinical_tags', c.clinical_tags, 'confidence_weight', c.confidence_weight, 'allowed_usage', c.allowed_usage, 'review_status', c.review_status" : ''}
          ) ORDER BY c.label)
          FROM choices c
          WHERE c.question_id = q.id
