@@ -4,7 +4,6 @@ import type {
   ConsentPurposes,
   HcpVectorMap,
   IntendedAudience,
-  PresentationMode,
   ReviewStatus,
 } from '../analytics/hcp';
 
@@ -27,7 +26,7 @@ export interface Quiz {
   avg_score?: number;
   creator_name?: string;
   intended_audience?: IntendedAudience;
-  presentation_mode?: PresentationMode;
+  presentation_mode?: string;
   reading_level?: string | null;
   jurisdiction_tags?: string[];
   medical_review_version?: string | null;
@@ -53,7 +52,7 @@ export interface Question {
   updated_at: string;
   choices: Choice[];
   intended_audience?: IntendedAudience;
-  presentation_mode?: PresentationMode;
+  presentation_mode?: string;
   reading_level?: string | null;
   jurisdiction_tags?: string[];
   medical_review_version?: string | null;

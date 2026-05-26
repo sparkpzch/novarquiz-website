@@ -27,7 +27,6 @@ export async function POST(request: NextRequest) {
   const consentPurposes = {
     platform_account: body?.consent_purposes?.platform_account !== false,
     analytics_profiling: body?.consent_purposes?.analytics_profiling !== false,
-    crm_linkage: body?.consent_purposes?.crm_linkage === true,
     marketing_follow_up: body?.consent_purposes?.marketing_follow_up === true,
   };
 

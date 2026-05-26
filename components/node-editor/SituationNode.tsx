@@ -2,13 +2,13 @@
 
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import type { IntendedAudience, PresentationMode } from '@/lib/analytics/hcp';
+import type { IntendedAudience } from '@/lib/analytics/hcp';
 
 export type SituationNodeData = {
   node_name: string | null;
   question_text: string;
   intended_audience: IntendedAudience;
-  presentation_mode: PresentationMode;
+  presentation_mode?: string;
   reading_level: string | null;
   jurisdiction_tags: string[];
   medical_review_version: string | null;

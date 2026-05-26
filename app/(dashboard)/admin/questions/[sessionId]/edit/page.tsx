@@ -71,7 +71,7 @@ function serializeGraph(nodes: AppNode[], edges: AppEdge[]) {
         node_name: data.node_name ?? null,
         // Sensible defaults for enterprise fields
         intended_audience: data.intended_audience || "public",
-        presentation_mode: data.presentation_mode || "shared",
+        presentation_mode: "shared",
         reading_level: data.reading_level || null,
         jurisdiction_tags: (data.jurisdiction_tags?.length) ? data.jurisdiction_tags : ["GLOBAL"],
         medical_review_version: data.medical_review_version || null,
@@ -129,7 +129,7 @@ function toFlowNodes(questions: Question[]): AppNode[] {
       node_name: q.node_name ?? null,
       question_text: q.question_text,
       intended_audience: q.intended_audience ?? "public",
-      presentation_mode: q.presentation_mode ?? "shared",
+      presentation_mode: "shared",
       reading_level: q.reading_level ?? null,
       jurisdiction_tags: q.jurisdiction_tags ?? [],
       medical_review_version: q.medical_review_version ?? null,

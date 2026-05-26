@@ -27,10 +27,10 @@ function validateGraph(nodes: AppNode[]) {
       return "Every node needs legal document version references.";
     }
     if (
-      (data.intended_audience === "hcp" || data.presentation_mode === "distinct") &&
+      data.intended_audience === "hcp" &&
       !data.medical_review_version
     ) {
-      return "HCP or distinct nodes need a medical review version.";
+      return "HCP nodes need a medical review version.";
     }
 
     if (node.type === "normalNode") {
@@ -70,7 +70,7 @@ function serializeGraph(nodes: AppNode[], edges: AppEdge[]) {
         question_text: data.question_text,
         node_name: data.node_name ?? null,
         intended_audience: data.intended_audience,
-        presentation_mode: data.presentation_mode,
+        presentation_mode: "shared",
         reading_level: data.reading_level,
         jurisdiction_tags: data.jurisdiction_tags,
         medical_review_version: data.medical_review_version,

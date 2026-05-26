@@ -408,7 +408,7 @@ export async function duplicateQuiz(sourceIdOrSlug: string, createdBy: string, i
               q.question_text,
               q.node_name,
               q.intended_audience ?? DEFAULT_QUESTION_METADATA.intended_audience,
-              q.presentation_mode ?? DEFAULT_QUESTION_METADATA.presentation_mode,
+              'shared',
               q.reading_level ?? null,
               JSON.stringify(q.jurisdiction_tags ?? []),
               q.medical_review_version ?? null,
@@ -690,7 +690,7 @@ export async function createQuestion(data: {
             data.question_text,
             data.node_name || null,
             metadata.intended_audience,
-            metadata.presentation_mode,
+            'shared',
             metadata.reading_level,
             JSON.stringify(metadata.jurisdiction_tags),
             metadata.medical_review_version,
@@ -804,7 +804,7 @@ function hydrateQuestionRow<T extends Record<string, unknown>>(row: T): T {
     presentation_mode:
       typeof row.presentation_mode === 'string'
         ? row.presentation_mode
-        : DEFAULT_QUESTION_METADATA.presentation_mode,
+        : 'shared',
     reading_level: typeof row.reading_level === 'string' ? row.reading_level : null,
     jurisdiction_tags: parseStringArray(row.jurisdiction_tags),
     medical_review_version:
@@ -938,7 +938,7 @@ export async function replaceQuizGraph(
               question.question_text,
               question.node_name ?? null,
               questionMetadata.intended_audience,
-              questionMetadata.presentation_mode,
+              'shared',
               questionMetadata.reading_level,
               JSON.stringify(questionMetadata.jurisdiction_tags),
               questionMetadata.medical_review_version,
@@ -1433,11 +1433,9 @@ export async function completeSession(data: {
           : DEFAULT_CHOICE_METADATA.allowed_usage,
       ),
     );
-    insightClassification = usageSet.has('crm_eligible')
-      ? 'identified'
-      : usageSet.has('pseudonymous_profile')
-        ? 'pseudonymous'
-        : 'aggregate';
+    insightClassification = usageSet.has('tracked_profile') || usageSet.has('pseudonymous_profile')
+      ? 'pseudonymous'
+      : 'aggregate';
   }
 
   await pool.query(
@@ -1815,11 +1813,9 @@ export async function getSessionAnalytics(sessionId: string) {
       divergence_rate: divergenceRate,
       node_friction_score: nodeFrictionScore,
       content_quality_flag:
-        hydrated.presentation_mode === 'distinct'
-          ? 'distinct'
-          : hydrated.intended_audience === 'hcp' && !hydrated.medical_review_version
-            ? 'needs_medical_review'
-            : 'shared_ready',
+        hydrated.intended_audience === 'hcp' && !hydrated.medical_review_version
+          ? 'needs_medical_review'
+          : 'shared_ready',
     };
   });
 
@@ -1844,9 +1840,9 @@ export async function getSessionAnalytics(sessionId: string) {
 
   const insights = {
     audience_mode_summary: {
-      shared: questions.filter((q) => q.presentation_mode === 'shared').length,
-      adapted: questions.filter((q) => q.presentation_mode === 'adapted').length,
-      distinct: questions.filter((q) => q.presentation_mode === 'distinct').length,
+      shared: questions.length,
+      adapted: 0,
+      distinct: 0,
     },
     archetype_distribution: Object.entries(archetypeCounts)
       .map(([archetype_id, count]) => ({ archetype_id, count }))

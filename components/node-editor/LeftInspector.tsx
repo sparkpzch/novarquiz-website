@@ -18,7 +18,6 @@ import AutoPlayVideo from '@/components/ui/AutoPlayVideo';
 import {
   ALLOWED_USAGE_OPTIONS,
   HCP_VECTOR_KEYS,
-  PRESENTATION_MODES,
   REVIEW_STATUS_OPTIONS,
   AUDIENCE_OPTIONS,
 } from '@/lib/analytics/hcp';
@@ -480,19 +479,6 @@ export function LeftInspector({
                 style={selectStyle}
               >
                 {AUDIENCE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <FieldLabel hint="How this question is shown">Presentation Mode</FieldLabel>
-              <select
-                value={draft.presentation_mode ?? 'shared'}
-                onChange={e => patch({ presentation_mode: e.target.value as NodeData['presentation_mode'] })}
-                style={selectStyle}
-              >
-                {PRESENTATION_MODES.map((option) => (
                   <option key={option} value={option}>{option}</option>
                 ))}
               </select>

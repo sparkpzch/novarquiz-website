@@ -311,9 +311,6 @@ export default function SessionAnalyticsPage({ params }: { params: Promise<{ ses
                   <span className="rounded-full border border-[#0460A9]/10 bg-white px-2 py-1 font-bold text-[#0460A9]">
                     {question.intended_audience}
                   </span>
-                  <span className="rounded-full border border-[#0460A9]/10 bg-white px-2 py-1 font-bold text-[#0460A9]">
-                    {question.presentation_mode}
-                  </span>
                   {question.reading_level && (
                     <span className="rounded-full border border-[#0460A9]/10 bg-white px-2 py-1 font-semibold text-[#5D7EA1]">
                       {question.reading_level}

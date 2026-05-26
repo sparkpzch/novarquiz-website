@@ -13,13 +13,9 @@ export type HcpVectorMap = Record<HcpVectorKey, number>;
 export const AUDIENCE_OPTIONS = ['public', 'mixed', 'hcp'] as const;
 export type IntendedAudience = (typeof AUDIENCE_OPTIONS)[number];
 
-export const PRESENTATION_MODES = ['shared', 'adapted', 'distinct'] as const;
-export type PresentationMode = (typeof PRESENTATION_MODES)[number];
-
 export const ALLOWED_USAGE_OPTIONS = [
-  'aggregate_only',
-  'pseudonymous_profile',
-  'crm_eligible',
+  'anonymous',
+  'tracked_profile',
 ] as const;
 export type AllowedUsage = (typeof ALLOWED_USAGE_OPTIONS)[number];
 
@@ -42,7 +38,6 @@ export type ChoiceMetadata = {
 
 export type QuestionMetadata = {
   intended_audience: IntendedAudience;
-  presentation_mode: PresentationMode;
   reading_level: string | null;
   jurisdiction_tags: string[];
   medical_review_version: string | null;
@@ -52,14 +47,12 @@ export type QuestionMetadata = {
 export type ConsentPurposes = {
   platform_account: boolean;
   analytics_profiling: boolean;
-  crm_linkage: boolean;
   marketing_follow_up: boolean;
 };
 
 export const DEFAULT_CONSENT_PURPOSES: ConsentPurposes = {
   platform_account: true,
   analytics_profiling: true,
-  crm_linkage: false,
   marketing_follow_up: false,
 };
 
@@ -76,7 +69,6 @@ export function emptyHcpVectorMap(): HcpVectorMap {
 
 export const DEFAULT_QUESTION_METADATA: QuestionMetadata = {
   intended_audience: 'public',
-  presentation_mode: 'shared',
   reading_level: null,
   jurisdiction_tags: [],
   medical_review_version: null,
@@ -88,7 +80,7 @@ export const DEFAULT_CHOICE_METADATA: ChoiceMetadata = {
   vector_deltas: emptyHcpVectorMap(),
   clinical_tags: [],
   confidence_weight: 1,
-  allowed_usage: 'aggregate_only',
+  allowed_usage: 'anonymous',
   requires_hcp_version: false,
   review_status: 'approved',
 };
@@ -140,9 +132,6 @@ export function normalizeQuestionMetadata(
     intended_audience: AUDIENCE_OPTIONS.includes(input?.intended_audience as IntendedAudience)
       ? (input?.intended_audience as IntendedAudience)
       : DEFAULT_QUESTION_METADATA.intended_audience,
-    presentation_mode: PRESENTATION_MODES.includes(input?.presentation_mode as PresentationMode)
-      ? (input?.presentation_mode as PresentationMode)
-      : DEFAULT_QUESTION_METADATA.presentation_mode,
     reading_level: readingLevel?.trim() || null,
     jurisdiction_tags: normalizeStringArray(input?.jurisdiction_tags),
     medical_review_version: medicalReviewVersion?.trim() || null,
@@ -154,6 +143,12 @@ export function normalizeChoiceMetadata(
   input: Partial<ChoiceMetadata> | Record<string, unknown> | null | undefined,
 ): ChoiceMetadata {
   const behaviorMeaning = typeof input?.behavior_meaning === 'string' ? input.behavior_meaning : null;
+  
+  // Backward compatibility mapping for old database values
+  let usage = input?.allowed_usage;
+  if (usage === 'aggregate_only') usage = 'anonymous';
+  if (usage === 'pseudonymous_profile' || usage === 'crm_eligible') usage = 'tracked_profile';
+
   return {
     behavior_meaning: behaviorMeaning?.trim() || null,
     vector_deltas: normalizeVectorMap(
@@ -165,8 +160,8 @@ export function normalizeChoiceMetadata(
     confidence_weight: clampConfidenceWeight(
       typeof input?.confidence_weight === 'number' ? input.confidence_weight : undefined,
     ),
-    allowed_usage: ALLOWED_USAGE_OPTIONS.includes(input?.allowed_usage as AllowedUsage)
-      ? (input?.allowed_usage as AllowedUsage)
+    allowed_usage: ALLOWED_USAGE_OPTIONS.includes(usage as AllowedUsage)
+      ? (usage as AllowedUsage)
       : DEFAULT_CHOICE_METADATA.allowed_usage,
     requires_hcp_version: Boolean(input?.requires_hcp_version),
     review_status: REVIEW_STATUS_OPTIONS.includes(input?.review_status as ReviewStatus)

@@ -4,7 +4,6 @@ import {
   ALLOWED_USAGE_OPTIONS,
   AUDIENCE_OPTIONS,
   HCP_VECTOR_KEYS,
-  PRESENTATION_MODES,
   REVIEW_STATUS_OPTIONS,
 } from '@/lib/analytics/hcp';
 import {
@@ -53,7 +52,7 @@ const QuestionSchema = z.object({
   question_order: z.number().int().min(0),
   node_type: z.enum(['normal', 'question', 'situation', 'end']).optional(),
   intended_audience: z.enum(AUDIENCE_OPTIONS).optional(),
-  presentation_mode: z.enum(PRESENTATION_MODES).optional(),
+  presentation_mode: z.string().optional(),
   reading_level: z.string().max(120).nullable().optional(),
   jurisdiction_tags: z.array(z.string().max(80)).max(20).optional(),
   medical_review_version: z.string().max(120).nullable().optional(),

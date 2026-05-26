@@ -7,7 +7,6 @@ import {
   type AllowedUsage,
   type HcpVectorMap,
   type IntendedAudience,
-  type PresentationMode,
   type ReviewStatus,
 } from '@/lib/analytics/hcp';
 
@@ -15,7 +14,7 @@ export type NormalNodeData = {
   node_name: string | null;
   question_text: string;
   intended_audience: IntendedAudience;
-  presentation_mode: PresentationMode;
+  presentation_mode?: string;
   reading_level: string | null;
   jurisdiction_tags: string[];
   medical_review_version: string | null;
