@@ -8,7 +8,7 @@ export default function PrivacyPage() {
         <p className="text-blue-200 text-xs leading-relaxed">
           This Privacy Policy complies with Thailand&apos;s Personal Data Protection Act B.E. 2562 (PDPA).
           NovarQuiz is the Data Controller for all personal data processed through this Service.
-          Contact: <span className="font-medium">privacy@novarquiz.com</span>
+          Contact: <span className="font-medium">Novartis@novartis-decisionlab.firebaseapp.com</span>
         </p>
       </div>
 
@@ -47,7 +47,7 @@ export default function PrivacyPage() {
             <li><strong className="text-white">Objection</strong> — object to processing based on legitimate interests</li>
             <li><strong className="text-white">Withdraw Consent</strong> — via Profile → Delete Account, effective immediately</li>
           </ul>
-          <p className="mt-2">Contact <span className="text-blue-400">privacy@novarquiz.com</span> to exercise these rights. We respond within 30 days.</p>
+          <p className="mt-2">Contact <span className="text-blue-400">Novartis@novartis-decisionlab.firebaseapp.com</span> to exercise these rights. We respond within 30 days.</p>
         </section>
         <section>
           <h2 className="text-lg font-semibold text-white mb-2">6. Cookies</h2>
