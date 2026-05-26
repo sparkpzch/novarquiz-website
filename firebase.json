@@ -34,7 +34,7 @@
       "emailPassword": true,
       "googleSignIn": {
         "oAuthBrandDisplayName": "Novarquiz",
-        "supportEmail": "support@undefined.firebaseapp.com"
+        "supportEmail": "Novartis@novartis-decisionlab.firebaseapp.com"
       }
     }
   }

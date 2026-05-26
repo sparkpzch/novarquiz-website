@@ -1,28 +1,33 @@
 # NovarQuiz
 
-NovarQuiz is an interactive quiz platform with branching question flows, live sessions, team play, solo runs, and real-time leaderboards.
+NovarQuiz is an interactive quiz platform built around branching, graph-based question flows. It supports live host-led sessions, team and solo play modes, real-time leaderboards, and an admin analytics dashboard.
 
-The app is built with Next.js 16, React 19, PostgreSQL, Firebase Auth, Firebase Realtime Database, and Firebase Storage. Quiz content lives in Postgres, while live room state and presence are synced through Firebase.
+The app is built on **Next.js 16 (App Router)** and **React 19**, with **PostgreSQL** for persistent content and **Firebase Realtime Database** for live session state.
 
 ## Highlights
 
-- Node-based quiz editor for branching question flows
-- Live host lobbies with shareable join tokens
+- Node-based quiz editor for branching question graphs
+- Live host lobbies with shareable join tokens / QR codes
 - Solo and team play modes
 - Real-time leaderboard updates
 - Admin analytics dashboard
-- Firebase-backed authentication and session rehydration
-- English and Thai UI support
+- Firebase-backed authentication with server-side session cookies
+- English and Thai UI (i18next)
 
 ## Tech Stack
 
-- Next.js 16 App Router
-- React 19
-- TypeScript
-- Tailwind CSS 4
-- PostgreSQL (`docker` or `neon` provider)
-- Firebase Auth, Realtime Database, Storage, and Admin SDK
-- Motion for UI animation
+| Layer | Technology |
+| --- | --- |
+| Framework | Next.js 16 (App Router), React 19 |
+| Language | TypeScript |
+| Styling | Tailwind CSS 4 |
+| Persistent DB | PostgreSQL (Docker or Neon) |
+| Live state | Firebase Realtime Database |
+| Auth | Firebase Auth + signed session cookies (`jose`) |
+| Rate limiting | Upstash Redis (`@upstash/ratelimit`) with in-process fallback |
+| Validation | Zod |
+| Animation | Motion |
+| Media | Sharp, FFmpeg (WASM) |
 
 ## Requirements
 
@@ -33,26 +38,20 @@ The app is built with Next.js 16, React 19, PostgreSQL, Firebase Auth, Firebase 
   - Realtime Database enabled
   - Storage enabled
   - A service account for server routes
-- Either:
-  - Docker Desktop for local Postgres, or
-  - A Neon Postgres database
+- Either Docker Desktop (local Postgres) **or** a Neon Postgres database
 
 ## Environment Setup
 
-This repo supports two local database setups:
+Two local database setups are supported:
 
-- `docker`: local PostgreSQL via `docker-compose.yml`
-- `neon`: hosted PostgreSQL via Neon
+- `docker` — local PostgreSQL via `docker-compose.yml`
+- `neon` — hosted PostgreSQL via Neon
 
 Copy one of the example env files:
 
 ```bash
 cp .env.local.example .env.local
-```
-
-or:
-
-```bash
+# or
 cp .env.neon.example .env.neon
 ```
 
@@ -60,112 +59,105 @@ Fill in:
 
 - `DATABASE_URL`
 - Firebase client variables (`NEXT_PUBLIC_FIREBASE_*`)
-- Firebase Admin credentials
+- Firebase Admin credentials (see below)
 - `SESSION_SECRET`
 
-## Firebase Admin Setup
+Do **not** commit any populated `.env*` files or service account JSON.
 
-This app uses the Firebase Admin SDK for server routes such as admin stats, session auth, uploads, and Realtime Database access.
+## Firebase Admin Credentials
 
-For local development, prefer one of these credential strategies:
+Server routes use the Firebase Admin SDK for session verification, admin stats, uploads, and Realtime Database access.
 
-1. Set `FIREBASE_SERVICE_ACCOUNT_JSON` in `.env.local` or `.env.neon` to the full service account JSON.
-2. Or set `GOOGLE_APPLICATION_CREDENTIALS` to an absolute path outside the repo.
-3. Use `FIREBASE_SERVICE_ACCOUNT_KEY` only if you must point directly at a key file, and keep that file outside the repository.
+Pick one credential strategy:
 
-Notes:
+1. Set `FIREBASE_SERVICE_ACCOUNT_JSON` to the full service account JSON.
+2. Set `GOOGLE_APPLICATION_CREDENTIALS` to an absolute path **outside** the repo.
+3. Set `FIREBASE_SERVICE_ACCOUNT_KEY` only if you must point at a key file, and keep that file outside the repository.
 
-- Do not commit service account JSON files into the repository.
-- On Firebase App Hosting, Cloud Run, App Engine, or Cloud Functions, prefer Application Default Credentials instead of shipping a key file.
-- If you use a raw JSON value in `.env*`, Next.js supports multiline environment variables.
+On Firebase App Hosting, Cloud Run, App Engine, or Cloud Functions, prefer **Application Default Credentials** instead of shipping a key file.
 
-## Install Dependencies
+## Install
 
 ```bash
 npm install
+# or
+bun install
 ```
-
-If your local workflow uses Bun, `bun install` also works. The repo currently declares `bun@1.2.0` as its package manager, but the scripts are written to work with `npm`.
 
 ## Run Locally
 
-### Option 1: Docker Postgres
-
-1. Create `.env.local` from `.env.local.example`.
-2. Start Postgres:
+### Option 1 — Docker Postgres
 
 ```bash
-npm run db:up
+cp .env.local.example .env.local   # fill in values
+npm run db:up                       # start local Postgres
+npm run migrate                     # apply migrations
+npm run dev:docker                  # start Next.js
 ```
 
-3. Apply migrations:
+### Option 2 — Neon Postgres
 
 ```bash
-npm run migrate
+cp .env.neon.example .env.neon      # fill in values
+npm run migrate:neon                # apply migrations
+npm run dev                         # start Next.js (uses .env.neon)
 ```
 
-4. Start the app:
+The app runs at [http://localhost:3000](http://localhost:3000).
 
-```bash
-npm run dev:docker
-```
+## Scripts
 
-The site will be available at [http://localhost:3000](http://localhost:3000).
-
-### Option 2: Neon Postgres
-
-1. Create `.env.neon` from `.env.neon.example`.
-2. Apply migrations:
-
-```bash
-npm run migrate:neon
-```
-
-3. Start the app:
-
-```bash
-npm run dev
-```
-
-Notes:
-
-- `npm run dev` and `npm run dev:neon` both load `.env.neon`.
-- The default `dev` script assumes the Neon setup.
-
-## Available Scripts
-
-- `npm run dev`: start Next.js with `.env.neon`
-- `npm run dev:docker`: start Next.js with `.env.local`
-- `npm run dev:neon`: explicit Neon dev command
-- `npm run build`: production build
-- `npm run start`: start the production server
-- `npm run lint`: run ESLint
-- `npm run migrate`: apply migrations using `.env.local`
-- `npm run migrate:neon`: apply migrations using `.env.neon`
-- `npm run migrate:005`: run the local 005 migration script
-- `npm run migrate:005:neon`: run the Neon 005 migration script
-- `npm run db:up`: start local Postgres with Docker Compose
-- `npm run db:down`: stop local Postgres containers
-- `npm run set-admin -- --email=user@example.com`: grant Firebase admin claims to a user
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Start Next.js with `.env.neon` |
+| `npm run dev:docker` | Start Next.js with `.env.local` |
+| `npm run build` | Production build |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
+| `npm run migrate` | Apply migrations against `.env.local` |
+| `npm run migrate:neon` | Apply migrations against `.env.neon` |
+| `npm run db:up` / `db:down` | Start / stop local Postgres |
+| `npm run set-admin -- --email=user@example.com` | Grant Firebase admin claims |
 
 ## Database Notes
 
-- `DB_PROVIDER` supports `docker` and `neon`.
-- If `DB_PROVIDER` is omitted, the app infers the provider from `DATABASE_URL`.
-- The main migration entrypoint is [scripts/migrate.ts](/Users/pjirawat/Downloads/_VSCode/novarquiz-website/scripts/migrate.ts).
-- Base schema metadata lives in [lib/db/schema.ts](/Users/pjirawat/Downloads/_VSCode/novarquiz-website/lib/db/schema.ts).
+- `DB_PROVIDER` supports `docker` and `neon`. If omitted, it is inferred from `DATABASE_URL`.
+- Base schema lives in `db/migrations/005_somchai_refac.sql`; forward-only migrations sit alongside it.
+- Schema metadata: `lib/db/schema.ts`.
+- Migration entry point: `scripts/migrate.ts`.
 
-## Project Areas
+## Project Layout
 
-- [app](/Users/pjirawat/Downloads/_VSCode/novarquiz-website/app): routes, layouts, and API handlers
-- [components/node-editor](/Users/pjirawat/Downloads/_VSCode/novarquiz-website/components/node-editor): admin quiz graph editor
-- [lib/db](/Users/pjirawat/Downloads/_VSCode/novarquiz-website/lib/db): database config, queries, and migration helpers
-- [lib/firebase](/Users/pjirawat/Downloads/_VSCode/novarquiz-website/lib/firebase): Firebase client and admin integrations
-- [scripts](/Users/pjirawat/Downloads/_VSCode/novarquiz-website/scripts): operational scripts such as migrations and admin setup
+```
+app/                Routes, layouts, API handlers (App Router)
+  (auth)/           Sign-in, sign-up, password flows
+  (dashboard)/      Authenticated dashboard, quizzes, history, admin
+  api/              Route handlers (Zod-validated, rate-limited)
+  join/, play/      Player-facing join and gameplay flows
+components/
+  node-editor/      Graph-based quiz editor
+  ui/               Shared UI primitives
+lib/
+  auth.ts           Session cookie signing / verification
+  ratelimit.ts      Upstash + in-process rate limiting
+  db/               Postgres config, queries, migrations helpers
+  firebase/         Firebase client + admin integrations
+  i18n/             i18next configuration
+db/migrations/      SQL migrations
+scripts/            Migration, admin, and export scripts
+```
+
+## Security Practices
+
+- All API routes validate input with **Zod** before any work.
+- Endpoints are **rate limited** via `lib/ratelimit.ts` (auth-keyed where a session exists, IP-keyed only when `TRUST_PROXY` is set).
+- Identity (`uid`, `role`, `isAdmin`) is read only from verified session cookies or Firebase Admin tokens — never trusted from the client.
+- Persistent data lives in Postgres; live room/presence in Firebase Realtime Database. State is not duplicated across the two without reason.
+- Secrets are loaded from environment variables; service account JSON must never be committed.
 
 ## Admin Setup
 
-To promote a user to admin, run:
+Promote a user to admin:
 
 ```bash
 npm run set-admin -- --email=user@example.com
@@ -173,14 +165,13 @@ npm run set-admin -- --email=user@example.com
 
 The user must sign out and sign back in before the new custom claims take effect.
 
-## Local URLs
+## Contributing
 
-- App: [http://localhost:3000](http://localhost:3000)
-- Docker production-style container app: [http://localhost:8080](http://localhost:8080)
+- Uses App Router conventions under `app/`.
+- Match existing code style; prefer surgical changes.
+- Run `npm run lint` and `npm run build` before opening a PR.
+- New API routes must include Zod validation and an appropriate rate limit.
 
-## Notes for Contributors
+## License
 
-- The repo uses App Router conventions under `app/`.
-- Live room state is stored in Firebase Realtime Database.
-- Persistent quiz, question, session, and leaderboard data is stored in Postgres.
-- The admin UI assumes desktop layouts in several flows.
+Proprietary. All rights reserved unless otherwise noted.
