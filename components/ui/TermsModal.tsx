@@ -218,7 +218,7 @@ export default function TermsModal({ initialTab = 'terms', onClose, onAccept }: 
 }
 
 /* ── shared palette type ──────────────────────────────────────── */
-type Palette = typeof palette.light;
+type Palette = typeof palette[keyof typeof palette];
 
 function Section({ title, children, c }: { title: string; children: React.ReactNode; c: Palette }) {
   return (
