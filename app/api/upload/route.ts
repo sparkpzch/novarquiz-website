@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminStorage } from '@/lib/firebase/admin';
 import { getSessionUser } from '@/lib/auth';
+import { checkRateLimit } from '@/lib/ratelimit';
 
 const MIME_TO_EXT: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -30,6 +31,16 @@ function detectMimeFromBytes(buf: Buffer): string | null {
 export async function POST(req: NextRequest) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // ROUTE_LIMITS caps this path at 5/min — previously declared but not enforced.
+  // Keyed per-uid: authenticated route, prevents storage-cost abuse.
+  const { allowed, retryAfter } = await checkRateLimit(`uid:${user.uid}`, '/api/upload');
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+    );
+  }
 
   try {
     const form = await req.formData();

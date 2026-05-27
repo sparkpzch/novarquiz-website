@@ -231,7 +231,7 @@ function QuestionVisual({
           Question {question.question_order + 1}
           {typeof totalQuestions === 'number' && totalQuestions > 0 ? `/${totalQuestions}` : ''}
         </p>
-        <h1 className="mt-2 text-lg font-bold leading-snug text-[#1B2530] md:text-xl">
+        <h1 className="mt-2 text-lg font-bold leading-snug text-[#1B2530] dark:text-[#d4e3f5] md:text-xl">
           {question.question_text}
         </h1>
       </div>
@@ -840,7 +840,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
           <Card className="w-full max-w-3xl">
             <QuestionVisual question={question} totalQuestions={sessionMeta?.question_count} />
             {question.question_text && (
-              <p className="mt-5 nq-subject leading-relaxed text-[#475E79]">{question.question_text}</p>
+              <p className="mt-5 nq-subject leading-relaxed text-[#475E79] dark:text-[#94a9c5]">{question.question_text}</p>
             )}
             <button
               onClick={() => setFinished(true)}
@@ -873,7 +873,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
           <Card>
             <QuestionVisual question={question} totalQuestions={sessionMeta?.question_count} />
             <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <p className="max-w-2xl nq-subject text-[#5D7EA1]">
+              <p className="max-w-2xl nq-subject text-[#5D7EA1] dark:text-[#94a9c5]">
                 {question.question_text || 'Continue when you are ready for the next part of the quiz.'}
               </p>
               <button

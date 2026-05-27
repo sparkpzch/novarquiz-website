@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { deleteUserData } from '@/lib/db/queries';
 import { adminAuth, adminDb, adminRtdb, adminStorage } from '@/lib/firebase/admin';
 import { checkRateLimit } from '@/lib/ratelimit';
+import { getRateLimitIp } from '@/lib/security/request-ip';
 
 // ---------------------------------------------------------------------------
 // SECURITY INVARIANT: Identity is verified exclusively via Firebase Admin
@@ -90,6 +91,22 @@ export async function DELETE(request: NextRequest) {
 
   if (!idToken) {
     return NextResponse.json({ error: 'Missing auth token' }, { status: 401 });
+  }
+
+  // Pre-verify IP-keyed rate-limit so a flood of junk tokens cannot exhaust
+  // Firebase Auth quota on the verifyIdToken call below. Per-uid limiter still
+  // runs after the verify succeeds as a second layer.
+  {
+    const { allowed, retryAfter } = await checkRateLimit(
+      getRateLimitIp(request),
+      '/api/account',
+    );
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+      );
+    }
   }
 
   let uid: string;
