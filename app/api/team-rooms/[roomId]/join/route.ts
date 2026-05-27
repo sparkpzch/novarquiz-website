@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { adminRtdb } from '@/lib/firebase/admin';
 import { getSessionUser } from '@/lib/auth';
+import { sanitizePhotoUrl } from '@/lib/security/photo-url';
 
 const JoinBody = z.object({
   pin: z.string().min(1).max(10).optional(),
@@ -35,7 +36,7 @@ export async function POST(
 
   await adminRtdb.ref(`teamRooms/${roomId}/players/${user.uid}`).set({
     displayName: parsed.data.displayName?.trim() || 'Anonymous',
-    photoURL: parsed.data.photoURL ?? null,
+    photoURL: sanitizePhotoUrl(parsed.data.photoURL),
     joinedAt: Date.now(),
   });
 

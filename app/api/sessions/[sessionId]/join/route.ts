@@ -4,6 +4,7 @@ import { adminRtdb } from '@/lib/firebase/admin';
 import { getSessionById } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { ROOM_STATUS } from '@/lib/constants/session';
+import { sanitizePhotoUrl } from '@/lib/security/photo-url';
 
 const JoinBody = z.object({
   displayName: z.string().max(100).optional(),
@@ -49,7 +50,7 @@ export async function POST(
     const playerRef = adminRtdb.ref(`sessions/${sessionId}/players/${user.uid}`);
     await playerRef.set({
       displayName: body?.displayName?.trim() || 'Anonymous',
-      photoURL: body?.photoURL ?? null,
+      photoURL: sanitizePhotoUrl(body?.photoURL),
       joinedAt: Date.now(),
     });
 

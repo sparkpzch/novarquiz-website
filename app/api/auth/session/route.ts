@@ -3,6 +3,8 @@ import { adminAuth } from '@/lib/firebase/admin';
 import { SignJWT } from 'jose';
 import { cookies } from 'next/headers';
 import { syncUserProfile } from '@/lib/db/queries';
+import { checkRateLimit } from '@/lib/ratelimit';
+import { getRateLimitIp } from '@/lib/security/request-ip';
 
 const COOKIE_NAME = 'session';
 const DEFAULT_MAX_AGE = 60 * 60 * 24 * 5;   // 5 days — session-scoped default
@@ -17,6 +19,20 @@ function getSecret() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate-limit BEFORE the expensive verifyIdToken call so an attacker cannot
+    // exhaust Firebase Auth quota by replaying junk tokens. ROUTE_LIMITS caps
+    // this path at 10/min — previously declared but never enforced.
+    const { allowed, retryAfter } = await checkRateLimit(
+      getRateLimitIp(request),
+      '/api/auth/session',
+    );
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+      );
+    }
+
     const { idToken, rememberMe } = await request.json();
     if (!idToken) {
       return NextResponse.json({ error: 'Missing idToken' }, { status: 400 });

@@ -27,6 +27,7 @@ function sanitizeQuestion(question: Record<string, unknown> | null) {
     ? question.choices.map((choice) => {
         const rest = { ...(choice as Record<string, unknown>) };
         delete rest.score_impact;
+        delete rest.points;
         delete rest.explanation;
         delete rest.behavior_meaning;
         delete rest.vector_deltas;
@@ -108,13 +109,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     const parsed = AnswerBody.safeParse(raw);
     if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 
-    if (parsed.data.is_guest) {
-      // Authorize: guest answer outcomes are only returned for questions
-      // belonging to the SAME published quiz as the URL session. Without
-      // the quiz-match check, the endpoint became an answer-key oracle:
-      // any unauthenticated caller could POST a question UUID and learn
-      // its score_impact/explanation, dumping the key for every published
-      // quiz one row at a time.
+    const user = await getSessionUser();
+
+    // An authenticated caller is ALWAYS routed through the non-guest path so
+    // the one-answer-per-(session,user,question) guard applies. Otherwise a
+    // logged-in player could set is_guest:true to probe every label, learn
+    // score_impact, then resubmit the best label non-guest for a perfect score.
+    if (parsed.data.is_guest && !user) {
       const access = await getQuizForQuestion(parsed.data.question_id);
       if (!access || !access.is_published) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -136,7 +137,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       });
     }
 
-    const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     // Authorize: the question must belong to the same quiz this play session

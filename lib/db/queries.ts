@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import pool, { queryWithRetry } from './postgres';
+import { maskLeaderboardEntry } from './schema';
 import { SESSION_STATUS, SessionStatus } from '../constants/session';
 import { incrementMediaUsage, decrementMediaUsage, syncMediaUsage } from './media';
 import {
@@ -1774,19 +1775,24 @@ export async function getSessionAnalytics(sessionId: string) {
     [actualId]
   );
 
-  const leaderboard = leaderboardResult.rows.map((row) => ({
-    ...row,
-    profile_vector_scores: normalizeVectorMap(
-      layered && row.profile_vector_scores && typeof row.profile_vector_scores === 'object'
-        ? (row.profile_vector_scores as Partial<Record<string, number>>)
-        : undefined,
-    ),
-    normalized_vector_scores: normalizeVectorMap(
-      layered && row.normalized_vector_scores && typeof row.normalized_vector_scores === 'object'
-        ? (row.normalized_vector_scores as Partial<Record<string, number>>)
-        : undefined,
-    ),
-  }));
+  // Apply privacy classification masking before any data leaves the query layer.
+  // 'aggregate' rows are stripped; 'pseudonymous' rows have uid/name replaced.
+  const leaderboard = leaderboardResult.rows
+    .map((row) => ({
+      ...row,
+      profile_vector_scores: normalizeVectorMap(
+        layered && row.profile_vector_scores && typeof row.profile_vector_scores === 'object'
+          ? (row.profile_vector_scores as Partial<Record<string, number>>)
+          : undefined,
+      ),
+      normalized_vector_scores: normalizeVectorMap(
+        layered && row.normalized_vector_scores && typeof row.normalized_vector_scores === 'object'
+          ? (row.normalized_vector_scores as Partial<Record<string, number>>)
+          : undefined,
+      ),
+    }))
+    .map((row) => maskLeaderboardEntry(row))
+    .filter((row): row is NonNullable<typeof row> => row !== null);
 
   const questions = questionsResult.rows.map((row) => {
     const hydrated = hydrateQuestionRow({

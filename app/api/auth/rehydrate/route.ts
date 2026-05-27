@@ -5,10 +5,12 @@
 // no client-side Firebase state briefly land on /sign-in before being bounced
 // back by the proxy.
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { jwtVerify, SignJWT } from 'jose';
 import { adminAuth } from '@/lib/firebase/admin';
+import { checkRateLimit } from '@/lib/ratelimit';
+import { getRateLimitIp } from '@/lib/security/request-ip';
 
 const COOKIE_NAME = 'session';
 const ADMIN_MAX_AGE = 60 * 60 * 24; // 24h cap for admins (mirrors session/route.ts)
@@ -19,8 +21,21 @@ function getSecret() {
   return new TextEncoder().encode(secret);
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    // Rate-limit BEFORE touching cookie/JWT verify. ROUTE_LIMITS caps this
+    // path at 5/min — previously declared but never enforced.
+    const { allowed, retryAfter } = await checkRateLimit(
+      getRateLimitIp(request),
+      '/api/auth/rehydrate',
+    );
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+      );
+    }
+
     const cookieStore = await cookies();
     const session = cookieStore.get(COOKIE_NAME)?.value;
     if (!session) {

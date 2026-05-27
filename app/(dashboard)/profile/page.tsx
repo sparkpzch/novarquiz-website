@@ -10,6 +10,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, storage } from "@/lib/firebase/config";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
+import TermsModal from "@/components/ui/TermsModal";
 import { useToast } from "@/components/ui/Toast";
 import { motion } from "motion/react";
 import Link from "next/link";
@@ -652,33 +653,9 @@ export default function ProfilePage() {
         </div>
       </Modal>
 
-      <Modal
-        isOpen={termsModal}
-        onClose={() => setTermsModal(false)}
-        title={t("profile.terms_privacy")}
-        size="lg"
-      >
-        <div className="max-h-[65vh] overflow-y-auto pr-1">
-          <div className="space-y-5 text-sm leading-relaxed">
-            {[
-              { title: "1. Acceptance of Terms", body: 'By accessing and using NovarQuiz ("the Service"), you accept and agree to be bound by the terms and provisions of this agreement. If you do not agree to these terms, please do not use the Service.' },
-              { title: "2. Description of Service", body: "NovarQuiz is an interactive quiz platform that allows users to participate in quiz sessions created by administrators. The Service includes user authentication, quiz participation, scoring, and leaderboards." },
-              { title: "3. User Accounts", body: "You are responsible for maintaining the confidentiality of your account credentials. You agree to notify us immediately of any unauthorized use of your account. You must be at least 13 years old to use this Service." },
-              { title: "4. User Conduct", body: "You agree not to: (a) use the Service for any unlawful purpose; (b) attempt to gain unauthorized access to any part of the Service; (c) interfere with or disrupt the Service; (d) upload malicious content or attempt to exploit vulnerabilities." },
-              { title: "5. Intellectual Property", body: "All content, features, and functionality of the Service are owned by NovarQuiz and are protected by copyright, trademark, and other intellectual property laws." },
-              { title: "6. Data Collection", body: "We collect and process personal data as described in our Privacy Policy. By using the Service, you consent to such processing." },
-              { title: "7. Limitation of Liability", body: 'The Service is provided "as is" without warranties of any kind. We shall not be liable for any indirect, incidental, special, consequential, or punitive damages.' },
-              { title: "8. Modifications", body: "We reserve the right to modify these terms at any time. Continued use of the Service after changes constitutes acceptance of the new terms." },
-            ].map(({ title, body }) => (
-              <section key={title}>
-                <h3 className="mb-1 font-semibold text-[#192246]">{title}</h3>
-                <p className="text-[#5D7EA1]">{body}</p>
-              </section>
-            ))}
-            <p className="pt-2 text-xs text-[#9BAFC6]">Last updated: April 2026</p>
-          </div>
-        </div>
-      </Modal>
+      {termsModal && (
+        <TermsModal onClose={() => setTermsModal(false)} />
+      )}
 
       <Modal
         isOpen={editModal}
