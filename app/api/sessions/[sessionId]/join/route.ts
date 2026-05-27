@@ -54,6 +54,11 @@ export async function POST(
       joinedAt: Date.now(),
     });
 
+    // First joiner becomes the leader. This must be server-side because
+    // normal players are not allowed to write session-level fields in RTDB.
+    const leaderRef = adminRtdb.ref(`sessions/${sessionId}/leaderId`);
+    await leaderRef.transaction((current) => current ?? user.uid);
+
     // 5. Track user session (Fan-out index)
     const userSessionRef = adminRtdb.ref(`userSessions/${user.uid}/${sessionId}`);
     await userSessionRef.set({

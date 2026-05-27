@@ -6,7 +6,6 @@ import { signInAnonymously, updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { useAuth } from "@/lib/hooks/useAuth";
 import {
-  claimLeaderIfEmpty,
   resolveJoinToken,
   getRoom,
 } from "@/lib/firebase/rtdb";
@@ -179,9 +178,6 @@ export default function JoinPage({
       }
 
       const joinData = await res.json();
-
-      // 2. Claim leader if empty (this remains client-side as a fast transaction)
-      await claimLeaderIfEmpty(session.id, user.uid);
 
       trackEvent("session_join_succeeded", { session_id: session.id });
 

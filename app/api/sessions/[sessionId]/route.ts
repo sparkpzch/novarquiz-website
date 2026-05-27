@@ -5,8 +5,8 @@ import { getSessionUser } from '@/lib/auth';
 import { SESSION_STATUS } from '@/lib/constants/session';
 
 const SessionPatchSchema = z.object({
-  pin: z.string().min(1).max(10).nullable().optional(),
-  pin_code: z.string().min(1).max(10).nullable().optional(),
+  pin: z.string().min(1).max(64).nullable().optional(),
+  pin_code: z.string().min(1).max(64).nullable().optional(),
   status: z
     .enum([
       SESSION_STATUS.CLOSED,
