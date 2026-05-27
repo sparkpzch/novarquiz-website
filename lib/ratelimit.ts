@@ -8,9 +8,14 @@ const WINDOW_MS = 60_000;
 const ROUTE_LIMITS: Array<[string, number]> = [
   ['/api/auth/session', 10],
   ['/api/auth/rehydrate', 5],
+  ['/api/auth/consent', 10],   // L1: consent writes are low-frequency by design
   ['/api/upload', 5],
   ['/api/join', 20],
   ['/api/play', 60],
+  ['/api/account', 5],         // L2: destructive — conservative cap on deletion attempts
+  // Admin routes touch HCP clinical profiles — conservative limit to
+  // bound bulk-scraping of pseudonymous behavioral data.
+  ['/api/admin', 20],
 ];
 const DEFAULT_LIMIT = 100;
 
@@ -80,6 +85,16 @@ function fallbackCheck(key: string, limit: number): { allowed: boolean; retryAft
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
+/**
+ * Check rate limit for a given key and route pathname.
+ *
+ * @param ip - The rate-limit identity key. For unauthenticated routes pass
+ *   the client IP. For authenticated routes pass `uid:<userId>` so the limit
+ *   is per-user rather than per-IP (avoids shared-IP false positives and
+ *   makes the key meaningful in server logs). L4: parameter named `ip` for
+ *   historical reasons — it accepts any stable string key.
+ * @param pathname - The route prefix used to look up the per-route limit.
+ */
 export async function checkRateLimit(
   ip: string,
   pathname: string,

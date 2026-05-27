@@ -48,12 +48,29 @@ export type ConsentPurposes = {
   platform_account: boolean;
   analytics_profiling: boolean;
   marketing_follow_up: boolean;
+  /** Explicitly acknowledged by HCP users before participating in HCP-audience sessions. */
+  hcp_vectors_acknowledged?: boolean;
 };
 
 export const DEFAULT_CONSENT_PURPOSES: ConsentPurposes = {
   platform_account: true,
   analytics_profiling: true,
   marketing_follow_up: false,
+  hcp_vectors_acknowledged: false,
+};
+
+/**
+ * Human-readable labels for the 6 HCP clinical profiling vectors.
+ * Referenced in consent text so users understand exactly what behavioral
+ * dimensions are measured during HCP-audience quiz sessions.
+ */
+export const HCP_VECTOR_LABELS: Record<HcpVectorKey, string> = {
+  guideline_adherence: 'Guideline Adherence',
+  innovation_adoption: 'Innovation Adoption',
+  patient_centricity: 'Patient Centricity',
+  diagnostic_proactivity: 'Diagnostic Proactivity',
+  therapy_escalation: 'Therapy Escalation',
+  evidence_depth: 'Evidence Depth',
 };
 
 export function emptyHcpVectorMap(): HcpVectorMap {
