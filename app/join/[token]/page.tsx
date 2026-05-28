@@ -68,7 +68,6 @@ export default function JoinPage({
 
     const TIMED_OUT = Symbol('timed_out');
 
-    // Race an RTDB promise against a timeout so a dead RTDB doesn't stall the page.
     function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
       return Promise.race([
         promise,
@@ -78,12 +77,45 @@ export default function JoinPage({
 
     (async () => {
       try {
-        // 1. Try Firebase RTDB resolution (5 s timeout — falls through to API on RTDB outage)
-        const rtdbResult = await withTimeout(resolveJoinToken(token), 5000);
+        // Fire RTDB and API in parallel — LP connections can be slow on enterprise
+        // networks that block WebSocket. The API (PostgreSQL) path resolves in ~200 ms
+        // and covers pin_code / session-id tokens. RTDB covers ephemeral lobby tokens.
+        const [rtdbResult, apiRes] = await Promise.all([
+          withTimeout(resolveJoinToken(token), 5000),
+          fetch(`/api/join/${token}`).catch(() => null),
+        ]);
         if (cancelled) return;
 
         const sessionIdFromRtdb = rtdbResult === TIMED_OUT ? null : rtdbResult;
 
+        // Prefer the API result for speed; fall back to RTDB-sourced session id.
+        if (apiRes && apiRes.ok) {
+          const data = await apiRes.json();
+
+          // Verify room is still live via RTDB (4 s timeout; if unreachable let
+          // the join API validate server-side).
+          const roomResult = await withTimeout(getRoom(data.id), 4000);
+          if (roomResult !== TIMED_OUT) {
+            const room = roomResult;
+            if (!room || room.status === ROOM_STATUS.ENDED) {
+              setFetchError(
+                "This invite link is no longer valid. Ask the host for a new one.",
+              );
+              return;
+            }
+          }
+
+          if (!cancelled)
+            setSession({
+              id: data.id,
+              name: data.name,
+              description: data.description,
+              is_private: data.is_private,
+            });
+          return;
+        }
+
+        // API didn't match — try the RTDB-resolved session id.
         if (sessionIdFromRtdb) {
           const res = await fetch(`/api/sessions/${sessionIdFromRtdb}`);
           if (!res.ok) {
@@ -92,8 +124,7 @@ export default function JoinPage({
           }
           const data = await res.json();
 
-          // 1.5 Check RTDB status; if RTDB is unreachable let the join API validate.
-          const roomResult = await withTimeout(getRoom(sessionIdFromRtdb), 5000);
+          const roomResult = await withTimeout(getRoom(sessionIdFromRtdb), 4000);
           if (roomResult !== TIMED_OUT) {
             const room = roomResult;
             if (!room || room.status === ROOM_STATUS.ENDED) {
@@ -114,37 +145,9 @@ export default function JoinPage({
           return;
         }
 
-        // 2. Fallback: Try PostgreSQL resolution (for pin_code or share_token)
-        const res = await fetch(`/api/join/${token}`);
-        if (cancelled) return;
-
-        if (res.ok) {
-          const data = await res.json();
-
-          // Check RTDB status; if RTDB is unreachable let the join API validate.
-          const roomResult = await withTimeout(getRoom(data.id), 5000);
-          if (roomResult !== TIMED_OUT) {
-            const room = roomResult;
-            if (!room || room.status === ROOM_STATUS.ENDED) {
-              setFetchError(
-                "This invite link is no longer valid. Ask the host for a new one.",
-              );
-              return;
-            }
-          }
-
-          if (!cancelled)
-            setSession({
-              id: data.id,
-              name: data.name,
-              description: data.description,
-              is_private: data.is_private,
-            });
-        } else {
-          setFetchError(
-            "This invite link is no longer valid. Ask the host for a new one.",
-          );
-        }
+        setFetchError(
+          "This invite link is no longer valid. Ask the host for a new one.",
+        );
       } catch {
         if (!cancelled) setFetchError("Failed to load session");
       }
