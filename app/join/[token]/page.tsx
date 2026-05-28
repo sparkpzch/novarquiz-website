@@ -75,9 +75,12 @@ export default function JoinPage({
     }
 
     async function backgroundRoomCheck(sessionId: string) {
-      const result = await withTimeout(getRoom(sessionId), 4000);
-      if (cancelled || result === TIMED_OUT) return; // unreachable — let server validate on join
-      if (!result || result.status === ROOM_STATUS.ENDED) {
+      // 1 s window: catches ended sessions when RTDB is already connected.
+      // If RTDB is slow (LP on enterprise networks) this times out immediately
+      // and the server-side join API does the authoritative validation instead.
+      const result = await withTimeout(getRoom(sessionId), 1000);
+      if (cancelled) return;
+      if (result !== TIMED_OUT && (!result || result.status === ROOM_STATUS.ENDED)) {
         setSession(null);
         setFetchError("This invite link is no longer valid. Ask the host for a new one.");
       }
@@ -292,7 +295,7 @@ export default function JoinPage({
 
             <button
               onClick={handleJoin}
-              disabled={joining || !videoReady || roomChecking}
+              disabled={joining || !videoReady}
               className="w-full py-3 rounded-xl bg-linear-to-r from-angular-700 to-angular-500 text-white! font-semibold text-base disabled:opacity-50 disabled:cursor-not-allowed hover:from-angular-500 hover:to-angular-700 transition-all"
             >
               {joining ? (
