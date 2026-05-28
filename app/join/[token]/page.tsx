@@ -32,6 +32,7 @@ export default function JoinPage({
 
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [fetchError, setFetchError] = useState("");
+  const [roomChecking, setRoomChecking] = useState(false);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState("");
   const [guestName, setGuestName] = useState("");
@@ -61,100 +62,65 @@ export default function JoinPage({
     );
   }
 
-  // Resolve join token → sessionId via RTDB or DB, then fetch session info.
+  // Resolve join token → session info, then check room status in the background.
+  // API path (~200 ms) covers pin_code / session-id tokens from the quizzes page.
+  // RTDB path covers ephemeral lobby tokens from host-generated share links.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
 
     const TIMED_OUT = Symbol('timed_out');
+    function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
+      return Promise.race([p, new Promise<typeof TIMED_OUT>(r => setTimeout(() => r(TIMED_OUT), ms))]);
+    }
 
-    function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
-      return Promise.race([
-        promise,
-        new Promise<typeof TIMED_OUT>((resolve) => setTimeout(() => resolve(TIMED_OUT), ms)),
-      ]);
+    async function backgroundRoomCheck(sessionId: string) {
+      const result = await withTimeout(getRoom(sessionId), 4000);
+      if (cancelled || result === TIMED_OUT) return; // unreachable — let server validate on join
+      if (!result || result.status === ROOM_STATUS.ENDED) {
+        setSession(null);
+        setFetchError("This invite link is no longer valid. Ask the host for a new one.");
+      }
+      setRoomChecking(false);
     }
 
     (async () => {
       try {
-        // Fire RTDB and API in parallel — LP connections can be slow on enterprise
-        // networks that block WebSocket. The API (PostgreSQL) path resolves in ~200 ms
-        // and covers pin_code / session-id tokens. RTDB covers ephemeral lobby tokens.
-        const [rtdbResult, apiRes] = await Promise.all([
-          withTimeout(resolveJoinToken(token), 5000),
-          fetch(`/api/join/${token}`).catch(() => null),
-        ]);
+        // Fast path: API resolves pin_code / session.id in ~200 ms.
+        // Show the modal immediately; verify room status in the background.
+        const apiRes = await fetch(`/api/join/${token}`).catch(() => null);
         if (cancelled) return;
 
-        const sessionIdFromRtdb = rtdbResult === TIMED_OUT ? null : rtdbResult;
-
-        // Prefer the API result for speed; fall back to RTDB-sourced session id.
-        if (apiRes && apiRes.ok) {
+        if (apiRes?.ok) {
           const data = await apiRes.json();
-
-          // Verify room is still live via RTDB (4 s timeout; if unreachable let
-          // the join API validate server-side).
-          const roomResult = await withTimeout(getRoom(data.id), 4000);
-          if (roomResult !== TIMED_OUT) {
-            const room = roomResult;
-            if (!room || room.status === ROOM_STATUS.ENDED) {
-              setFetchError(
-                "This invite link is no longer valid. Ask the host for a new one.",
-              );
-              return;
-            }
-          }
-
-          if (!cancelled)
-            setSession({
-              id: data.id,
-              name: data.name,
-              description: data.description,
-              is_private: data.is_private,
-            });
+          if (cancelled) return;
+          setSession({ id: data.id, name: data.name, description: data.description, is_private: data.is_private });
+          setRoomChecking(true);
+          backgroundRoomCheck(data.id);
           return;
         }
 
-        // API didn't match — try the RTDB-resolved session id.
-        if (sessionIdFromRtdb) {
-          const res = await fetch(`/api/sessions/${sessionIdFromRtdb}`);
-          if (!res.ok) {
-            setFetchError("Session not found");
-            return;
-          }
-          const data = await res.json();
+        // Slow path: ephemeral RTDB token from host share link.
+        const rtdbResult = await withTimeout(resolveJoinToken(token), 5000);
+        if (cancelled) return;
 
-          const roomResult = await withTimeout(getRoom(sessionIdFromRtdb), 4000);
-          if (roomResult !== TIMED_OUT) {
-            const room = roomResult;
-            if (!room || room.status === ROOM_STATUS.ENDED) {
-              setFetchError(
-                "This invite link is no longer valid. Ask the host for a new one.",
-              );
-              return;
-            }
-          }
-
-          if (!cancelled)
-            setSession({
-              id: data.id,
-              name: data.quiz_name || data.name,
-              description: data.quiz_description || data.description,
-              is_private: data.is_private,
-            });
+        if (!rtdbResult || rtdbResult === TIMED_OUT) {
+          setFetchError("This invite link is no longer valid. Ask the host for a new one.");
           return;
         }
 
-        setFetchError(
-          "This invite link is no longer valid. Ask the host for a new one.",
-        );
+        const res = await fetch(`/api/sessions/${rtdbResult}`);
+        if (!res.ok) { setFetchError("Session not found"); return; }
+        const data = await res.json();
+        if (cancelled) return;
+        setSession({ id: data.id, name: data.quiz_name || data.name, description: data.quiz_description || data.description, is_private: data.is_private });
+        setRoomChecking(true);
+        backgroundRoomCheck(rtdbResult);
       } catch {
         if (!cancelled) setFetchError("Failed to load session");
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [token, user]);
 
   useEffect(() => {
@@ -326,13 +292,18 @@ export default function JoinPage({
 
             <button
               onClick={handleJoin}
-              disabled={joining || !videoReady}
+              disabled={joining || !videoReady || roomChecking}
               className="w-full py-3 rounded-xl bg-linear-to-r from-angular-700 to-angular-500 text-white! font-semibold text-base disabled:opacity-50 disabled:cursor-not-allowed hover:from-angular-500 hover:to-angular-700 transition-all"
             >
               {joining ? (
                 <span className="flex items-center justify-center gap-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   Joining…
+                </span>
+              ) : roomChecking ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Checking availability…
                 </span>
               ) : !videoReady ? (
                 <span className="flex items-center justify-center gap-2">
