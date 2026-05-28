@@ -48,15 +48,41 @@ export default function JoinPage({
     }
   }, [authLoading, user]);
 
+  // Show error early if anonymous sign-in failed (user stays null after auth settles).
+  if (!authLoading && !user && fetchError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-8 text-center max-w-md w-full">
+          <div className="text-5xl mb-4">⚠️</div>
+          <h1 className="text-xl font-bold text-white mb-2">Unable to Join</h1>
+          <p className="text-gray-400 text-sm">{fetchError}</p>
+        </div>
+      </div>
+    );
+  }
+
   // Resolve join token → sessionId via RTDB or DB, then fetch session info.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+
+    const TIMED_OUT = Symbol('timed_out');
+
+    // Race an RTDB promise against a timeout so a dead RTDB doesn't stall the page.
+    function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
+      return Promise.race([
+        promise,
+        new Promise<typeof TIMED_OUT>((resolve) => setTimeout(() => resolve(TIMED_OUT), ms)),
+      ]);
+    }
+
     (async () => {
       try {
-        // 1. Try Firebase RTDB resolution
-        const sessionIdFromRtdb = await resolveJoinToken(token);
+        // 1. Try Firebase RTDB resolution (5 s timeout — falls through to API on RTDB outage)
+        const rtdbResult = await withTimeout(resolveJoinToken(token), 5000);
         if (cancelled) return;
+
+        const sessionIdFromRtdb = rtdbResult === TIMED_OUT ? null : rtdbResult;
 
         if (sessionIdFromRtdb) {
           const res = await fetch(`/api/sessions/${sessionIdFromRtdb}`);
@@ -66,13 +92,16 @@ export default function JoinPage({
           }
           const data = await res.json();
 
-          // 1.5 Check if the session is joinable in RTDB
-          const room = await getRoom(sessionIdFromRtdb);
-          if (!room || room.status === ROOM_STATUS.ENDED) {
-            setFetchError(
-              "This invite link is no longer valid. Ask the host for a new one.",
-            );
-            return;
+          // 1.5 Check RTDB status; if RTDB is unreachable let the join API validate.
+          const roomResult = await withTimeout(getRoom(sessionIdFromRtdb), 5000);
+          if (roomResult !== TIMED_OUT) {
+            const room = roomResult;
+            if (!room || room.status === ROOM_STATUS.ENDED) {
+              setFetchError(
+                "This invite link is no longer valid. Ask the host for a new one.",
+              );
+              return;
+            }
           }
 
           if (!cancelled)
@@ -92,13 +121,16 @@ export default function JoinPage({
         if (res.ok) {
           const data = await res.json();
 
-          // Check if the session is joinable in RTDB
-          const room = await getRoom(data.id);
-          if (!room || room.status === ROOM_STATUS.ENDED) {
-            setFetchError(
-              "This invite link is no longer valid. Ask the host for a new one.",
-            );
-            return;
+          // Check RTDB status; if RTDB is unreachable let the join API validate.
+          const roomResult = await withTimeout(getRoom(data.id), 5000);
+          if (roomResult !== TIMED_OUT) {
+            const room = roomResult;
+            if (!room || room.status === ROOM_STATUS.ENDED) {
+              setFetchError(
+                "This invite link is no longer valid. Ask the host for a new one.",
+              );
+              return;
+            }
           }
 
           if (!cancelled)
