@@ -10,8 +10,8 @@ export function getRateLimitIp(request: Request): string {
   if (process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true') {
     const xff = request.headers.get('x-forwarded-for');
     if (xff) {
-      const first = xff.split(',')[0]?.trim();
-      if (first) return first;
+      const last = xff.split(',').at(-1)?.trim();
+      if (last) return last;
     }
     const real = request.headers.get('x-real-ip');
     if (real) return real.trim();

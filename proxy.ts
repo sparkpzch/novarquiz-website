@@ -11,6 +11,32 @@ function getSecret() {
   return new TextEncoder().encode(secret);
 }
 
+function buildCsp(nonce: string): string {
+  const isDev = process.env.NODE_ENV === 'development';
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://apis.google.com https://www.gstatic.com https://*.firebaseio.com https://*.firebasedatabase.app${isDev ? " 'unsafe-eval'" : ''}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https://lh3.googleusercontent.com https://storage.googleapis.com https://firebasestorage.googleapis.com https://*.firebasestorage.app",
+    "media-src 'self' blob: https://storage.googleapis.com https://firebasestorage.googleapis.com",
+    "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://*.upstash.io https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.firebaseapp.com",
+    "font-src 'self'",
+    "frame-src 'self' https://*.firebaseapp.com https://*.firebaseauth.com",
+    "frame-ancestors 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+  ].join('; ');
+}
+
+function withCsp(request: NextRequest, nonce: string): NextResponse {
+  const csp = buildCsp(nonce);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set('Content-Security-Policy', csp);
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -51,6 +77,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Per-request nonce for nonce-based CSP (applied to all page responses below).
+  const nonce = btoa(crypto.randomUUID());
+
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   const session = request.cookies.get(COOKIE_NAME)?.value;
 
@@ -64,7 +93,7 @@ export async function proxy(request: NextRequest) {
         // Expired / invalid — let through to sign-in
       }
     }
-    return NextResponse.next();
+    return withCsp(request, nonce);
   }
 
   // Unauthenticated → sign-in
@@ -79,7 +108,7 @@ export async function proxy(request: NextRequest) {
     if (pathname.startsWith('/admin') && !payload.isAdmin) {
       return NextResponse.redirect(new URL('/', request.url));
     }
-    return NextResponse.next();
+    return withCsp(request, nonce);
   } catch {
     const res = NextResponse.redirect(new URL('/sign-in', request.url));
     res.cookies.delete(COOKIE_NAME);
