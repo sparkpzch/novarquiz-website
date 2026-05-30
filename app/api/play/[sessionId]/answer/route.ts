@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getQuizForQuestion, resolveSessionToQuizId, getExistingAnswer } from '@/lib/db/queries';
+import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getQuizForQuestion, getQuizById, resolveSessionToQuizId, getExistingAnswer } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
 import { DEFAULT_CHOICE_METADATA } from '@/lib/analytics/hcp';
@@ -58,6 +58,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     if (searchParams.get('entry') === 'true') {
+      const quizId = await resolveSessionToQuizId(sessionId);
+      if (!quizId) return NextResponse.json(null, { status: 404 });
+      const quiz = await getQuizById(quizId);
+      if (!quiz || (!quiz.is_published && !user.isAdmin && quiz.created_by !== user.uid)) {
+        return NextResponse.json(null, { status: 404 });
+      }
       const question = await getEntryQuestion(sessionId);
       if (!question) return NextResponse.json(null, { status: 404 });
       return NextResponse.json(sanitizeQuestion(question));
@@ -66,6 +72,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const fromQuestionId = searchParams.get('fromQuestionId');
     const choiceLabel = searchParams.get('choiceLabel');
     if (fromQuestionId && choiceLabel) {
+      const access = await getQuizForQuestion(fromQuestionId);
+      if (!access) return NextResponse.json(null, { status: 404 });
+      if (!access.is_published && !user.isAdmin && access.created_by !== user.uid) {
+        return NextResponse.json(null, { status: 404 });
+      }
       const next = await getNextQuestion(fromQuestionId, choiceLabel);
       if (!next) return NextResponse.json(null, { status: 404 });
       return NextResponse.json(sanitizeQuestion(next));

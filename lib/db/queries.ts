@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import pool, { queryWithRetry } from './postgres';
-import { maskLeaderboardEntry } from './schema';
+import { maskLeaderboardEntry, toPublicLeaderboardEntry } from './schema';
 import { SESSION_STATUS, SessionStatus } from '../constants/session';
 import { incrementMediaUsage, decrementMediaUsage, syncMediaUsage } from './media';
 import {
@@ -1608,7 +1608,15 @@ export async function getLeaderboard(sessionId: string) {
     `SELECT * FROM leaderboard_entries WHERE session_id = $1 ORDER BY total_score DESC`,
     [sessionId]
   );
-  return result.rows;
+
+  // This feeds the public (no admin gate) leaderboard routes. Enforce the
+  // privacy-classification model — 'aggregate' rows dropped, 'pseudonymous'
+  // identifiers replaced — then strip all HCP profiling columns before the
+  // rows leave the query layer. Mirrors getSessionAnalytics' masking pass.
+  return result.rows
+    .map((row) => maskLeaderboardEntry(row))
+    .filter((row): row is NonNullable<typeof row> => row !== null)
+    .map((row) => toPublicLeaderboardEntry(row));
 }
 
 export async function upsertLeaderboardEntry(data: {

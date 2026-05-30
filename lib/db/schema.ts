@@ -87,7 +87,14 @@ export function maskLeaderboardEntry<T extends Record<string, unknown>>(
     // attacks using known Firebase uid values.
     const secret = process.env.SESSION_SECRET;
     if (!secret) throw new Error('SESSION_SECRET not configured');
-    const rawUid = typeof row.uid === 'string' ? row.uid : String(row.uid ?? '');
+    // leaderboard_entries rows carry `user_id`, not `uid`; fall back to it so
+    // each participant gets a distinct, stable pseudo-id (not a constant '').
+    const rawUid =
+      typeof row.uid === 'string'
+        ? row.uid
+        : typeof row.user_id === 'string'
+          ? row.user_id
+          : '';
     const pseudoId = createHmac('sha256', secret).update(rawUid).digest('hex').slice(0, 16);
 
     return {
@@ -102,4 +109,25 @@ export function maskLeaderboardEntry<T extends Record<string, unknown>>(
 
   // 'identified' — user gave explicit individual consent; return as-is.
   return row;
+}
+
+// HCP clinical-profiling columns. The public leaderboard routes have no admin
+// gate, so these are stripped from every row regardless of classification —
+// they may only surface through the admin analytics route.
+const HCP_PROFILING_COLUMNS = [
+  'profile_vector_scores',
+  'normalized_vector_scores',
+  'archetype_id',
+  'insight_classification',
+] as const;
+
+/**
+ * Strips HCP profiling columns from a (already masked) leaderboard row before
+ * it leaves a public, non-admin boundary. Returns a new object; never mutates.
+ */
+export function toPublicLeaderboardEntry<T extends Record<string, unknown>>(
+  row: T,
+): Record<string, unknown> {
+  const omit = new Set<string>(HCP_PROFILING_COLUMNS);
+  return Object.fromEntries(Object.entries(row).filter(([key]) => !omit.has(key)));
 }
