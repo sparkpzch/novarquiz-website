@@ -32,6 +32,10 @@ function withCsp(request: NextRequest, nonce: string): NextResponse {
   const csp = buildCsp(nonce);
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
+  // Next.js reads the nonce from the CSP on the *request* headers during SSR to
+  // stamp it onto framework/bundle <script> tags. Without this, 'strict-dynamic'
+  // blocks those scripts. See node_modules/next/dist/docs/.../content-security-policy.md
+  requestHeaders.set('Content-Security-Policy', csp);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set('Content-Security-Policy', csp);
   return response;
