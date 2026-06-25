@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { Inter, Lexend, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/hooks/useAuth";
@@ -25,11 +26,16 @@ export const metadata: Metadata = {
   description: "A Kahoot-like quiz platform with node-based question flows, real-time scoring, and leaderboards.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Nonce-based CSP (proxy.ts) requires every page to render dynamically so the
+  // per-request nonce is stamped onto Next's <script> tags. Without this, public
+  // pages (sign-in, privacy, terms) are statically prerendered with no nonce and
+  // 'strict-dynamic' blocks all scripts.
+  await connection();
   return (
     <html
       lang="en"
