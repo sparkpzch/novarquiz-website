@@ -38,6 +38,11 @@ function getRedis(): Redis {
     redis = new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL!,
       token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+      // The SDK defaults to 5 retries with Math.exp(n) * 50 backoff, i.e.
+      // ~4.3s before it gives up. A rate limiter sits in front of every /api
+      // request, so an unreachable Redis added ~4.3s to each one. One quick
+      // retry is all this is worth: the fallback below is right there.
+      retry: { retries: 1, backoff: () => 50 },
     });
   }
   return redis;
@@ -70,6 +75,12 @@ const fallbackStore = new Map<string, Entry>();
 // that before, which is why a deleted Redis went unnoticed. Warn once per
 // instance — enough to show up in logs without one line per request.
 let warnedFallback = false;
+
+// Even one quick retry costs every request while Redis is down. Trip a breaker
+// on failure so an outage costs one slow request per cooldown rather than one
+// per request; the fallback keeps enforcing limits meanwhile.
+const BREAKER_COOLDOWN_MS = 30_000;
+let redisDownUntil = 0;
 
 function warnFallback(reason: string) {
   if (warnedFallback) return;
@@ -120,16 +131,20 @@ export async function checkRateLimit(
   const key = `${ip}:${pathname}`;
 
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    try {
-      const { success, reset } = await getLimiter(limit).limit(key);
-      return {
-        allowed: success,
-        retryAfter: success ? 0 : Math.ceil((reset - Date.now()) / 1000),
-      };
-    } catch {
-      // Redis unavailable — degrade gracefully to in-process fallback.
-      // Reason only; the error can carry the configured REST URL.
-      warnFallback('Redis request failed');
+    if (Date.now() >= redisDownUntil) {
+      try {
+        const { success, reset } = await getLimiter(limit).limit(key);
+        redisDownUntil = 0;
+        return {
+          allowed: success,
+          retryAfter: success ? 0 : Math.ceil((reset - Date.now()) / 1000),
+        };
+      } catch {
+        // Redis unavailable — degrade gracefully to in-process fallback.
+        // Reason only; the error can carry the configured REST URL.
+        redisDownUntil = Date.now() + BREAKER_COOLDOWN_MS;
+        warnFallback('Redis request failed');
+      }
     }
   } else {
     warnFallback('UPSTASH_REDIS_REST_URL/TOKEN not set');
