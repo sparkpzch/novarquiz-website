@@ -64,6 +64,23 @@ function getLimiter(limit: number): Ratelimit {
 type Entry = { count: number; resetAt: number };
 const fallbackStore = new Map<string, Entry>();
 
+// Falling back is a security regression, not a nicety: each instance keeps its
+// own counter, so with maxInstances > 1 the effective limit is multiplied, and
+// minInstances: 0 resets every counter on each cold start. Nothing surfaced
+// that before, which is why a deleted Redis went unnoticed. Warn once per
+// instance — enough to show up in logs without one line per request.
+let warnedFallback = false;
+
+function warnFallback(reason: string) {
+  if (warnedFallback) return;
+  warnedFallback = true;
+  const message =
+    `[ratelimit] using in-process fallback (${reason}) — ` +
+    'limits are per-instance and reset on cold start';
+  if (process.env.NODE_ENV === 'production') console.error(message);
+  else console.warn(message);
+}
+
 function fallbackCheck(key: string, limit: number): { allowed: boolean; retryAfter: number } {
   const now = Date.now();
   if (fallbackStore.size > 10_000) {
@@ -110,8 +127,12 @@ export async function checkRateLimit(
         retryAfter: success ? 0 : Math.ceil((reset - Date.now()) / 1000),
       };
     } catch {
-      // Redis unavailable — degrade gracefully to in-process fallback
+      // Redis unavailable — degrade gracefully to in-process fallback.
+      // Reason only; the error can carry the configured REST URL.
+      warnFallback('Redis request failed');
     }
+  } else {
+    warnFallback('UPSTASH_REDIS_REST_URL/TOKEN not set');
   }
 
   return fallbackCheck(key, limit);
