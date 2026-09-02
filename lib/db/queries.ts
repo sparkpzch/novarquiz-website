@@ -583,6 +583,10 @@ export async function getQuestionById(questionId: string) {
   return result.rows[0] ? hydrateQuestionRow(result.rows[0]) : null;
 }
 
+// Returns the quiz's entry question. Falls back to the lowest question_order
+// when no node is flagged: a quiz with questions but no entry point would
+// otherwise 404 out of /api/play/<id>/answer?entry=true, which the player UI
+// reads as "quiz finished" and drops straight onto the final leaderboard.
 export async function getEntryQuestion(id: string) {
   const layered = await hasLayeredAnalyticsSchema();
   const choiceJson = layered ? buildChoiceJsonSql('c') : buildLegacyChoiceJsonSql('c');
@@ -598,9 +602,10 @@ export async function getEntryQuestion(id: string) {
      FROM questions q
      JOIN quizzes qs ON qs.id = q.session_id
      LEFT JOIN choices c ON c.question_id = q.id
-     WHERE (q.session_id = $1 OR q.session_id = (SELECT session_id FROM sessions WHERE id = $1)) 
-       AND q.is_entry_point = TRUE
-     GROUP BY q.id, qs.timer_seconds`,
+     WHERE (q.session_id = $1 OR q.session_id = (SELECT session_id FROM sessions WHERE id = $1))
+     GROUP BY q.id, qs.timer_seconds
+     ORDER BY q.is_entry_point DESC, q.question_order ASC
+     LIMIT 1`,
     [id]
   );
   return result.rows[0] ? hydrateQuestionRow(result.rows[0]) : null;
@@ -1140,7 +1145,7 @@ export async function upsertChoices(questionId: string, choices: Array<{
   choice_text: string;
   score_impact?: number;
   points?: number;
-  explanation?: string;
+  explanation?: string | null;
   behavior_meaning?: string | null;
   vector_deltas?: Partial<Record<string, number>>;
   clinical_tags?: string[];

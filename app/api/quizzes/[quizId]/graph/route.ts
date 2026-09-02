@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import {
-  ALLOWED_USAGE_OPTIONS,
-  AUDIENCE_OPTIONS,
-  HCP_VECTOR_KEYS,
-  REVIEW_STATUS_OPTIONS,
-} from '@/lib/analytics/hcp';
+import { ConnectionSchema, GraphBody, MEDIA_PATH_RE, QuestionSchema } from './schema';
 import {
   createQuestion,
   upsertChoices,
@@ -18,65 +13,6 @@ import {
   getQuizById,
 } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
-
-const ALLOWED_MEDIA_ORIGINS = new Set([
-  'storage.googleapis.com',
-  'firebasestorage.googleapis.com',
-]);
-
-function isAllowedMediaUrl(url: string): boolean {
-  try {
-    const { hostname, protocol } = new URL(url);
-    return protocol === 'https:' && ALLOWED_MEDIA_ORIGINS.has(hostname);
-  } catch {
-    return false;
-  }
-}
-
-const ChoiceSchema = z.object({
-  label: z.string().min(1).max(10),
-  choice_text: z.string().max(1000),
-  score_impact: z.number().finite().min(-10000).max(10000).optional(),
-  explanation: z.string().max(2000).optional(),
-  behavior_meaning: z.string().max(2000).nullable().optional(),
-  vector_deltas: z.record(z.enum(HCP_VECTOR_KEYS), z.number().finite()).optional(),
-  clinical_tags: z.array(z.string().max(120)).max(20).optional(),
-  confidence_weight: z.number().finite().min(0).max(3).optional(),
-  allowed_usage: z.enum(ALLOWED_USAGE_OPTIONS).optional(),
-  requires_hcp_version: z.boolean().optional(),
-  review_status: z.enum(REVIEW_STATUS_OPTIONS).optional(),
-});
-
-const QuestionSchema = z.object({
-  question_text: z.string().max(5000),
-  question_order: z.number().int().min(0),
-  node_type: z.enum(['normal', 'question', 'situation', 'end']).optional(),
-  intended_audience: z.enum(AUDIENCE_OPTIONS).optional(),
-  presentation_mode: z.string().optional(),
-  reading_level: z.string().max(120).nullable().optional(),
-  jurisdiction_tags: z.array(z.string().max(80)).max(20).optional(),
-  medical_review_version: z.string().max(120).nullable().optional(),
-  legal_document_versions_required: z.record(z.string().max(80), z.string().max(120)).optional(),
-  media_url: z.string().max(500).optional().nullable().refine(
-    (v) => !v || isAllowedMediaUrl(v),
-    { message: 'media_url must be an https URL from an allowed storage domain' },
-  ),
-  media_type: z.enum(['image', 'video']).optional().nullable(),
-  node_x: z.number().finite().optional(),
-  node_y: z.number().finite().optional(),
-  choices: z.array(ChoiceSchema).max(20).optional(),
-});
-
-const ConnectionSchema = z.object({
-  from_question_id: z.string(),
-  to_question_id: z.string(),
-  from_choice_label: z.string().max(10),
-});
-
-const GraphBody = z.object({
-  questions: z.array(QuestionSchema).max(500),
-  connections: z.array(ConnectionSchema).max(2000),
-});
 
 async function requireQuizOwnership(quizId: string) {
   const user = await getSessionUser();
@@ -114,12 +50,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid request', details: parsed.error.flatten() }, { status: 400 });
     }
+    // `id` is deliberately dropped here: createQuestion upserts ON CONFLICT (id)
+    // and rewrites session_id, so honouring a client-chosen id would let an
+    // owner of quiz A pull a question row out of quiz B. Ids are only accepted
+    // on PUT, where replaceQuizGraph re-mints anything that isn't a UUID.
     const { choices, ...questionData } = parsed.data;
+    delete questionData.id;
     const question = await createQuestion({
       ...questionData,
       session_id: realId,
+      node_name: questionData.node_name ?? undefined,
       media_type: questionData.media_type ?? undefined,
       media_url: questionData.media_url ?? undefined,
+      media_path: questionData.media_path ?? undefined,
+      timer_override: questionData.timer_override ?? undefined,
     });
     if (choices?.length) {
       await upsertChoices(question.id, choices);
@@ -130,8 +74,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
-
-const MEDIA_PATH_RE = /^quiz-media\/[\w.-]+$/;
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
