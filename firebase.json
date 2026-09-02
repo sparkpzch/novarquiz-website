@@ -10,17 +10,6 @@
         "firebase-debug.*.log",
         "functions"
       ]
-    },
-    {
-      "backendId": "novarquiz-website",
-      "rootDir": "/",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        "functions"
-      ]
     }
   ],
   "storage": {
