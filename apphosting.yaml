@@ -13,9 +13,19 @@ env:
     value: "1"
     availability:
       - RUNTIME
+  # Rate limiting (lib/ratelimit.ts). Without these the limiter silently falls
+  # back to a per-instance Map, which maxInstances > 1 and minInstances: 0
+  # between them make close to meaningless.
+  - variable: UPSTASH_REDIS_REST_URL
+    secret: UPSTASH_REDIS_REST_URL
+    availability:
+      - RUNTIME
+  - variable: UPSTASH_REDIS_REST_TOKEN
+    secret: UPSTASH_REDIS_REST_TOKEN
+    availability:
+      - RUNTIME
 
-  # Grant access to secrets in Cloud Secret Manager.
-  # You can create secrets with the CLI command `firebase apphosting:secrets:set <secretName>`.
+  # Secrets live in Cloud Secret Manager; set them with
+  # `firebase apphosting:secrets:set <name>` and grant the backend access with
+  # `firebase apphosting:secrets:grantaccess <name> --backend novarquiz-website`.
   # See https://firebase.google.com/docs/app-hosting/configure#secret-parameters
-  # - variable: MY_SECRET
-  #   secret: mySecretRef
