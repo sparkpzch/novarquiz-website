@@ -739,7 +739,7 @@ export default function QuizzesManager({
             </h3>
             <p className="text-sm text-[#5D7EA1] mb-6 leading-relaxed">
               {confirmModal.name
-                ? <>This action {confirmModal.action === 'delete' ? 'cannot be undone' : 'will clear all access links'}. To confirm, type <strong className={`${confirmModal.action === 'delete' ? 'text-[#E74C3C]' : 'text-[#E67E22]'} select-none`}>{confirmModal.name}</strong> below.</>
+                ? <>This action {confirmModal.action === 'delete' ? 'cannot be undone' : 'will clear all access links'}. To confirm, type <strong className={`${confirmModal.action === 'delete' ? 'text-[#E74C3C]' : 'text-[#E67E22]'} select-all cursor-pointer`}>{confirmModal.name}</strong> below.</>
                 : <>Are you sure you want to {confirmModal.action} this? This action {confirmModal.action === 'delete' ? 'cannot be undone' : 'will clear all access links'}.</>
               }
             </p>
