@@ -1,21 +1,16 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-import Button from "@/components/ui/Button";
 import { useTranslation } from "react-i18next";
 import "@/lib/i18n";
 import { motion, AnimatePresence } from "motion/react";
-import type { Quiz } from "@/lib/types";
-import { useToast } from "@/components/ui/Toast";
-import QuizzesManager from "./QuizzesManager";
+import type { Quiz, Session } from "@/lib/types";
+import dynamic from "next/dynamic";
+const QuizzesManager = dynamic(() => import("./QuizzesManager"), { loading: () => <p role="status">Loading quiz manager…</p> });
 import {
-  watchSessionRooms,
-  endRoom,
-  closeLobby,
-  type PlayerScore,
+  watchRoom,
   type SessionRoom,
 } from "@/lib/firebase/rtdb";
 
@@ -56,12 +51,6 @@ interface AdminStats {
   }>;
 }
 
-type LiveSession = {
-  session: Quiz;
-  room: SessionRoom;
-  liveAt: number;
-};
-
 type AdminTab = "dashboard" | "quizzes-manager";
 
 const MONTHS = [
@@ -78,28 +67,6 @@ const MONTHS = [
   "Nov",
   "Dec",
 ];
-const SCORE_BUCKETS = ["< 0", "0–25", "26–50", "51–75", "76–100", "> 100"];
-const ADMIN_TABS: Array<{ id: AdminTab; label: string; description: string }> =
-  [
-    {
-      id: "dashboard",
-      label: "Dashboard",
-      description: "Platform analytics and recent activity",
-    },
-    {
-      id: "quizzes-manager",
-      label: "Quizzes Manager",
-      description: "Manage your quiz library and active sessions",
-    },
-  ];
-
-function formatClockTime(timestamp: number) {
-  return new Date(timestamp).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function formatDuration(ms: number): string {
   if (!ms || ms <= 0) return "—";
   const totalSecs = Math.round(ms / 1000);
@@ -107,12 +74,6 @@ function formatDuration(ms: number): string {
   const secs = totalSecs % 60;
   if (mins === 0) return `${secs}s`;
   return `${mins}m ${secs}s`;
-}
-
-function getLatestActivity(room: SessionRoom) {
-  const playerJoins = Object.values(room.players ?? {}).map((p) => p.joinedAt);
-  const scoreUpdates = Object.values(room.scores ?? {}).map((s) => s.updatedAt);
-  return Math.max(0, ...playerJoins, ...scoreUpdates);
 }
 
 function SkeletonRow({ cols }: { cols: number }) {
@@ -132,15 +93,16 @@ function AdminDashboardContent() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { showToast } = useToast();
 
+  const [dataError, setDataError] = useState("");
+  const [statsError, setStatsError] = useState("");
+  const [statsRetry, setStatsRetry] = useState(0);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [fetchingStats, setFetchingStats] = useState(true);
   const [allData, setAllData] = useState<Quiz[]>([]);
-  const [allSessions, setAllSessions] = useState<any[]>([]);
+  const [allSessions, setAllSessions] = useState<(Session & { quiz_name?: string })[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [rooms, setRooms] = useState<Record<string, SessionRoom>>({});
-  const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
 
   const tabParam = searchParams.get("tab") as AdminTab | null;
   const activeTab: AdminTab =
@@ -153,60 +115,75 @@ function AdminDashboardContent() {
     if (!authLoading && !isAdmin) router.push("/");
   }, [authLoading, isAdmin, router]);
 
-  const fetchData = () => {
-    Promise.all([
-      fetch("/api/quizzes?all=true").then((r) => (r.ok ? r.json() : [])),
-      fetch("/api/sessions").then((r) => (r.ok ? r.json() : []))
-    ])
-      .then(([quizzes, sessionsData]) => {
-        setAllData(quizzes);
-        setAllSessions(sessionsData);
-      })
-      .catch(() => { })
-      .finally(() => setLoadingData(false));
-  };
+  const fetchData = useCallback(async () => {
+    setLoadingData(true);
+    setDataError("");
+    const results = await Promise.allSettled([
+      fetch("/api/quizzes?all=true", { signal: AbortSignal.timeout(20000) }).then(async r => {
+        if (!r.ok) throw new Error("Could not load quizzes");
+        const data = await r.json();
+        if (!Array.isArray(data)) throw new Error("Invalid quiz response");
+        setAllData(data);
+      }),
+      fetch("/api/sessions", { signal: AbortSignal.timeout(20000) }).then(async r => {
+        if (!r.ok) throw new Error("Could not load sessions");
+        const data = await r.json();
+        if (!Array.isArray(data)) throw new Error("Invalid session response");
+        setAllSessions(data);
+      }),
+    ]);
+    if (results.some(result => result.status === "rejected")) {
+      setDataError("Some data could not be loaded. Please retry.");
+    }
+    setLoadingData(false);
+  }, []);
 
   useEffect(() => {
-    if (!isAdmin) return;
-    fetch("/api/admin/stats")
-      .then((r) => (r.ok ? r.json() : null))
-      .then(setStats)
-      .catch(() => { })
-      .finally(() => setFetchingStats(false));
-    fetchData();
-  }, [isAdmin]);
+    if (!isAdmin || activeTab !== "dashboard") return;
+    const controller = new AbortController();
+    // Loading state belongs to this external request lifecycle.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFetchingStats(true);
+    setStatsError("");
+    fetch("/api/admin/stats", { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]) })
+      .then(async r => {
+        if (!r.ok) throw new Error("Could not load statistics");
+        return r.json();
+      })
+      .then(data => { if (!controller.signal.aborted) setStats(data); })
+      .catch(() => { if (!controller.signal.aborted) setStatsError("Statistics could not be loaded. Please retry."); })
+      .finally(() => { if (!controller.signal.aborted) setFetchingStats(false); });
+    return () => controller.abort();
+  }, [isAdmin, activeTab, statsRetry]);
 
   useEffect(() => {
-    if (!isAdmin) return;
-    return watchSessionRooms(setRooms);
-  }, [isAdmin]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (isAdmin && activeTab === "quizzes-manager") void fetchData();
+  }, [isAdmin, activeTab, fetchData]);
 
-  const liveSessions = useMemo<LiveSession[]>(() => {
-    return allData
-      .map((session) => {
-        const room = rooms[session.id];
-        if (!room || (room.status !== "waiting" && room.status !== "started"))
-          return null;
-        return { session, room, liveAt: getLatestActivity(room) };
-      })
-      .filter((entry): entry is LiveSession => entry !== null)
-      .sort((a, b) => {
-        if (a.room.status !== b.room.status)
-          return a.room.status === "started" ? -1 : 1;
-        return b.liveAt - a.liveAt;
+  useEffect(() => {
+    if (!isAdmin || activeTab !== "quizzes-manager") return;
+    // RTDB rules permit reads at /sessions/:id, not at the sessions root.
+    const unsubscribers = allSessions.map(session => watchRoom(session.id, room => {
+      setRooms(previous => {
+        const next = { ...previous };
+        if (room) next[session.id] = room;
+        else delete next[session.id];
+        return next;
       });
-  }, [allData, rooms]);
-
-  const currentLive = liveSessions[0] ?? null;
-  const sessions = allData;
+    }));
+    return () => unsubscribers.forEach(unsubscribe => unsubscribe());
+  }, [isAdmin, activeTab, allSessions]);
 
   const handleDeleteQuiz = async (id: string) => {
-    await fetch(`/api/quizzes/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/quizzes/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to delete quiz");
     setAllData((prev) => prev.filter((s) => s.id !== id));
   };
 
   const handleDeleteSession = async (id: string) => {
-    await fetch(`/api/sessions/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/sessions/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to delete session");
     setAllSessions((prev) => prev.filter((s) => s.id !== id));
   };
 
@@ -219,9 +196,11 @@ function AdminDashboardContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ createdBy: user.uid, isQuizDuplicate }),
       });
-      if (res.ok) fetchData();
+      if (!res.ok) throw new Error("Failed to duplicate quiz");
+      await fetchData();
     } catch (err) {
       console.error(err);
+      throw err;
     } finally {
       setLoadingData(false);
     }
@@ -237,7 +216,7 @@ function AdminDashboardContent() {
         body: JSON.stringify({ quizId, userId: user.uid, isPrivate, name }),
       });
       if (res.ok) {
-        fetchData();
+        await fetchData();
       } else {
         const errData = await res.json();
         throw new Error(errData.error || "Failed to create session");
@@ -269,45 +248,7 @@ function AdminDashboardContent() {
     }
   };
 
-  const handleCloseSession = async () => {
-    if (!currentLive) return;
-    if (!confirm("Close this session? Players will be disconnected.")) return;
-    try {
-      await endRoom(currentLive.session.id);
-      await closeLobby(currentLive.session.id);
-      showToast("Session closed", "success");
-    } catch {
-      showToast("Failed to close session", "error");
-    }
-  };
-
-  const copyInvite = async (live: LiveSession) => {
-    if (typeof window === "undefined" || !live.room.joinToken) return;
-    const shareLink = `${window.location.origin}/join/${live.room.joinToken}`;
-    try {
-      await navigator.clipboard.writeText(shareLink);
-      setCopiedSessionId(live.session.id);
-      showToast("Invite link copied", "success");
-      setTimeout(
-        () => setCopiedSessionId((c) => (c === live.session.id ? null : c)),
-        2000,
-      );
-    } catch {
-      showToast("Could not copy invite link", "error");
-    }
-  };
-
   if (authLoading || !isAdmin) return null;
-
-  const liveShareLink =
-    currentLive?.room.joinToken && typeof window !== "undefined"
-      ? `${window.location.origin}/join/${currentLive.room.joinToken}`
-      : "";
-  const livePlayers = Object.entries(currentLive?.room.players ?? {});
-  const liveScores = Object.values(
-    currentLive?.room.scores ?? {},
-  ) as PlayerScore[];
-  const finishedCount = liveScores.filter((s) => s.finished).length;
 
   const statCards = [
     {
@@ -334,12 +275,6 @@ function AdminDashboardContent() {
   ];
 
   const maxActivity = stats ? Math.max(...stats.monthlyActivity, 1) : 1;
-  const correctPct = stats?.scoreDistribution.correct ?? 0;
-  const incorrectPct = stats?.scoreDistribution.incorrect ?? 0;
-  const C = 502.65;
-  const correctDash = (correctPct / 100) * C;
-  const incorrectDash = (incorrectPct / 100) * C;
-  const maxHistogram = stats ? Math.max(...stats.scoreHistogram, 1) : 1;
   const maxQuizPlays = stats?.topQuizzes.length
     ? Math.max(...stats.topQuizzes.map((q) => q.play_count), 1)
     : 1;
@@ -350,6 +285,13 @@ function AdminDashboardContent() {
         activeTab === "quizzes-manager" ? "max-w-[1600px]" : "max-w-6xl"
       }`}
     >
+      {(activeTab === "dashboard" ? statsError : dataError) && (
+        <div role="alert" className="rounded-2xl border border-red-300 bg-red-50 p-4 text-red-800">
+          {activeTab === "dashboard" ? statsError : dataError}
+          <button className="ml-4 underline" onClick={() => activeTab === "dashboard" ? setStatsRetry(n => n + 1) : void fetchData()}>Retry</button>
+        </div>
+      )}
+      {activeTab === "quizzes-manager" && loadingData && <p role="status">Loading quizzes and sessions…</p>}
       <AnimatePresence mode="wait" initial={false}>
         {/* ── DASHBOARD TAB ── */}
         {activeTab === "dashboard" && (

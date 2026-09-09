@@ -289,6 +289,7 @@ export type UserSessionEntry = {
   sessionId: string;
   sessionName: string;
   mode: 'lobby' | 'team' | 'solo';
+  lastActiveAt?: number;
   roomId?: string;
   joinedAt: number;
 };
@@ -303,7 +304,7 @@ export async function trackUserSession(
 ): Promise<void> {
   const id = userSessionEntryId(entry.sessionId, entry.roomId);
   const entryRef = ref(rtdb, `userSessions/${uid}/${id}`);
-  onDisconnect(entryRef).remove();
+  await onDisconnect(entryRef).remove();
   await set(entryRef, entry);
 }
 
@@ -413,4 +414,38 @@ export function watchTeamRoom(
   const handler = (snap: DataSnapshot) => callback(snap.val() as TeamRoom | null);
   onValue(roomRef, handler);
   return () => off(roomRef, 'value', handler);
+}
+
+// A play layout survives lobby → question navigation. Refresh only existing
+// index entries so completed/removed entries cannot be resurrected by a timer.
+export function maintainSessionPresence(uid: string, sessionId: string): () => void {
+  let stopped = false;
+  let updating = false;
+  const refresh = async () => {
+    if (stopped || updating) return;
+    updating = true;
+    try {
+      const snapshot = await get(ref(rtdb, `userSessions/${uid}`));
+      const entries = (snapshot.val() ?? {}) as Record<string, UserSessionEntry>;
+      await Promise.all(Object.entries(entries).filter(([, entry]) => entry.sessionId === sessionId).map(async ([id, entry]) => {
+        if (stopped) return;
+        const entryRef = ref(rtdb, `userSessions/${uid}/${id}`);
+        const playerRef = ref(rtdb, entry.roomId
+          ? `teamRooms/${entry.roomId}/players/${uid}`
+          : `sessions/${sessionId}/players/${uid}`);
+        await Promise.all([onDisconnect(entryRef).remove(), onDisconnect(playerRef).remove()]);
+        if (stopped) return;
+        await runTransaction(entryRef, current => current ? { ...current, lastActiveAt: Date.now() } : undefined);
+      }));
+    } catch (error) {
+      console.error('Could not refresh session presence:', error);
+    } finally {
+      updating = false;
+    }
+  };
+  const unsubscribe = onValue(ref(rtdb, '.info/connected'), snapshot => {
+    if (snapshot.val() === true) void refresh();
+  });
+  const timer = setInterval(() => void refresh(), 30_000);
+  return () => { stopped = true; clearInterval(timer); unsubscribe(); };
 }

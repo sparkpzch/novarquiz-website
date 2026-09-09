@@ -47,19 +47,25 @@ async function hasLayeredAnalyticsSchema() {
 
 export async function getAllQuizzes() {
   const result = await queryWithRetry(
-    `SELECT qs.*, 
-      COALESCE(p.display_name, (SELECT user_display_name FROM leaderboard_entries le WHERE le.user_id = qs.created_by LIMIT 1)) as creator_name,
-      (SELECT COUNT(*) FROM questions q WHERE q.session_id = qs.id)::int AS question_count,
-      (SELECT COUNT(*) 
-       FROM leaderboard_entries le 
-       JOIN sessions s ON le.session_id::text = s.id::text 
-       WHERE s.session_id::text = qs.id::text)::int AS play_count,
-      (SELECT COALESCE(ROUND(AVG(le.total_score)), 0) 
-       FROM leaderboard_entries le 
-       JOIN sessions s ON le.session_id::text = s.id::text 
-       WHERE s.session_id::text = qs.id::text)::int AS avg_score
+    `WITH question_counts AS (
+       SELECT session_id, COUNT(*)::int AS question_count FROM questions GROUP BY session_id
+     ), play_stats AS (
+       SELECT s.session_id, COUNT(*)::int AS play_count,
+         COALESCE(ROUND(AVG(le.total_score)), 0)::int AS avg_score
+       FROM leaderboard_entries le JOIN sessions s ON le.session_id::text = s.id::text
+       GROUP BY s.session_id
+     ), names AS (
+       SELECT DISTINCT ON (user_id) user_id, user_display_name
+       FROM leaderboard_entries ORDER BY user_id, completed_at DESC NULLS LAST
+     )
+     SELECT qs.*, COALESCE(p.display_name, names.user_display_name) AS creator_name,
+       COALESCE(qc.question_count, 0) AS question_count,
+       COALESCE(ps.play_count, 0) AS play_count, COALESCE(ps.avg_score, 0) AS avg_score
      FROM quizzes qs
      LEFT JOIN profiles p ON qs.created_by = p.uid
+     LEFT JOIN names ON names.user_id = qs.created_by
+     LEFT JOIN question_counts qc ON qc.session_id = qs.id
+     LEFT JOIN play_stats ps ON ps.session_id = qs.id
      ORDER BY qs.created_at DESC`
   );
   return result.rows;
@@ -69,20 +75,26 @@ export async function getAllSessions(visibleToUid?: string) {
   const where = visibleToUid ? `WHERE (s.is_private = FALSE OR s.user_id = $1)` : '';
   const params = visibleToUid ? [visibleToUid] : [];
   const result = await queryWithRetry(
-    `SELECT s.*,
-      q.name as quiz_name,
-      s.name as raw_session_name,
-      COALESCE(s.name, q.name) as name,
-      q.description as description,
-      q.cover_image_url as cover_image_url,
-      q.share_token as share_token,
-      COALESCE(p.display_name, (SELECT user_display_name FROM leaderboard_entries le WHERE le.user_id = s.user_id LIMIT 1)) as user_name,
-      (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count,
-      (SELECT COUNT(*) FROM leaderboard_entries le WHERE le.session_id::text = s.id::text)::int AS play_count,
-      (SELECT COALESCE(ROUND(AVG(le.total_score)), 0) FROM leaderboard_entries le WHERE le.session_id::text = s.id::text)::int AS avg_score
-     FROM sessions s
-     JOIN quizzes q ON s.session_id = q.id
+    `WITH question_counts AS (
+       SELECT session_id, COUNT(*)::int AS question_count FROM questions GROUP BY session_id
+     ), play_stats AS (
+       SELECT session_id, COUNT(*)::int AS play_count,
+         COALESCE(ROUND(AVG(total_score)), 0)::int AS avg_score
+       FROM leaderboard_entries GROUP BY session_id
+     ), names AS (
+       SELECT DISTINCT ON (user_id) user_id, user_display_name
+       FROM leaderboard_entries ORDER BY user_id, completed_at DESC NULLS LAST
+     )
+     SELECT s.*, q.name AS quiz_name, s.name AS raw_session_name,
+       COALESCE(s.name, q.name) AS name, q.description, q.cover_image_url, q.share_token,
+       COALESCE(p.display_name, names.user_display_name) AS user_name,
+       COALESCE(qc.question_count, 0) AS question_count,
+       COALESCE(ps.play_count, 0) AS play_count, COALESCE(ps.avg_score, 0) AS avg_score
+     FROM sessions s JOIN quizzes q ON s.session_id = q.id
      LEFT JOIN profiles p ON s.user_id = p.uid
+     LEFT JOIN names ON names.user_id = s.user_id
+     LEFT JOIN question_counts qc ON qc.session_id = q.id
+     LEFT JOIN play_stats ps ON ps.session_id::text = s.id::text
      ${where}
      ORDER BY s.started_at DESC`,
     params,

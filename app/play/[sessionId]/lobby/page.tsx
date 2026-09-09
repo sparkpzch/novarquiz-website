@@ -3,7 +3,7 @@
 import { use, useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { watchRoomStatus, watchRoomPlayers, leaveWaitingRoom, type WaitingPlayer } from '@/lib/firebase/rtdb';
+import { watchRoomStatus, watchRoomPlayers, leaveWaitingRoom, untrackUserSession, type WaitingPlayer } from '@/lib/firebase/rtdb';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Quiz } from '@/lib/types';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
@@ -51,7 +51,10 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
   useEffect(() => {
     if (!session?.id) return;
     return watchRoomStatus(session.id, (status) => {
-      if (status === 'started') router.push(`/play/${session.id}/question`);
+      if (status === 'started') {
+        shouldLeaveOnUnmountRef.current = false;
+        router.push(`/play/${session.id}/question`);
+      }
     });
   }, [router, session?.id]);
 
@@ -77,7 +80,8 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
     return () => {
       const uid = joinedUserIdRef.current;
       if (shouldLeaveOnUnmountRef.current && uid && session?.id) {
-        leaveWaitingRoom(session.id, uid);
+        void leaveWaitingRoom(session.id, uid).catch(console.error);
+        void untrackUserSession(uid, session.id).catch(console.error);
       }
     };
   }, [session?.id]);
@@ -85,7 +89,7 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
   const handleLeave = useCallback(async () => {
     if (!session) return;
     shouldLeaveOnUnmountRef.current = false;
-    if (user) await leaveWaitingRoom(session.id, user.uid);
+    if (user) await Promise.all([leaveWaitingRoom(session.id, user.uid), untrackUserSession(user.uid, session.id)]);
     router.push('/');
   }, [router, session, user]);
 

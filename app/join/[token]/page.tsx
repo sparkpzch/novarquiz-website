@@ -49,19 +49,6 @@ export default function JoinPage({
     }
   }, [authLoading, user]);
 
-  // Show error early if anonymous sign-in failed (user stays null after auth settles).
-  if (!authLoading && !user && fetchError) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-8 text-center max-w-md w-full">
-          <div className="text-5xl mb-4">⚠️</div>
-          <h1 className="text-xl font-bold text-white mb-2">Unable to Join</h1>
-          <p className="text-gray-400 text-sm">{fetchError}</p>
-        </div>
-      </div>
-    );
-  }
-
   // Resolve join token → session info, then check room status in the background.
   // API path (~200 ms) covers pin_code / session-id tokens from the quizzes page.
   // RTDB path covers ephemeral lobby tokens from host-generated share links.
@@ -201,6 +188,19 @@ export default function JoinPage({
   };
 
   // Show spinner while Firebase resolves auth state (including anonymous sign-in).
+  // Show error early if anonymous sign-in failed (user stays null after auth settles).
+  if (!authLoading && !user && fetchError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-8 text-center max-w-md w-full">
+          <div className="text-5xl mb-4">⚠️</div>
+          <h1 className="text-xl font-bold text-white mb-2">Unable to Join</h1>
+          <p className="text-gray-400 text-sm">{fetchError}</p>
+        </div>
+      </div>
+    );
+  }
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">

@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import {
   getRoom,
+  watchRoom,
+  watchTeamRoom,
   resolveJoinToken,
   watchUserSessions,
   type UserSessionEntry,
 } from "@/lib/firebase/rtdb";
+import { canResumeRoom, hasRecentSessionPresence } from "@/lib/session-resume";
 import { ROOM_STATUS } from "@/lib/constants/session";
 import { useToast } from "@/components/ui/Toast";
 import { useTranslation } from "react-i18next";
@@ -61,14 +64,38 @@ function LiveSessionsWidget() {
   const { user } = useAuth();
   const router = useRouter();
   const [entries, setEntries] = useState<Record<string, UserSessionEntry>>({});
+  const [validRooms, setValidRooms] = useState<Record<string, boolean>>({});
+  const [now, setNow] = useState(() => Date.now());
   const [resuming, setResuming] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    return watchUserSessions(user.uid, setEntries);
+    return watchUserSessions(user.uid, data => { setEntries(data); setValidRooms({}); });
   }, [user]);
 
-  const list = Object.values(entries).sort((a, b) => b.joinedAt - a.joinedAt);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribers = Object.entries(entries).map(([id, entry]) => {
+      const updateValidity = (valid: boolean) => setValidRooms(previous => ({ ...previous, [id]: valid }));
+      if (entry.mode === "team" && entry.roomId) {
+        return watchTeamRoom(entry.roomId, room => updateValidity(
+          room?.sessionId === entry.sessionId && canResumeRoom(room, user.uid),
+        ));
+      }
+      return watchRoom(entry.sessionId, room => updateValidity(canResumeRoom(room, user.uid)));
+    });
+    return () => unsubscribers.forEach(unsubscribe => unsubscribe());
+  }, [entries, user]);
+
+  const list = Object.entries(entries)
+    .filter(([id, entry]) => validRooms[id] && hasRecentSessionPresence(entry, now))
+    .map(([, entry]) => entry)
+    .sort((a, b) => b.joinedAt - a.joinedAt);
   if (list.length === 0) return null;
 
   const entry = list[0];
@@ -92,6 +119,11 @@ function LiveSessionsWidget() {
         ? ((await sessionResponse.json()) as SessionResumeSnapshot)
         : null;
 
+      if (!session || !user || !canResumeRoom(room, user.uid)) {
+        setResuming(false);
+        return;
+      }
+
       if (room?.status === ROOM_STATUS.STARTED) {
         router.push(`/play/${entry.sessionId}/question`);
         return;
@@ -107,15 +139,9 @@ function LiveSessionsWidget() {
         return;
       }
     } catch {
-      // fall back to the local session index when live checks fail
+      // Do not navigate into a stale room when verification fails.
     }
-
-    if (entry.mode === "solo") {
-      router.push(`/play/${entry.sessionId}/question`);
-      return;
-    }
-
-    router.push(`/play/${entry.sessionId}/lobby`);
+    setResuming(false);
   };
 
   const modeLabel =
@@ -378,7 +404,7 @@ export default function DashboardPage() {
 
       <JoinByCodeCard />
 
-      <LiveSessionsWidget />
+      <LiveSessionsWidget key={user?.uid} />
 
     </div>
   );

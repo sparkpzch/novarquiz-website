@@ -1,15 +1,22 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import type { Quiz, Session } from "@/lib/types";
 import type { SessionRoom } from "@/lib/firebase/rtdb";
 import { SESSION_STATUS, ROOM_STATUS } from "@/lib/constants/session";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { openLobby, closeLobby, reopenLobby, startRoom, removeRoom } from "@/lib/firebase/rtdb";
-import { motion, AnimatePresence } from "motion/react";
 import InvitationModal from "@/components/InvitationModal";
+
+async function patchSession(sessionId: string, data: Record<string, unknown>) {
+  const response = await fetch(`/api/sessions/${sessionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error(`Session update failed (${response.status})`);
+}
 
 function ItemCard({
   title,
@@ -47,7 +54,7 @@ function ItemCard({
 
 interface QuizzesManagerProps {
   allData: Quiz[];
-  allSessions: (Session & { quiz_name?: string })[];
+  allSessions: (Session & { quiz_name?: string; play_count?: number; avg_score?: number; raw_session_name?: string | null })[];
   rooms: Partial<Record<string, SessionRoom>>;
   onDuplicate: (id: string, isQuizDuplicate: boolean) => Promise<void>;
   onCreateSession: (quizId: string, isPrivate: boolean, name?: string) => Promise<void>;
@@ -65,7 +72,6 @@ export default function QuizzesManager({
   onCreateSession,
   onDeleteQuiz,
   onDeleteSession,
-  onToggleStatus,
   onRefresh,
 }: QuizzesManagerProps) {
   const router = useRouter();
@@ -123,7 +129,7 @@ export default function QuizzesManager({
   }, [createSessionModal.isOpen, confirmModal.isOpen]);
 
   const filteredTemplates = allData.filter(q => {
-    const ownerId = (q as any).created_by || (q as any).user_id;
+    const ownerId = q.created_by;
     if (filterMode === "owned" && ownerId !== user?.uid) return false;
     if (sessionFilterQuizId && q.id !== sessionFilterQuizId) return false;
     if (searchQuery) {
@@ -149,19 +155,25 @@ export default function QuizzesManager({
     return true;
   });
 
-  const paginatedSessions = filteredSessions.slice((sessionPage - 1) * SESSION_ITEMS_PER_PAGE, sessionPage * SESSION_ITEMS_PER_PAGE);
+
   const totalSessionPages = Math.max(1, Math.ceil(filteredSessions.length / SESSION_ITEMS_PER_PAGE));
 
-  const paginatedTemplates = filteredTemplates.slice((quizPage - 1) * QUIZ_ITEMS_PER_PAGE, quizPage * QUIZ_ITEMS_PER_PAGE);
+
   const totalQuizPages = Math.max(1, Math.ceil(filteredTemplates.length / QUIZ_ITEMS_PER_PAGE));
 
-  const handleCreateSessionSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+
+  const safeSessionPage = Math.min(sessionPage, totalSessionPages);
+  const safeQuizPage = Math.min(quizPage, totalQuizPages);
+  const paginatedSessions = filteredSessions.slice((safeSessionPage - 1) * SESSION_ITEMS_PER_PAGE, safeSessionPage * SESSION_ITEMS_PER_PAGE);
+  const paginatedTemplates = filteredTemplates.slice((safeQuizPage - 1) * QUIZ_ITEMS_PER_PAGE, safeQuizPage * QUIZ_ITEMS_PER_PAGE);
+
+  const handleCreateSessionSubmit = async (isPrivate: boolean) => {
+    if (isSubmitting) return;
     if (!createSessionModal.quizId) return;
 
     setIsSubmitting(true);
     try {
-      await onCreateSession(createSessionModal.quizId, createSessionModal.isPrivate, createSessionModal.sessionName);
+      await onCreateSession(createSessionModal.quizId, isPrivate, createSessionModal.sessionName);
       setCreateSessionModal({ isOpen: false, quizId: null, quizName: "", isPrivate: true, sessionName: "" });
       showToast("Session created. Check the Sessions column.", "success");
     } catch (error) {
@@ -188,18 +200,10 @@ export default function QuizzesManager({
 
         if (!isPrivate) {
           await startRoom(sessionId);
-          await fetch(`/api/sessions/${sessionId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: SESSION_STATUS.STARTED, pin: token }),
-          });
+          await patchSession(sessionId, { status: SESSION_STATUS.STARTED, pin: token });
           showToast(`Session started!`, "success");
         } else {
-          await fetch(`/api/sessions/${sessionId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: SESSION_STATUS.OPENED, pin: token }),
-          });
+          await patchSession(sessionId, { status: SESSION_STATUS.OPENED, pin: token });
           showToast("Lobby opened! Share the invite link.", "success");
         }
         onRefresh();
@@ -216,16 +220,12 @@ export default function QuizzesManager({
     setItemLoading(sessionId, true);
     try {
       await removeRoom(sessionId);
-      await fetch(`/api/sessions/${sessionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: SESSION_STATUS.ARCHIVED, pin: null }),
-      });
+      await patchSession(sessionId, { status: SESSION_STATUS.ARCHIVED, pin: null });
       showToast("Session archived.", "success");
       onRefresh();
     } catch (err) {
       console.error("Archive failed:", err);
-      showToast("Failed to archive session.", "error");
+      throw err;
     } finally {
       setItemLoading(sessionId, false);
     }
@@ -235,11 +235,7 @@ export default function QuizzesManager({
     setItemLoading(sessionId, true);
     try {
       await closeLobby(sessionId);
-      await fetch(`/api/sessions/${sessionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: SESSION_STATUS.CLOSED, pin: null }),
-      });
+      await patchSession(sessionId, { status: SESSION_STATUS.CLOSED, pin: null });
       showToast("Session closed.", "success");
       onRefresh();
     } catch (err) {
@@ -281,7 +277,7 @@ export default function QuizzesManager({
   return (
     <div className="flex h-full w-full flex-col gap-6 pb-12 lg:gap-8">
       {/* Control Bar */}
-      <div className="nq-card rounded-[34px] p-4 flex flex-col sm:flex-row items-center gap-4 justify-between">
+      <div className="nq-card rounded-[34px] p-4 flex flex-col sm:flex-row sm:flex-wrap items-center gap-4 justify-between">
         <div className="flex items-center gap-2">
           <button
             onClick={() => { setFilterMode("owned"); setSessionPage(1); setQuizPage(1); }}
@@ -299,7 +295,7 @@ export default function QuizzesManager({
         <div className="flex items-center gap-2 w-full sm:w-auto">
           {sessionFilterQuizId && (
             <button
-              onClick={() => { setSessionFilterQuizId(null); setSessionPage(1); }}
+              onClick={() => { setSessionFilterQuizId(null); setSessionPage(1); setQuizPage(1); }}
               className="px-3 py-2 rounded-[20px] bg-[#E74C3C]/10 text-[#E74C3C] text-sm font-bold flex items-center gap-1 hover:bg-[#E74C3C]/20 transition-all"
             >
               Clear Template Filter ✕
@@ -322,7 +318,7 @@ export default function QuizzesManager({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-stretch flex-1">
         {/* LEFT COLUMN: Sessions */}
-        <div className="nq-card flex min-h-[720px] flex-col rounded-[34px] p-5 md:p-6 lg:min-h-[calc(100dvh-13rem)] lg:p-8">
+        <div className="nq-card flex min-w-0 flex-col rounded-[34px] p-5 md:p-6 lg:min-h-[calc(100dvh-13rem)] lg:p-8">
           <div className="mb-6 lg:mb-8">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#5D7EA1]">Live instances</p>
             <h2 className="mt-2 text-2xl md:text-3xl font-bold text-[#16324F]">Sessions</h2>
@@ -342,7 +338,6 @@ export default function QuizzesManager({
                   const status = (room?.status || s.status || SESSION_STATUS.CLOSED);
                   const isJoinOpen = status === ROOM_STATUS.WAITING || status === ROOM_STATUS.STARTED || status === SESSION_STATUS.OPENED;
                   const effectiveStatus = status === ROOM_STATUS.WAITING ? SESSION_STATUS.OPENED : status;
-                  const playerCount = room?.players ? Object.keys(room.players).length : 0;
 
                   return (
                     <ItemCard
@@ -380,6 +375,7 @@ export default function QuizzesManager({
                               <button
                                 onClick={() => {
                                   setSessionFilterQuizId(s.session_id);
+                                  setQuizPage(1);
                                   setSessionPage(1);
                                 }}
                                 className="p-1 rounded-[8px] bg-[#0460A9]/5 text-[#0460A9] hover:bg-[#0460A9]/15 transition-colors"
@@ -397,7 +393,7 @@ export default function QuizzesManager({
                       content={
                         <div className="flex flex-col gap-4 w-full">
                           <button
-                            onClick={() => router.push(`/admin/sessions/${s.slug || s.id}/analytics`)}
+                            onClick={() => router.push(`/admin/sessions/${s.id}/analytics`)}
                             className="bg-[#F8FAFC] rounded-[20px] p-4 border border-[#0460A9]/10 hover:bg-[#F1F5F9] transition-colors w-full text-left group"
                           >
                             <div className="flex items-center justify-between mb-3">
@@ -412,11 +408,11 @@ export default function QuizzesManager({
                             <div className="grid grid-cols-2 gap-4">
                               <div>
                                 <p className="text-[10px] font-semibold uppercase text-[#5D7EA1]/70">Total Players</p>
-                                <p className="text-lg font-bold text-[#16324F]">{(s as any).play_count || 0}</p>
+                                <p className="text-lg font-bold text-[#16324F]">{s.play_count || 0}</p>
                               </div>
                               <div>
                                 <p className="text-[10px] font-semibold uppercase text-[#5D7EA1]/70">Avg. Score</p>
-                                <p className="text-lg font-bold text-[#16324F]">{(s as any).avg_score || 0}</p>
+                                <p className="text-lg font-bold text-[#16324F]">{s.avg_score || 0}</p>
                               </div>
                             </div>
                           </button>
@@ -504,7 +500,7 @@ export default function QuizzesManager({
                             onClick={() => setConfirmModal({
                               isOpen: true,
                               id: s.id,
-                              name: (s as any).raw_session_name || "",
+                              name: s.raw_session_name || "",
                               confirmName: "",
                               type: "session",
                               action: "delete"
@@ -525,18 +521,18 @@ export default function QuizzesManager({
           {totalSessionPages > 1 && (
             <div className="mt-6 flex shrink-0 items-center justify-center gap-2 border-t border-[#0460A9]/10 pt-4">
               <button
-                onClick={() => setSessionPage(p => Math.max(1, p - 1))}
-                disabled={sessionPage === 1}
+                onClick={() => setSessionPage(Math.max(1, safeSessionPage - 1))}
+                disabled={safeSessionPage === 1}
                 className="px-3 py-1.5 rounded-[12px] bg-white border border-[#0460A9]/10 text-[#5D7EA1] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-sm"
               >
                 Prev
               </button>
               <span className="text-sm font-bold text-[#16324F] px-4">
-                {sessionPage} / {totalSessionPages}
+                {safeSessionPage} / {totalSessionPages}
               </span>
               <button
-                onClick={() => setSessionPage(p => Math.min(totalSessionPages, p + 1))}
-                disabled={sessionPage === totalSessionPages}
+                onClick={() => setSessionPage(Math.min(totalSessionPages, safeSessionPage + 1))}
+                disabled={safeSessionPage === totalSessionPages}
                 className="px-3 py-1.5 rounded-[12px] bg-white border border-[#0460A9]/10 text-[#5D7EA1] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-sm"
               >
                 Next
@@ -546,7 +542,7 @@ export default function QuizzesManager({
         </div>
 
         {/* RIGHT COLUMN: Quizzes */}
-        <div className="nq-card flex min-h-[720px] flex-col rounded-[34px] p-5 md:p-6 lg:min-h-[calc(100dvh-13rem)] lg:p-8">
+        <div className="nq-card flex min-w-0 flex-col rounded-[34px] p-5 md:p-6 lg:min-h-[calc(100dvh-13rem)] lg:p-8">
           <div className="mb-6 lg:mb-8 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#5D7EA1]">Templates</p>
@@ -588,6 +584,7 @@ export default function QuizzesManager({
                               <button
                                 onClick={() => {
                                   setSessionFilterQuizId(q.id);
+                                  setQuizPage(1);
                                   setSessionPage(1);
                                   // Scroll to sessions column for mobile
                                   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -656,18 +653,18 @@ export default function QuizzesManager({
           {totalQuizPages > 1 && (
             <div className="mt-6 flex shrink-0 items-center justify-center gap-2 border-t border-[#0460A9]/10 pt-4">
               <button
-                onClick={() => setQuizPage(p => Math.max(1, p - 1))}
-                disabled={quizPage === 1}
+                onClick={() => setQuizPage(Math.max(1, safeQuizPage - 1))}
+                disabled={safeQuizPage === 1}
                 className="px-3 py-1.5 rounded-[12px] bg-white border border-[#0460A9]/10 text-[#5D7EA1] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-sm"
               >
                 Prev
               </button>
               <span className="text-sm font-bold text-[#16324F] px-4">
-                {quizPage} / {totalQuizPages}
+                {safeQuizPage} / {totalQuizPages}
               </span>
               <button
-                onClick={() => setQuizPage(p => Math.min(totalQuizPages, p + 1))}
-                disabled={quizPage === totalQuizPages}
+                onClick={() => setQuizPage(Math.min(totalQuizPages, safeQuizPage + 1))}
+                disabled={safeQuizPage === totalQuizPages}
                 className="px-3 py-1.5 rounded-[12px] bg-white border border-[#0460A9]/10 text-[#5D7EA1] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-sm"
               >
                 Next
@@ -702,11 +699,8 @@ export default function QuizzesManager({
               <div className="flex flex-col gap-3 pt-2">
                 <button
                   className="w-full rounded-[22px] py-3 text-sm font-bold transition-all bg-[#0460A9] text-white hover:bg-[#03508C] shadow-lg shadow-[#0460A9]/20 flex items-center justify-center gap-2"
-                  onClick={() => {
-                    onCreateSession(createSessionModal.quizId!, true, createSessionModal.sessionName);
-                    setCreateSessionModal({ isOpen: false, quizId: null, quizName: "", isPrivate: true, sessionName: "" });
-                    showToast("Private Lobby created.", "success");
-                  }}
+                  disabled={isSubmitting}
+                  onClick={() => void handleCreateSessionSubmit(true)}
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
@@ -715,11 +709,8 @@ export default function QuizzesManager({
                 </button>
                 <button
                   className="w-full rounded-[22px] py-3 text-sm font-bold transition-all bg-[#8E44AD] text-white hover:bg-[#7D3C98] shadow-lg shadow-[#8E44AD]/20 flex items-center justify-center gap-2"
-                  onClick={() => {
-                    onCreateSession(createSessionModal.quizId!, false, createSessionModal.sessionName);
-                    setCreateSessionModal({ isOpen: false, quizId: null, quizName: "", isPrivate: true, sessionName: "" });
-                    showToast("Public Session created.", "success");
-                  }}
+                  disabled={isSubmitting}
+                  onClick={() => void handleCreateSessionSubmit(false)}
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" />
