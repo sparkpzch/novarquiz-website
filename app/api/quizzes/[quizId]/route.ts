@@ -34,6 +34,7 @@ const QuizUpdateSchema = z.object({
     .refine((v) => !v || MEDIA_PATH_RE.test(v), { message: 'invalid cover_image_path' }),
   timer_seconds: z.number().int().min(0).max(3600).nullable().optional(),
   is_published: z.boolean().optional(),
+  shuffle_choices: z.boolean().optional(),
 });
 
 export async function GET(_request: Request, { params }: { params: Promise<{ quizId: string }> }) {

@@ -17,7 +17,16 @@ import {
   type AllowedUsage,
   type ConsentPurposes,
   type HcpVectorMap,
+  type IntendedAudience,
 } from '../analytics/hcp';
+import { ANY_ARCHETYPE } from '../analytics/insights';
+import type {
+  DraftScenario,
+  InsightLocale,
+  InsightReviewStatus,
+  InsightSummary,
+  InsightTemplate,
+} from '../analytics/insights';
 import type { HealthStatsInput, HealthTopicRow } from '../stats/health';
 
 let layeredAnalyticsSchemaPromise: Promise<boolean> | null = null;
@@ -172,6 +181,23 @@ export async function resolveSessionToQuizId(sessionId: string): Promise<string 
 // Returns the earliest existing user_answers row for (session, user, question).
 // Used to make POST /api/play/.../answer idempotent so a player cannot probe
 // every choice and resubmit the highest-scoring one last.
+/**
+ * The player's answer to this question **in the current attempt**, if any.
+ *
+ * The caller uses this to refuse a second answer, which stops a player probing
+ * every label to learn its score_impact and resubmitting the best one. That
+ * guard has to be scoped to one attempt, or a replay keeps returning the
+ * previous run's row — the player picks a different answer and still sees the
+ * old points, which reads as "wrong answer marked correct".
+ *
+ * completeSession() writes leaderboard_entries.completed_at at the end of a
+ * run, and it is always later than that run's last answer, so it is the
+ * attempt boundary. There is one entry per (session, user), and its session_id
+ * is the same value user_answers carries — including for a shared session,
+ * where several players answer under one id and each has their own entry.
+ *
+ * Previous attempts stay in user_answers; only this lookup ignores them.
+ */
 export async function getExistingAnswer(
   sessionId: string,
   userId: string,
@@ -191,11 +217,21 @@ export async function getExistingAnswer(
          FROM user_answers ua
          LEFT JOIN choices c ON c.question_id = ua.question_id AND c.label = ua.chosen_label
          WHERE ua.session_id = $1 AND ua.user_id = $2 AND ua.question_id = $3
+           AND ua.answered_at > COALESCE(
+             (SELECT le.completed_at FROM leaderboard_entries le
+              WHERE le.session_id = $1 AND le.user_id = $2),
+             '-infinity'::timestamptz
+           )
          ORDER BY ua.answered_at ASC LIMIT 1`
       : `SELECT ua.id, ua.utility_score, c.explanation
          FROM user_answers ua
          LEFT JOIN choices c ON c.question_id = ua.question_id AND c.label = ua.chosen_label
          WHERE ua.session_id = $1 AND ua.user_id = $2 AND ua.question_id = $3
+           AND ua.answered_at > COALESCE(
+             (SELECT le.completed_at FROM leaderboard_entries le
+              WHERE le.session_id = $1 AND le.user_id = $2),
+             '-infinity'::timestamptz
+           )
          ORDER BY ua.answered_at ASC LIMIT 1`,
     [sessionId, userId, questionId],
   );
@@ -264,6 +300,7 @@ export async function createQuiz(data: {
 
 const ALLOWED_QUIZ_FIELDS: ReadonlySet<string> = new Set([
   'name', 'description', 'cover_image_url', 'cover_image_path', 'timer_seconds', 'is_published',
+  'shuffle_choices',
 ]);
 
 export async function updateQuiz(sessionId: string, data: Partial<{
@@ -273,6 +310,7 @@ export async function updateQuiz(sessionId: string, data: Partial<{
   cover_image_path: string;
   timer_seconds: number;
   is_published: boolean;
+  shuffle_choices: boolean;
 }>) {
   const client = await pool.connect();
   try {
@@ -563,9 +601,14 @@ export async function getQuestionsByQuiz(sessionId: string) {
 // Returns null if the question doesn't exist.
 export async function getQuizForQuestion(
   questionId: string,
-): Promise<{ quiz_id: string; is_published: boolean; created_by: string } | null> {
+): Promise<{
+  quiz_id: string;
+  is_published: boolean;
+  created_by: string;
+  shuffle_choices: boolean;
+} | null> {
   const result = await pool.query(
-    `SELECT qs.id AS quiz_id, qs.is_published, qs.created_by
+    `SELECT qs.id AS quiz_id, qs.is_published, qs.created_by, qs.shuffle_choices
        FROM questions q
        JOIN quizzes qs ON qs.id = q.session_id
       WHERE q.id = $1
@@ -574,7 +617,12 @@ export async function getQuizForQuestion(
   );
   const row = result.rows[0];
   if (!row) return null;
-  return { quiz_id: row.quiz_id, is_published: !!row.is_published, created_by: row.created_by };
+  return {
+    quiz_id: row.quiz_id,
+    is_published: !!row.is_published,
+    created_by: row.created_by,
+    shuffle_choices: !!row.shuffle_choices,
+  };
 }
 
 export async function getQuestionById(questionId: string) {
@@ -1571,21 +1619,24 @@ export async function getUserHistory(userId: string) {
 // resolved through questions.session_id, which always holds the quiz id,
 // whether user_answers.session_id is a quiz id or a sessions.id.
 export async function getUserHealthStatsInput(userId: string): Promise<HealthStatsInput> {
-  const [topics, days, totals] = await Promise.all([
+  const layered = await hasLayeredAnalyticsSchema();
+  const [topics, days, totals, profile, gaps] = await Promise.all([
     queryWithRetry<HealthTopicRow>(
       `SELECT qz.id AS quiz_id,
               qz.name AS quiz_name,
+              ${layered ? 'qz.intended_audience' : "'public'"} AS audience,
               COUNT(*)::int AS answered,
-              COUNT(*) FILTER (WHERE latest.utility_score > 0)::int AS positive
+              COUNT(*) FILTER (WHERE latest.utility_score > 0)::int AS positive,
+              MAX(latest.answered_at)::text AS last_answered_at
        FROM (
-         SELECT DISTINCT ON (session_id, question_id) question_id, utility_score
+         SELECT DISTINCT ON (session_id, question_id) question_id, utility_score, answered_at
          FROM user_answers
          WHERE user_id = $1
          ORDER BY session_id, question_id, answered_at DESC
        ) latest
        JOIN questions q ON q.id = latest.question_id
        JOIN quizzes qz ON qz.id = q.session_id
-       GROUP BY qz.id, qz.name`,
+       GROUP BY qz.id, qz.name${layered ? ', qz.intended_audience' : ''}`,
       [userId],
     ),
     queryWithRetry<{ day: string }>(
@@ -1607,6 +1658,39 @@ export async function getUserHealthStatsInput(userId: string): Promise<HealthSta
          (NOW() AT TIME ZONE 'Asia/Bangkok')::date::text AS today`,
       [userId],
     ),
+    // archetype_id is only non-NULL when the player consented to profiling,
+    // so this filter doubles as the consent gate for the whole insight.
+    layered
+      ? queryWithRetry<{ profile_vector_scores: Record<string, number> }>(
+          `SELECT profile_vector_scores
+           FROM leaderboard_entries
+           WHERE user_id = $1 AND archetype_id IS NOT NULL`,
+          [userId],
+        )
+      : Promise.resolve({ rows: [] as Array<{ profile_vector_scores: Record<string, number> }> }),
+    // Clinical tags the player's own non-positive answers carried. Latest
+    // answer per (session, question) only, matching the topic query above.
+    layered
+      ? queryWithRetry<{ quiz_id: string; tag: string }>(
+          `SELECT qz.id AS quiz_id, tag
+           FROM (
+             SELECT DISTINCT ON (ua.session_id, ua.question_id)
+                    ua.question_id, ua.utility_score, c.clinical_tags
+             FROM user_answers ua
+             JOIN choices c
+               ON c.question_id = ua.question_id AND c.label = ua.chosen_label
+             WHERE ua.user_id = $1
+             ORDER BY ua.session_id, ua.question_id, ua.answered_at DESC
+           ) latest
+           JOIN questions q ON q.id = latest.question_id
+           JOIN quizzes qz ON qz.id = q.session_id
+           CROSS JOIN LATERAL jsonb_array_elements_text(latest.clinical_tags) AS t(tag)
+           WHERE latest.utility_score <= 0
+           GROUP BY qz.id, tag
+           ORDER BY qz.id, COUNT(*) DESC, tag ASC`,
+          [userId],
+        )
+      : Promise.resolve({ rows: [] as Array<{ quiz_id: string; tag: string }> }),
   ]);
 
   return {
@@ -1615,6 +1699,264 @@ export async function getUserHealthStatsInput(userId: string): Promise<HealthSta
     today: totals.rows[0].today,
     completedQuizzes: totals.rows[0].completed,
     publishedQuizzes: totals.rows[0].published,
+    profileVectors: profile.rows.map((r) => r.profile_vector_scores ?? {}),
+    gapTagRows: gaps.rows,
+  };
+}
+
+// ===================== Insight templates =====================
+
+// Same lazy probe as hasLayeredAnalyticsSchema(): the app has to keep working
+// on a database where migration 010 has not been applied yet.
+let insightTemplatesSchemaPromise: Promise<boolean> | null = null;
+
+async function hasInsightTemplatesSchema() {
+  if (insightTemplatesSchemaPromise) return insightTemplatesSchemaPromise;
+
+  const probe = (async () => {
+    const result = await pool.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = 'insight_templates'
+       ) AS "exists"`,
+    );
+    return result.rows[0]?.exists ?? false;
+  })().catch(() => false);
+
+  // Only a positive answer is worth keeping: a table, once created, stays.
+  // Caching a negative one means a process that started before the migration
+  // ran serves `null` summaries forever — which is exactly what a long-running
+  // dev server did after migration 010 was applied mid-session.
+  const exists = await probe;
+  if (exists) insightTemplatesSchemaPromise = probe;
+  return exists;
+}
+
+/**
+ * The one summary a player is shown, or null when nothing approved matches.
+ * Most specific wins: quiz-scoped over global, a real archetype over the '*'
+ * wildcard, tag-scoped over tag-agnostic, and among tag-scoped rows the tag the
+ * player missed most often. Only review_status = 'approved' is ever considered.
+ */
+export async function getApprovedInsightSummary(params: {
+  quizId: string | null;
+  /** null for a public player, who has no clinical archetype. */
+  archetypeId: string | null;
+  tags: string[];
+  audience: IntendedAudience;
+  locale: InsightLocale;
+}): Promise<InsightSummary | null> {
+  if (!(await hasInsightTemplatesSchema())) return null;
+
+  const result = await queryWithRetry<InsightSummary>(
+    `SELECT headline, body, suggestion
+     FROM insight_templates
+     WHERE review_status = 'approved'
+       AND (archetype_id = $6 OR ($1::text IS NOT NULL AND archetype_id = $1))
+       AND audience = $2
+       AND locale = $3
+       AND (quiz_id IS NULL OR quiz_id = $4)
+       AND (clinical_tag = '' OR clinical_tag = ANY($5::text[]))
+     ORDER BY (quiz_id IS NOT NULL) DESC,
+              (archetype_id <> $6) DESC,
+              (clinical_tag <> '') DESC,
+              array_position($5::text[], clinical_tag) NULLS LAST
+     LIMIT 1`,
+    [params.archetypeId, params.audience, params.locale, params.quizId, params.tags, ANY_ARCHETYPE],
+  );
+
+  return result.rows[0] ?? null;
+}
+
+export async function listInsightTemplates(filters: {
+  quizId?: string | null;
+  archetypeId?: string;
+  audience?: IntendedAudience;
+  locale?: InsightLocale;
+  reviewStatus?: InsightReviewStatus;
+}): Promise<InsightTemplate[]> {
+  if (!(await hasInsightTemplatesSchema())) return [];
+
+  const result = await queryWithRetry<InsightTemplate>(
+    `SELECT id, quiz_id, archetype_id, clinical_tag, audience, locale,
+            headline, body, suggestion, review_status, source, model,
+            created_by, reviewed_by, reviewed_at, updated_at
+     FROM insight_templates
+     WHERE ($1::uuid IS NULL OR quiz_id = $1)
+       AND ($2::text IS NULL OR archetype_id = $2)
+       AND ($3::text IS NULL OR audience = $3)
+       AND ($4::text IS NULL OR locale = $4)
+       AND ($5::text IS NULL OR review_status = $5)
+     ORDER BY archetype_id ASC, clinical_tag ASC, locale ASC, updated_at DESC`,
+    [
+      filters.quizId ?? null,
+      filters.archetypeId ?? null,
+      filters.audience ?? null,
+      filters.locale ?? null,
+      filters.reviewStatus ?? null,
+    ],
+  );
+
+  return result.rows;
+}
+
+/**
+ * Create or replace one resolution key. Editing the text always drops the row
+ * back to 'draft' — an approval belongs to the wording that was reviewed, not
+ * to the slot it sits in.
+ */
+export async function upsertInsightTemplate(data: {
+  quizId: string | null;
+  archetypeId: string;
+  clinicalTag: string;
+  audience: IntendedAudience;
+  locale: InsightLocale;
+  headline: string;
+  body: string;
+  suggestion: string | null;
+  source: 'manual' | 'llm_draft';
+  model: string | null;
+  createdBy: string;
+}): Promise<InsightTemplate> {
+  const conflictTarget =
+    data.quizId === null
+      ? '(archetype_id, clinical_tag, audience, locale) WHERE quiz_id IS NULL'
+      : '(quiz_id, archetype_id, clinical_tag, audience, locale) WHERE quiz_id IS NOT NULL';
+
+  const result = await queryWithRetry<InsightTemplate>(
+    `INSERT INTO insight_templates
+       (quiz_id, archetype_id, clinical_tag, audience, locale,
+        headline, body, suggestion, source, model, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     ON CONFLICT ${conflictTarget} DO UPDATE SET
+       headline = EXCLUDED.headline,
+       body = EXCLUDED.body,
+       suggestion = EXCLUDED.suggestion,
+       source = EXCLUDED.source,
+       model = EXCLUDED.model,
+       review_status = 'draft',
+       reviewed_by = NULL,
+       reviewed_at = NULL,
+       updated_at = now()
+     RETURNING id, quiz_id, archetype_id, clinical_tag, audience, locale,
+               headline, body, suggestion, review_status, source, model,
+               created_by, reviewed_by, reviewed_at, updated_at`,
+    [
+      data.quizId,
+      data.archetypeId,
+      data.clinicalTag,
+      data.audience,
+      data.locale,
+      data.headline,
+      data.body,
+      data.suggestion,
+      data.source,
+      data.model,
+      data.createdBy,
+    ],
+    { allowWriteRetry: true },
+  );
+
+  return result.rows[0];
+}
+
+export async function reviewInsightTemplate(
+  id: string,
+  reviewStatus: InsightReviewStatus,
+  reviewerUid: string,
+): Promise<InsightTemplate | null> {
+  const result = await queryWithRetry<InsightTemplate>(
+    `UPDATE insight_templates
+     SET review_status = $2,
+         reviewed_by = CASE WHEN $2 = 'draft' THEN NULL ELSE $3 END,
+         reviewed_at = CASE WHEN $2 = 'draft' THEN NULL ELSE now() END,
+         updated_at = now()
+     WHERE id = $1
+     RETURNING id, quiz_id, archetype_id, clinical_tag, audience, locale,
+               headline, body, suggestion, review_status, source, model,
+               created_by, reviewed_by, reviewed_at, updated_at`,
+    [id, reviewStatus, reviewerUid],
+    { allowWriteRetry: true },
+  );
+
+  return result.rows[0] ?? null;
+}
+
+export async function deleteInsightTemplate(id: string): Promise<boolean> {
+  const result = await queryWithRetry('DELETE FROM insight_templates WHERE id = $1', [id], {
+    allowWriteRetry: true,
+  });
+  return (result.rowCount ?? 0) > 0;
+}
+
+/**
+ * The authored material a draft is allowed to draw on: the quiz blurb plus
+ * every situation and the answers that cost points, as the author worded them.
+ *
+ * Question and choice text exists in every quiz, so this works on any public
+ * quiz with no extra authoring. behaviour_meaning is folded in when someone has
+ * written it, but is never required. Nothing here comes from a player, which is
+ * what keeps the drafting call free of personal data.
+ */
+export async function getQuizDraftContext(
+  quizId: string,
+  clinicalTag: string,
+): Promise<{
+  quizName: string;
+  quizDescription: string | null;
+  audience: IntendedAudience;
+  scenarios: DraftScenario[];
+} | null> {
+  const layered = await hasLayeredAnalyticsSchema();
+
+  const quiz = await queryWithRetry<{
+    name: string;
+    description: string | null;
+    intended_audience: string | null;
+  }>(
+    `SELECT name, description, ${layered ? 'intended_audience' : "'public' AS intended_audience"}
+     FROM quizzes WHERE id = $1`,
+    [quizId],
+  );
+  if (!quiz.rows[0]) return null;
+
+  // Tag filtering only narrows when tags have actually been authored; asking
+  // for a tag nobody has assigned would otherwise yield an empty prompt.
+  const tagFilter = layered && clinicalTag ? 'AND c.clinical_tags ? $2' : '';
+
+  const rows = await queryWithRetry<{
+    question_text: string;
+    choice_text: string;
+    behavior_meaning: string | null;
+  }>(
+    `SELECT q.question_text, c.choice_text,
+            ${layered ? 'c.behavior_meaning' : 'NULL AS behavior_meaning'}
+     FROM choices c
+     JOIN questions q ON q.id = c.question_id
+     WHERE q.session_id = $1
+       AND c.score_impact <= 0
+       ${tagFilter}
+     ORDER BY q.question_order ASC, c.label ASC`,
+    layered && clinicalTag ? [quizId, clinicalTag] : [quizId],
+  );
+
+  const byQuestion = new Map<string, DraftScenario>();
+  for (const row of rows.rows) {
+    const scenario = byQuestion.get(row.question_text) ?? {
+      question: row.question_text,
+      poorChoices: [],
+    };
+    scenario.poorChoices.push(
+      row.behavior_meaning ? `${row.choice_text} — ${row.behavior_meaning}` : row.choice_text,
+    );
+    byQuestion.set(row.question_text, scenario);
+  }
+
+  return {
+    quizName: quiz.rows[0].name,
+    quizDescription: quiz.rows[0].description,
+    audience: (quiz.rows[0].intended_audience ?? 'public') as IntendedAudience,
+    scenarios: [...byQuestion.values()],
   };
 }
 

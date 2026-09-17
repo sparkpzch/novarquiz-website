@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { ref, deleteObject } from 'firebase/storage';
 import { storage } from '@/lib/firebase/config';
 import { useFFmpeg } from '@/lib/hooks/useFFmpeg';
+import { useToast } from '@/components/ui/Toast';
 import AutoPlayVideo from '@/components/ui/AutoPlayVideo';
 import {
   ALLOWED_USAGE_OPTIONS,
@@ -163,6 +164,7 @@ export function LeftInspector({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { load: loadFFmpeg, progress: ffmpegProgress, compressVideo } = useFFmpeg();
+  const { showToast } = useToast();
 
   const handleFileUpload = async (file: File) => {
     if (!file || !selectedNode) return;
@@ -174,6 +176,15 @@ export function LeftInspector({
         const blob = await compressVideo(file);
         onUpload(new File([blob], file.name.replace(/\.[^.]+$/, '.mp4'), { type: 'video/mp4' }));
       } catch {
+        // Falling back to the raw file uploads a video that was never run
+        // through `-movflags +faststart`, so its moov atom may sit at the end
+        // of the container. Safari then spends extra round trips seeking the
+        // tail before it can start playback. Upload it anyway — blocking the
+        // admin is worse — but never let this pass silently.
+        showToast(
+          'Video compression failed — uploading the original. It may load slowly on Safari; consider compressing it before upload.',
+          'error',
+        );
         onUpload(file);
       } finally {
         setCompressing(false);

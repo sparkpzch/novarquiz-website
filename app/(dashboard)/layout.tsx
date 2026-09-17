@@ -62,6 +62,11 @@ const desktopAdminItems: NavItem[] = [
     label: 'Quizzes Manager',
     icon: 'M3.75 3h16.5M3.75 7.5h16.5M3.75 12h16.5M3.75 16.5h16.5M3.75 21h16.5',
   },
+  {
+    href: '/admin/insights',
+    label: 'Insight Summaries',
+    icon: 'M12 3v1.5m0 15V21m9-9h-1.5m-15 0H3m15.364-6.364-1.06 1.06M6.696 17.304l-1.06 1.06m12.728 0-1.06-1.06M6.696 6.696l-1.06-1.06M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
+  },
 ];
 
 function Icon({ path, active = false }: { path: string; active?: boolean }) {

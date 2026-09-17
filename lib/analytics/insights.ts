@@ -1,0 +1,192 @@
+// Player-facing insight summaries.
+//
+// The division of labour this module exists to enforce: the *claim* a player
+// reads is picked deterministically from reviewed rows (insight_templates),
+// and an LLM only ever drafts wording for a human to approve beforehand. No
+// request-time generation, so nothing a player sees has skipped review.
+
+import type { IntendedAudience } from './hcp';
+
+/** Every id classifyArchetype() can return. */
+export const ARCHETYPE_IDS = [
+  'conservative_guideline_follower',
+  'evidence_seeking_early_adopter',
+  'qol_driven_prescriber',
+  'diagnostic_evidence_builder',
+  'balanced_clinician',
+] as const;
+
+export type ArchetypeId = (typeof ARCHETYPE_IDS)[number];
+
+/**
+ * Archetype wildcard. The six HCP vectors only describe clinical decision
+ * style, so a public quiz — a diet or symptom-response journey — produces no
+ * archetype at all. Rows keyed '*' apply to any player, which is what lets the
+ * whole feature work on an ordinary public quiz. A real archetype still wins
+ * over the wildcard when one is known.
+ */
+export const ANY_ARCHETYPE = '*';
+
+/** What the CMS offers and the API accepts for archetype_id. */
+export const ARCHETYPE_KEYS = [ANY_ARCHETYPE, ...ARCHETYPE_IDS] as const;
+
+export const INSIGHT_LOCALES = ['th', 'en'] as const;
+export type InsightLocale = (typeof INSIGHT_LOCALES)[number];
+
+export const INSIGHT_REVIEW_STATUSES = ['draft', 'reviewed', 'approved'] as const;
+export type InsightReviewStatus = (typeof INSIGHT_REVIEW_STATUSES)[number];
+
+export type InsightTemplate = {
+  id: string;
+  quiz_id: string | null;
+  archetype_id: string;
+  clinical_tag: string;
+  audience: IntendedAudience;
+  locale: InsightLocale;
+  headline: string;
+  body: string;
+  suggestion: string | null;
+  review_status: InsightReviewStatus;
+  source: 'manual' | 'llm_draft';
+  model: string | null;
+  created_by: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  updated_at: string;
+};
+
+/** What a player is shown. A strict subset of the template — no review metadata. */
+export type InsightSummary = Pick<InsightTemplate, 'headline' | 'body' | 'suggestion'>;
+
+export const HEADLINE_MAX = 120;
+// 200, not 400: at 400 a Thai body runs ~6 lines on a phone and pushes the
+// gauge and the topic bars off the first screen. This bound is enforced twice —
+// it is quoted into the prompt and re-checked by the validator — so lowering it
+// changes what the model drafts, not just what is accepted.
+export const BODY_MAX = 200;
+export const SUGGESTION_MAX = 200;
+
+// ── Draft validation ────────────────────────────────────────────────────────
+
+// A drafted summary describes what the player's *answers* showed and what to
+// discuss with a clinician. It must not name a condition as theirs, name a
+// drug, or tell them to change treatment — those are claims only a reviewed
+// medical source can make, and a model has no basis for them here.
+const FORBIDDEN_PATTERNS: Array<[RegExp, string]> = [
+  [/\b(you (have|are suffering from)|you['’]?ve got)\b/i, 'diagnoses the player'],
+  [/คุณ(เป็น|ป่วยเป็น|กำลังเป็น)(โรค|เบาหวาน|ความดัน|มะเร็ง)/, 'diagnoses the player'],
+  [/\b(mg|mcg|dose|dosage|prescribe|prescription)\b/i, 'gives dosing or prescribing advice'],
+  [/(ขนาดยา|สั่งยา|จ่ายยา|กินยา|หยุดยา|ปรับยา)/, 'gives medication advice'],
+  [/\b(diagnos(is|ed|e)|treatment plan|cure)\b/i, 'makes a clinical determination'],
+  [/(วินิจฉัย|รักษาหาย|แผนการรักษา)/, 'makes a clinical determination'],
+];
+
+export type DraftValidation = { ok: true; value: InsightSummary } | { ok: false; reason: string };
+
+function trimmed(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * Validate a model-drafted summary before it is stored, even as a draft.
+ * Rejecting here keeps text a reviewer would have to reject anyway out of the
+ * table entirely, so nothing unsafe is one accidental "approve" click away.
+ */
+export function validateInsightDraft(input: unknown): DraftValidation {
+  if (!input || typeof input !== 'object') return { ok: false, reason: 'not an object' };
+
+  const raw = input as Record<string, unknown>;
+  const headline = trimmed(raw.headline);
+  const body = trimmed(raw.body);
+  const suggestion = trimmed(raw.suggestion);
+
+  if (!headline) return { ok: false, reason: 'headline is empty' };
+  if (!body) return { ok: false, reason: 'body is empty' };
+  if (headline.length > HEADLINE_MAX) return { ok: false, reason: 'headline is too long' };
+  if (body.length > BODY_MAX) return { ok: false, reason: 'body is too long' };
+  if (suggestion.length > SUGGESTION_MAX) return { ok: false, reason: 'suggestion is too long' };
+
+  const joined = `${headline}\n${body}\n${suggestion}`;
+  for (const [pattern, reason] of FORBIDDEN_PATTERNS) {
+    if (pattern.test(joined)) return { ok: false, reason: `draft ${reason}` };
+  }
+
+  return { ok: true, value: { headline, body, suggestion: suggestion || null } };
+}
+
+/** Strip the ```json fence models often wrap structured output in. */
+export function parseDraftResponse(text: string): DraftValidation {
+  const unfenced = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  try {
+    return validateInsightDraft(JSON.parse(unfenced));
+  } catch {
+    return { ok: false, reason: 'response was not valid JSON' };
+  }
+}
+
+// ── Prompt ──────────────────────────────────────────────────────────────────
+
+/** One scenario the player got wrong, as the quiz author wrote it. */
+export type DraftScenario = {
+  question: string;
+  /** Choices that cost points, with behaviour_meaning appended when authored. */
+  poorChoices: string[];
+};
+
+export type DraftContext = {
+  quizName: string;
+  quizDescription: string | null;
+  archetypeId: string;
+  clinicalTag: string;
+  audience: IntendedAudience;
+  locale: InsightLocale;
+  /**
+   * The grounding material. Question and choice text is authored content that
+   * exists in every quiz, so drafting works without anyone filling in the
+   * optional HCP metadata first.
+   */
+  scenarios: DraftScenario[];
+};
+
+export function buildInsightPrompt(context: DraftContext): string {
+  const language = context.locale === 'th' ? 'Thai' : 'English';
+  const reader =
+    context.audience === 'hcp'
+      ? 'a healthcare professional reviewing their own answers'
+      : 'a member of the public with no medical training';
+
+  const scenarios = context.scenarios.flatMap((scenario, index) => [
+    `${index + 1}. ${scenario.question}`,
+    ...scenario.poorChoices.map((choice) => `   - answer that loses points: ${choice}`),
+  ]);
+
+  return [
+    `You are writing one short summary that ${reader} will read on their personal stats page`,
+    `after playing the quiz "${context.quizName}".`,
+    context.quizDescription ? `The quiz is about: ${context.quizDescription}` : '',
+    '',
+    'The situations in the quiz and the answers that count as poor choices, exactly as the',
+    'quiz author wrote them. This is your ONLY source of fact:',
+    ...scenarios,
+    '',
+    context.archetypeId && context.archetypeId !== ANY_ARCHETYPE
+      ? `Behavioural segment: ${context.archetypeId}`
+      : '',
+    context.clinicalTag ? `Topic they most often got wrong: ${context.clinicalTag}` : '',
+    '',
+    'Rules:',
+    `- Write in ${language}, in plain everyday words. No clinical jargon.`,
+    '- Describe what their ANSWERS showed. Never state or imply that they have a condition.',
+    '- Never name a medicine, a dose, or tell them to start, stop or change any treatment.',
+    '- Do not introduce any fact that is not in the list above.',
+    '- Write to the reader as "you". Do not name any character from the quiz story.',
+    '- Encouraging and matter-of-fact. Not alarming.',
+    `- headline: at most ${HEADLINE_MAX} characters.`,
+    `- body: 2-3 sentences, at most ${BODY_MAX} characters.`,
+    `- suggestion: one concrete next step, at most ${SUGGESTION_MAX} characters.`,
+    '',
+    'Reply with JSON only: {"headline": "...", "body": "...", "suggestion": "..."}',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}

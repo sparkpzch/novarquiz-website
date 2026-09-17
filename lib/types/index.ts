@@ -17,6 +17,8 @@ export interface Quiz {
   cover_image_path: string | null;
   timer_seconds: number | null;
   is_published: boolean;
+  /** Present choices in a randomised order. Display only — `Choice.label` is unchanged. */
+  shuffle_choices?: boolean;
   created_by: string;
   created_at: string;
   updated_at: string;

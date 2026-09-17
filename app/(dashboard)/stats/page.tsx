@@ -6,6 +6,10 @@ import { motion } from "motion/react";
 import { Trans, useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { WEAK_TOPIC_THRESHOLD, type HealthStats } from "@/lib/stats/health";
+import type { InsightSummary } from "@/lib/analytics/insights";
+
+/** health-stats returns the aggregate plus whichever reviewed summary matched. */
+type StatsResponse = HealthStats & { summary: InsightSummary | null };
 
 type HistoryEntry = {
   session_id: string;
@@ -136,25 +140,56 @@ function KnowledgeGauge({ stats }: { stats: HealthStats }) {
   );
 }
 
-function InsightCard({ stats }: { stats: HealthStats | null }) {
+function InsightCard({ stats }: { stats: StatsResponse }) {
   const { t } = useTranslation();
-  const weakest = stats?.weakestTopic;
+  const { summary, archetype, weakestTopic } = stats;
   const hl = <span className="text-[#E67E22]" />;
 
   return (
-    <section className="nq-card space-y-2 rounded-[24px] px-5 py-4 md:rounded-[28px] md:px-8 md:py-6">
-      {weakest && (
+    <section className="nq-card space-y-3 rounded-[24px] px-5 py-5 md:rounded-[28px] md:px-8 md:py-7">
+      <p className="text-[12px] font-semibold uppercase tracking-wide text-[#8AA4C0] md:text-[13px]">
+        {t("stats.insight_label")}
+      </p>
+
+      {/* A reviewed summary wins. Without one we fall back to the behavioural
+          segment, then to the plain weakest-topic line — every branch is text
+          the app itself owns, none of it generated at request time. */}
+      {summary ? (
         <>
-          <p className="text-[13px] font-medium text-[#5D7EA1] md:text-[15px]">{t("stats.insight_label")}</p>
-          <h2 className="text-[22px] font-bold leading-snug text-[#16324F] md:text-3xl">
+          <h2 className="font-display text-[26px] font-bold leading-tight tracking-tight text-[#16324F] md:text-[34px]">
+            {summary.headline}
+          </h2>
+          <p className="text-[15px] font-medium leading-relaxed text-[#35597F] md:text-[17px]">{summary.body}</p>
+          {summary.suggestion && (
+            <p className="flex gap-2.5 rounded-[14px] border-l-4 border-[#0D8C6D] bg-[#0D8C6D]/10 px-3.5 py-3 text-[13px] font-semibold leading-relaxed text-[#0A5C48] md:text-[15px]">
+              <span aria-hidden="true">👉</span>
+              {summary.suggestion}
+            </p>
+          )}
+        </>
+      ) : archetype ? (
+        <>
+          <h2 className="font-display text-[26px] font-bold leading-tight tracking-tight text-[#16324F] md:text-[34px]">
             <Trans
-              i18nKey={stats.topics.length > 1 ? "stats.insight_weakest" : "stats.insight_single"}
-              values={{ topic: weakest.name, score: weakest.score }}
+              i18nKey="stats.insight_archetype"
+              values={{ label: t(`stats.archetype_${archetype}`) }}
               components={{ hl }}
             />
           </h2>
+          <p className="text-[15px] font-medium leading-relaxed text-[#35597F] md:text-[17px]">
+            {t(`stats.archetype_${archetype}_desc`)}
+          </p>
         </>
-      )}
+      ) : weakestTopic ? (
+        <h2 className="font-display text-[26px] font-bold leading-tight tracking-tight text-[#16324F] md:text-[34px]">
+          <Trans
+            i18nKey={stats.topics.length > 1 ? "stats.insight_weakest" : "stats.insight_single"}
+            values={{ topic: weakestTopic.name, score: weakestTopic.score }}
+            components={{ hl }}
+          />
+        </h2>
+      ) : null}
+
       <p className="flex gap-2 rounded-[14px] bg-[#0460A9]/6 px-3 py-2.5 text-xs leading-relaxed text-[#5D7EA1] md:text-[13px]">
         <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={1.8} />
@@ -244,12 +279,16 @@ function HealthPanel({ stats }: { stats: HealthStats }) {
       </section>
 
       <div className="grid grid-cols-3 gap-2.5 md:gap-4">
-        <StatTile label={t("stats.accuracy")} value={stats.accuracy} unit="%" />
+        <StatTile
+          label={t("stats.topics_solid")}
+          value={stats.solidTopics}
+          unit={t("stats.of_topics", { total: stats.topics.length })}
+          valueClassName="text-[#0D8C6D]"
+        />
         <StatTile
           label={t("stats.answered")}
           value={stats.answered.toLocaleString()}
           unit={t("stats.unit_questions")}
-          valueClassName="text-[#0D8C6D]"
         />
         <StatTile
           label={t("stats.day_streak")}
@@ -270,6 +309,8 @@ function GamePanel({ history }: { history: HistoryEntry[] }) {
     : 0;
   const bestStreak = history.length ? Math.max(...history.map((h) => h.streak)) : 0;
   const totalCorrect = history.reduce((sum, h) => sum + h.correct_count, 0);
+  const totalAnswered = totalCorrect + history.reduce((sum, h) => sum + h.incorrect_count, 0);
+  const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
   const topRank = history.length ? `#${Math.min(...history.map((h) => h.rank))}` : "—";
   const recent = history.slice(0, RECENT_COUNT);
 
@@ -281,6 +322,7 @@ function GamePanel({ history }: { history: HistoryEntry[] }) {
         <StatTile label={t("stats.avg_score")} value={avgScore.toLocaleString()} />
         <StatTile label={t("stats.best_streak")} value={bestStreak} valueClassName="text-[#E67E22]" />
         <StatTile label={t("stats.correct")} value={totalCorrect.toLocaleString()} valueClassName="text-[#0D8C6D]" />
+        <StatTile label={t("stats.accuracy")} value={accuracy} unit="%" />
         <StatTile label={t("stats.top_rank")} value={topRank} />
       </div>
 
@@ -313,10 +355,10 @@ function GamePanel({ history }: { history: HistoryEntry[] }) {
 }
 
 export default function StatsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [health, setHealth] = useState<HealthStats | null>(null);
+  const [health, setHealth] = useState<StatsResponse | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState<Tab>("health");
@@ -328,14 +370,18 @@ export default function StatsPage() {
       if (!r.ok) throw new Error(`${path} ${r.status}`);
       return r.json();
     };
-    Promise.all([load<HistoryEntry[]>("history"), load<HealthStats>("health-stats")])
+    const locale = i18n.language?.startsWith("en") ? "en" : "th";
+    Promise.all([
+      load<HistoryEntry[]>("history"),
+      load<StatsResponse>(`health-stats?locale=${locale}`),
+    ])
       .then(([h, s]) => {
         setHistory(h);
         setHealth(s);
       })
       .catch(() => setFailed(true))
       .finally(() => setLoaded(true));
-  }, [user]);
+  }, [user, i18n.language]);
 
   const loading = !!user && !user.isAnonymous && !loaded;
 

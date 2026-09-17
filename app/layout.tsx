@@ -6,6 +6,7 @@ import { AuthProvider } from "@/lib/hooks/useAuth";
 import { ThemeProvider } from "@/lib/hooks/useTheme";
 import { ToastProvider } from "@/components/ui/Toast";
 import ConsentGate from "@/components/ConsentGate";
+import MediaPreconnect from "@/components/MediaPreconnect";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -45,6 +46,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col font-sans antialiased">
+        <MediaPreconnect />
         <div
           aria-hidden="true"
           className="nq-root-bg fixed inset-0 -z-10"

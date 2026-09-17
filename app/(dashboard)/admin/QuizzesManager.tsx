@@ -6,8 +6,17 @@ import type { Quiz, Session } from "@/lib/types";
 import type { SessionRoom } from "@/lib/firebase/rtdb";
 import { SESSION_STATUS, ROOM_STATUS } from "@/lib/constants/session";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { openLobby, closeLobby, reopenLobby, startRoom, removeRoom } from "@/lib/firebase/rtdb";
+import { openLobby, closeLobby, reopenLobby, startRoom, endRoom, removeRoom } from "@/lib/firebase/rtdb";
 import InvitationModal from "@/components/InvitationModal";
+
+async function updateQuiz(quizId: string, data: Record<string, unknown>) {
+  const response = await fetch(`/api/quizzes/${quizId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error(`Quiz update failed (${response.status})`);
+}
 
 async function patchSession(sessionId: string, data: Record<string, unknown>) {
   const response = await fetch(`/api/sessions/${sessionId}`, {
@@ -75,7 +84,7 @@ export default function QuizzesManager({
   onRefresh,
 }: QuizzesManagerProps) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { showToast } = useToast();
 
   const [createSessionModal, setCreateSessionModal] = useState<{ isOpen: boolean; quizId: string | null; quizName: string; isPrivate: boolean; sessionName: string }>({
@@ -103,6 +112,9 @@ export default function QuizzesManager({
   const [qrModal, setQrModal] = useState<{ isOpen: boolean; sessionId: string; sessionName: string; joinToken: string | null; slug: string | null } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingIds, setLoadingIds] = useState<Record<string, boolean>>({});
+  // Optimistic overrides for the Random Choices toggle; `allData` only catches
+  // up on the next onRefresh, which would otherwise snap the checkbox back.
+  const [shuffleOverrides, setShuffleOverrides] = useState<Record<string, boolean>>({});
 
   const setItemLoading = (id: string, isLoading: boolean) => {
     setLoadingIds(prev => ({ ...prev, [id]: isLoading }));
@@ -234,6 +246,7 @@ export default function QuizzesManager({
   const handleCloseSession = async (sessionId: string) => {
     setItemLoading(sessionId, true);
     try {
+      await endRoom(sessionId);
       await closeLobby(sessionId);
       await patchSession(sessionId, { status: SESSION_STATUS.CLOSED, pin: null });
       showToast("Session closed.", "success");
@@ -335,7 +348,10 @@ export default function QuizzesManager({
               <div className="space-y-4">
                 {paginatedSessions.map(s => {
                   const room = rooms[s.id];
-                  const status = (room?.status || s.status || SESSION_STATUS.CLOSED);
+                  // An 'ended' room is no longer live — fall back to the DB status
+                  // so a closed session shows as closed and can be reopened.
+                  const liveRoom = room?.status === ROOM_STATUS.ENDED ? undefined : room;
+                  const status = (liveRoom?.status || s.status || SESSION_STATUS.CLOSED);
                   const isJoinOpen = status === ROOM_STATUS.WAITING || status === ROOM_STATUS.STARTED || status === SESSION_STATUS.OPENED;
                   const effectiveStatus = status === ROOM_STATUS.WAITING ? SESSION_STATUS.OPENED : status;
 
@@ -570,6 +586,8 @@ export default function QuizzesManager({
               <div className="space-y-4">
                 {paginatedTemplates.map(q => {
                   const sessionCount = allSessions.filter(s => s.session_id === q.id).length;
+                  const canEditQuiz = isAdmin || q.created_by === user?.uid;
+                  const shuffleOn = shuffleOverrides[q.id] ?? !!q.shuffle_choices;
                   return (
                     <ItemCard
                       key={q.id}
@@ -599,6 +617,33 @@ export default function QuizzesManager({
                             )}
                           </div>
                           <p className="text-sm text-[#4D6F93] line-clamp-2 leading-relaxed">{q.description || "No description provided."}</p>
+                          {canEditQuiz && (
+                            <label className="flex w-fit cursor-pointer items-center gap-2 text-xs font-semibold text-[#5D7EA1] select-none">
+                              <input
+                                type="checkbox"
+                                checked={shuffleOn}
+                                disabled={loadingIds[q.id]}
+                                onChange={async (e) => {
+                                  const next = e.target.checked;
+                                  setShuffleOverrides(prev => ({ ...prev, [q.id]: next }));
+                                  setItemLoading(q.id, true);
+                                  try {
+                                    await updateQuiz(q.id, { shuffle_choices: next });
+                                    showToast(next ? "Random Choices enabled." : "Random Choices disabled.", "success");
+                                    onRefresh();
+                                  } catch {
+                                    setShuffleOverrides(prev => ({ ...prev, [q.id]: !next }));
+                                    showToast("Failed to update Random Choices.", "error");
+                                  } finally {
+                                    setItemLoading(q.id, false);
+                                  }
+                                }}
+                                className="h-4 w-4 cursor-pointer rounded-[5px] border-[#0460A9]/30 accent-[#0460A9] disabled:cursor-not-allowed"
+                              />
+                              Random Choices
+                              <span className="font-medium text-[#8AA4C0]">— shuffle answer order for each player</span>
+                            </label>
+                          )}
                         </div>
                       }
                       actions={

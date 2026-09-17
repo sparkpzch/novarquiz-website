@@ -20,9 +20,50 @@ const AnswerBody = z.object({
   is_guest: z.boolean().optional(),
 });
 
+// Deterministic PRNG so a question's choice order is stable for a given player.
+// The client fetches the same question more than once (prefetch on answer, then
+// a refetch when the prefetch failed, plus any reload), and a fresh random order
+// on each fetch would visibly reshuffle the list mid-question.
+function seedFrom(input: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+function mulberry32(seed: number): () => number {
+  let a = seed;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Fisher-Yates: a uniform permutation, so every choice lands on a distinct
+// position and none is dropped or duplicated.
+function shuffleChoices<T>(choices: T[], seed: string): T[] {
+  const out = [...choices];
+  const rand = mulberry32(seedFrom(seed));
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 // Strip answer-key and profiling fields from player-facing question payloads.
 // Choice outcomes are returned only after a player answers via POST.
-function sanitizeQuestion(question: Record<string, unknown> | null) {
+//
+// `shuffleSeed` reorders the choices for display when the quiz has
+// shuffle_choices on. Each choice keeps its own `label`, so branching
+// (question_connections.from_choice_label) and scoring (user_answers.chosen_label)
+// are unaffected by the order the player sees.
+function sanitizeQuestion(question: Record<string, unknown> | null, shuffleSeed?: string) {
   if (!question) return question;
   const choices = Array.isArray(question.choices)
     ? question.choices.map((choice) => {
@@ -40,6 +81,8 @@ function sanitizeQuestion(question: Record<string, unknown> | null) {
         return rest;
       })
     : question.choices;
+  const orderedChoices =
+    shuffleSeed && Array.isArray(choices) ? shuffleChoices(choices, shuffleSeed) : choices;
   const restQuestion = { ...question };
   delete restQuestion.intended_audience;
   delete restQuestion.presentation_mode;
@@ -47,7 +90,7 @@ function sanitizeQuestion(question: Record<string, unknown> | null) {
   delete restQuestion.jurisdiction_tags;
   delete restQuestion.medical_review_version;
   delete restQuestion.legal_document_versions_required;
-  return { ...restQuestion, choices };
+  return { ...restQuestion, choices: orderedChoices };
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
@@ -67,7 +110,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }
       const question = await getEntryQuestion(sessionId);
       if (!question) return NextResponse.json(null, { status: 404 });
-      return NextResponse.json(sanitizeQuestion(question));
+      return NextResponse.json(
+        sanitizeQuestion(question, quiz.shuffle_choices ? `${user.uid}:${question.id}` : undefined),
+      );
     }
 
     const fromQuestionId = searchParams.get('fromQuestionId');
@@ -80,7 +125,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }
       const next = await getNextQuestion(fromQuestionId, choiceLabel);
       if (!next) return NextResponse.json(null, { status: 404 });
-      return NextResponse.json(sanitizeQuestion(next));
+      // `next` is reachable only via a connection, so it shares fromQuestionId's quiz.
+      return NextResponse.json(
+        sanitizeQuestion(next, access.shuffle_choices ? `${user.uid}:${next.id}` : undefined),
+      );
     }
 
     const questionId = searchParams.get('questionId');
@@ -94,7 +142,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }
       const question = await getQuestionById(questionId);
       if (!question) return NextResponse.json(null, { status: 404 });
-      return NextResponse.json(sanitizeQuestion(question));
+      return NextResponse.json(
+        sanitizeQuestion(question, access.shuffle_choices ? `${user.uid}:${question.id}` : undefined),
+      );
     }
 
     return NextResponse.json({ error: 'Missing params' }, { status: 400 });
