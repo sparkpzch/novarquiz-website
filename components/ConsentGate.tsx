@@ -15,7 +15,7 @@ const EXEMPT_PATHS = ['/sign-in', '/sign-up', '/privacy', '/terms'];
 /**
  * Blocks signed-in users who have never consented, or who consented to an
  * older Terms/Privacy version, until they accept the current documents.
- * Declining signs them out. Optional purposes keep their stored values.
+ * Declining signs them out. Accepting enables Analytics & Profiling.
  */
 export default function ConsentGate() {
   const { user } = useAuth();
@@ -30,7 +30,7 @@ export default function ConsentGate() {
   useEffect(() => {
     if (!uid || exempt || checkedUid === uid) return;
     let cancelled = false;
-    fetch('/api/auth/consent')
+    fetch('/api/auth/consent', { cache: 'no-store' })
       .then((response) => (response.ok ? response.json() : null))
       .then((data: UserConsentProfile | null) => {
         if (cancelled || !data) return;
@@ -49,11 +49,9 @@ export default function ConsentGate() {
 
   if (!uid || exempt || !pending) return null;
 
-  // GET merges defaults into consent_purposes, so only trust optional
-  // purposes from an existing consent record, and profiling only when both
-  // opt-ins are set.
+  // GET merges defaults into consent_purposes, so only trust marketing from an
+  // existing consent record.
   const stored = pending.consented ? pending.consent_purposes : undefined;
-  const profiling = stored?.analytics_profiling === true && stored?.hcp_vectors_acknowledged === true;
 
   const handleAccept = async () => {
     try {
@@ -63,8 +61,10 @@ export default function ConsentGate() {
         body: JSON.stringify({
           consent_purposes: {
             platform_account: true,
-            analytics_profiling: profiling,
-            hcp_vectors_acknowledged: profiling,
+            // Accepting the documents enables Analytics & Profiling; users can
+            // turn it off in Profile.
+            analytics_profiling: true,
+            hcp_vectors_acknowledged: true,
             marketing_follow_up: stored?.marketing_follow_up === true,
           },
         }),

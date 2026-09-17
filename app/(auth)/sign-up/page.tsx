@@ -18,7 +18,6 @@ export default function SignUpPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
-  const [agreeProfiling, setAgreeProfiling] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showTermsTab, setShowTermsTab] = useState<'terms' | 'privacy'>('terms');
   const [error, setError] = useState('');
@@ -58,8 +57,8 @@ export default function SignUpPage() {
         body: JSON.stringify({
           consent_purposes: {
             platform_account: true,
-            analytics_profiling: agreeProfiling,
-            hcp_vectors_acknowledged: agreeProfiling,
+            analytics_profiling: true,
+            hcp_vectors_acknowledged: true,
           },
         }),
       });
@@ -180,20 +179,6 @@ export default function SignUpPage() {
             >
               Privacy Policy
             </button>
-          </span>
-        </label>
-
-        {/* Optional, unbundled opt-in for analytics & HCP clinical profiling */}
-        <label className="flex items-start gap-2.5 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={agreeProfiling}
-            onChange={(e) => setAgreeProfiling(e.target.checked)}
-            className="mt-0.5 h-[17px] w-[17px] flex-shrink-0 cursor-pointer accent-[#3b5fd4]"
-          />
-          <span className="text-sm text-gray-600 md:text-gray-400">
-            (Optional) I consent to Analytics &amp; Profiling, including clinical profiling vectors
-            calculated from my answers in HCP quizzes. You can change this later in Profile.
           </span>
         </label>
 

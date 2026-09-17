@@ -182,7 +182,8 @@ export default function TermsModal({ initialTab = 'terms', onClose, onAccept }: 
               <>
                 <p className="text-xs mb-3 text-center" style={{ color: c.muted }}>
                   By continuing, you agree to our Terms of Service and consent to personal data
-                  processing under PDPA.
+                  processing under PDPA, including Analytics &amp; Profiling (you can turn this off
+                  in Profile settings).
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -325,8 +326,9 @@ function PrivacyContent({ c }: { c: Palette }) {
         <p className="font-semibold mb-0.5" style={{ color: c.noticeTitle }}>PDPA Compliance Notice</p>
         <p style={{ color: c.noticeBody }}>
           This Privacy Policy complies with Thailand&apos;s Personal Data Protection Act B.E. 2562
-          (PDPA). NovarQuiz is the Data Controller. Consent for each processing purpose is
-          collected separately; only Platform Account is required to use the Service.
+          (PDPA). NovarQuiz is the Data Controller. Accepting these documents enables Platform
+          Account and Analytics &amp; Profiling; Analytics &amp; Profiling can be turned off at any
+          time in Profile settings.
         </p>
       </div>
 
@@ -345,28 +347,27 @@ function PrivacyContent({ c }: { c: Palette }) {
           proof of consent), browser type, session cookies.
         </p>
         <p>
-          <strong>Clinical Profiling Data (HCP/mixed-audience quizzes, opt-in only):</strong> Behavioural
+          <strong>Clinical Profiling Data (HCP/mixed-audience quizzes, while Analytics &amp; Profiling is on):</strong> Behavioural
           signals from your quiz choices, linked to your account and mapped to six practice-pattern vectors —
           Guideline Adherence, Innovation Adoption, Patient Centricity, Diagnostic Proactivity,
           Therapy Escalation, and Evidence Depth. No patient-identifiable data is collected.
         </p>
         <p>
-          <strong>Legal Basis:</strong> Explicit, unbundled consent (PDPA §19) collected
-          separately for each processing purpose at registration and manageable at any time
-          via Profile settings.
+          <strong>Legal Basis:</strong> Your consent (PDPA §19), given when you accept these
+          documents and manageable at any time via Profile settings.
         </p>
       </Section>
 
       <Section title="3. How We Use Your Data" c={c}>
-        <p>Processing is split by consent purpose — you may opt in or out of each independently:</p>
+        <p>Processing is split by consent purpose:</p>
         <ul className="list-disc list-inside space-y-0.5 mt-1">
           <li>
             <strong>Platform Account</strong> (required): authenticate identity, maintain account,
             calculate scores, leaderboards, quiz history.
           </li>
           <li>
-            <strong>Analytics &amp; Profiling</strong> (optional): performance analytics to improve
-            the Service.
+            <strong>Analytics &amp; Profiling</strong> (on when you accept; can be turned off):
+            performance analytics to improve the Service.
           </li>
           <li>
             <strong>CRM Linkage</strong> (optional): link account data with CRM systems for
@@ -379,8 +380,8 @@ function PrivacyContent({ c }: { c: Palette }) {
         </ul>
         <p className="mt-1">
           Clinical profiling vectors are calculated from your choices in HCP or mixed-audience
-          quizzes only if you have opted in to Analytics &amp; Profiling. Without that consent, only
-          your scores are recorded.
+          quizzes while Analytics &amp; Profiling is on. If you turn it off, only your scores are
+          recorded.
         </p>
       </Section>
 
@@ -400,21 +401,20 @@ function PrivacyContent({ c }: { c: Palette }) {
         </ul>
       </Section>
 
-      <Section title="Unbundled Consent" c={c}>
+      <Section title="Consent Choices" c={c}>
         <p>
-          Under PDPA §19, each processing purpose requires a separate, freely given consent.
-          Only <strong>Platform Account</strong> is required to use the Service; all other
-          purposes are optional.
+          Accepting these documents enables <strong>Platform Account</strong> and{' '}
+          <strong>Analytics &amp; Profiling</strong>. Other purposes are optional.
         </p>
         <ul className="list-disc list-inside space-y-0.5 mt-1">
           <li><strong>Platform Account</strong> — required; withdrawal requires account deletion</li>
-          <li><strong>Analytics &amp; Profiling</strong> — optional</li>
+          <li><strong>Analytics &amp; Profiling</strong> — on when you accept; turn off any time in Profile settings</li>
           <li><strong>CRM Linkage</strong> — optional</li>
           <li><strong>Marketing Follow-Up</strong> — optional</li>
         </ul>
         <p className="mt-1">
-          Opting in to Analytics &amp; Profiling (at sign-up or via Profile) also allows six
-          clinical profiling vectors to be calculated in HCP or mixed-audience quizzes: Guideline
+          While Analytics &amp; Profiling is on, six clinical profiling vectors are calculated in
+          HCP or mixed-audience quizzes: Guideline
           Adherence, Innovation Adoption, Patient Centricity, Diagnostic Proactivity, Therapy
           Escalation, and Evidence Depth.
         </p>

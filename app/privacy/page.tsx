@@ -23,7 +23,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold text-white mb-2">2. How We Use Your Data</h2>
           <p>We use your data to: (a) authenticate your identity; (b) calculate scores and leaderboards; (c) provide quiz history and statistics; (d) improve the Service through analytics; (e) comply with PDPA obligations.</p>
-          <p className="mt-1">If you opt in to Analytics &amp; Profiling (at sign-up or via Profile), your choices in HCP or mixed-audience quizzes are also used to calculate clinical profiling vectors linked to your account. Without that consent, only your scores are recorded.</p>
+          <p className="mt-1">Accepting our Terms and Privacy Policy turns on Analytics &amp; Profiling: your choices in HCP or mixed-audience quizzes are also used to calculate clinical profiling vectors linked to your account. You can turn this off at any time in Profile settings; after that, only your scores are recorded.</p>
         </section>
         <section>
           <h2 className="text-lg font-semibold text-white mb-2">Who Can See Your Data</h2>

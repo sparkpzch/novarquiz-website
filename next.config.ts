@@ -16,6 +16,14 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // API responses are per-user (session cookie); never let a CDN or the
+        // browser serve one user's cached response to a later request.
+        source: "/api/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store" },
+        ],
+      },
+      {
         // Static assets in /public — logo, icons, images
         source: "/image/:path*",
         headers: [

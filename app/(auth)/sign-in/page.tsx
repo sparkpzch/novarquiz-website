@@ -80,7 +80,13 @@ function SignInForm() {
         fetch('/api/auth/consent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ consent_purposes: { platform_account: true } }),
+          body: JSON.stringify({
+            consent_purposes: {
+              platform_account: true,
+              analytics_profiling: true,
+              hcp_vectors_acknowledged: true,
+            },
+          }),
         }),
       );
     } catch (err) {

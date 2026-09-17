@@ -350,7 +350,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!user || user.isAnonymous) return;
-    fetch("/api/auth/consent")
+    fetch("/api/auth/consent", { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
       .then((data: UserConsentProfile | null) => {
         const purposes = data?.consented ? data.consent_purposes : undefined;
