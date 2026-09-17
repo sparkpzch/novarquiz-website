@@ -12,6 +12,25 @@ import type { UserConsentProfile } from '@/lib/types';
 // Pages a signed-in user can still reach without re-accepting.
 const EXEMPT_PATHS = ['/sign-in', '/sign-up', '/privacy', '/terms'];
 
+// Remembers that this uid already accepted the current documents, so a page
+// refresh doesn't re-check and re-open the modal.
+const ACCEPTED_VALUE = `${TOS_VERSION}|${PRIVACY_VERSION}`;
+const acceptedKey = (uid: string) => `nq_consent_${uid}`;
+
+function hasAcceptedLocally(uid: string) {
+  try {
+    return localStorage.getItem(acceptedKey(uid)) === ACCEPTED_VALUE;
+  } catch {
+    return false;
+  }
+}
+
+function markAcceptedLocally(uid: string) {
+  try {
+    localStorage.setItem(acceptedKey(uid), ACCEPTED_VALUE);
+  } catch {}
+}
+
 /**
  * Blocks signed-in users who have never consented, or who consented to an
  * older Terms/Privacy version, until they accept the current documents.
@@ -28,7 +47,7 @@ export default function ConsentGate() {
   const uid = user && !user.isAnonymous ? user.uid : null;
 
   useEffect(() => {
-    if (!uid || exempt || checkedUid === uid) return;
+    if (!uid || exempt || checkedUid === uid || hasAcceptedLocally(uid)) return;
     let cancelled = false;
     fetch('/api/auth/consent', { cache: 'no-store' })
       .then((response) => (response.ok ? response.json() : null))
@@ -39,6 +58,7 @@ export default function ConsentGate() {
           data.consented &&
           data.tos_version === TOS_VERSION &&
           data.privacy_version === PRIVACY_VERSION;
+        if (upToDate) markAcceptedLocally(uid);
         setPending(upToDate ? null : data);
       })
       .catch(() => {});
@@ -70,6 +90,7 @@ export default function ConsentGate() {
         }),
       });
       if (!response.ok) throw new Error('Consent update failed');
+      markAcceptedLocally(uid);
       setPending(null);
     } catch {
       showToast('Failed to save consent. Please try again.', 'error');
