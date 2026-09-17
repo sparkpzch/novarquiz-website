@@ -27,9 +27,12 @@ env:
       - RUNTIME
 
   # Server credentials — Secret Manager only, never plain backend env.
+  # BUILD too: lib/db/postgres.ts creates the pool at import time, and
+  # `next build` imports route modules while collecting page data.
   - variable: DATABASE_URL
     secret: DATABASE_URL
     availability:
+      - BUILD
       - RUNTIME
   - variable: SESSION_SECRET
     secret: SESSION_SECRET
