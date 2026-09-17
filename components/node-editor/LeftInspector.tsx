@@ -402,6 +402,7 @@ export function LeftInspector({
                 )
               ) : (
                 <AutoPlayVideo
+                  key={draft.media_url ?? ''}
                   src={draft.media_url ?? ''}
                   controls
                   autoPlay
