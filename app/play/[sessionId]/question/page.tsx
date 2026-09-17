@@ -169,6 +169,7 @@ function prepareInlineVideo(src: string, preload: 'auto' | 'metadata') {
   // Attaching to the DOM and calling play() is the only reliable trigger.
   video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;pointer-events:none;';
   video.src = src;
+  video.dataset.warmSrc = src;
   document.body.appendChild(video);
   video.play().catch(() => {});
   return video;
@@ -576,6 +577,25 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     };
   }, [sessionId]);
 
+  // Guard against an accidental refresh/close mid-quiz: reloading restarts
+  // from the entry question. overscroll-behavior stops mobile pull-to-refresh,
+  // which never triggers the beforeunload prompt.
+  useEffect(() => {
+    if (finished) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = ''; // Safari and older Chromium still require this
+    };
+    const root = document.documentElement;
+    const previousOverscroll = root.style.overscrollBehaviorY;
+    root.style.overscrollBehaviorY = 'contain';
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      root.style.overscrollBehaviorY = previousOverscroll;
+    };
+  }, [finished]);
+
   const isSituation = question?.node_type === 'situation';
   const isEnd = question?.node_type === 'end';
   const selectedChoice = question?.choices.find((choice) => choice.label === selectedLabel) ?? null;
@@ -586,10 +606,15 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       explanationTimerRef.current = null;
     }
 
-    releaseVideo(currentVideoWarmupRef.current);
-    currentVideoWarmupRef.current = nextQuestion.media_type === 'video' && nextQuestion.media_url
-      ? prepareInlineVideo(nextQuestion.media_url, resolvePreload(videoQualityRef.current))
-      : null;
+    // Keep a warm-up element that is already buffering this video (handed over
+    // from the prefetch); restarting it would throw the buffered bytes away.
+    const nextVideoSrc = nextQuestion.media_type === 'video' ? nextQuestion.media_url : null;
+    if (!nextVideoSrc || currentVideoWarmupRef.current?.dataset.warmSrc !== nextVideoSrc) {
+      releaseVideo(currentVideoWarmupRef.current);
+      currentVideoWarmupRef.current = nextVideoSrc
+        ? prepareInlineVideo(nextVideoSrc, resolvePreload(videoQualityRef.current))
+        : null;
+    }
 
     setQuestion(nextQuestion);
     setSelectedLabel(null);
@@ -754,12 +779,18 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     setNextLoading(true);
     const prefetched = prefetchedNextRef.current;
     prefetchedNextRef.current = null;
-    releaseVideo(prefetchVideoRef.current);
+    const prefetchVideo = prefetchVideoRef.current;
     prefetchVideoRef.current = null;
     if (prefetched) {
+      // Hand the prefetched video over instead of aborting its download.
+      if (prefetchVideo) {
+        releaseVideo(currentVideoWarmupRef.current);
+        currentVideoWarmupRef.current = prefetchVideo;
+      }
       applyQuestion(prefetched);
       setNextLoading(false);
     } else {
+      releaseVideo(prefetchVideo);
       await goToNext(question.id, selectedLabel);
       setNextLoading(false);
     }
