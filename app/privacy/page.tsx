@@ -29,7 +29,7 @@ export default function PrivacyPage() {
           <h2 className="text-lg font-semibold text-white mb-2">Who Can See Your Data</h2>
           <ul className="list-disc list-inside space-y-1">
             <li><strong className="text-white">NovarQuiz administrators</strong> — can access all personal data we collect about you, including your email, display name, profile picture, quiz responses, scores and clinical profiling vectors.</li>
-            <li><strong className="text-white">Other users and visitors</strong> — can see only your display name and quiz results on session leaderboards (score, rank, correct answers, streak and completion time). They cannot see your email, profile picture, individual quiz responses or clinical profiling data.</li>
+            <li><strong className="text-white">Other users and visitors</strong> — can see only your display name, profile picture and quiz results on session leaderboards (score, rank, correct answers, streak and completion time). They cannot see your email, individual quiz responses or clinical profiling data.</li>
           </ul>
         </section>
         <section>

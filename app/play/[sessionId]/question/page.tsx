@@ -324,7 +324,7 @@ function FinishedLeaderboard({
         session_id: sessionId,
         user_id: uid,
         user_display_name: live.displayName,
-        user_photo_url: uid === userId ? live.photoURL ?? null : null,
+        user_photo_url: live.photoURL ?? null,
         is_me: uid === userId,
         total_score: live.score,
         correct_count: 0,

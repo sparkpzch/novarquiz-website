@@ -113,14 +113,18 @@ export function maskLeaderboardEntry<T extends Record<string, unknown>>(
 
 /**
  * Public leaderboard variant of maskLeaderboardEntry: every row is kept and
- * shows the player's display name, but photo and raw uid are always masked
- * (pseudo-id) regardless of classification.
+ * shows the player's display name and photo, but the raw uid is always
+ * replaced with the pseudo-id regardless of classification.
  */
 export function maskPublicLeaderboardEntry<T extends Record<string, unknown>>(
   row: T,
 ): T | null {
   const masked = maskLeaderboardEntry({ ...row, insight_classification: 'pseudonymous' });
-  return masked && { ...masked, user_display_name: row.user_display_name };
+  return masked && {
+    ...masked,
+    user_display_name: row.user_display_name,
+    user_photo_url: row.user_photo_url,
+  };
 }
 
 // HCP clinical-profiling columns. The public leaderboard routes have no admin

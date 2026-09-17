@@ -392,9 +392,9 @@ function PrivacyContent({ c }: { c: Palette }) {
             scores and clinical profiling vectors.
           </li>
           <li>
-            <strong>Other users and visitors</strong> — can see only your display name and quiz
-            results on session leaderboards (score, rank, correct answers, streak and completion
-            time). They cannot see your email, profile picture, individual quiz responses or
+            <strong>Other users and visitors</strong> — can see only your display name, profile
+            picture and quiz results on session leaderboards (score, rank, correct answers, streak
+            and completion time). They cannot see your email, individual quiz responses or
             clinical profiling data.
           </li>
         </ul>

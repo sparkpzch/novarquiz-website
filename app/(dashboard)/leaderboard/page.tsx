@@ -60,7 +60,7 @@ function LeaderboardPageContent() {
         session_id: selectedSession,
         user_id: uid,
         user_display_name: live.displayName,
-        user_photo_url: uid === user?.uid ? live.photoURL ?? null : null,
+        user_photo_url: live.photoURL ?? null,
         is_me: uid === user?.uid,
         total_score: live.score,
         correct_count: 0,
