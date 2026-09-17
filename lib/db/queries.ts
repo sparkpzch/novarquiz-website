@@ -17,6 +17,7 @@ import {
   type AllowedUsage,
   type HcpVectorMap,
 } from '../analytics/hcp';
+import type { HealthStatsInput, HealthTopicRow } from '../stats/health';
 
 let layeredAnalyticsSchemaPromise: Promise<boolean> | null = null;
 
@@ -1555,6 +1556,58 @@ export async function getUserHistory(userId: string) {
     [userId],
   );
   return result.rows;
+}
+
+// Raw inputs for the /stats Health tab — one topic per quiz. Uses the latest
+// answer per (session, question), matching completeSession(). The quiz is
+// resolved through questions.session_id, which always holds the quiz id,
+// whether user_answers.session_id is a quiz id or a sessions.id.
+export async function getUserHealthStatsInput(userId: string): Promise<HealthStatsInput> {
+  const [topics, days, totals] = await Promise.all([
+    queryWithRetry<HealthTopicRow>(
+      `SELECT qz.id AS quiz_id,
+              qz.name AS quiz_name,
+              COUNT(*)::int AS answered,
+              COUNT(*) FILTER (WHERE latest.utility_score > 0)::int AS positive
+       FROM (
+         SELECT DISTINCT ON (session_id, question_id) question_id, utility_score
+         FROM user_answers
+         WHERE user_id = $1
+         ORDER BY session_id, question_id, answered_at DESC
+       ) latest
+       JOIN questions q ON q.id = latest.question_id
+       JOIN quizzes qz ON qz.id = q.session_id
+       GROUP BY qz.id, qz.name`,
+      [userId],
+    ),
+    queryWithRetry<{ day: string }>(
+      `SELECT DISTINCT (answered_at AT TIME ZONE 'Asia/Bangkok')::date::text AS day
+       FROM user_answers
+       WHERE user_id = $1
+       ORDER BY day DESC
+       LIMIT 366`,
+      [userId],
+    ),
+    queryWithRetry<{ published: number; completed: number; today: string }>(
+      `SELECT
+         (SELECT COUNT(*) FROM quizzes WHERE is_published = TRUE)::int AS published,
+         (SELECT COUNT(DISTINCT qz.id)
+          FROM leaderboard_entries le
+          LEFT JOIN sessions s ON le.session_id::text = s.id::text
+          JOIN quizzes qz ON qz.id::text = COALESCE(s.session_id::text, le.session_id::text)
+          WHERE le.user_id = $1 AND qz.is_published = TRUE)::int AS completed,
+         (NOW() AT TIME ZONE 'Asia/Bangkok')::date::text AS today`,
+      [userId],
+    ),
+  ]);
+
+  return {
+    topics: topics.rows,
+    answerDays: days.rows.map((r) => r.day),
+    today: totals.rows[0].today,
+    completedQuizzes: totals.rows[0].completed,
+    publishedQuizzes: totals.rows[0].published,
+  };
 }
 
 // ===================== Sessions =====================
