@@ -4,6 +4,7 @@ import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, get
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
 import { DEFAULT_CHOICE_METADATA } from '@/lib/analytics/hcp';
+import { hasProfilingConsent } from '@/lib/analytics/consent';
 import type { Choice } from '@/lib/types';
 
 const StartBody = z.object({
@@ -178,6 +179,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       question_id: parsed.data.question_id,
       chosen_label: parsed.data.chosen_label,
       time_taken_ms: parsed.data.time_taken_ms,
+      profiling_consent: await hasProfilingConsent(user.uid),
     });
 
     // Fire-and-forget: server writes authoritative score to RTDB so clients
@@ -195,7 +197,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       } catch { /* non-fatal — live leaderboard degrades gracefully */ }
     })();
 
-    return NextResponse.json(result);
+    // Profiling vectors are admin-only; don't echo them to the player.
+    const playerResult: Partial<typeof result> = { ...result };
+    delete playerResult.vector_scores;
+    return NextResponse.json(playerResult);
   } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }

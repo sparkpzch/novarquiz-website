@@ -2,7 +2,7 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-[#0a0a1a] text-gray-300 p-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold text-white mb-2">Privacy Policy</h1>
-      <p className="text-gray-500 text-sm mb-4">Last updated: May 19, 2026 · Version 2026-05-19</p>
+      <p className="text-gray-500 text-sm mb-4">Last updated: September 17, 2026 · Version 2026-09-17</p>
       <div className="rounded-xl p-4 mb-8 text-sm" style={{ background: 'rgba(59,91,212,0.15)', border: '1px solid rgba(59,91,212,0.4)' }}>
         <p className="font-semibold text-blue-300 mb-1">PDPA Compliance Notice</p>
         <p className="text-blue-200 text-xs leading-relaxed">
@@ -22,7 +22,15 @@ export default function PrivacyPage() {
         </section>
         <section>
           <h2 className="text-lg font-semibold text-white mb-2">2. How We Use Your Data</h2>
-          <p>We use your data to: (a) authenticate your identity; (b) calculate scores and leaderboards; (c) provide quiz history and statistics; (d) improve the Service through aggregate analytics; (e) comply with PDPA obligations.</p>
+          <p>We use your data to: (a) authenticate your identity; (b) calculate scores and leaderboards; (c) provide quiz history and statistics; (d) improve the Service through analytics; (e) comply with PDPA obligations.</p>
+          <p className="mt-1">If you opt in to Analytics &amp; Profiling (at sign-up or via Profile), your choices in HCP or mixed-audience quizzes are also used to calculate clinical profiling vectors linked to your account. Without that consent, only your scores are recorded.</p>
+        </section>
+        <section>
+          <h2 className="text-lg font-semibold text-white mb-2">Who Can See Your Data</h2>
+          <ul className="list-disc list-inside space-y-1">
+            <li><strong className="text-white">NovarQuiz administrators</strong> — can access all personal data we collect about you, including your email, display name, profile picture, quiz responses, scores and clinical profiling vectors.</li>
+            <li><strong className="text-white">Other users and visitors</strong> — can see only your display name and quiz results on session leaderboards (score, rank, correct answers, streak and completion time). They cannot see your email, profile picture, individual quiz responses or clinical profiling data.</li>
+          </ul>
         </section>
         <section>
           <h2 className="text-lg font-semibold text-white mb-2">3. Data Retention</h2>
@@ -63,7 +71,7 @@ export default function PrivacyPage() {
         </section>
         <section>
           <h2 className="text-lg font-semibold text-white mb-2">9. Policy Changes</h2>
-          <p>Material changes notified via email or in-app notice at least 30 days in advance, as required by PDPA.</p>
+          <p>We may update this Privacy Policy at any time without prior notice. Changes take effect when published.</p>
         </section>
       </div>
     </div>

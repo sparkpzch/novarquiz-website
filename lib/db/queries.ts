@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import pool, { queryWithRetry } from './postgres';
-import { maskLeaderboardEntry, maskPublicLeaderboardEntry, toPublicLeaderboardEntry } from './schema';
+import { maskPublicLeaderboardEntry, toPublicLeaderboardEntry } from './schema';
 import { SESSION_STATUS, SessionStatus } from '../constants/session';
 import { incrementMediaUsage, decrementMediaUsage, syncMediaUsage } from './media';
 import {
@@ -1289,6 +1289,8 @@ export async function saveUserAnswer(data: {
   question_id: string;
   chosen_label: string;
   time_taken_ms: number;
+  // Without opt-in, the answer is stored with an empty profiling vector.
+  profiling_consent: boolean;
 }): Promise<{
   id: string;
   points_earned: number;
@@ -1317,8 +1319,10 @@ export async function saveUserAnswer(data: {
       : undefined,
   );
   const weightedVector = emptyHcpVectorMap();
-  for (const key of Object.keys(baseVector) as Array<keyof HcpVectorMap>) {
-    weightedVector[key] = Number((baseVector[key] * confidence).toFixed(4));
+  if (data.profiling_consent) {
+    for (const key of Object.keys(baseVector) as Array<keyof HcpVectorMap>) {
+      weightedVector[key] = Number((baseVector[key] * confidence).toFixed(4));
+    }
   }
   const behaviorMeaning = typeof choice.behavior_meaning === 'string' ? choice.behavior_meaning : null;
   const allowedUsage =
@@ -1382,6 +1386,8 @@ export async function completeSession(data: {
   user_id: string;
   user_display_name: string;
   user_photo_url?: string | null;
+  // Without opt-in, no profiling vectors or archetype are computed.
+  profiling_consent: boolean;
 }) {
   const layered = await hasLayeredAnalyticsSchema();
   const agg = await pool.query(
@@ -1424,7 +1430,7 @@ export async function completeSession(data: {
   let archetypeId: string | null = null;
   let insightClassification: 'aggregate' | 'pseudonymous' | 'identified' = 'aggregate';
 
-  if (layered) {
+  if (layered && data.profiling_consent) {
     const vectorsResult = await pool.query(
       `SELECT vector_scores, allowed_usage_snapshot FROM (
          SELECT DISTINCT ON (question_id) vector_scores, allowed_usage_snapshot, answered_at
@@ -1680,9 +1686,9 @@ export async function getLeaderboard(sessionId: string, viewerUid?: string) {
   );
 
   // This feeds the public (no admin gate) leaderboard routes. Enforce the
-  // privacy-classification model — 'aggregate' and 'pseudonymous' rows are
-  // anonymized (score only, no identifiers) — then strip all HCP profiling
-  // columns before the rows leave the query layer. is_me is flagged before
+  // public masking — display names are shown, photos and raw uids are
+  // masked — then strip all HCP profiling columns before the rows leave the
+  // query layer. is_me is flagged before
   // masking, while user_id is still the real uid.
   return result.rows
     .map((row) => maskPublicLeaderboardEntry({ ...row, is_me: !!viewerUid && row.user_id === viewerUid }))
@@ -1854,8 +1860,7 @@ export async function getSessionAnalytics(sessionId: string) {
     [actualId]
   );
 
-  // Apply privacy classification masking before any data leaves the query layer.
-  // 'aggregate' rows are stripped; 'pseudonymous' rows have uid/name replaced.
+  // Admin-only: rows are returned unmasked (every participant, real identity).
   const leaderboard = leaderboardResult.rows
     .map((row) => ({
       ...row,
@@ -1869,9 +1874,7 @@ export async function getSessionAnalytics(sessionId: string) {
           ? (row.normalized_vector_scores as Partial<Record<string, number>>)
           : undefined,
       ),
-    }))
-    .map((row) => maskLeaderboardEntry(row))
-    .filter((row): row is NonNullable<typeof row> => row !== null);
+    }));
 
   const questions = questionsResult.rows.map((row) => {
     const hydrated = hydrateQuestionRow({

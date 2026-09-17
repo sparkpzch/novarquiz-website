@@ -28,7 +28,7 @@ function SignInForm() {
   const safeNextUrl =
     nextUrl && /^\/(?!\/)/.test(nextUrl) ? nextUrl : '/';
 
-  const createSession = async (idToken: string) => {
+  const createSession = async (idToken: string, beforeRedirect?: () => Promise<unknown>) => {
     const res = await fetch('/api/auth/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -36,6 +36,7 @@ function SignInForm() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Session creation failed');
+    await beforeRedirect?.();
     router.push(safeNextUrl);
   };
 
@@ -74,8 +75,14 @@ function SignInForm() {
     setConsentPending(null);
     setLoading(true);
     try {
-      await createSession(consentPending);
-      await fetch('/api/auth/consent', { method: 'POST' });
+      // Record consent before redirecting so ConsentGate doesn't prompt again.
+      await createSession(consentPending, () =>
+        fetch('/api/auth/consent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ consent_purposes: { platform_account: true } }),
+        }),
+      );
     } catch (err) {
       setError('Sign in failed after consent. Please try again.');
     } finally {

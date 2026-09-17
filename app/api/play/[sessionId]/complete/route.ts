@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { completeSession } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
+import { hasProfilingConsent } from '@/lib/analytics/consent';
 
 const TRUSTED_PHOTO_ORIGINS = new Set([
   'lh3.googleusercontent.com',
@@ -41,6 +42,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       user_id: user.uid,
       user_display_name: sanitizeDisplayName(body.user_display_name),
       user_photo_url: sanitizePhotoUrl(body.user_photo_url),
+      profiling_consent: await hasProfilingConsent(user.uid),
     });
 
     void adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).update({
@@ -49,7 +51,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       updatedAt: Date.now(),
     }).catch(() => {});
 
-    return NextResponse.json(result);
+    // HCP profiling fields are admin-only (admin analytics route); return scores only.
+    return NextResponse.json({
+      total_score: result.total_score,
+      streak: result.streak,
+      total_time_ms: result.total_time_ms,
+    });
   } catch (err) {
     console.error('complete failed:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

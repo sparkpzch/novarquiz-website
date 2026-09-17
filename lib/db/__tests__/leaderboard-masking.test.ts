@@ -36,22 +36,22 @@ function pseudonymousRow(userId: string) {
   };
 }
 
-test('aggregate rows stay on the public board but are anonymized', () => {
+test('aggregate rows stay on the public board with name, but no photo or raw uid', () => {
   const [row] = publicLeaderboard([
     { ...pseudonymousRow('uid-keep'), insight_classification: 'aggregate' },
   ]);
-  assert.equal(row.user_display_name, 'HCP Participant');
+  assert.equal(row.user_display_name, 'Dr. Jane Doe');
   assert.equal(row.user_photo_url, null);
   assert.notEqual(row.user_id, 'uid-keep');
   assert.equal(row.total_score, 90);
   assert.ok(!('insight_classification' in row));
 });
 
-test('rows without a classification default to aggregate and are anonymized', () => {
+test('rows without a classification keep their name but not their raw uid', () => {
   const unclassified: Record<string, unknown> = pseudonymousRow('uid-none');
   delete unclassified.insight_classification;
   const [row] = publicLeaderboard([unclassified]);
-  assert.equal(row.user_display_name, 'HCP Participant');
+  assert.equal(row.user_display_name, 'Dr. Jane Doe');
   assert.notEqual(row.user_id, 'uid-none');
 });
 
@@ -62,9 +62,9 @@ test('admin masker still drops aggregate rows', () => {
   );
 });
 
-test('pseudonymous: masks name, nulls photo, never returns raw user_id', () => {
+test('pseudonymous: keeps name, nulls photo, never returns raw user_id', () => {
   const [row] = publicLeaderboard([pseudonymousRow('firebase-uid-12345')]);
-  assert.equal(row.user_display_name, 'HCP Participant');
+  assert.equal(row.user_display_name, 'Dr. Jane Doe');
   assert.equal(row.user_photo_url, null);
   assert.notEqual(row.user_id, 'firebase-uid-12345');
   // total_score etc. survive — pseudonymous keeps behavioural/score data.

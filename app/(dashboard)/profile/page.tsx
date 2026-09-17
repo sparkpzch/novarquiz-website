@@ -16,6 +16,7 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
 import { Card } from "@/components/ui/Card";
+import type { UserConsentProfile } from "@/lib/types";
 
 type UserHistoryRow = {
   total_score: number;
@@ -342,6 +343,25 @@ export default function ProfilePage() {
       .catch(() => {});
   }, [user]);
 
+  // Profiling counts as granted only when both opt-ins are stored as true.
+  const [profilingConsent, setProfilingConsent] = useState<boolean | null>(null);
+  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [savingConsent, setSavingConsent] = useState(false);
+
+  useEffect(() => {
+    if (!user || user.isAnonymous) return;
+    fetch("/api/auth/consent")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: UserConsentProfile | null) => {
+        const purposes = data?.consented ? data.consent_purposes : undefined;
+        setProfilingConsent(
+          purposes?.analytics_profiling === true && purposes?.hcp_vectors_acknowledged === true,
+        );
+        setMarketingConsent(purposes?.marketing_follow_up === true);
+      })
+      .catch(() => setProfilingConsent(false));
+  }, [user]);
+
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -417,6 +437,33 @@ export default function ProfilePage() {
       showToast("Failed to delete account", "error");
     } finally {
       setDeletingAccount(false);
+    }
+  };
+
+  const handleProfilingToggle = async () => {
+    if (profilingConsent === null) return;
+    const next = !profilingConsent;
+    setSavingConsent(true);
+    try {
+      const response = await fetch("/api/auth/consent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          consent_purposes: {
+            platform_account: true,
+            analytics_profiling: next,
+            hcp_vectors_acknowledged: next,
+            marketing_follow_up: marketingConsent,
+          },
+        }),
+      });
+      if (!response.ok) throw new Error("Consent update failed");
+      setProfilingConsent(next);
+      showToast("Consent updated", "success");
+    } catch {
+      showToast("Failed to update consent", "error");
+    } finally {
+      setSavingConsent(false);
     }
   };
 
@@ -552,6 +599,21 @@ export default function ProfilePage() {
               </>
             }
           />
+
+          {!user?.isAnonymous && (
+            <GeneralRow
+              icon={<ShieldIcon />}
+              label="Analytics & Profiling"
+              description="Optional. Allows clinical profiling vectors from your HCP quiz answers."
+              trailing={
+                <Toggle
+                  enabled={profilingConsent === true}
+                  disabled={profilingConsent === null || savingConsent}
+                  onToggle={handleProfilingToggle}
+                />
+              }
+            />
+          )}
 
           <GeneralRow
             icon={<ShieldIcon />}

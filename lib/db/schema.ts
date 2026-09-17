@@ -112,17 +112,15 @@ export function maskLeaderboardEntry<T extends Record<string, unknown>>(
 }
 
 /**
- * Public leaderboard variant of maskLeaderboardEntry: 'aggregate' rows are kept
- * but anonymized exactly like 'pseudonymous' ones (no name, photo or raw uid),
- * so rankings stay complete without showing who scored what.
+ * Public leaderboard variant of maskLeaderboardEntry: every row is kept and
+ * shows the player's display name, but photo and raw uid are always masked
+ * (pseudo-id) regardless of classification.
  */
 export function maskPublicLeaderboardEntry<T extends Record<string, unknown>>(
   row: T,
 ): T | null {
-  const classification = (row.insight_classification ?? 'aggregate') as InsightClassification;
-  return maskLeaderboardEntry(
-    classification === 'aggregate' ? { ...row, insight_classification: 'pseudonymous' } : row,
-  );
+  const masked = maskLeaderboardEntry({ ...row, insight_classification: 'pseudonymous' });
+  return masked && { ...masked, user_display_name: row.user_display_name };
 }
 
 // HCP clinical-profiling columns. The public leaderboard routes have no admin

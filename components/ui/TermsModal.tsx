@@ -4,10 +4,10 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '@/lib/hooks/useTheme';
 
-export const TOS_VERSION = '2026-05-27';
-export const PRIVACY_VERSION = '2026-05-27';
+export const TOS_VERSION = '2026-09-17';
+export const PRIVACY_VERSION = '2026-09-17';
 export const ANALYTICS_NOTICE_VERSION = '2026-05-25';
-export const PROFILING_NOTICE_VERSION = '2026-05-27';
+export const PROFILING_NOTICE_VERSION = '2026-09-17';
 
 type Tab = 'terms' | 'privacy';
 
@@ -232,7 +232,7 @@ function Section({ title, children, c }: { title: string; children: React.ReactN
 function TermsContent({ c }: { c: Palette }) {
   return (
     <div>
-      <p className="text-xs mb-4" style={{ color: c.subtle }}>Last updated: May 27, 2026 · Version {TOS_VERSION}</p>
+      <p className="text-xs mb-4" style={{ color: c.subtle }}>Last updated: September 17, 2026 · Version {TOS_VERSION}</p>
 
       <Section title="1. Acceptance of Terms" c={c}>
         <p>
@@ -300,8 +300,8 @@ function TermsContent({ c }: { c: Palette }) {
 
       <Section title="9. Modifications" c={c}>
         <p>
-          We may update these Terms at any time. We will notify registered users of material changes
-          with at least 30 days&apos; notice. Continued use after changes constitutes acceptance.
+          We may update these Terms at any time without prior notice. Changes take effect when
+          published. Continued use after changes constitutes acceptance.
         </p>
       </Section>
 
@@ -316,7 +316,7 @@ function TermsContent({ c }: { c: Palette }) {
 function PrivacyContent({ c }: { c: Palette }) {
   return (
     <div>
-      <p className="text-xs mb-4" style={{ color: c.subtle }}>Last updated: May 27, 2026 · Version {PRIVACY_VERSION}</p>
+      <p className="text-xs mb-4" style={{ color: c.subtle }}>Last updated: September 17, 2026 · Version {PRIVACY_VERSION}</p>
 
       <div
         className="rounded-xl p-3 mb-4 text-xs"
@@ -345,15 +345,15 @@ function PrivacyContent({ c }: { c: Palette }) {
           proof of consent), browser type, session cookies.
         </p>
         <p>
-          <strong>Clinical Profiling Data (HCP/mixed audience, opt-in only):</strong> Anonymised
-          behavioural signals from quiz choices, mapped to six practice-pattern vectors —
+          <strong>Clinical Profiling Data (HCP/mixed-audience quizzes, opt-in only):</strong> Behavioural
+          signals from your quiz choices, linked to your account and mapped to six practice-pattern vectors —
           Guideline Adherence, Innovation Adoption, Patient Centricity, Diagnostic Proactivity,
           Therapy Escalation, and Evidence Depth. No patient-identifiable data is collected.
         </p>
         <p>
           <strong>Legal Basis:</strong> Explicit, unbundled consent (PDPA §19) collected
           separately for each processing purpose at registration and manageable at any time
-          via Profile → Manage Consents.
+          via Profile settings.
         </p>
       </Section>
 
@@ -365,8 +365,8 @@ function PrivacyContent({ c }: { c: Palette }) {
             calculate scores, leaderboards, quiz history.
           </li>
           <li>
-            <strong>Analytics &amp; Profiling</strong> (optional): aggregate performance analytics
-            to improve the Service.
+            <strong>Analytics &amp; Profiling</strong> (optional): performance analytics to improve
+            the Service.
           </li>
           <li>
             <strong>CRM Linkage</strong> (optional): link account data with CRM systems for
@@ -378,9 +378,26 @@ function PrivacyContent({ c }: { c: Palette }) {
           </li>
         </ul>
         <p className="mt-1">
-          Clinical profiling vector processing applies only when you have selected an HCP or mixed
-          audience and opted in to the relevant vectors.
+          Clinical profiling vectors are calculated from your choices in HCP or mixed-audience
+          quizzes only if you have opted in to Analytics &amp; Profiling. Without that consent, only
+          your scores are recorded.
         </p>
+      </Section>
+
+      <Section title="Who Can See Your Data" c={c}>
+        <ul className="list-disc list-inside space-y-0.5">
+          <li>
+            <strong>NovarQuiz administrators</strong> — can access all personal data we collect
+            about you, including your email, display name, profile picture, quiz responses,
+            scores and clinical profiling vectors.
+          </li>
+          <li>
+            <strong>Other users and visitors</strong> — can see only your display name and quiz
+            results on session leaderboards (score, rank, correct answers, streak and completion
+            time). They cannot see your email, profile picture, individual quiz responses or
+            clinical profiling data.
+          </li>
+        </ul>
       </Section>
 
       <Section title="Unbundled Consent" c={c}>
@@ -396,13 +413,14 @@ function PrivacyContent({ c }: { c: Palette }) {
           <li><strong>Marketing Follow-Up</strong> — optional</li>
         </ul>
         <p className="mt-1">
-          Users identifying as healthcare professionals (HCP or mixed audience) may separately
-          opt in to six clinical profiling vectors: Guideline Adherence, Innovation Adoption,
-          Patient Centricity, Diagnostic Proactivity, Therapy Escalation, and Evidence Depth.
+          Opting in to Analytics &amp; Profiling (at sign-up or via Profile) also allows six
+          clinical profiling vectors to be calculated in HCP or mixed-audience quizzes: Guideline
+          Adherence, Innovation Adoption, Patient Centricity, Diagnostic Proactivity, Therapy
+          Escalation, and Evidence Depth.
         </p>
         <p className="mt-1">
-          You may update or withdraw any optional consent at any time via Profile → Manage
-          Consents. Withdrawal is effective immediately and does not affect the lawfulness of
+          You may update or withdraw any optional consent at any time via Profile
+          settings. Withdrawal is effective immediately and does not affect the lawfulness of
           prior processing.
         </p>
       </Section>
@@ -437,7 +455,7 @@ function PrivacyContent({ c }: { c: Palette }) {
           <li><strong>Restriction</strong> — limit processing of your data</li>
           <li><strong>Objection</strong> — object to processing based on legitimate interests</li>
           <li>
-            <strong>Withdraw Consent</strong> — optional purposes via Profile → Manage Consents;
+            <strong>Withdraw Consent</strong> — optional purposes via Profile settings;
             all processing via Profile → Delete Account. Effective immediately.
           </li>
         </ul>
@@ -471,8 +489,8 @@ function PrivacyContent({ c }: { c: Palette }) {
 
       <Section title="10. Policy Changes" c={c}>
         <p>
-          Material changes will be notified via email or in-app notice at least 30 days in advance,
-          as required by PDPA. Archived versions are available on request.
+          We may update this Privacy Policy at any time without prior notice. Changes take effect
+          when published. Archived versions are available on request.
         </p>
       </Section>
     </div>

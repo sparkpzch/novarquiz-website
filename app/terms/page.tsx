@@ -2,7 +2,7 @@ export default function TermsPage() {
   return (
     <div className="min-h-screen bg-[#0a0a1a] text-gray-300 p-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold text-white mb-2">Terms of Service</h1>
-      <p className="text-gray-500 text-sm mb-8">Last updated: May 19, 2026 · Version 2026-05-19</p>
+      <p className="text-gray-500 text-sm mb-8">Last updated: September 17, 2026 · Version 2026-09-17</p>
 
       <div className="space-y-6 text-sm leading-relaxed">
         <section>
@@ -39,7 +39,7 @@ export default function TermsPage() {
         </section>
         <section>
           <h2 className="text-lg font-semibold text-white mb-2">9. Modifications</h2>
-          <p>We will notify registered users of material changes with at least 30 days&apos; notice. Continued use after changes constitutes acceptance of the revised Terms.</p>
+          <p>We may update these Terms at any time without prior notice. Changes take effect when published. Continued use after changes constitutes acceptance of the revised Terms.</p>
         </section>
         <section>
           <h2 className="text-lg font-semibold text-white mb-2">10. Governing Law</h2>

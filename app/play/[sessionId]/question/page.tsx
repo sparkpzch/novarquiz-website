@@ -323,7 +323,7 @@ function FinishedLeaderboard({
         id: uid,
         session_id: sessionId,
         user_id: uid,
-        user_display_name: uid === userId ? live.displayName : 'HCP Participant',
+        user_display_name: live.displayName,
         user_photo_url: uid === userId ? live.photoURL ?? null : null,
         is_me: uid === userId,
         total_score: live.score,

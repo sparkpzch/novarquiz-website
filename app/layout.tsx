@@ -5,6 +5,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/hooks/useAuth";
 import { ThemeProvider } from "@/lib/hooks/useTheme";
 import { ToastProvider } from "@/components/ui/Toast";
+import ConsentGate from "@/components/ConsentGate";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -52,6 +53,7 @@ export default async function RootLayout({
           <ThemeProvider>
             <ToastProvider>
               {children}
+              <ConsentGate />
             </ToastProvider>
           </ThemeProvider>
         </AuthProvider>

@@ -59,7 +59,7 @@ function LeaderboardPageContent() {
         id: uid,
         session_id: selectedSession,
         user_id: uid,
-        user_display_name: uid === user?.uid ? live.displayName : 'HCP Participant',
+        user_display_name: live.displayName,
         user_photo_url: uid === user?.uid ? live.photoURL ?? null : null,
         is_me: uid === user?.uid,
         total_score: live.score,

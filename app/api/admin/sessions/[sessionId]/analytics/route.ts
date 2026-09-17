@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionAnalytics } from '@/lib/db/queries';
-import { maskLeaderboardEntry } from '@/lib/db/schema';
 import { getSessionUser } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/ratelimit';
 
@@ -51,14 +50,7 @@ export async function GET(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    // 3. Defensive second-pass masking at the route boundary.
-    //    getSessionAnalytics() already masks inside the query layer.
-    //    This ensures masking is enforced even if the query function changes.
-    const safeLeaderboard = analytics.leaderboard
-      .map((row) => maskLeaderboardEntry(row as Record<string, unknown>))
-      .filter((row): row is NonNullable<typeof row> => row !== null);
-
-    // 4. Emit structured audit log when HCP profiling data is accessed.
+    // 3. Emit structured audit log when HCP profiling data is accessed.
     //    Covers sessions with HCP audience or entries with non-aggregate classification.
     const isHcpSession = analytics.session?.intended_audience === 'hcp';
     const pseudonymousCount = analytics.leaderboard.filter(
@@ -80,10 +72,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({
-      ...analytics,
-      leaderboard: safeLeaderboard,
-    });
+    return NextResponse.json(analytics);
   } catch (error) {
     console.error('Failed to fetch session analytics:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
