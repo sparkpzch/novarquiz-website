@@ -340,6 +340,13 @@ export function EditorCanvas({
     setInspectedNode(node as AppNode);
   }, []);
 
+  // A click where the pointer moves even a pixel is a drag to React Flow, so
+  // onNodeClick never fires — yet the node still becomes selected. Inspect on
+  // drag start too, or the panel keeps showing the previous node.
+  const onNodeDragStart = useCallback((_: React.MouseEvent, node: Node) => {
+    setInspectedNode(node as AppNode);
+  }, []);
+
   const ctxNodeData = ctxMenu?.nodeId
     ? nodes.find(n => n.id === ctxMenu.nodeId)?.data as AppNodeData | undefined
     : undefined;
@@ -404,6 +411,7 @@ export function EditorCanvas({
           onConnect={onConnect}
           onNodeClick={onNodeClick}
           onNodeDoubleClick={onNodeDblClick}
+          onNodeDragStart={onNodeDragStart}
           onPaneClick={() => { closeCtx(); setInspectedNode(null); }}
           onPaneContextMenu={onPaneCtx}
           onNodeContextMenu={onNodeCtx}
