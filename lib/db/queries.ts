@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import pool, { queryWithRetry } from './postgres';
-import { maskLeaderboardEntry, toPublicLeaderboardEntry } from './schema';
+import { maskLeaderboardEntry, maskPublicLeaderboardEntry, toPublicLeaderboardEntry } from './schema';
 import { SESSION_STATUS, SessionStatus } from '../constants/session';
 import { incrementMediaUsage, decrementMediaUsage, syncMediaUsage } from './media';
 import {
@@ -1673,18 +1673,19 @@ export async function updateSession(playSessionId: string, data: Partial<{
 
 // ===================== Leaderboard =====================
 
-export async function getLeaderboard(sessionId: string) {
+export async function getLeaderboard(sessionId: string, viewerUid?: string) {
   const result = await pool.query(
     `SELECT * FROM leaderboard_entries WHERE session_id = $1 ORDER BY total_score DESC`,
     [sessionId]
   );
 
   // This feeds the public (no admin gate) leaderboard routes. Enforce the
-  // privacy-classification model — 'aggregate' rows dropped, 'pseudonymous'
-  // identifiers replaced — then strip all HCP profiling columns before the
-  // rows leave the query layer. Mirrors getSessionAnalytics' masking pass.
+  // privacy-classification model — 'aggregate' and 'pseudonymous' rows are
+  // anonymized (score only, no identifiers) — then strip all HCP profiling
+  // columns before the rows leave the query layer. is_me is flagged before
+  // masking, while user_id is still the real uid.
   return result.rows
-    .map((row) => maskLeaderboardEntry(row))
+    .map((row) => maskPublicLeaderboardEntry({ ...row, is_me: !!viewerUid && row.user_id === viewerUid }))
     .filter((row): row is NonNullable<typeof row> => row !== null)
     .map((row) => toPublicLeaderboardEntry(row));
 }

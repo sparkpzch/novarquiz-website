@@ -8,12 +8,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ses
     const session = await getSessionById(sessionId);
     if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    if (session.is_private) {
-      const user = await getSessionUser();
-      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const user = await getSessionUser();
+    if (session.is_private && !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const leaderboard = await getLeaderboard(sessionId);
+    const leaderboard = await getLeaderboard(sessionId, user?.uid);
     return NextResponse.json(leaderboard);
   } catch (err) {
     console.error(`Failed to load play leaderboard for session ${sessionId}:`, err);

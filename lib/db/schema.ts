@@ -111,6 +111,20 @@ export function maskLeaderboardEntry<T extends Record<string, unknown>>(
   return row;
 }
 
+/**
+ * Public leaderboard variant of maskLeaderboardEntry: 'aggregate' rows are kept
+ * but anonymized exactly like 'pseudonymous' ones (no name, photo or raw uid),
+ * so rankings stay complete without showing who scored what.
+ */
+export function maskPublicLeaderboardEntry<T extends Record<string, unknown>>(
+  row: T,
+): T | null {
+  const classification = (row.insight_classification ?? 'aggregate') as InsightClassification;
+  return maskLeaderboardEntry(
+    classification === 'aggregate' ? { ...row, insight_classification: 'pseudonymous' } : row,
+  );
+}
+
 // HCP clinical-profiling columns. The public leaderboard routes have no admin
 // gate, so these are stripped from every row regardless of classification —
 // they may only surface through the admin analytics route.

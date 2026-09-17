@@ -197,12 +197,12 @@ function HistoryPageContent() {
                   </thead>
                   <tbody>
                     {sortedEntries.map((entry, idx) => (
-                      <tr key={entry.user_id} className={`border-b border-[#0460A9]/05 ${entry.user_id === user?.uid ? 'bg-[#0460A9]/05' : 'hover:bg-white/40'}`}>
+                      <tr key={entry.user_id} className={`border-b border-[#0460A9]/05 ${entry.is_me ? 'bg-[#0460A9]/05' : 'hover:bg-white/40'}`}>
                         <td className="px-4 py-3 font-bold text-[#5D7EA1]">#{idx + 1}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <ProfileAvatar displayName={entry.user_display_name} photoURL={entry.user_photo_url} size={32} />
-                            <span className="font-bold text-[#16324F]">{entry.user_id === user?.uid ? 'You' : entry.user_display_name}</span>
+                            <span className="font-bold text-[#16324F]">{entry.is_me ? 'You' : entry.user_display_name}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-right font-bold text-[#0460A9]">{entry.total_score}</td>

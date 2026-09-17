@@ -53,13 +53,15 @@ function LeaderboardPageContent() {
       return live ? { ...entry, total_score: live.score } : entry;
     }),
     ...Object.entries(liveScores)
-      .filter(([uid]) => !dbUserIds.has(uid))
+      // Finished players are already in the DB rows, under an anonymized id.
+      .filter(([uid, live]) => !dbUserIds.has(uid) && !live.finished)
       .map(([uid, live]): LeaderboardEntry => ({
         id: uid,
         session_id: selectedSession,
         user_id: uid,
-        user_display_name: live.displayName,
-        user_photo_url: live.photoURL ?? null,
+        user_display_name: uid === user?.uid ? live.displayName : 'HCP Participant',
+        user_photo_url: uid === user?.uid ? live.photoURL ?? null : null,
+        is_me: uid === user?.uid,
         total_score: live.score,
         correct_count: 0,
         incorrect_count: 0,
@@ -75,8 +77,8 @@ function LeaderboardPageContent() {
     if (a.total_time_ms !== b.total_time_ms) return a.total_time_ms - b.total_time_ms;
     return a.user_display_name.localeCompare(b.user_display_name);
   });
-  const myEntry = sortedEntries.find((entry) => entry.user_id === user?.uid);
-  const myRank = sortedEntries.findIndex((entry) => entry.user_id === user?.uid) + 1;
+  const myEntry = sortedEntries.find((entry) => entry.is_me);
+  const myRank = sortedEntries.findIndex((entry) => entry.is_me) + 1;
   const topThree = sortedEntries.slice(0, 3);
   const selectedSessionMeta = sessions.find((session) => session.id === selectedSession);
   const podium =
@@ -211,7 +213,7 @@ function LeaderboardPageContent() {
                   {entriesVirtualizer.getVirtualItems().map((virtualItem) => {
                     const entry = entriesBelow3[virtualItem.index];
                     const rank = virtualItem.index + 4;
-                    const isMe = entry.user_id === user?.uid;
+                    const isMe = !!entry.is_me;
                     return (
                       <div
                         key={virtualItem.key}

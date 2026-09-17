@@ -10,12 +10,12 @@ import { test } from 'node:test';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET ?? 'test-secret-for-masking';
 
-import { maskLeaderboardEntry, toPublicLeaderboardEntry } from '../schema';
+import { maskLeaderboardEntry, maskPublicLeaderboardEntry, toPublicLeaderboardEntry } from '../schema';
 
 // Mirrors the getLeaderboard() pipeline exactly.
 function publicLeaderboard(rows: Array<Record<string, unknown>>) {
   return rows
-    .map((row) => maskLeaderboardEntry(row))
+    .map((row) => maskPublicLeaderboardEntry(row))
     .filter((row): row is NonNullable<typeof row> => row !== null)
     .map(toPublicLeaderboardEntry);
 }
@@ -36,11 +36,30 @@ function pseudonymousRow(userId: string) {
   };
 }
 
-test('drops aggregate-classified rows entirely', () => {
-  const out = publicLeaderboard([
+test('aggregate rows stay on the public board but are anonymized', () => {
+  const [row] = publicLeaderboard([
     { ...pseudonymousRow('uid-keep'), insight_classification: 'aggregate' },
   ]);
-  assert.equal(out.length, 0);
+  assert.equal(row.user_display_name, 'HCP Participant');
+  assert.equal(row.user_photo_url, null);
+  assert.notEqual(row.user_id, 'uid-keep');
+  assert.equal(row.total_score, 90);
+  assert.ok(!('insight_classification' in row));
+});
+
+test('rows without a classification default to aggregate and are anonymized', () => {
+  const unclassified: Record<string, unknown> = pseudonymousRow('uid-none');
+  delete unclassified.insight_classification;
+  const [row] = publicLeaderboard([unclassified]);
+  assert.equal(row.user_display_name, 'HCP Participant');
+  assert.notEqual(row.user_id, 'uid-none');
+});
+
+test('admin masker still drops aggregate rows', () => {
+  assert.equal(
+    maskLeaderboardEntry({ ...pseudonymousRow('uid-x'), insight_classification: 'aggregate' }),
+    null,
+  );
 });
 
 test('pseudonymous: masks name, nulls photo, never returns raw user_id', () => {
@@ -79,4 +98,14 @@ test('identified rows keep their real display name but still drop HCP cols', () 
   ]);
   assert.equal(row.user_display_name, 'Dr. Consented');
   assert.ok(!('archetype_id' in row));
+});
+
+test('is_me survives masking so the viewer can find their anonymized row', () => {
+  const out = publicLeaderboard([
+    { ...pseudonymousRow('viewer'), insight_classification: 'aggregate', is_me: true },
+    { ...pseudonymousRow('other'), insight_classification: 'aggregate', is_me: false },
+  ]);
+  assert.equal(out[0].is_me, true);
+  assert.equal(out[1].is_me, false);
+  assert.notEqual(out[0].user_id, 'viewer');
 });

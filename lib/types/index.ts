@@ -115,6 +115,9 @@ export interface LeaderboardEntry {
   streak: number;
   total_time_ms: number;
   completed_at: string;
+  // Set by the public leaderboard API for the viewer's own row, since user_id
+  // is anonymized there.
+  is_me?: boolean;
   profile_vector_scores?: HcpVectorMap;
   normalized_vector_scores?: HcpVectorMap;
   archetype_id?: string | null;

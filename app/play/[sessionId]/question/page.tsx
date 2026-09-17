@@ -317,13 +317,15 @@ function FinishedLeaderboard({
       return live ? { ...entry, total_score: live.score } : entry;
     }),
     ...Object.entries(liveScores)
-      .filter(([uid]) => !dbUserIds.has(uid))
+      // Finished players are already in the DB rows, under an anonymized id.
+      .filter(([uid, live]) => !dbUserIds.has(uid) && !live.finished)
       .map(([uid, live]): LeaderboardEntry => ({
         id: uid,
         session_id: sessionId,
         user_id: uid,
-        user_display_name: live.displayName,
-        user_photo_url: live.photoURL ?? null,
+        user_display_name: uid === userId ? live.displayName : 'HCP Participant',
+        user_photo_url: uid === userId ? live.photoURL ?? null : null,
+        is_me: uid === userId,
         total_score: live.score,
         correct_count: 0,
         incorrect_count: 0,
@@ -340,7 +342,7 @@ function FinishedLeaderboard({
     if (a.total_time_ms !== b.total_time_ms) return a.total_time_ms - b.total_time_ms;
     return (a.user_display_name || '').localeCompare(b.user_display_name || '');
   });
-  const myRankIdx = userId ? sortedBoard.findIndex((entry) => entry.user_id === userId) : -1;
+  const myRankIdx = sortedBoard.findIndex((entry) => entry.is_me);
   const myEntry = myRankIdx >= 0 ? sortedBoard[myRankIdx] : null;
   const myRank = myRankIdx >= 0 ? myRankIdx + 1 : null;
   const topThree = sortedBoard.slice(0, 3);
@@ -398,7 +400,7 @@ function FinishedLeaderboard({
                 <div className="space-y-3">
                   {sortedBoard.slice(3, 10).map((entry, index) => {
                     const rank = index + 4;
-                    const isMe = entry.user_id === userId;
+                    const isMe = !!entry.is_me;
                     return (
                       <div
                         key={entry.user_id}
