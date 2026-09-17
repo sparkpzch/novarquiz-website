@@ -130,6 +130,5 @@ function adminAppInstance() {
 
 export const adminApp = makeLazy(adminAppInstance);
 export const adminAuth = makeLazy(() => admin.auth(adminAppInstance()));
-export const adminDb = makeLazy(() => admin.firestore(adminAppInstance()));
 export const adminRtdb = makeLazy(() => admin.database(adminAppInstance()));
 export const adminStorage = makeLazy(() => admin.storage(adminAppInstance()));

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { FieldValue } from 'firebase-admin/firestore';
 import { getSessionUser } from '@/lib/auth';
-import { adminDb } from '@/lib/firebase/admin';
+import { getUserConsent, upsertUserConsent } from '@/lib/db/queries';
 import { checkRateLimit } from '@/lib/ratelimit';
 import {
   ANALYTICS_NOTICE_VERSION,
@@ -90,22 +89,16 @@ export async function POST(request: NextRequest) {
   };
 
   try {
-    const consentRef = adminDb.collection('userConsents').doc(user.uid);
-    await consentRef.set(
-      {
-        uid: user.uid,
-        tos_version: TOS_VERSION,
-        privacy_version: PRIVACY_VERSION,
-        analytics_notice_version: ANALYTICS_NOTICE_VERSION,
-        profiling_notice_version: PROFILING_NOTICE_VERSION,
-        pdpa_consent: true,
-        consent_purposes: consentPurposes,
-        consented_at: FieldValue.serverTimestamp(),
-        ip_address: ip,
-        user_agent: userAgent,
-      },
-      { merge: true },
-    );
+    await upsertUserConsent({
+      uid: user.uid,
+      tos_version: TOS_VERSION,
+      privacy_version: PRIVACY_VERSION,
+      analytics_notice_version: ANALYTICS_NOTICE_VERSION,
+      profiling_notice_version: PROFILING_NOTICE_VERSION,
+      consent_purposes: consentPurposes,
+      ip_address: ip,
+      user_agent: userAgent,
+    });
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('Failed to record consent:', err instanceof Error ? err.message : 'unknown');
@@ -120,26 +113,21 @@ export async function GET() {
   }
 
   try {
-    const doc = await adminDb.collection('userConsents').doc(user.uid).get();
-    if (!doc.exists) return NextResponse.json({ consented: false });
+    const data = await getUserConsent(user.uid);
+    if (!data) return NextResponse.json({ consented: false });
 
-    const data = doc.data();
     return NextResponse.json({
-      consented: data?.pdpa_consent === true,
-      tos_version: data?.tos_version ?? null,
-      privacy_version: data?.privacy_version ?? null,
-      analytics_notice_version: data?.analytics_notice_version ?? null,
-      profiling_notice_version: data?.profiling_notice_version ?? null,
-      consent_purposes:
-        data?.consent_purposes && typeof data.consent_purposes === 'object'
-          ? {
-              ...DEFAULT_CONSENT_PURPOSES,
-              ...data.consent_purposes,
-            }
-          : DEFAULT_CONSENT_PURPOSES,
+      consented: true,
+      tos_version: data.tos_version,
+      privacy_version: data.privacy_version,
+      analytics_notice_version: data.analytics_notice_version,
+      profiling_notice_version: data.profiling_notice_version,
+      consent_purposes: { ...DEFAULT_CONSENT_PURPOSES, ...data.consent_purposes },
     });
   } catch (err) {
+    // Report failure as an error, not as "not consented", so a storage outage
+    // doesn't lock every user behind the consent prompt.
     console.error('Failed to check consent:', err instanceof Error ? err.message : 'unknown');
-    return NextResponse.json({ consented: false });
+    return NextResponse.json({ error: 'Failed to check consent' }, { status: 500 });
   }
 }

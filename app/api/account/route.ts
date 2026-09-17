@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { deleteUserData } from '@/lib/db/queries';
-import { adminAuth, adminDb, adminRtdb, adminStorage } from '@/lib/firebase/admin';
+import { adminAuth, adminRtdb, adminStorage } from '@/lib/firebase/admin';
 import { checkRateLimit } from '@/lib/ratelimit';
 import { getRateLimitIp } from '@/lib/security/request-ip';
 
@@ -134,13 +134,13 @@ export async function DELETE(request: NextRequest) {
   // Coordinated best-effort deletion cascade.
   //
   // Order matters for PDPA "Right to be Forgotten":
-  //   1. PostgreSQL  — transactional; roll back on failure (no partial deletes).
-  //   2. Firestore   — consent record; log failure, continue.
-  //   3. RTDB        — live presence/sessions; log failure, continue.
-  //   4. Storage     — profile photo; log failure, continue.
-  //   5. Firebase Auth — delete the identity record; fail-hard (must succeed
+  //   1. PostgreSQL  — transactional, includes the consent record; roll back
+  //                    on failure (no partial deletes).
+  //   2. RTDB        — live presence/sessions; log failure, continue.
+  //   3. Storage     — profile photo; log failure, continue.
+  //   4. Firebase Auth — delete the identity record; fail-hard (must succeed
   //                      so the user cannot log back in after data is gone).
-  //   6. Session cookie — clear.
+  //   5. Session cookie — clear.
   //
   // Cross-system atomicity is not possible; each step is logged individually
   // so any partial failure is surfaced in server logs for manual remediation.
@@ -159,48 +159,38 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to delete account data' }, { status: 500 });
   }
 
-  // Step 2: Firestore consent record.
-  try {
-    await adminDb.collection('userConsents').doc(uid).delete();
-  } catch (err) {
-    console.error('[account/delete] Step 2 PARTIAL — Firestore consent record not deleted:', {
-      uid,
-      message: errorMessage(err),
-    });
-  }
-
-  // Step 3: Firebase Realtime Database — live presence, sessions, team rooms.
+  // Step 2: Firebase Realtime Database — live presence, sessions, team rooms.
   try {
     await cleanupRealtimeData(uid);
   } catch (err) {
-    console.error('[account/delete] Step 3 PARTIAL — RTDB cleanup incomplete:', {
+    console.error('[account/delete] Step 2 PARTIAL — RTDB cleanup incomplete:', {
       uid,
       message: errorMessage(err),
     });
   }
 
-  // Step 4: Cloud Storage — profile photo.
+  // Step 3: Cloud Storage — profile photo.
   try {
     await cleanupProfilePhoto(uid);
   } catch (err) {
-    console.error('[account/delete] Step 4 PARTIAL — profile photo not deleted:', {
+    console.error('[account/delete] Step 3 PARTIAL — profile photo not deleted:', {
       uid,
       message: errorMessage(err),
     });
   }
 
-  // Step 5: Firebase Auth — must succeed; user must not be able to log back in.
+  // Step 4: Firebase Auth — must succeed; user must not be able to log back in.
   try {
     await adminAuth.deleteUser(uid);
   } catch (err) {
-    console.error('[account/delete] Step 5 FAILED — Firebase Auth user not deleted:', {
+    console.error('[account/delete] Step 4 FAILED — Firebase Auth user not deleted:', {
       uid,
       message: errorMessage(err),
     });
     return NextResponse.json({ error: 'Failed to delete auth account' }, { status: 500 });
   }
 
-  // Step 6: Clear session cookie.
+  // Step 5: Clear session cookie.
   const cookieStore = await cookies();
   cookieStore.delete(COOKIE_NAME);
 

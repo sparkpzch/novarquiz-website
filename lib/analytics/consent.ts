@@ -1,4 +1,4 @@
-import { adminDb } from '@/lib/firebase/admin';
+import { getUserConsent } from '@/lib/db/queries';
 
 // Server-only. Clinical profiling vectors are computed only for users who have
 // explicitly opted in to both Analytics & Profiling and the HCP vectors.
@@ -6,8 +6,7 @@ import { adminDb } from '@/lib/firebase/admin';
 // means no consent.
 export async function hasProfilingConsent(uid: string): Promise<boolean> {
   try {
-    const doc = await adminDb.collection('userConsents').doc(uid).get();
-    const purposes = doc.data()?.consent_purposes;
+    const purposes = (await getUserConsent(uid))?.consent_purposes;
     return purposes?.analytics_profiling === true && purposes?.hcp_vectors_acknowledged === true;
   } catch (err) {
     console.error('Failed to read profiling consent:', err instanceof Error ? err.message : 'unknown');

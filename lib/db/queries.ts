@@ -15,6 +15,7 @@ import {
   normalizeQuestionMetadata,
   normalizeVectorMap,
   type AllowedUsage,
+  type ConsentPurposes,
   type HcpVectorMap,
 } from '../analytics/hcp';
 import type { HealthStatsInput, HealthTopicRow } from '../stats/health';
@@ -523,6 +524,7 @@ export async function deleteUserData(uid: string) {
     await client.query('DELETE FROM sessions WHERE user_id = $1', [uid]);
     await client.query('DELETE FROM leaderboard_entries WHERE user_id = $1', [uid]);
     await client.query('DELETE FROM profiles WHERE uid = $1', [uid]);
+    await client.query('DELETE FROM user_consents WHERE uid = $1', [uid]);
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
@@ -1674,6 +1676,60 @@ export async function updateSession(playSessionId: string, data: Partial<{
   await pool.query(
     `UPDATE sessions SET ${fields.join(', ')} WHERE id = $${paramIdx}`,
     values
+  );
+}
+
+// ===================== Consent =====================
+
+export type UserConsentRecord = {
+  tos_version: string;
+  privacy_version: string;
+  analytics_notice_version: string | null;
+  profiling_notice_version: string | null;
+  consent_purposes: Partial<ConsentPurposes>;
+};
+
+export async function getUserConsent(uid: string): Promise<UserConsentRecord | null> {
+  const result = await queryWithRetry(
+    `SELECT tos_version, privacy_version, analytics_notice_version,
+            profiling_notice_version, consent_purposes
+     FROM user_consents WHERE uid = $1`,
+    [uid],
+  );
+  return (result.rows[0] as UserConsentRecord | undefined) ?? null;
+}
+
+// Re-consent replaces the whole record, including the proof fields.
+export async function upsertUserConsent(data: UserConsentRecord & {
+  uid: string;
+  ip_address: string;
+  user_agent: string;
+}) {
+  await pool.query(
+    `INSERT INTO user_consents (
+       uid, tos_version, privacy_version, analytics_notice_version,
+       profiling_notice_version, consent_purposes, ip_address, user_agent, consented_at
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, NOW())
+     ON CONFLICT (uid) DO UPDATE SET
+       tos_version = EXCLUDED.tos_version,
+       privacy_version = EXCLUDED.privacy_version,
+       analytics_notice_version = EXCLUDED.analytics_notice_version,
+       profiling_notice_version = EXCLUDED.profiling_notice_version,
+       consent_purposes = EXCLUDED.consent_purposes,
+       ip_address = EXCLUDED.ip_address,
+       user_agent = EXCLUDED.user_agent,
+       consented_at = NOW()`,
+    [
+      data.uid,
+      data.tos_version,
+      data.privacy_version,
+      data.analytics_notice_version,
+      data.profiling_notice_version,
+      JSON.stringify(data.consent_purposes),
+      data.ip_address,
+      data.user_agent,
+    ],
   );
 }
 
