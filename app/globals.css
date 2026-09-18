@@ -267,6 +267,10 @@ h1, h2, h3, .nq-header, .nq-topic {
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
 }
 
+.nq-bottom-fade {
+  background: linear-gradient(180deg, rgba(196, 222, 255, 0.24) 0%, rgba(196, 222, 255, 0.72) 100%);
+}
+
 .nq-answer-shadow {
   box-shadow: 0 14px 36px rgba(17, 87, 145, 0.12);
 }
@@ -433,6 +437,10 @@ html[data-theme="dark"] {
   background:
     linear-gradient(135deg, transparent 0 66%, rgba(255, 255, 255, 0.03) 66%, transparent 82%),
     radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.05), transparent 20%);
+}
+
+[data-theme="dark"] .nq-bottom-fade {
+  background: linear-gradient(180deg, rgba(8, 20, 52, 0.24) 0%, rgba(8, 20, 52, 0.72) 100%);
 }
 
 /* Cards */

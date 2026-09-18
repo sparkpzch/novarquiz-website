@@ -298,7 +298,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
       <>
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 bottom-0 z-30 h-[20px] bg-[linear-gradient(180deg,rgba(196,222,255,0.24)_0%,rgba(196,222,255,0.72)_100%)] backdrop-blur-md lg:hidden"
+          className="nq-bottom-fade pointer-events-none fixed inset-x-0 bottom-0 z-30 h-[20px] backdrop-blur-md lg:hidden"
         />
         {/* Mobile bottom nav — 4 regular items + 1 special Quizzes center FAB */}
         <nav 
