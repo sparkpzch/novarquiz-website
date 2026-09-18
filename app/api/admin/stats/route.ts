@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebase/admin';
 import { queryWithRetry } from '@/lib/db/postgres';
 import { getSessionUser } from '@/lib/auth';
+import { getInsightSummaryDistribution } from '@/lib/db/queries';
 
 export async function GET() {
   const user = await getSessionUser();
@@ -112,6 +113,13 @@ export async function GET() {
     `),
   ]);
 
+  // Rolled up separately: it fans out per quiz, so a failure here must not
+  // take the rest of the dashboard down with it.
+  const insights = await getInsightSummaryDistribution().catch((err) => {
+    console.error('Failed to load insight distribution:', err);
+    return { rows: [], playersWithSummary: 0, playersWithoutSummary: 0 };
+  });
+
   if (usersResult.status === 'rejected') console.error('Failed to load admin user stats:', usersResult.reason);
   if (coreStats.status === 'rejected') console.error('Failed to load core admin stats:', coreStats.reason);
   if (monthlyResult.status === 'rejected') console.error('Failed to load admin monthly activity:', monthlyResult.reason);
@@ -190,5 +198,6 @@ export async function GET() {
     topQuizzes: topQuizzesResult.status === 'fulfilled' ? topQuizzesResult.value.rows : [],
     topPlayers: topPlayersResult.status === 'fulfilled' ? topPlayersResult.value.rows : [],
     recentActivity: recentResult.status === 'fulfilled' ? recentResult.value.rows : [],
+    insightSummaries: insights,
   });
 }

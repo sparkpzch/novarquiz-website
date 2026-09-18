@@ -702,3 +702,46 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
 [data-theme="dark"] .nq-auth-google-btn:active:not(:disabled) {
   background-color: rgba(255, 255, 255, 0.14) !important;
 }
+
+/* ─── Insight summary card (/stats) ─────────────────────────────
+   The card sits on .nq-card, which flips to a dark navy gradient in dark
+   mode. These are semantic so the colours flip with it — the page used to
+   hardcode #16324F ink, which is invisible on that gradient. */
+.nq-insight-eyebrow { color: #8aa4c0; }
+.nq-insight-headline { color: #16324f; }
+.nq-insight-body { color: #35597f; }
+
+.nq-insight-note {
+  color: #5d7ea1;
+  background: rgba(4, 96, 169, 0.06);
+}
+
+.nq-insight-suggestion {
+  color: #0a5c48;
+  background: rgba(13, 140, 109, 0.1);
+  border-left: 4px solid #0d8c6d;
+}
+
+[data-theme="dark"] .nq-insight-eyebrow { color: #7f9dbe; }
+[data-theme="dark"] .nq-insight-headline { color: #eaf3ff; }
+[data-theme="dark"] .nq-insight-body { color: #b3c9e2; }
+
+[data-theme="dark"] .nq-insight-note {
+  color: #93b0cf;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Lifted well clear of the navy card: #0A5C48 on dark fails contrast badly. */
+[data-theme="dark"] .nq-insight-suggestion {
+  color: #7ff0c8;
+  background: rgba(43, 179, 154, 0.16);
+  border-left-color: #2bb39a;
+}
+
+/* ─── Mobile: stop the browser's pull-to-refresh firing on a scroll ──
+   `contain` keeps normal scrolling and only blocks the overscroll gesture
+   the browser turns into a page reload. */
+html,
+body {
+  overscroll-behavior-y: contain;
+}

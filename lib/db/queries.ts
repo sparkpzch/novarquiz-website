@@ -19,7 +19,7 @@ import {
   type HcpVectorMap,
   type IntendedAudience,
 } from '../analytics/hcp';
-import { ANY_ARCHETYPE } from '../analytics/insights';
+import { ANY_ARCHETYPE, pickInsightTemplate } from '../analytics/insights';
 import type {
   DraftScenario,
   InsightLocale,
@@ -1746,26 +1746,144 @@ export async function getApprovedInsightSummary(params: {
   audience: IntendedAudience;
   locale: InsightLocale;
 }): Promise<InsightSummary | null> {
-  if (!(await hasInsightTemplatesSchema())) return null;
+  const rows = await getApprovedInsightCandidates(params);
+  const picked = pickInsightTemplate(rows, {
+    quizId: params.quizId,
+    archetypeId: params.archetypeId,
+    tags: params.tags,
+  });
+  return picked ? { headline: picked.headline, body: picked.body, suggestion: picked.suggestion } : null;
+}
 
-  const result = await queryWithRetry<InsightSummary>(
-    `SELECT headline, body, suggestion
+type InsightCandidate = {
+  quiz_id: string | null;
+  archetype_id: string;
+  clinical_tag: string;
+  headline: string;
+  body: string;
+  suggestion: string | null;
+};
+
+/**
+ * Every approved row that could apply to this quiz, audience and locale.
+ * Narrow — one quiz's wording plus the global fallbacks — so the caller ranks
+ * them in memory with pickInsightTemplate() instead of duplicating the rule in
+ * SQL. The admin breakdown fetches this once and reuses it for every player.
+ */
+export async function getApprovedInsightCandidates(params: {
+  quizId: string | null;
+  audience: IntendedAudience;
+  locale: InsightLocale;
+}): Promise<InsightCandidate[]> {
+  if (!(await hasInsightTemplatesSchema())) return [];
+
+  const result = await queryWithRetry<InsightCandidate>(
+    `SELECT quiz_id, archetype_id, clinical_tag, headline, body, suggestion
      FROM insight_templates
      WHERE review_status = 'approved'
-       AND (archetype_id = $6 OR ($1::text IS NOT NULL AND archetype_id = $1))
        AND audience = $2
        AND locale = $3
-       AND (quiz_id IS NULL OR quiz_id = $4)
-       AND (clinical_tag = '' OR clinical_tag = ANY($5::text[]))
-     ORDER BY (quiz_id IS NOT NULL) DESC,
-              (archetype_id <> $6) DESC,
-              (clinical_tag <> '') DESC,
-              array_position($5::text[], clinical_tag) NULLS LAST
-     LIMIT 1`,
-    [params.archetypeId, params.audience, params.locale, params.quizId, params.tags, ANY_ARCHETYPE],
+       AND (quiz_id IS NULL OR quiz_id = $1)`,
+    [params.quizId, params.audience, params.locale],
   );
 
-  return result.rows[0] ?? null;
+  return result.rows;
+}
+
+/**
+ * Per-player view of what the insight engine decided, for the admin screens.
+ * Runs two queries for the whole quiz, then resolves each player in memory —
+ * one query per player would not survive a busy session.
+ */
+export async function getQuizInsightBreakdown(
+  quizId: string,
+  locale: InsightLocale = 'th',
+): Promise<Array<{
+  user_id: string;
+  user_display_name: string | null;
+  answered: number;
+  missed: number;
+  gap_tags: string[];
+  archetype_id: string | null;
+  headline: string | null;
+  suggestion: string | null;
+}>> {
+  const layered = await hasLayeredAnalyticsSchema();
+
+  const perPlayer = await queryWithRetry<{
+    user_id: string;
+    user_display_name: string | null;
+    answered: number;
+    missed: number;
+    archetype_id: string | null;
+    gap_tags: string[];
+  }>(
+    `WITH latest AS (
+       SELECT DISTINCT ON (ua.session_id, ua.user_id, ua.question_id)
+              ua.user_id, ua.question_id, ua.utility_score
+              ${layered ? ', c.clinical_tags' : ''}
+       FROM user_answers ua
+       ${layered ? 'LEFT JOIN choices c ON c.question_id = ua.question_id AND c.label = ua.chosen_label' : ''}
+       JOIN questions q ON q.id = ua.question_id
+       WHERE q.session_id = $1
+       ORDER BY ua.session_id, ua.user_id, ua.question_id, ua.answered_at DESC
+     ),
+     tallies AS (
+       SELECT user_id,
+              COUNT(*)::int AS answered,
+              COUNT(*) FILTER (WHERE utility_score <= 0)::int AS missed
+       FROM latest GROUP BY user_id
+     ),
+     tags AS (
+       ${layered
+         ? `SELECT user_id, ARRAY_AGG(tag ORDER BY n DESC, tag ASC) AS gap_tags
+            FROM (
+              SELECT l.user_id, t.tag, COUNT(*)::int AS n
+              FROM latest l
+              CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(l.clinical_tags, '[]'::jsonb)) AS t(tag)
+              WHERE l.utility_score <= 0
+              GROUP BY l.user_id, t.tag
+            ) counted GROUP BY user_id`
+         : `SELECT NULL::text AS user_id, ARRAY[]::text[] AS gap_tags WHERE FALSE`}
+     )
+     SELECT t.user_id,
+            MAX(le.user_display_name) AS user_display_name,
+            MAX(t.answered) AS answered,
+            MAX(t.missed) AS missed,
+            ${layered ? 'MAX(le.archetype_id)' : 'NULL::text'} AS archetype_id,
+            COALESCE(MAX(tg.gap_tags), ARRAY[]::text[]) AS gap_tags
+     FROM tallies t
+     LEFT JOIN tags tg ON tg.user_id = t.user_id
+     LEFT JOIN leaderboard_entries le ON le.user_id = t.user_id
+     GROUP BY t.user_id
+     ORDER BY MAX(t.missed) DESC, t.user_id ASC`,
+    [quizId],
+  );
+
+  const quiz = await queryWithRetry<{ intended_audience: string | null }>(
+    `SELECT ${layered ? 'intended_audience' : "'public' AS intended_audience"} FROM quizzes WHERE id = $1`,
+    [quizId],
+  );
+  const audience = (quiz.rows[0]?.intended_audience ?? 'public') as IntendedAudience;
+  const candidates = await getApprovedInsightCandidates({ quizId, audience, locale });
+
+  return perPlayer.rows.map((row) => {
+    const picked = pickInsightTemplate(candidates, {
+      quizId,
+      archetypeId: row.archetype_id,
+      tags: row.gap_tags ?? [],
+    });
+    return {
+      user_id: row.user_id,
+      user_display_name: row.user_display_name,
+      answered: row.answered,
+      missed: row.missed,
+      gap_tags: row.gap_tags ?? [],
+      archetype_id: row.archetype_id,
+      headline: picked?.headline ?? null,
+      suggestion: picked?.suggestion ?? null,
+    };
+  });
 }
 
 export async function listInsightTemplates(filters: {
@@ -1798,6 +1916,48 @@ export async function listInsightTemplates(filters: {
   );
 
   return result.rows;
+}
+
+/**
+ * Dashboard rollup: how many players each approved summary is currently
+ * reaching, across every published quiz. Built on getQuizInsightBreakdown so
+ * the numbers are the same ones the per-quiz screen shows.
+ */
+export async function getInsightSummaryDistribution(
+  locale: InsightLocale = 'th',
+): Promise<{
+  rows: Array<{ quiz_id: string; quiz_name: string; headline: string; players: number }>;
+  playersWithSummary: number;
+  playersWithoutSummary: number;
+}> {
+  if (!(await hasInsightTemplatesSchema())) {
+    return { rows: [], playersWithSummary: 0, playersWithoutSummary: 0 };
+  }
+
+  const quizzes = await queryWithRetry<{ id: string; name: string }>(
+    'SELECT id, name FROM quizzes WHERE is_published = TRUE ORDER BY name ASC',
+  );
+
+  const tally = new Map<string, { quiz_id: string; quiz_name: string; headline: string; players: number }>();
+  let withSummary = 0;
+  let withoutSummary = 0;
+
+  for (const quiz of quizzes.rows) {
+    for (const player of await getQuizInsightBreakdown(quiz.id, locale)) {
+      if (!player.headline) { withoutSummary += 1; continue; }
+      withSummary += 1;
+      const key = `${quiz.id}::${player.headline}`;
+      const seen = tally.get(key);
+      if (seen) seen.players += 1;
+      else tally.set(key, { quiz_id: quiz.id, quiz_name: quiz.name, headline: player.headline, players: 1 });
+    }
+  }
+
+  return {
+    rows: [...tally.values()].sort((a, b) => b.players - a.players || a.headline.localeCompare(b.headline)),
+    playersWithSummary: withSummary,
+    playersWithoutSummary: withoutSummary,
+  };
 }
 
 /**

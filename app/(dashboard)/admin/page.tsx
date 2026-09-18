@@ -49,6 +49,12 @@ interface AdminStats {
     total_time_ms: number;
     completed_at: string | null;
   }>;
+  /** Which approved insight summary each player is currently reaching. */
+  insightSummaries?: {
+    rows: Array<{ quiz_id: string; quiz_name: string; headline: string; players: number }>;
+    playersWithSummary: number;
+    playersWithoutSummary: number;
+  };
 }
 
 type AdminTab = "dashboard" | "quizzes-manager";
@@ -514,6 +520,70 @@ function AdminDashboardContent() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* AI insight summaries — which wording is reaching how many players */}
+            <div className="rounded-2xl border border-white/5 bg-white/5 p-6">
+              <div className="mb-5">
+                <h3 className="text-base font-semibold text-white">AI Insight Summaries</h3>
+                <p className="mt-1 text-xs text-gray-400">
+                  Approved wording currently shown on players&apos; stats pages, and how many
+                  players each one reaches. Drafted ahead of time and human-approved — nothing
+                  here is generated while a player is looking at it.
+                </p>
+              </div>
+
+              {(() => {
+                const ins = stats?.insightSummaries;
+                const reached = ins?.playersWithSummary ?? 0;
+                const missed = ins?.playersWithoutSummary ?? 0;
+                return (
+                  <>
+                    <div className="mb-5 flex flex-wrap gap-3">
+                      <div className="rounded-xl bg-white/5 px-4 py-3">
+                        <p className="text-xs text-gray-400">Players reached</p>
+                        <p className="text-xl font-bold text-white">{reached}</p>
+                      </div>
+                      <div className="rounded-xl bg-white/5 px-4 py-3">
+                        <p className="text-xs text-gray-400">No match yet</p>
+                        <p className="text-xl font-bold text-white">{missed}</p>
+                      </div>
+                    </div>
+
+                    {!ins?.rows.length ? (
+                      <p className="text-sm text-gray-400">
+                        No approved summaries are reaching anyone yet. Draft and approve wording
+                        in Insight Summaries.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {ins.rows.map((row) => {
+                          const pct = reached > 0 ? Math.round((row.players / reached) * 100) : 0;
+                          return (
+                            <div key={`${row.quiz_id}-${row.headline}`} className="space-y-1.5">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm text-white">{row.headline}</p>
+                                  <p className="truncate text-xs text-gray-500">{row.quiz_name}</p>
+                                </div>
+                                <span className="shrink-0 text-sm font-bold text-white">
+                                  {row.players}
+                                </span>
+                              </div>
+                              <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-[#2BB39A] to-[#5AADFF]"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             {/* Recent Activity */}

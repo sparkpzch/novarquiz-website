@@ -41,6 +41,17 @@ interface AnalyticsData {
   };
   leaderboard: (LeaderboardEntry & { profile_photo?: string })[];
   questions: QuestionAnalytic[];
+  /** What the insight engine resolved for each player who answered this quiz. */
+  insight_breakdown?: Array<{
+    user_id: string;
+    user_display_name: string | null;
+    answered: number;
+    missed: number;
+    gap_tags: string[];
+    archetype_id: string | null;
+    headline: string | null;
+    suggestion: string | null;
+  }>;
   insights: {
     audience_mode_summary: Record<string, number>;
     archetype_distribution: Array<{ archetype_id: string; count: number }>;
@@ -121,6 +132,7 @@ export default function SessionAnalyticsPage({ params }: { params: Promise<{ ses
   }
 
   const { session, leaderboard, questions, insights } = data;
+  const insightBreakdown = data.insight_breakdown ?? [];
   const avgScore = leaderboard.length > 0
     ? Math.round(leaderboard.reduce((sum, row) => sum + row.total_score, 0) / leaderboard.length)
     : 0;
@@ -224,6 +236,69 @@ export default function SessionAnalyticsPage({ params }: { params: Promise<{ ses
                 </div>
               ))
             )}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-1 text-lg font-bold text-[#16324F]">Insight Summaries by Player</h3>
+          <p className="mb-4 text-xs text-[#5D7EA1]">
+            The approved wording each player currently resolves to, and the topics their
+            point-losing answers were tagged with. A dash means nothing approved matched.
+          </p>
+          <div className="overflow-x-auto rounded-[24px] border border-[#0460A9]/10 bg-white">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-[#0460A9]/10 bg-[#F8FAFC] text-[10px] font-bold uppercase tracking-[0.2em] text-[#5D7EA1]">
+                  <th className="px-5 py-4">Player</th>
+                  <th className="px-5 py-4 text-center">Answered</th>
+                  <th className="px-5 py-4 text-center">Missed</th>
+                  <th className="px-5 py-4">Gap topics</th>
+                  <th className="px-5 py-4">Summary shown</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#0460A9]/10">
+                {!insightBreakdown.length ? (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-6 text-center text-sm text-[#5D7EA1]">
+                      No answers recorded for this quiz yet.
+                    </td>
+                  </tr>
+                ) : (
+                  insightBreakdown.map((row) => (
+                    <tr key={row.user_id} className="text-sm">
+                      <td className="px-5 py-4 font-medium text-[#16324F]">
+                        {row.user_display_name ?? row.user_id.slice(0, 10)}
+                      </td>
+                      <td className="px-5 py-4 text-center text-[#5D7EA1]">{row.answered}</td>
+                      <td className="px-5 py-4 text-center font-bold text-[#E67E22]">{row.missed}</td>
+                      <td className="px-5 py-4">
+                        {row.gap_tags.length === 0 ? (
+                          <span className="text-[#5D7EA1]">—</span>
+                        ) : (
+                          <span className="flex flex-wrap gap-1">
+                            {row.gap_tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded-full bg-[#E67E22]/12 px-2 py-0.5 text-[11px] font-semibold text-[#C4661A]"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4">
+                        {row.headline ? (
+                          <span className="text-[#16324F]">{row.headline}</span>
+                        ) : (
+                          <span className="text-[#D63A3D]">— nothing approved matched</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 

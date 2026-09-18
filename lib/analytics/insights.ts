@@ -66,6 +66,53 @@ export const HEADLINE_MAX = 120;
 export const BODY_MAX = 200;
 export const SUGGESTION_MAX = 200;
 
+// ── Resolution ──────────────────────────────────────────────────────────────
+
+/** The fields resolution reads. Anything with these can be ranked. */
+export type ResolvableTemplate = {
+  quiz_id: string | null;
+  archetype_id: string;
+  clinical_tag: string;
+};
+
+/**
+ * Pick the one summary a player should read, most specific first:
+ * quiz-scoped over global, a real archetype over the '*' wildcard, tag-scoped
+ * over tag-agnostic, and among tag-scoped rows the tag the player missed most.
+ *
+ * Callers pass only rows that are already approved and already filtered to the
+ * right audience and locale. Shared by the player lookup and the admin
+ * breakdown so the two can never disagree about who sees what.
+ */
+export function pickInsightTemplate<T extends ResolvableTemplate>(
+  rows: readonly T[],
+  opts: { quizId: string | null; archetypeId: string | null; tags: readonly string[] },
+): T | null {
+  const eligible = rows.filter(
+    (r) =>
+      (r.quiz_id === null || r.quiz_id === opts.quizId) &&
+      (r.archetype_id === ANY_ARCHETYPE ||
+        (opts.archetypeId !== null && r.archetype_id === opts.archetypeId)) &&
+      (r.clinical_tag === '' || opts.tags.includes(r.clinical_tag)),
+  );
+
+  const rank = (r: T) => [
+    r.quiz_id !== null ? 0 : 1,
+    r.archetype_id !== ANY_ARCHETYPE ? 0 : 1,
+    r.clinical_tag !== '' ? 0 : 1,
+    r.clinical_tag !== '' ? opts.tags.indexOf(r.clinical_tag) : Number.MAX_SAFE_INTEGER,
+  ];
+
+  return (
+    eligible.sort((a, b) => {
+      const ra = rank(a);
+      const rb = rank(b);
+      for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i] - rb[i];
+      return 0;
+    })[0] ?? null
+  );
+}
+
 // ── Draft validation ────────────────────────────────────────────────────────
 
 // A drafted summary describes what the player's *answers* showed and what to
