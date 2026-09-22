@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getQuizInsightBreakdown, getSessionAnalytics, resolveSessionToQuizId } from '@/lib/db/queries';
+import { getQuizInsightBreakdown, getSessionAnalytics, resolveSessionToQuizId, getPeerSessionsForQuiz } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/ratelimit';
 
@@ -75,8 +75,13 @@ export async function GET(
     // What the insight engine decided for each player in this quiz.
     const quizId = await resolveSessionToQuizId(sessionId);
     const insightBreakdown = quizId ? await getQuizInsightBreakdown(quizId) : [];
+    const peerSessions = quizId ? await getPeerSessionsForQuiz(sessionId, quizId) : [];
 
-    return NextResponse.json({ ...analytics, insight_breakdown: insightBreakdown });
+    return NextResponse.json({ 
+      ...analytics, 
+      insight_breakdown: insightBreakdown,
+      peer_sessions: peerSessions 
+    });
   } catch (error) {
     console.error('Failed to fetch session analytics:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

@@ -2512,3 +2512,54 @@ export async function getSessionAnalytics(sessionId: string) {
     insights,
   };
 }
+
+export async function getPeerSessionsForQuiz(currentSessionId: string, quizId: string) {
+  try {
+    const res = await pool.query(
+      `SELECT 
+         s.id,
+         s.name,
+         s.pin_code,
+         s.status,
+         s.started_at,
+         s.ended_at,
+         (SELECT COUNT(*) FROM leaderboard_entries le WHERE le.session_id = s.id)::int as participant_count,
+         (SELECT COALESCE(AVG(total_score), 0)::int FROM leaderboard_entries le WHERE le.session_id = s.id) as avg_score
+       FROM sessions s
+       WHERE s.session_id = $1 AND s.id::text != $2::text
+       ORDER BY s.started_at DESC
+       LIMIT 10`,
+      [quizId, currentSessionId]
+    );
+    return res.rows;
+  } catch (err) {
+    console.error('Failed to get peer sessions for quiz:', err);
+    return [];
+  }
+}
+
+export async function getSessionsByQuizId(quizId: string) {
+  try {
+    const res = await pool.query(
+      `SELECT 
+         s.id,
+         s.name,
+         s.pin_code,
+         s.status,
+         s.started_at,
+         s.ended_at,
+         s.created_at,
+         s.is_private,
+         (SELECT COUNT(*) FROM leaderboard_entries le WHERE le.session_id = s.id)::int as participant_count,
+         (SELECT COALESCE(AVG(total_score), 0)::int FROM leaderboard_entries le WHERE le.session_id = s.id) as avg_score
+       FROM sessions s
+       WHERE s.session_id = $1
+       ORDER BY s.started_at DESC`,
+      [quizId]
+    );
+    return res.rows;
+  } catch (err) {
+    console.error('Failed to get sessions for quiz:', err);
+    return [];
+  }
+}

@@ -32,6 +32,16 @@ interface AnalyticsData {
     headline: string | null;
     suggestion: string | null;
   }>;
+  peer_sessions?: Array<{
+    id: string;
+    name: string;
+    pin_code?: string;
+    status?: string;
+    started_at?: string;
+    ended_at?: string;
+    participant_count?: number;
+    avg_score?: number;
+  }>;
   insights: {
     audience_mode_summary: Record<string, number>;
     archetype_distribution: Array<{ archetype_id: string; count: number }>;
@@ -89,6 +99,7 @@ export default function SessionAnalyticsPage({ params }: { params: Promise<{ ses
 
   const { session, leaderboard, questions, insights } = data;
   const insightBreakdown = data.insight_breakdown ?? [];
+  const peerSessions = data.peer_sessions ?? [];
 
   return (
     <div className="mx-auto max-w-[1700px]">
@@ -98,6 +109,7 @@ export default function SessionAnalyticsPage({ params }: { params: Promise<{ ses
         questions={questions}
         insights={insights}
         insightBreakdown={insightBreakdown}
+        peerSessions={peerSessions}
         onBack={() => router.back()}
       />
     </div>

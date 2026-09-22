@@ -9,6 +9,7 @@ import { SESSION_STATUS, ROOM_STATUS } from "@/lib/constants/session";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { openLobby, closeLobby, reopenLobby, startRoom, endRoom, removeRoom } from "@/lib/firebase/rtdb";
 import InvitationModal from "@/components/InvitationModal";
+import CompareSessionsModal from "@/components/admin/CompareSessionsModal";
 
 async function updateQuiz(quizId: string, data: Record<string, unknown>) {
   const response = await fetch(`/api/quizzes/${quizId}`, {
@@ -120,6 +121,16 @@ export default function QuizzesManager({
   // up on the next onRefresh, which would otherwise snap the checkbox back.
   const [shuffleOverrides, setShuffleOverrides] = useState<Record<string, boolean>>({});
 
+  const [compareModal, setCompareModal] = useState<{
+    isOpen: boolean;
+    quizId: string | null;
+    selectedSessionIds: string[];
+  }>({
+    isOpen: false,
+    quizId: null,
+    selectedSessionIds: []
+  });
+
   const setItemLoading = (id: string, isLoading: boolean) => {
     setLoadingIds(prev => ({ ...prev, [id]: isLoading }));
   };
@@ -189,7 +200,7 @@ export default function QuizzesManager({
   const QUIZ_ITEMS_PER_PAGE = 5;
 
   useEffect(() => {
-    const hasOverlay = createSessionModal.isOpen || confirmModal.isOpen;
+    const hasOverlay = createSessionModal.isOpen || confirmModal.isOpen || compareModal.isOpen;
     if (!hasOverlay) return;
 
     const previousOverflow = document.body.style.overflow;
@@ -366,10 +377,24 @@ export default function QuizzesManager({
           </button>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => setCompareModal({
+              isOpen: true,
+              quizId: sessionFilterQuizId || (allData[0]?.id ?? null),
+              selectedSessionIds: []
+            })}
+            className="flex items-center gap-2 rounded-[20px] bg-[#0460A9]/10 hover:bg-[#0460A9] text-[#0460A9] hover:text-white px-4 py-2 text-sm font-bold transition-all shadow-sm shrink-0"
+            title="Launch cross-cohort session comparison"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Compare Sessions
+          </button>
           {sessionFilterQuizId && (
             <button
               onClick={() => { setSessionFilterQuizId(null); setSessionPage(1); setQuizPage(1); }}
-              className="px-3 py-2 rounded-[20px] bg-[#E74C3C]/10 text-[#E74C3C] text-sm font-bold flex items-center gap-1 hover:bg-[#E74C3C]/20 transition-all"
+              className="px-3 py-2 rounded-[20px] bg-[#E74C3C]/10 text-[#E74C3C] text-sm font-bold flex items-center gap-1 hover:bg-[#E74C3C]/20 transition-all shrink-0"
             >
               Clear Template Filter ✕
             </button>
@@ -573,6 +598,18 @@ export default function QuizzesManager({
                           )}
                           <button
                             disabled={loadingIds[s.id]}
+                            onClick={() => setCompareModal({
+                              isOpen: true,
+                              quizId: s.session_id,
+                              selectedSessionIds: [s.id]
+                            })}
+                            className="rounded-[20px] px-4 py-2 text-sm font-semibold transition-all bg-[#0460A9]/10 text-[#0460A9] hover:bg-[#0460A9]/20"
+                            title="Compare session with peers"
+                          >
+                            Compare
+                          </button>
+                          <button
+                            disabled={loadingIds[s.id]}
                             onClick={() => setConfirmModal({
                               isOpen: true,
                               id: s.id,
@@ -715,21 +752,40 @@ export default function QuizzesManager({
                               By <span className="font-bold text-[#16324F]">{q.creator_name || q.created_by}</span> • {new Date(q.created_at).toLocaleDateString()}
                             </p>
                             {sessionCount > 0 && (
-                              <button
-                                onClick={() => {
-                                  setSessionFilterQuizId(q.id);
-                                  setQuizPage(1);
-                                  setSessionPage(1);
-                                  // Scroll to sessions column for mobile
-                                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                                }}
-                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-[12px] bg-[#0460A9]/5 text-[#0460A9] hover:bg-[#0460A9]/15 transition-colors text-[10px] font-bold uppercase tracking-wide"
-                              >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                                </svg>
-                                Show Sessions ({sessionCount})
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => {
+                                    setSessionFilterQuizId(q.id);
+                                    setQuizPage(1);
+                                    setSessionPage(1);
+                                    // Scroll to sessions column for mobile
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                  }}
+                                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-[12px] bg-[#0460A9]/5 text-[#0460A9] hover:bg-[#0460A9]/15 transition-colors text-[10px] font-bold uppercase tracking-wide"
+                                >
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                                  </svg>
+                                  Show Sessions ({sessionCount})
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const relatedSessions = allSessions.filter(s => s.session_id === q.id).map(s => s.id);
+                                    setCompareModal({
+                                      isOpen: true,
+                                      quizId: q.id,
+                                      selectedSessionIds: relatedSessions.slice(0, 2)
+                                    });
+                                  }}
+                                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-[12px] bg-[#7C3AED]/10 text-[#7C3AED] hover:bg-[#7C3AED]/20 transition-colors text-[10px] font-bold uppercase tracking-wide"
+                                  title="Compare sessions of this quiz"
+                                >
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                  </svg>
+                                  Compare ({sessionCount})
+                                </button>
+                              </div>
                             )}
                           </div>
                           <p className="text-sm text-[#4D6F93] line-clamp-2 leading-relaxed">{q.description || "No description provided."}</p>
@@ -951,6 +1007,18 @@ export default function QuizzesManager({
         onClose={() => setQrModal(null)}
         sessionName={qrModal?.sessionName ?? ""}
         joinToken={qrModal?.joinToken ?? null}
+      />
+
+      <CompareSessionsModal
+        isOpen={compareModal.isOpen}
+        onClose={() => setCompareModal({ isOpen: false, quizId: null, selectedSessionIds: [] })}
+        allQuizzes={allData}
+        allSessions={allSessions}
+        initialQuizId={compareModal.quizId}
+        initialSelectedSessionIds={compareModal.selectedSessionIds}
+        onLaunchCompare={(quizId, sessionIds) => {
+          router.push(`/admin/quizzes/${quizId}/compare?sessions=${sessionIds.join(',')}`);
+        }}
       />
     </div>
   );
