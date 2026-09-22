@@ -73,10 +73,10 @@ function QuizHeader({
   currentUserId?: string;
 }) {
   return (
-    <div className="rounded-[24px] border border-white/25 bg-white/15 px-4 py-3 text-white shadow-[0_20px_48px_rgba(7,16,43,0.18)] backdrop-blur-md">
+    <div className="rounded-[22px] border border-white/75 bg-[linear-gradient(135deg,rgba(150,200,255,.96),rgba(102,164,238,.94))] px-4 py-3 text-[#10284b] shadow-[0_18px_42px_rgba(35,87,145,0.18)] backdrop-blur-md">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="nq-details" style={{ color: 'rgba(255,255,255,0.65)' }}>Time</p>
+          <p className="nq-details text-[#55749c]">Time</p>
           <p className="mt-0.5 text-xl font-bold tabular-nums">{elapsed}</p>
         </div>
 
@@ -84,11 +84,11 @@ function QuizHeader({
           displayName={userName}
           photoURL={photoURL}
           size={36}
-          ringClassName="ring-2 ring-[#92BFFF]/70"
+          ringClassName="ring-2 ring-white/80 shadow-md"
         />
 
         <div className="text-right">
-          <p className="nq-details" style={{ color: 'rgba(255,255,255,0.65)' }}>Score</p>
+          <p className="nq-details text-[#55749c]">Score</p>
           <div className="mt-0.5 flex items-center justify-end gap-1.5">
             <p className="text-xl font-bold tabular-nums">{score}</p>
             <AnimatePresence>
@@ -98,7 +98,7 @@ function QuizHeader({
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
-                  className={`text-xs font-semibold ${lastDelta >= 0 ? 'text-[#92FFBF]' : 'text-[#FFB6B8]'}`}
+                  className={`text-xs font-semibold ${lastDelta >= 0 ? 'text-[#087c4b]' : 'text-[#c33142]'}`}
                 >
                   {lastDelta >= 0 ? `+${lastDelta}` : lastDelta}
                 </motion.span>
@@ -109,12 +109,12 @@ function QuizHeader({
       </div>
 
       {(topScores.length > 1 || streak > 1) && (
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/15 pt-2.5">
-          <span className="nq-details" style={{ color: 'rgba(255,255,255,0.55)' }}>🏆 Live</span>
-          <span className="nq-details" style={{ color: 'rgba(255,255,255,0.55)' }}>{totalPlayers} players</span>
-          {streak > 1 && <span className="rounded-full bg-[#FFB020]/20 px-2 py-0.5 text-xs font-semibold text-[#FFD48A]">🔥 {streak}</span>}
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[#24568f]/15 pt-2.5">
+          <span className="nq-details text-[#55749c]">🏆 Live</span>
+          <span className="nq-details text-[#55749c]">{totalPlayers} players</span>
+          {streak > 1 && <span className="rounded-full bg-[#fff1cd] px-2 py-0.5 text-xs font-semibold text-[#986300]">🔥 {streak}</span>}
           {topScores.map((player, index) => (
-            <span key={player.uid} className={`text-xs ${player.uid === currentUserId ? 'font-bold text-white' : 'text-white/75'}`}>
+            <span key={player.uid} className={`text-xs ${player.uid === currentUserId ? 'font-bold text-[#10284b]' : 'text-[#49688f]'}`}>
               #{index + 1} {formatPlayerName(player.displayName, player.uid === currentUserId)} {player.score}
             </span>
           ))}
@@ -200,10 +200,10 @@ function QuestionVisual({
   return (
     <>
       {question.media_url && (
-        <div className="relative overflow-hidden rounded-[22px]">
+        <div className="relative overflow-hidden rounded-[20px] border border-white/10 shadow-[0_16px_34px_rgba(0,0,0,0.28)]">
           {mediaError ? (
-            <div className="flex h-44 w-full items-center justify-center bg-[#EEF3F8] md:h-56">
-              <p className="nq-details text-[#B0C4D8]">Media unavailable</p>
+            <div className="flex h-52 w-full items-center justify-center bg-[#111d48] md:h-64">
+              <p className="nq-details text-[#9AA8D1]">Media unavailable</p>
             </div>
           ) : question.media_type === 'video' ? (
             <QuestionMediaPlayer
@@ -217,7 +217,7 @@ function QuestionVisual({
             <img
               src={question.media_url}
               alt=""
-              className="h-44 w-full object-cover md:h-56"
+              className="h-52 w-full object-cover md:h-64"
               onError={() => setFailedMediaQuestionId(question.id)}
             />
           )}
@@ -228,11 +228,11 @@ function QuestionVisual({
       )}
 
       <div className={question.media_url ? "mt-4" : ""}>
-        <p className="nq-details text-[#7A8EA7]">
+        <p className="nq-details text-[#9AA8D1]">
           Question {question.question_order + 1}
           {typeof totalQuestions === 'number' && totalQuestions > 0 ? `/${totalQuestions}` : ''}
         </p>
-        <h1 className="mt-2 text-lg font-bold leading-snug text-[#1B2530] dark:text-[#d4e3f5] md:text-xl">
+        <h1 className="mt-2 text-lg font-bold leading-snug text-[#F4F7FF] md:text-xl">
           {question.question_text}
         </h1>
       </div>
@@ -255,9 +255,9 @@ function ChoiceButton({
       whileTap={!disabled ? { scale: 0.99 } : undefined}
       onClick={onSelect}
       disabled={disabled}
-      className="nq-answer-shadow w-full rounded-[22px] border border-[#DCE7F5] bg-white px-5 py-4 text-left transition hover:border-[#92BFFF] hover:shadow-[0_18px_34px_rgba(17,87,145,0.12)] disabled:cursor-not-allowed"
+      className="nq-answer-shadow w-full rounded-[18px] border border-white/10 bg-[#111D48]/95 px-5 py-4 text-left transition hover:border-[#7898FF]/65 hover:bg-[#172657] hover:shadow-[0_18px_34px_rgba(0,0,0,0.24)] disabled:cursor-not-allowed"
     >
-      <span className="text-base font-semibold text-[#202832] text-wrap-balance">{choice.choice_text}</span>
+      <span className="text-base font-semibold text-[#F4F7FF] text-wrap-balance">{choice.choice_text}</span>
     </motion.button>
   );
 }
@@ -277,10 +277,10 @@ function ResultChoice({
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`relative overflow-hidden rounded-[22px] border bg-white px-5 py-4 ${selected ? tone.border : 'border-[#DCE7F5]'} ${selected ? 'shadow-[0_18px_36px_rgba(17,87,145,0.16)]' : 'shadow-[0_12px_28px_rgba(17,87,145,0.08)] opacity-75'}`}
+      className={`relative overflow-hidden rounded-[18px] border bg-[#111D48] px-5 py-4 ${selected ? tone.border : 'border-white/10'} ${selected ? 'shadow-[0_18px_36px_rgba(0,0,0,0.28)]' : 'shadow-[0_12px_28px_rgba(0,0,0,0.2)] opacity-75'}`}
     >
       <div className="flex items-center justify-between gap-4">
-        <p className="text-base font-semibold text-[#202832] text-wrap-balance">{choice.choice_text}</p>
+        <p className="text-base font-semibold text-[#F4F7FF] text-wrap-balance">{choice.choice_text}</p>
         {selected && feedback && (
           <span className={`rounded-full px-3 py-1 text-sm font-semibold ${tone.badge}`}>
             {formatImpact(feedback.points_earned)}
@@ -454,11 +454,13 @@ function ExplanationModal({
   feedback,
   nextLoading,
   onContinue,
+  headerProps,
 }: {
   selectedChoice: Choice;
   feedback: AnswerFeedback | null;
   nextLoading: boolean;
   onContinue: () => void;
+  headerProps: Parameters<typeof QuizHeader>[0];
 }) {
   const tone = getImpactTone(feedback?.points_earned ?? 0);
   return (
@@ -466,16 +468,19 @@ function ExplanationModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
     >
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-[#09182f]/35 backdrop-blur-md" />
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 16 }}
-        className="relative w-full max-w-lg space-y-4 rounded-[32px] bg-white p-6 shadow-[0_32px_64px_rgba(7,16,43,0.28)]"
+        className="relative max-h-[92dvh] w-full max-w-xl space-y-4 overflow-y-auto rounded-t-[30px] bg-[#fbfdff] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[0_32px_64px_rgba(7,16,43,0.28)] sm:rounded-[30px] sm:p-5"
       >
-        <div className={`flex items-center gap-3 rounded-[18px] border px-4 py-3 ${tone.border}`}>
+        <div className="mx-auto h-1 w-10 rounded-full bg-[#c5d3e5] sm:hidden" />
+        <QuizHeader {...headerProps} />
+
+        <div className={`flex items-center gap-3 rounded-[16px] border bg-white px-4 py-3 ${tone.border}`}>
           <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${tone.badge}`}>
             {formatImpact(feedback?.points_earned ?? 0)}
           </span>
@@ -485,7 +490,7 @@ function ExplanationModal({
         {feedback?.explanation && (
           <>
             <p className="mb-2 text-sm font-medium text-[#7A8EA7]">Explanation</p>
-            <div className="rounded-[20px] bg-[#F0F6FF] p-4">
+            <div className="rounded-[18px] bg-[#eef4fd] p-4">
               <p className="text-base leading-relaxed text-[#202832]">{feedback.explanation}</p>
             </div>
           </>
@@ -494,7 +499,7 @@ function ExplanationModal({
         <button
           onClick={onContinue}
           disabled={nextLoading}
-          className="w-full rounded-[24px] bg-[#0460A9] px-4 py-4 text-base font-semibold text-white! shadow-[0_16px_36px_rgba(4,96,169,0.24)] disabled:opacity-60"
+          className="w-full rounded-[18px] bg-[#2f6fbd] px-4 py-4 text-base font-semibold text-white! shadow-[0_16px_36px_rgba(4,96,169,0.24)] disabled:opacity-60"
         >
           {nextLoading ? 'Loading…' : 'Next Question'}
         </button>
@@ -929,8 +934,8 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     .slice(0, 5);
 
   return (
-    <div className="nq-sky min-h-screen">
-      <div className="nq-content mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-4 px-4 py-5">
+    <div className="nq-play-screen min-h-screen">
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-3 px-3 py-3 sm:gap-4 sm:px-4 sm:py-5">
         {!selectedLabel && (
           <QuizHeader
             elapsed={elapsed}
@@ -945,8 +950,8 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
           />
         )}
 
-        <Card className="relative overflow-hidden">
-          <div className="absolute inset-x-0 top-0 h-1 bg-[#EEF3F8]">
+        <Card className="nq-play-card relative overflow-hidden rounded-[28px] border-white/10! bg-[#0D173E]/88! p-4! shadow-[0_24px_54px_rgba(0,0,0,0.3)] backdrop-blur-md sm:p-5!">
+          <div className="absolute inset-x-0 top-0 h-1 bg-white/10">
             <AnimatePresence>
               {selectedLabel && (
                 <motion.div
@@ -969,7 +974,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="mt-8 space-y-3"
+                className="mt-5 space-y-3 sm:mt-6"
               >
                 {question.choices.map((choice) => (
                   <ChoiceButton
@@ -988,7 +993,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="mt-8 space-y-3"
+                className="mt-5 space-y-3 sm:mt-6"
               >
                 {question.choices.map((choice) => (
                   <ResultChoice
@@ -1013,6 +1018,17 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
             feedback={answerFeedback}
             nextLoading={nextLoading}
             onContinue={handleContinue}
+            headerProps={{
+              elapsed,
+              score,
+              streak,
+              userName: user?.displayName,
+              photoURL: user?.photoURL,
+              lastDelta,
+              totalPlayers: Object.keys(scores).length,
+              topScores,
+              currentUserId: user?.uid,
+            }}
           />
         )}
       </AnimatePresence>

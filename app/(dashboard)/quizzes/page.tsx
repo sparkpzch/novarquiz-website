@@ -2,9 +2,11 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "motion/react";
-import { useAuth } from "@/lib/hooks/useAuth";
-import type { Quiz } from "@/lib/types";
+import Image from "next/image";
+import { motion } from "motion/react";
+import type { Session } from "@/lib/types";
+
+type BrowseSession = Session & { created_at?: string };
 
 // ─── Filter Chip ──────────────────────────────────────────────────────────────
 
@@ -38,7 +40,7 @@ function SessionCard({
   index,
   onClick,
 }: {
-  session: any;
+  session: BrowseSession;
   index: number;
   onClick: () => void;
 }) {
@@ -50,15 +52,25 @@ function SessionCard({
       onClick={onClick}
       className="group nq-card-soft flex min-h-[228px] flex-col overflow-hidden rounded-[28px] p-0 text-left transition hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(17,87,145,0.18)]"
     >
-      {session.cover_image_url && (
-        <div className="h-40 overflow-hidden">
-          <img
+      <div className="nq-always-dark relative h-40 overflow-hidden bg-[linear-gradient(135deg,#172c6c,#3157c8_58%,#7188f6)]">
+        {session.cover_image_url ? (
+          <Image
             src={session.cover_image_url}
-            alt={session.name}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            alt={`${session.name} thumbnail`}
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            className="object-cover transition duration-300 group-hover:scale-105"
           />
-        </div>
-      )}
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
+            <div className="absolute inset-0 opacity-40 [background-image:radial-gradient(circle_at_20%_20%,rgba(255,255,255,.35),transparent_28%),radial-gradient(circle_at_85%_75%,rgba(255,255,255,.22),transparent_24%)]" />
+            <div className="relative">
+              <span className="text-4xl text-white" aria-hidden="true">✦</span>
+              <p className="mt-2 line-clamp-2 text-base font-bold text-white">{session.name}</p>
+            </div>
+          </div>
+        )}
+      </div>
       <div className="flex flex-1 flex-col p-5">
         <div className="mb-3 flex items-start justify-between gap-3">
           <h3 className="line-clamp-2 flex-1 text-[1.75rem] font-bold leading-tight text-[#16324F]">
@@ -115,7 +127,7 @@ function QuizzesContent() {
     | "long";
 
   const [inputValue, setInputValue] = useState(qParam);
-  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<BrowseSession[]>([]);
   const [loading, setLoading] = useState(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -123,13 +135,15 @@ function QuizzesContent() {
   useEffect(() => {
     fetch("/api/sessions")
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: any[]) => setSessions(data.filter((s: any) => s.is_private === false && (s.status === 'opened' || s.status === 'started'))))
+      .then((data: BrowseSession[]) => setSessions(data.filter((s) => s.is_private === false && (s.status === 'opened' || s.status === 'started'))))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   // Keep input in sync when URL changes (e.g. back/forward)
   useEffect(() => {
+    // This mirrors browser navigation state into the controlled search field.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInputValue(qParam);
   }, [qParam]);
 
@@ -170,7 +184,7 @@ function QuizzesContent() {
       const term = qParam.toLowerCase();
       if (term) {
         return (
-          s.name.toLowerCase().includes(term) ||
+          (s.name ?? "").toLowerCase().includes(term) ||
           (s.description ?? "").toLowerCase().includes(term)
         );
       }
@@ -185,7 +199,7 @@ function QuizzesContent() {
     })
     .sort((a, b) => {
       // For sessions, default to newest first based on created_at or id
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
     });
 
   const sortOptions = [
@@ -305,7 +319,7 @@ function QuizzesContent() {
               {qParam && (
                 <span>
                   {" for "}
-                  <span className="font-semibold text-[#0460A9]">"{qParam}"</span>
+                  <span className="font-semibold text-[#0460A9]">&ldquo;{qParam}&rdquo;</span>
                 </span>
               )}
             </p>

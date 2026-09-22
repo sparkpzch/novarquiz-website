@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useToast } from "@/components/ui/Toast";
 import type { Quiz, Session } from "@/lib/types";
 import type { SessionRoom } from "@/lib/firebase/rtdb";
@@ -30,6 +31,7 @@ async function patchSession(sessionId: string, data: Record<string, unknown>) {
 function ItemCard({
   title,
   badges,
+  media,
   subtitle,
   content,
   actions,
@@ -38,6 +40,7 @@ function ItemCard({
 }: {
   title: string;
   badges?: React.ReactNode;
+  media?: React.ReactNode;
   subtitle?: React.ReactNode;
   content?: React.ReactNode;
   actions: React.ReactNode;
@@ -46,6 +49,7 @@ function ItemCard({
 }) {
   return (
     <div className={`rounded-[30px] p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(17,87,145,0.08)] flex flex-col ${!noBorder ? 'border' : ''} ${highlighted ? (noBorder ? 'bg-[#F4F9FF]' : 'border-[#0460A9]/30 bg-[#F4F9FF]') : (noBorder ? 'bg-white/60' : 'border-[#0460A9]/10 bg-white/60')}`}>
+      {media && <div className="mb-4">{media}</div>}
       <div className="min-w-0 flex flex-col">
         <div className="flex flex-wrap items-center gap-2 mb-2">
           <h3 className="text-xl font-bold text-[#16324F] leading-tight truncate">{title}</h3>
@@ -118,6 +122,62 @@ export default function QuizzesManager({
 
   const setItemLoading = (id: string, isLoading: boolean) => {
     setLoadingIds(prev => ({ ...prev, [id]: isLoading }));
+  };
+
+  const handleThumbnailUpload = async (quizId: string, file: File) => {
+    const loadingKey = `thumbnail:${quizId}`;
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      showToast("Thumbnail must be a JPG, PNG, GIF, or WebP image.", "error");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast("Thumbnail must be smaller than 10 MB.", "error");
+      return;
+    }
+
+    setItemLoading(loadingKey, true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const uploadResponse = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const uploaded = await uploadResponse.json().catch(() => null);
+      if (!uploadResponse.ok || !uploaded?.url || !uploaded?.path) {
+        throw new Error(uploaded?.error || "Thumbnail upload failed");
+      }
+
+      await updateQuiz(quizId, {
+        cover_image_url: uploaded.url,
+        cover_image_path: uploaded.path,
+      });
+      showToast("Quiz thumbnail updated.", "success");
+      onRefresh();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Failed to update thumbnail.", "error");
+    } finally {
+      setItemLoading(loadingKey, false);
+    }
+  };
+
+  const handleThumbnailRemove = async (quizId: string) => {
+    const loadingKey = `thumbnail:${quizId}`;
+    setItemLoading(loadingKey, true);
+    try {
+      await updateQuiz(quizId, {
+        cover_image_url: null,
+        cover_image_path: null,
+      });
+      showToast("Quiz thumbnail removed.", "success");
+      onRefresh();
+    } catch {
+      showToast("Failed to remove thumbnail.", "error");
+    } finally {
+      setItemLoading(loadingKey, false);
+    }
   };
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -592,6 +652,62 @@ export default function QuizzesManager({
                     <ItemCard
                       key={q.id}
                       title={q.name}
+                      media={
+                        <div className="nq-always-dark group relative aspect-[16/7] overflow-hidden rounded-[22px] border border-white/10 bg-[linear-gradient(135deg,#192d70,#2f55c7_58%,#6f84f6)]">
+                          {q.cover_image_url ? (
+                            <Image
+                              src={q.cover_image_url}
+                              alt={`${q.name} thumbnail`}
+                              fill
+                              sizes="(max-width: 1024px) 100vw, 44vw"
+                              className="object-cover transition duration-500 group-hover:scale-[1.03]"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center px-8 text-center">
+                              <div className="absolute inset-0 opacity-40 [background-image:radial-gradient(circle_at_20%_20%,rgba(255,255,255,.35),transparent_28%),radial-gradient(circle_at_85%_75%,rgba(255,255,255,.22),transparent_24%)]" />
+                              <div className="relative">
+                                <span className="text-4xl" aria-hidden="true">✦</span>
+                                <p className="mt-2 line-clamp-2 text-base font-bold text-white">{q.name}</p>
+                                <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/65">Add quiz thumbnail</p>
+                              </div>
+                            </div>
+                          )}
+                          <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-center justify-end gap-2 bg-gradient-to-t from-[#060b26]/95 via-[#060b26]/55 to-transparent p-3 pt-10">
+                            {canEditQuiz && (
+                              <>
+                                <input
+                                  id={`quiz-thumbnail-${q.id}`}
+                                  type="file"
+                                  accept="image/jpeg,image/png,image/gif,image/webp"
+                                  className="sr-only"
+                                  disabled={loadingIds[`thumbnail:${q.id}`]}
+                                  onChange={(event) => {
+                                    const file = event.currentTarget.files?.[0];
+                                    event.currentTarget.value = "";
+                                    if (file) void handleThumbnailUpload(q.id, file);
+                                  }}
+                                />
+                                <label
+                                  htmlFor={`quiz-thumbnail-${q.id}`}
+                                  className={`cursor-pointer rounded-full border border-white/20 bg-[#0b1434]/85 px-3 py-1.5 text-xs font-bold text-white shadow-lg backdrop-blur transition hover:bg-[#172455] ${loadingIds[`thumbnail:${q.id}`] ? "pointer-events-none opacity-60" : ""}`}
+                                >
+                                  {loadingIds[`thumbnail:${q.id}`] ? "Uploading…" : q.cover_image_url ? "Replace" : "Upload"}
+                                </label>
+                                {q.cover_image_url && (
+                                  <button
+                                    type="button"
+                                    disabled={loadingIds[`thumbnail:${q.id}`]}
+                                    onClick={() => void handleThumbnailRemove(q.id)}
+                                    className="rounded-full border border-rose-300/25 bg-rose-500/15 px-3 py-1.5 text-xs font-bold text-rose-100 backdrop-blur transition hover:bg-rose-500/25 disabled:opacity-60"
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      }
                       subtitle={
                         <div className="flex flex-col gap-2">
                           <div className="flex items-center justify-between">

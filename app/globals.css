@@ -275,6 +275,51 @@ h1, h2, h3, .nq-header, .nq-topic {
   box-shadow: 0 14px 36px rgba(17, 87, 145, 0.12);
 }
 
+/* ─── Figma "New Design" dashboard + mobile play surfaces ─────────────── */
+.nq-dashboard-shell {
+  background:
+    radial-gradient(circle at 78% 4%, rgba(53, 88, 220, 0.12), transparent 26rem),
+    #060b26;
+}
+
+[data-theme="light"] .nq-dashboard-shell.text-white,
+[data-theme="light"] .nq-dashboard-shell .text-white {
+  color: #ffffff !important;
+}
+
+.nq-play-screen {
+  position: relative;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(71, 105, 229, 0.24), transparent 24rem),
+    radial-gradient(circle at 4% 82%, rgba(41, 69, 170, 0.18), transparent 20rem),
+    linear-gradient(180deg, #080e2b 0%, #060b22 100%);
+}
+
+.nq-play-screen::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(158, 178, 255, 0.16) 1px, transparent 1px);
+  background-size: 20px 20px;
+  opacity: 0.48;
+}
+
+.nq-play-screen::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 95% 18%, rgba(104, 130, 255, 0.12), transparent 22rem),
+    radial-gradient(circle at 4% 80%, rgba(58, 91, 214, 0.1), transparent 20rem);
+}
+
+[data-theme="light"] .nq-play-screen .text-white {
+  color: #ffffff !important;
+}
+
 .nq-admin-panel {
   --nq-admin-title: #16324f;
   --nq-admin-body: #294867;
@@ -752,4 +797,255 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
 html,
 body {
   overscroll-behavior-y: contain;
+}
+
+/* ─── Dashboard: the redesigned workspace is always dark ─────────────
+   The public theme preference must not turn this product area back into
+   the legacy light palette. Keep these overrides last so older utility
+   classes remain readable while pages are migrated incrementally. */
+.nq-dashboard-shell {
+  color-scheme: dark;
+  color: #f4f7ff;
+}
+
+[data-theme="light"] .nq-dashboard-shell.text-white,
+[data-theme="light"] .nq-dashboard-shell .text-white {
+  color: #ffffff !important;
+}
+
+.nq-dashboard-shell .nq-card,
+.nq-dashboard-shell .nq-card-soft {
+  border-color: rgba(156, 173, 255, 0.12) !important;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(73, 101, 217, 0.12), transparent 16rem),
+    linear-gradient(150deg, rgba(18, 29, 73, 0.98), rgba(10, 18, 49, 0.98)) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22) !important;
+}
+
+.nq-dashboard-shell .nq-admin-panel {
+  --nq-admin-title: #f4f7ff;
+  --nq-admin-body: #c3cdec;
+  --nq-admin-muted: #9aa8d1;
+  --nq-admin-soft: #8494c0;
+  --nq-admin-border: rgba(156, 173, 255, 0.12);
+  --nq-admin-surface: rgba(19, 31, 76, 0.74);
+  --nq-admin-surface-strong: rgba(31, 46, 100, 0.88);
+}
+
+.nq-dashboard-shell .nq-admin-panel .bg-white\/5,
+.nq-dashboard-shell .nq-admin-panel .bg-white\/\[0\.03\],
+.nq-dashboard-shell .nq-admin-panel .bg-white\/\[0\.04\],
+.nq-dashboard-shell [class~="bg-white/60"],
+.nq-dashboard-shell [class~="bg-white/70"],
+.nq-dashboard-shell [class~="bg-white/50"] {
+  background-color: rgba(20, 33, 79, 0.78) !important;
+}
+
+.nq-dashboard-shell [class~="bg-white"],
+.nq-dashboard-shell [class~="bg-[#F8FAFC]"],
+.nq-dashboard-shell [class~="bg-[#F4F9FF]"] {
+  background-color: #111d48 !important;
+}
+
+.nq-dashboard-shell [class~="text-[#16324F]"],
+.nq-dashboard-shell [class~="text-[#202832]"],
+.nq-dashboard-shell [class~="text-[#294867]"] {
+  color: #f4f7ff !important;
+}
+
+.nq-dashboard-shell [class~="text-[#4D6F93]"],
+.nq-dashboard-shell [class~="text-[#5D7EA1]"],
+.nq-dashboard-shell [class~="text-[#475E79]"],
+.nq-dashboard-shell [class~="text-[#8AA4C0]"] {
+  color: #aebbe0 !important;
+}
+
+.nq-dashboard-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.nq-dashboard-shell select,
+.nq-dashboard-shell textarea {
+  border-color: rgba(156, 173, 255, 0.16) !important;
+  background-color: rgba(7, 14, 42, 0.78) !important;
+  color: #f4f7ff !important;
+}
+
+.nq-dashboard-shell input::placeholder,
+.nq-dashboard-shell textarea::placeholder {
+  color: #7f8db6 !important;
+}
+
+.nq-dashboard-shell .border-\[\#0460A9\]\/10,
+.nq-dashboard-shell .border-\[\#0460A9\]\/15,
+.nq-dashboard-shell .border-\[\#0460A9\]\/20 {
+  border-color: rgba(156, 173, 255, 0.13) !important;
+}
+
+.nq-dashboard-shell .hover\:bg-white:hover,
+.nq-dashboard-shell .hover\:bg-white\/60:hover,
+.nq-dashboard-shell .hover\:bg-white\/70:hover {
+  background-color: rgba(42, 59, 121, 0.82) !important;
+}
+
+/* Light mode keeps the original airy NovarQuiz surfaces. The redesigned
+   layout and thumbnail features are shared, while palette follows the user's
+   saved theme preference. */
+[data-theme="light"] .nq-dashboard-shell {
+  color-scheme: light;
+  color: #16324f;
+  background:
+    radial-gradient(circle at 82% 4%, rgba(112, 162, 249, 0.22), transparent 28rem),
+    linear-gradient(180deg, #eef6ff 0%, #f8fbff 48%, #edf5ff 100%) !important;
+}
+
+[data-theme="light"] .nq-dashboard-sidebar,
+[data-theme="light"] .nq-dashboard-mobile-header {
+  border-color: rgba(4, 96, 169, 0.1) !important;
+  background: rgba(248, 251, 255, 0.94) !important;
+  box-shadow: 12px 0 36px rgba(17, 87, 145, 0.06);
+}
+
+[data-theme="light"] .nq-dashboard-mobile-nav {
+  border-color: rgba(4, 96, 169, 0.12) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 18px 50px rgba(17, 87, 145, 0.18) !important;
+}
+
+[data-theme="light"] .nq-dashboard-logo {
+  filter: none !important;
+}
+
+[data-theme="light"] .nq-dashboard-shell [class~="bg-[#18255d]"],
+[data-theme="light"] .nq-dashboard-shell [class~="bg-[#17275f]"] {
+  background-color: #e4f0ff !important;
+}
+
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#8a97c1]"],
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#7886af]"],
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#7180ad]"],
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#65739f]"] {
+  color: #5d7ea1 !important;
+}
+
+[data-theme="light"] .nq-dashboard-shell .nq-card,
+[data-theme="light"] .nq-dashboard-shell .nq-card-soft {
+  border-color: rgba(4, 96, 169, 0.14) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(233, 244, 255, 0.92)) !important;
+  box-shadow: 0 20px 52px rgba(17, 87, 145, 0.12) !important;
+}
+
+[data-theme="light"] .nq-dashboard-shell .nq-admin-panel {
+  --nq-admin-title: #16324f;
+  --nq-admin-body: #294867;
+  --nq-admin-muted: #456786;
+  --nq-admin-soft: #587693;
+  --nq-admin-border: rgba(4, 96, 169, 0.18);
+  --nq-admin-surface: rgba(255, 255, 255, 0.8);
+  --nq-admin-surface-strong: rgba(255, 255, 255, 0.92);
+}
+
+[data-theme="light"] .nq-dashboard-shell .nq-admin-panel .bg-white\/5,
+[data-theme="light"] .nq-dashboard-shell .nq-admin-panel .bg-white\/\[0\.03\],
+[data-theme="light"] .nq-dashboard-shell .nq-admin-panel .bg-white\/\[0\.04\],
+[data-theme="light"] .nq-dashboard-shell [class~="bg-white/60"],
+[data-theme="light"] .nq-dashboard-shell [class~="bg-white/70"],
+[data-theme="light"] .nq-dashboard-shell [class~="bg-white/50"] {
+  background-color: rgba(255, 255, 255, 0.76) !important;
+}
+
+[data-theme="light"] .nq-dashboard-shell [class~="bg-white"],
+[data-theme="light"] .nq-dashboard-shell [class~="bg-[#F8FAFC]"],
+[data-theme="light"] .nq-dashboard-shell [class~="bg-[#F4F9FF]"] {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .nq-dashboard-shell [class~="bg-[#070d2b]"],
+[data-theme="light"] .nq-dashboard-shell [class~="bg-[#0a1234]"],
+[data-theme="light"] .nq-dashboard-shell [class~="bg-[#0d173e]"],
+[data-theme="light"] .nq-dashboard-shell [class~="bg-[#101b49]"],
+[data-theme="light"] .nq-dashboard-shell [class~="bg-[#111d48]"],
+[data-theme="light"] .nq-dashboard-shell [class~="bg-[#142153]"] {
+  background-color: rgba(255, 255, 255, 0.86) !important;
+}
+
+[data-theme="light"] .nq-dashboard-shell .text-white,
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#16324F]"],
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#202832]"],
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#294867]"] {
+  color: #16324f !important;
+}
+
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#4D6F93]"],
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#5D7EA1]"],
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#475E79]"],
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#8AA4C0]"],
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#8391bc]"],
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#7987b3]"],
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#7886b2]"],
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#7180ad]"],
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#62709d]"],
+[data-theme="light"] .nq-dashboard-shell [class~="text-[#5f6e9c]"] {
+  color: #5d7ea1 !important;
+}
+
+[data-theme="light"] .nq-dashboard-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+[data-theme="light"] .nq-dashboard-shell select,
+[data-theme="light"] .nq-dashboard-shell textarea {
+  border-color: rgba(4, 96, 169, 0.16) !important;
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  color: #16324f !important;
+}
+
+[data-theme="light"] .nq-dashboard-shell input::placeholder,
+[data-theme="light"] .nq-dashboard-shell textarea::placeholder {
+  color: #7890aa !important;
+}
+
+[data-theme="light"] .nq-dashboard-shell .nq-always-dark .text-white,
+[data-theme="light"] .nq-dashboard-shell .nq-always-dark [class*="text-white"] {
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .nq-dashboard-shell button[class*="bg-[#4f76ff]"],
+[data-theme="light"] .nq-dashboard-shell button[class*="bg-[#0460A9]"],
+[data-theme="light"] .nq-dashboard-shell a[class*="bg-[#0460A9]"] {
+  color: #ffffff !important;
+}
+
+/* The mobile player follows the same preference: pale sky in light mode,
+   navy glass in dark mode. */
+[data-theme="light"] .nq-play-screen {
+  color-scheme: light;
+  background:
+    linear-gradient(180deg, rgba(78, 145, 227, 0.3), transparent 12rem),
+    linear-gradient(180deg, #84bafb 0%, #b7d9ff 55%, #d5e9ff 100%);
+}
+
+[data-theme="light"] .nq-play-screen::before {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.48) 1.25px, transparent 1.25px);
+  opacity: 0.62;
+}
+
+[data-theme="light"] .nq-play-screen::after {
+  background:
+    radial-gradient(circle at 95% 18%, rgba(255, 255, 255, 0.42), transparent 22rem),
+    radial-gradient(circle at 4% 80%, rgba(78, 145, 227, 0.18), transparent 20rem);
+}
+
+[data-theme="light"] .nq-play-screen .nq-play-card {
+  border-color: rgba(255, 255, 255, 0.55) !important;
+  background-color: rgba(255, 255, 255, 0.38) !important;
+  box-shadow: 0 24px 54px rgba(31, 84, 143, 0.17) !important;
+}
+
+[data-theme="light"] .nq-play-screen [class~="bg-[#111D48]/95"],
+[data-theme="light"] .nq-play-screen [class~="bg-[#111D48]"] {
+  border-color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+[data-theme="light"] .nq-play-screen [class~="text-[#F4F7FF]"] {
+  color: #202832 !important;
+}
+
+[data-theme="light"] .nq-play-screen [class~="text-[#9AA8D1]"] {
+  color: #617892 !important;
 }
