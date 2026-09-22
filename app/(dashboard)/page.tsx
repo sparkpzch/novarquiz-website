@@ -18,6 +18,8 @@ import { canResumeRoom, hasRecentSessionPresence } from "@/lib/session-resume";
 import { ROOM_STATUS } from "@/lib/constants/session";
 import { useToast } from "@/components/ui/Toast";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
+import { summarizeGameStats, type GameHistoryScore } from "@/lib/stats/game";
+import type { InsightSummary } from "@/lib/analytics/insights";
 import "@/lib/i18n";
 
 type ParsedJoinInput =
@@ -31,9 +33,15 @@ type SessionResumeSnapshot = {
 
 type UserStats = {
   total_played: number;
-  avg_score: number;
   best_score: number;
   best_streak: number;
+  accuracy: number;
+};
+
+type DashboardHealthStats = {
+  knowledgeScore: number;
+  summary: InsightSummary | null;
+  weakestTopic: { name: string; score: number } | null;
 };
 
 type DashboardSession = {
@@ -177,7 +185,7 @@ function LiveSessionsWidget() {
       disabled={resuming}
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group flex w-full items-center gap-3 rounded-xl border border-[#557cff]/35 bg-[#101b49] px-4 py-3 text-left shadow-[0_14px_36px_rgba(0,0,0,0.18)] transition hover:border-[#7898ff]/70 hover:bg-[#142153] disabled:cursor-wait disabled:opacity-70"
+      className="nq-dashboard-panel group flex w-full items-center gap-3 rounded-xl border border-[#557cff]/35 bg-[#101b49] px-4 py-3 text-left shadow-[0_14px_36px_rgba(0,0,0,0.18)] transition hover:border-[#7898ff]/70 hover:bg-[#142153] disabled:cursor-wait disabled:opacity-70"
     >
       <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#4f76ff] text-white">
         <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[#68f0b0]" />
@@ -244,7 +252,7 @@ function JoinByCodeCard() {
   };
 
   return (
-    <section className="relative overflow-hidden rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
+    <section className="nq-dashboard-panel relative overflow-hidden rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
       <div className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-[#3f6fff]/20 blur-3xl" />
       <div className="relative flex items-start gap-3">
         <DashboardIcon>
@@ -283,7 +291,7 @@ function JoinByCodeCard() {
 
 function MetricCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-lg border border-white/7 bg-[#0a1234] px-3 py-2.5">
+    <div className="nq-dashboard-metric rounded-lg border border-white/7 bg-[#0a1234] px-3 py-2.5">
       <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#62709d]">{label}</p>
       <p className="mt-1 text-lg font-semibold tabular-nums text-white">{value}</p>
     </div>
@@ -295,7 +303,7 @@ function QuizCard({ session, onClick }: { session: DashboardSession; onClick: ()
     <button
       type="button"
       onClick={onClick}
-      className="group min-w-0 overflow-hidden rounded-xl border border-white/8 bg-[#0a1234] text-left transition hover:-translate-y-0.5 hover:border-[#557cff]/45 hover:shadow-[0_18px_40px_rgba(0,0,0,0.25)]"
+      className="nq-dashboard-quiz-card group min-w-0 overflow-hidden rounded-xl border border-white/8 bg-[#0a1234] text-left transition hover:-translate-y-0.5 hover:border-[#557cff]/45 hover:shadow-[0_18px_40px_rgba(0,0,0,0.25)]"
     >
       <div className="nq-always-dark relative h-28 overflow-hidden bg-[linear-gradient(135deg,#2346ae,#101942_55%,#542d8e)] sm:h-32">
         {session.cover_image_url ? (
@@ -330,11 +338,65 @@ function QuizCard({ session, onClick }: { session: DashboardSession; onClick: ()
   );
 }
 
+function AiSummaryCard({
+  healthStats,
+  onViewStats,
+}: {
+  healthStats: DashboardHealthStats | null;
+  onViewStats: () => void;
+}) {
+  const reviewed = healthStats?.summary;
+  const fallback = healthStats?.weakestTopic;
+  const headline = reviewed?.headline
+    ?? (fallback ? `หัวข้อที่ควรทบทวน: ${fallback.name}` : "ทำแบบทดสอบเพื่อรับข้อมูลสรุปเฉพาะคุณ");
+  const body = reviewed?.body
+    ?? (fallback
+      ? `จากคำตอบล่าสุด คุณทำคะแนนหัวข้อนี้ได้ ${fallback.score}% ลองทบทวนประเด็นสำคัญก่อนเล่นครั้งถัดไป`
+      : "เมื่อทำแบบทดสอบเสร็จ ระบบจะแสดงภาพรวมจากคำตอบและหัวข้อที่ควรทบทวนที่นี่");
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="nq-dashboard-panel relative overflow-hidden rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5"
+    >
+      <div className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-[#705cff]/15 blur-3xl" />
+      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#705cff]/15 text-[#8f83ff]" aria-hidden="true">✦</span>
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#7898ff]">Personal insight</p>
+              <h2 className="text-sm font-semibold text-white">AI Summary</h2>
+            </div>
+          </div>
+          <h3 className="mt-4 text-base font-semibold leading-snug text-white sm:text-lg">{headline}</h3>
+          <p className="mt-2 max-w-4xl text-xs leading-5 text-[#9aa8d1] sm:text-sm">{body}</p>
+          {reviewed?.suggestion && (
+            <p className="nq-ai-suggestion mt-3 rounded-lg border border-[#2bb39a]/20 bg-[#2bb39a]/10 px-3 py-2 text-xs font-medium leading-5 text-[#65d7b9]">
+              <span aria-hidden="true">→ </span>{reviewed.suggestion}
+            </p>
+          )}
+          <p className="mt-3 text-[9px] leading-4 text-[#7180ad]">อ้างอิงจากคำตอบในแบบทดสอบและข้อความที่ผ่านการตรวจทานแล้ว ไม่ใช่คำแนะนำทางการแพทย์</p>
+        </div>
+        <button
+          type="button"
+          onClick={onViewStats}
+          className="shrink-0 self-start rounded-lg border border-[#557cff]/35 px-3 py-2 text-[10px] font-semibold text-[#7898ff] transition hover:border-[#557cff]/70 hover:text-white"
+        >
+          View full insight →
+        </button>
+      </div>
+    </motion.section>
+  );
+}
+
 export default function DashboardPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
   const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [healthStats, setHealthStats] = useState<DashboardHealthStats | null>(null);
   const [sessions, setSessions] = useState<DashboardSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
 
@@ -342,19 +404,31 @@ export default function DashboardPage() {
     if (!user || user.isAnonymous) return;
     fetch(`/api/users/${user.uid}/history`)
       .then((response) => (response.ok ? response.json() : []))
-      .then((history: Array<{ total_score: number; streak: number }>) => {
+      .then((history: GameHistoryScore[]) => {
         if (!history.length) return;
+        const summary = summarizeGameStats(history);
         setUserStats({
-          total_played: history.length,
-          avg_score: Math.round(
-            history.reduce((sum, item) => sum + item.total_score, 0) / history.length,
-          ),
-          best_score: Math.max(...history.map((item) => item.total_score)),
-          best_streak: Math.max(...history.map((item) => item.streak)),
+          total_played: summary.totalPlayed,
+          best_score: summary.bestScore,
+          best_streak: summary.bestStreak,
+          accuracy: summary.accuracy,
         });
       })
       .catch(() => {});
   }, [user]);
+
+  useEffect(() => {
+    if (!user || user.isAnonymous) return;
+    const locale = i18n.language?.startsWith("en") ? "en" : "th";
+    fetch(`/api/users/${user.uid}/health-stats?locale=${locale}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((stats: DashboardHealthStats | null) => {
+        if (typeof stats?.knowledgeScore === "number") {
+          setHealthStats(stats);
+        }
+      })
+      .catch(() => {});
+  }, [user, i18n.language]);
 
   useEffect(() => {
     fetch("/api/sessions")
@@ -376,7 +450,8 @@ export default function DashboardPage() {
       .finally(() => setSessionsLoading(false));
   }, []);
 
-  const avgForRing = Math.max(0, Math.min(userStats?.avg_score ?? 0, 100));
+  const healthKnowledge = healthStats?.knowledgeScore ?? null;
+  const healthForRing = Math.max(0, Math.min(healthKnowledge ?? 0, 100));
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-4 lg:space-y-5">
@@ -426,11 +501,11 @@ export default function DashboardPage() {
         </motion.div>
 
         <div className="grid gap-4 md:grid-cols-[1.3fr_0.8fr]">
-          <section className="rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
+          <section className="nq-dashboard-panel rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold text-white">Performance overview</h2>
-                <p className="mt-1 text-xs text-[#7886b2]">Your latest quiz activity and score.</p>
+                <p className="mt-1 text-xs text-[#7886b2]">Your health knowledge and latest quiz activity.</p>
               </div>
               <button
                 type="button"
@@ -445,14 +520,14 @@ export default function DashboardPage() {
               <div
                 className="relative mx-auto flex h-[98px] w-[98px] items-center justify-center rounded-full sm:h-[108px] sm:w-[108px]"
                 style={{
-                  background: `conic-gradient(#f19a38 ${avgForRing * 3.6}deg, #182044 0deg)`,
+                  background: `conic-gradient(var(--nq-performance-fill) ${healthForRing * 3.6}deg, var(--nq-performance-track) 0deg)`,
                 }}
               >
-                <div className="flex h-[76px] w-[76px] flex-col items-center justify-center rounded-full bg-[#0d173e] sm:h-[84px] sm:w-[84px]">
+                <div className="nq-dashboard-metric flex h-[76px] w-[76px] flex-col items-center justify-center rounded-full bg-[#0d173e] sm:h-[84px] sm:w-[84px]">
                   <span className="text-xl font-semibold tabular-nums text-white sm:text-2xl">
-                    {userStats?.avg_score ?? "—"}
+                    {healthKnowledge ?? "—"}
                   </span>
-                  <span className="mt-0.5 text-[8px] uppercase tracking-[0.12em] text-[#7180ad]">Avg score</span>
+                  <span className="mt-0.5 text-center text-[8px] uppercase leading-3 tracking-[0.1em] text-[#7180ad]">Health knowledge</span>
                 </div>
               </div>
 
@@ -460,7 +535,7 @@ export default function DashboardPage() {
                 <MetricCard label="Best score" value={userStats?.best_score ?? "—"} />
                 <MetricCard label="Best streak" value={userStats?.best_streak ?? "—"} />
                 <MetricCard label={t("dashboard.total_played")} value={userStats?.total_played ?? "—"} />
-                <MetricCard label="Status" value={userStats ? "Active" : "New"} />
+                <MetricCard label="Accuracy" value={userStats ? `${userStats.accuracy}%` : "—"} />
               </div>
             </div>
           </section>
@@ -469,8 +544,10 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      <AiSummaryCard healthStats={healthStats} onViewStats={() => router.push("/stats")} />
+
       <section className="grid gap-4 xl:grid-cols-[0.42fr_1.58fr]">
-        <div className="rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
+        <div className="nq-dashboard-panel rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-white">Stat Summary</h2>
             <span className="rounded-md bg-[#4f76ff]/15 px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-[#7898ff]">
@@ -481,7 +558,7 @@ export default function DashboardPage() {
             {[
               ["Best score", userStats?.best_score ?? "—"],
               ["Best streak", userStats?.best_streak ?? "—"],
-              ["Average score", userStats?.avg_score ?? "—"],
+              ["Health knowledge", healthKnowledge === null ? "—" : `${healthKnowledge}/100`],
               ["Total played", userStats?.total_played ?? "—"],
             ].map(([label, value]) => (
               <div key={label} className="flex items-center justify-between border-b border-white/6 pb-2.5 last:border-0 last:pb-0">
@@ -492,7 +569,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <section className="rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
+        <section className="nq-dashboard-panel rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
           <div className="mb-4 flex items-end justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-white">Quizzes</h2>
@@ -527,7 +604,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => router.push("/quizzes")}
-              className="flex min-h-44 w-full flex-col items-center justify-center rounded-xl border border-dashed border-white/12 bg-[#0a1234] px-5 text-center transition hover:border-[#557cff]/45"
+              className="nq-dashboard-metric flex min-h-44 w-full flex-col items-center justify-center rounded-xl border border-dashed border-white/12 bg-[#0a1234] px-5 text-center transition hover:border-[#557cff]/45"
             >
               <span className="text-2xl">✦</span>
               <span className="mt-2 text-sm font-semibold text-white">Explore the quiz library</span>

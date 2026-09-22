@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import { Trans, useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { WEAK_TOPIC_THRESHOLD, type HealthStats } from "@/lib/stats/health";
+import { summarizeGameStats } from "@/lib/stats/game";
 import type { InsightSummary } from "@/lib/analytics/insights";
 
 /** health-stats returns the aggregate plus whichever reviewed summary matched. */
@@ -303,26 +304,19 @@ function HealthPanel({ stats }: { stats: HealthStats }) {
 
 function GamePanel({ history }: { history: HistoryEntry[] }) {
   const { t } = useTranslation();
-  const bestScore = history.length ? Math.max(...history.map((h) => h.total_score)) : 0;
-  const avgScore = history.length
-    ? Math.round(history.reduce((sum, h) => sum + h.total_score, 0) / history.length)
-    : 0;
-  const bestStreak = history.length ? Math.max(...history.map((h) => h.streak)) : 0;
-  const totalCorrect = history.reduce((sum, h) => sum + h.correct_count, 0);
-  const totalAnswered = totalCorrect + history.reduce((sum, h) => sum + h.incorrect_count, 0);
-  const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
-  const topRank = history.length ? `#${Math.min(...history.map((h) => h.rank))}` : "—";
+  const summary = summarizeGameStats(history);
+  const topRank = summary.topRank === null ? "—" : `#${summary.topRank}`;
   const recent = history.slice(0, RECENT_COUNT);
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:gap-4">
-        <StatTile label={t("stats.total_played")} value={history.length} />
-        <StatTile label={t("stats.best_score")} value={bestScore.toLocaleString()} />
-        <StatTile label={t("stats.avg_score")} value={avgScore.toLocaleString()} />
-        <StatTile label={t("stats.best_streak")} value={bestStreak} valueClassName="text-[#E67E22]" />
-        <StatTile label={t("stats.correct")} value={totalCorrect.toLocaleString()} valueClassName="text-[#0D8C6D]" />
-        <StatTile label={t("stats.accuracy")} value={accuracy} unit="%" />
+        <StatTile label={t("stats.total_played")} value={summary.totalPlayed} />
+        <StatTile label={t("stats.best_score")} value={summary.bestScore.toLocaleString()} />
+        <StatTile label={t("stats.avg_score")} value={summary.avgScore.toLocaleString()} />
+        <StatTile label={t("stats.best_streak")} value={summary.bestStreak} valueClassName="text-[#E67E22]" />
+        <StatTile label={t("stats.correct")} value={summary.totalCorrect.toLocaleString()} valueClassName="text-[#0D8C6D]" />
+        <StatTile label={t("stats.accuracy")} value={summary.accuracy} unit="%" />
         <StatTile label={t("stats.top_rank")} value={topRank} />
       </div>
 
@@ -345,7 +339,7 @@ function GamePanel({ history }: { history: HistoryEntry[] }) {
                   {entry.total_score.toLocaleString()}
                 </span>
               </div>
-              <Bar pct={bestScore > 0 ? (entry.total_score / bestScore) * 100 : 0} delay={0.1 + i * 0.04} />
+              <Bar pct={summary.bestScore > 0 ? (entry.total_score / summary.bestScore) * 100 : 0} delay={0.1 + i * 0.04} />
             </div>
           ))}
         </section>

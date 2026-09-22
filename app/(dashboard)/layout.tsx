@@ -16,6 +16,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
+import { useTheme } from '@/lib/hooks/useTheme';
 
 type NavItem = {
   href: string;
@@ -108,6 +109,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { theme } = useTheme();
   const { user, loading, isAdmin, cachedProfile } = useAuth();
   const avatarName = user?.displayName ?? cachedProfile?.displayName;
   const avatarPhoto = user?.photoURL ?? cachedProfile?.photoURL;
@@ -140,7 +142,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="nq-dashboard-shell min-h-dvh">
+    <div className={`nq-dashboard-shell nq-theme-${theme} min-h-dvh`}>
       <div className="flex min-h-dvh">
         <aside className="nq-dashboard-sidebar sticky top-0 hidden h-dvh w-[252px] shrink-0 border-r border-white/8 bg-[#080e2d]/95 px-5 py-7 lg:flex xl:w-[276px]">
           <div className="flex min-h-0 w-full flex-col">
