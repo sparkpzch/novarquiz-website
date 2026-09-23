@@ -1157,8 +1157,7 @@ body {
   filter: none !important;
 }
 
-/* Desktop vertical navigation follows the dark New Design sidebar in Figma,
-   independently from the content theme. */
+/* Desktop vertical navigation follows the selected content theme. */
 .nq-dashboard-sidebar {
   color-scheme: dark;
   border-color: rgba(98, 126, 226, 0.22);
@@ -1169,15 +1168,16 @@ body {
 }
 
 .nq-dashboard-shell.nq-theme-light .nq-dashboard-sidebar {
-  border-color: rgba(98, 126, 226, 0.22) !important;
+  color-scheme: light;
+  border-color: rgba(4, 96, 169, 0.12) !important;
   background:
-    radial-gradient(circle at 20% 102%, rgba(35, 80, 198, 0.2), transparent 22rem),
-    linear-gradient(180deg, #080d2b 0%, #050924 100%) !important;
-  box-shadow: 10px 0 32px rgba(0, 0, 0, 0.16) !important;
+    radial-gradient(circle at 20% 102%, rgba(112, 162, 249, 0.16), transparent 22rem),
+    linear-gradient(180deg, #ffffff 0%, #f3f8ff 100%) !important;
+  box-shadow: 10px 0 32px rgba(17, 87, 145, 0.08) !important;
 }
 
 .nq-dashboard-shell.nq-theme-light .nq-dashboard-sidebar .nq-dashboard-logo {
-  filter: brightness(0) invert(1) !important;
+  filter: none !important;
 }
 
 .nq-sidebar-scroll {
@@ -1209,7 +1209,79 @@ body {
   box-shadow: 0 5px 14px rgba(50, 91, 232, 0.38);
 }
 
-.nq-sidebar-help { padding-inline: 0.25rem; }
+.nq-sidebar-footer { padding-inline: 0.25rem; }
+
+.nq-sidebar-logout {
+  color: #f2f5ff;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.nq-sidebar-logout:hover {
+  color: #ffffff;
+  border-color: rgba(239, 99, 99, 0.34);
+  background: rgba(239, 99, 99, 0.12);
+}
+
+.nq-sidebar-logout-icon {
+  color: #ff8b8b;
+  background: rgba(239, 99, 99, 0.12);
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-sidebar-scroll {
+  scrollbar-color: rgba(4, 96, 169, 0.24) transparent;
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-sidebar-profile {
+  border-color: rgba(4, 96, 169, 0.12);
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-sidebar-label,
+.nq-dashboard-shell.nq-theme-light .nq-sidebar-name {
+  color: #16324f !important;
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-sidebar-muted {
+  color: #5d7ea1 !important;
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-sidebar-link:hover {
+  color: #16324f !important;
+  background: rgba(4, 96, 169, 0.06);
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-sidebar-link-active {
+  color: #16324f !important;
+  background: linear-gradient(90deg, rgba(112, 162, 249, 0.22), rgba(146, 191, 255, 0.12));
+  box-shadow: inset 0 0 0 1px rgba(4, 96, 169, 0.08);
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-sidebar-icon {
+  color: #0460a9;
+  background: rgba(112, 162, 249, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(4, 96, 169, 0.06);
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-sidebar-link-active .nq-sidebar-icon {
+  color: #ffffff;
+  background: linear-gradient(135deg, #3078f2, #5458e9);
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-sidebar-logout {
+  color: #b4232c;
+  border-color: rgba(180, 35, 44, 0.18);
+  background: rgba(239, 99, 99, 0.07);
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-sidebar-logout:hover {
+  border-color: rgba(180, 35, 44, 0.3);
+  background: rgba(239, 99, 99, 0.12);
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-sidebar-logout-icon {
+  color: #b4232c;
+  background: rgba(239, 99, 99, 0.12);
+}
 
 /* The explicit React theme class updates before the root data attribute in
    some transitions, so cover both and keep Related Question readable. */

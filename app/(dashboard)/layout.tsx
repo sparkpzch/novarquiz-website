@@ -146,7 +146,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   return (
     <div className={`nq-dashboard-shell nq-theme-${theme} min-h-dvh`}>
       <div className="flex min-h-dvh">
-        <aside className="nq-dashboard-sidebar nq-always-dark sticky top-0 hidden h-dvh w-[264px] shrink-0 overflow-hidden border-r px-4 py-5 lg:flex">
+        <aside className="nq-dashboard-sidebar sticky top-0 hidden h-dvh w-[264px] shrink-0 overflow-hidden border-r px-4 py-5 lg:flex">
           <div className="nq-sidebar-scroll flex min-h-0 w-full flex-col overflow-y-auto pr-1">
             <Link href="/" className="flex h-10 items-center px-1">
               <Image
@@ -250,39 +250,22 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
                   </span>
                   <span>{t('nav.profile')}</span>
                 </Link>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="nq-sidebar-link nq-sidebar-muted flex min-h-10 w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left text-xs transition hover:text-white"
-                >
-                  <span className="nq-sidebar-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m-3-3h9m0 0-3-3m3 3-3 3" />
-                    </svg>
-                  </span>
-                  {t('nav.logout')}
-                </button>
               </div>
             </div>
 
-            <div className="nq-sidebar-help mt-auto pt-6">
-              <div className="overflow-hidden rounded-xl border border-white/10 bg-[#111944]">
-                <div className="relative h-12 bg-[radial-gradient(circle_at_75%_30%,#6957ff_0,transparent_30%),linear-gradient(135deg,#274ecb,#7f45dc)]">
-                  <span className="absolute bottom-[-12px] left-3 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#3d64e9] text-xs font-bold text-white shadow-lg">
-                    ?
-                  </span>
-                </div>
-                <div className="px-3 pb-3 pt-5">
-                  <p className="text-[10px] font-semibold text-white">Need Help?</p>
-                  <p className="nq-sidebar-muted mt-0.5 text-[8px]">Please check our docs</p>
-                  <Link
-                    href="/terms"
-                    className="mt-2 flex h-6 items-center justify-center rounded-md border border-white/10 bg-[#0a1030] text-[7px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-[#172356]"
-                  >
-                    Documentation
-                  </Link>
-                </div>
-              </div>
+            <div className="nq-sidebar-footer mt-auto pt-6">
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="nq-sidebar-logout flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition"
+              >
+                <span className="nq-sidebar-logout-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m-3-3h9m0 0-3-3m3 3-3 3" />
+                  </svg>
+                </span>
+                <span>{t('nav.logout')}</span>
+              </button>
             </div>
           </div>
         </aside>
