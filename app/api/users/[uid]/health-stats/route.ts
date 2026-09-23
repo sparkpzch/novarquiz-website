@@ -41,7 +41,7 @@ export async function GET(
     // This includes both negative choices and zero-impact choices that were
     // reasonable but did not answer the question's learning objective.
     const choiceInsight = stats.latestTopic
-      ? await getUserChoiceInsight(uid, stats.latestTopic.quiz_id)
+      ? await getUserChoiceInsight(uid, stats.latestTopic.quiz_id, stats.gapTags[0] ?? null)
       : null;
 
     // The narrative is looked up, never generated here: only rows a human

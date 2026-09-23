@@ -25,6 +25,12 @@ type NavItem = {
   exact?: boolean;
 };
 
+const profileNavItem: NavItem = {
+  href: '/profile',
+  label: 'nav.profile',
+  icon: 'M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0zM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632z',
+};
+
 const primaryNavItems: NavItem[] = [
   {
     href: '/',
@@ -47,11 +53,7 @@ const primaryNavItems: NavItem[] = [
     label: 'nav.history',
     icon: 'M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
   },
-  {
-    href: '/profile',
-    label: 'nav.profile',
-    icon: 'M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0zM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632z',
-  },
+  profileNavItem,
 ];
 
 const desktopAdminItems: NavItem[] = [
@@ -144,53 +146,59 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   return (
     <div className={`nq-dashboard-shell nq-theme-${theme} min-h-dvh`}>
       <div className="flex min-h-dvh">
-        <aside className="nq-dashboard-sidebar sticky top-0 hidden h-dvh w-[252px] shrink-0 border-r border-white/8 bg-[#080e2d]/95 px-5 py-7 lg:flex xl:w-[276px]">
-          <div className="flex min-h-0 w-full flex-col">
-            <Link href="/" className="flex h-12 items-center px-1">
+        <aside className="nq-dashboard-sidebar nq-always-dark sticky top-0 hidden h-dvh w-[264px] shrink-0 overflow-hidden border-r px-4 py-5 lg:flex">
+          <div className="nq-sidebar-scroll flex min-h-0 w-full flex-col overflow-y-auto pr-1">
+            <Link href="/" className="flex h-10 items-center px-1">
               <Image
                 src="/image/icon/novartis-logo-transparent.png"
                 alt="Novartis"
                 width={150}
                 height={36}
-                className="nq-dashboard-logo h-8 w-auto object-contain brightness-0 invert"
+                className="nq-dashboard-logo h-[30px] w-auto object-contain brightness-0 invert"
                 priority
               />
             </Link>
 
             <Link
               href="/profile"
-              className="mt-7 flex items-center gap-3 rounded-xl border border-white/6 bg-white/[0.035] p-3 transition hover:border-[#4f7cff]/35 hover:bg-white/[0.06]"
+              className="nq-sidebar-profile mt-5 flex items-center gap-3 border-b px-1 pb-5 transition hover:opacity-90"
             >
               <ProfileAvatar
                 displayName={avatarName}
                 photoURL={avatarPhoto}
-                size={42}
-                ringClassName="ring-1 ring-white/20"
+                size={40}
+                ringClassName="ring-1 ring-white/25"
               />
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">{user.displayName || 'Player'}</p>
-                <p className="truncate text-[11px] text-[#8a97c1]">{user.email}</p>
+                <p className="nq-sidebar-name truncate text-xs font-semibold text-white">
+                  {user.displayName || 'Player'}
+                </p>
+                <p className="nq-sidebar-muted mt-1 truncate text-[9px]" title={user.email ?? undefined}>
+                  {user.email}
+                </p>
               </div>
             </Link>
 
-            <p className="mt-8 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#65739f]">
+            <p className="nq-sidebar-label mt-5 px-2 text-[8px] font-semibold uppercase tracking-[0.12em]">
               Main
             </p>
-            <nav className="mt-2 space-y-1">
-              {primaryNavItems.map((item) => {
+            <nav className="mt-2 space-y-1.5">
+              {primaryNavItems.filter((item) => item.href !== '/profile').map((item) => {
                 const active = isActive(item.href, item.exact);
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
                     aria-current={active ? 'page' : undefined}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+                    className={`nq-sidebar-link flex min-h-10 items-center gap-3 rounded-xl px-2 py-1.5 text-xs transition ${
                       active
-                        ? 'bg-[#18255d] font-semibold text-white shadow-[inset_3px_0_0_#557cff]'
-                        : 'text-[#8a97c1] hover:bg-white/[0.045] hover:text-white'
+                        ? 'nq-sidebar-link-active font-semibold text-white'
+                        : 'nq-sidebar-muted hover:text-white'
                     }`}
                   >
-                    <Icon path={item.icon} className="h-[18px] w-[18px]" />
+                    <span className="nq-sidebar-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
+                      <Icon path={item.icon} className="h-3.5 w-3.5" />
+                    </span>
                     <span>{t(item.label)}</span>
                   </Link>
                 );
@@ -198,22 +206,25 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
             </nav>
 
             {isAdmin && (
-              <div className="mt-7">
-                <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#65739f]">
+              <div className="mt-5">
+                <p className="nq-sidebar-label px-2 text-[8px] font-semibold uppercase tracking-[0.12em]">
                   Admin
                 </p>
-                <div className="mt-2 space-y-1">
+                <div className="mt-2 space-y-1.5">
                   {desktopAdminItems.map((item) => {
                     const active = isActive(item.href);
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-xs transition ${
-                          active ? 'bg-[#18255d] text-white' : 'text-[#7886af] hover:bg-white/[0.045] hover:text-white'
+                        aria-current={active ? 'page' : undefined}
+                        className={`nq-sidebar-link flex min-h-10 items-center gap-3 rounded-xl px-2 py-1.5 text-xs transition ${
+                          active ? 'nq-sidebar-link-active font-semibold text-white' : 'nq-sidebar-muted hover:text-white'
                         }`}
                       >
-                        <Icon path={item.icon} className="h-4 w-4" />
+                        <span className="nq-sidebar-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
+                          <Icon path={item.icon} className="h-3.5 w-3.5" />
+                        </span>
                         <span>{item.label}</span>
                       </Link>
                     );
@@ -222,16 +233,57 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="mt-auto flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#d5677d] transition hover:bg-[#d5677d]/10 hover:text-[#ff8da3]"
-            >
-              <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m-3-3h9m0 0-3-3m3 3-3 3" />
-              </svg>
-              {t('nav.logout')}
-            </button>
+            <div className="mt-5">
+              <p className="nq-sidebar-label px-2 text-[8px] font-semibold uppercase tracking-[0.12em]">
+                Account pages
+              </p>
+              <div className="mt-2 space-y-1.5">
+                <Link
+                  href="/profile"
+                  aria-current={isActive('/profile') ? 'page' : undefined}
+                  className={`nq-sidebar-link flex min-h-10 items-center gap-3 rounded-xl px-2 py-1.5 text-xs transition ${
+                    isActive('/profile') ? 'nq-sidebar-link-active font-semibold text-white' : 'nq-sidebar-muted hover:text-white'
+                  }`}
+                >
+                  <span className="nq-sidebar-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
+                    <Icon path={profileNavItem.icon} className="h-3.5 w-3.5" />
+                  </span>
+                  <span>{t('nav.profile')}</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="nq-sidebar-link nq-sidebar-muted flex min-h-10 w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left text-xs transition hover:text-white"
+                >
+                  <span className="nq-sidebar-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m-3-3h9m0 0-3-3m3 3-3 3" />
+                    </svg>
+                  </span>
+                  {t('nav.logout')}
+                </button>
+              </div>
+            </div>
+
+            <div className="nq-sidebar-help mt-auto pt-6">
+              <div className="overflow-hidden rounded-xl border border-white/10 bg-[#111944]">
+                <div className="relative h-12 bg-[radial-gradient(circle_at_75%_30%,#6957ff_0,transparent_30%),linear-gradient(135deg,#274ecb,#7f45dc)]">
+                  <span className="absolute bottom-[-12px] left-3 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#3d64e9] text-xs font-bold text-white shadow-lg">
+                    ?
+                  </span>
+                </div>
+                <div className="px-3 pb-3 pt-5">
+                  <p className="text-[10px] font-semibold text-white">Need Help?</p>
+                  <p className="nq-sidebar-muted mt-0.5 text-[8px]">Please check our docs</p>
+                  <Link
+                    href="/terms"
+                    className="mt-2 flex h-6 items-center justify-center rounded-md border border-white/10 bg-[#0a1030] text-[7px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-[#172356]"
+                  >
+                    Documentation
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
         </aside>
 

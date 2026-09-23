@@ -1709,13 +1709,14 @@ export async function getUserHealthStatsInput(userId: string): Promise<HealthSta
 
 /**
  * Pick one reviewed, non-positive answer from the player's latest quiz topic.
- * confidence_weight is the author's "Insight Impact", so a medically or
- * educationally important miss wins over an incidental one. Negative utility
- * is an incorrect choice; zero utility is useful but off-target/neutral.
+ * The player's most frequently missed clinical tag wins first, then
+ * confidence_weight (the author's "Insight Impact") breaks ties. Negative
+ * utility is an incorrect choice; zero utility is useful but off-target/neutral.
  */
 export async function getUserChoiceInsight(
   userId: string,
   quizId: string,
+  preferredTag: string | null = null,
 ): Promise<ChoiceInsight | null> {
   const layered = await hasLayeredAnalyticsSchema();
   const result = await queryWithRetry<{
@@ -1740,11 +1741,13 @@ export async function getUserChoiceInsight(
        AND latest.utility_score <= 0
        AND NULLIF(BTRIM(c.explanation), '') IS NOT NULL
        ${layered ? "AND c.review_status = 'approved'" : ''}
-     ORDER BY ${layered ? 'c.confidence_weight DESC,' : ''}
+     ORDER BY ${layered
+       ? "CASE WHEN NULLIF($3, '') IS NOT NULL AND COALESCE(c.clinical_tags, '[]'::jsonb) ? $3 THEN 0 ELSE 1 END, c.confidence_weight DESC,"
+       : ''}
               latest.utility_score ASC,
               latest.answered_at DESC
      LIMIT 1`,
-    [userId, quizId],
+    layered ? [userId, quizId, preferredTag] : [userId, quizId],
   );
 
   const row = result.rows[0];
@@ -2102,7 +2105,7 @@ export async function deleteInsightTemplate(id: string): Promise<boolean> {
 
 /**
  * The authored material a draft is allowed to draw on: the quiz blurb plus
- * every situation and the answers that cost points, as the author worded them.
+ * each relevant situation and all of its choices, as the author worded them.
  *
  * Question and choice text exists in every quiz, so this works on any public
  * quiz with no extra authoring. behaviour_meaning is folded in when someone has
@@ -2131,22 +2134,30 @@ export async function getQuizDraftContext(
   );
   if (!quiz.rows[0]) return null;
 
-  // Tag filtering only narrows when tags have actually been authored; asking
-  // for a tag nobody has assigned would otherwise yield an empty prompt.
-  const tagFilter = layered && clinicalTag ? 'AND c.clinical_tags ? $2' : '';
+  // A tag narrows the questions, not the choices. Once a question is relevant,
+  // Gemini needs every option (including the good one) to make a grounded
+  // comparison instead of filling the missing answer in from general knowledge.
+  const questionFilter = layered && clinicalTag
+    ? `AND EXISTS (
+         SELECT 1 FROM choices tagged
+         WHERE tagged.question_id = q.id
+           AND tagged.score_impact <= 0
+           AND COALESCE(tagged.clinical_tags, '[]'::jsonb) ? $2
+       )`
+    : 'AND EXISTS (SELECT 1 FROM choices poor WHERE poor.question_id = q.id AND poor.score_impact <= 0)';
 
   const rows = await queryWithRetry<{
     question_text: string;
     choice_text: string;
     behavior_meaning: string | null;
+    score_impact: number;
   }>(
-    `SELECT q.question_text, c.choice_text,
+    `SELECT q.question_text, c.choice_text, c.score_impact,
             ${layered ? 'c.behavior_meaning' : 'NULL AS behavior_meaning'}
      FROM choices c
      JOIN questions q ON q.id = c.question_id
      WHERE q.session_id = $1
-       AND c.score_impact <= 0
-       ${tagFilter}
+       ${questionFilter}
      ORDER BY q.question_order ASC, c.label ASC`,
     layered && clinicalTag ? [quizId, clinicalTag] : [quizId],
   );
@@ -2155,11 +2166,13 @@ export async function getQuizDraftContext(
   for (const row of rows.rows) {
     const scenario = byQuestion.get(row.question_text) ?? {
       question: row.question_text,
-      poorChoices: [],
+      choices: [],
     };
-    scenario.poorChoices.push(
-      row.behavior_meaning ? `${row.choice_text} — ${row.behavior_meaning}` : row.choice_text,
-    );
+    scenario.choices.push({
+      text: row.choice_text,
+      outcome: row.score_impact > 0 ? 'aligned' : 'off_target',
+      meaning: row.behavior_meaning,
+    });
     byQuestion.set(row.question_text, scenario);
   }
 

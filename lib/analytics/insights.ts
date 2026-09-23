@@ -185,11 +185,16 @@ export function parseDraftResponse(text: string): DraftValidation {
 
 // ── Prompt ──────────────────────────────────────────────────────────────────
 
-/** One scenario the player got wrong, as the quiz author wrote it. */
+/** One quiz scenario and every authored answer the model may compare. */
 export type DraftScenario = {
   question: string;
-  /** Choices that cost points, with behaviour_meaning appended when authored. */
-  poorChoices: string[];
+  choices: Array<{
+    text: string;
+    /** Positive choices meet the learning objective; the rest miss it. */
+    outcome: 'aligned' | 'off_target';
+    /** Optional author-reviewed context for why this choice matters. */
+    meaning: string | null;
+  }>;
 };
 
 export type DraftContext = {
@@ -216,7 +221,11 @@ export function buildInsightPrompt(context: DraftContext): string {
 
   const scenarios = context.scenarios.flatMap((scenario, index) => [
     `${index + 1}. ${scenario.question}`,
-    ...scenario.poorChoices.map((choice) => `   - answer that loses points: ${choice}`),
+    ...scenario.choices.map(
+      (choice) =>
+        `   - ${choice.outcome === 'aligned' ? 'aligns with the objective' : 'misses the objective'}: ` +
+        `${choice.text}${choice.meaning ? ` — ${choice.meaning}` : ''}`,
+    ),
   ]);
 
   return [
@@ -224,8 +233,8 @@ export function buildInsightPrompt(context: DraftContext): string {
     `after playing the quiz "${context.quizName}".`,
     context.quizDescription ? `The quiz is about: ${context.quizDescription}` : '',
     '',
-    'The situations in the quiz and the answers that count as poor choices, exactly as the',
-    'quiz author wrote them. This is your ONLY source of fact:',
+    'The relevant situations and every answer choice, exactly as the quiz author wrote them.',
+    'The labels say whether each choice meets the learning objective. This is your ONLY source of fact:',
     ...scenarios,
     '',
     context.archetypeId && context.archetypeId !== ANY_ARCHETYPE

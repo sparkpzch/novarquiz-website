@@ -72,7 +72,11 @@ test('parseDraftResponse reports non-JSON rather than throwing', () => {
 
 const scenario = {
   question: 'A friend invites you out for a heavy dinner. What do you order?',
-  poorChoices: ['Grilled pork buffet and cold beer', 'Skip dinner entirely'],
+  choices: [
+    { text: 'Grilled pork buffet and cold beer', outcome: 'off_target' as const, meaning: null },
+    { text: 'Rice, boiled fish, and vegetables', outcome: 'aligned' as const, meaning: 'balanced meal' },
+    { text: 'Skip dinner entirely', outcome: 'off_target' as const, meaning: null },
+  ],
 };
 
 test('prompt carries the authored scenarios and forbids inventing facts', () => {
@@ -87,6 +91,8 @@ test('prompt carries the authored scenarios and forbids inventing facts', () => 
   });
   assert.match(prompt, /heavy dinner/);
   assert.match(prompt, /Grilled pork buffet/);
+  assert.match(prompt, /Rice, boiled fish/);
+  assert.match(prompt, /aligns with the objective/);
   assert.match(prompt, /Skip dinner entirely/);
   assert.match(prompt, /ASCVD risk/);
   assert.match(prompt, /Thai/);

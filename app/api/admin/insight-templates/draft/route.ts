@@ -16,10 +16,10 @@ import { GeminiError, generateText, geminiModel, isGeminiConfigured } from '@/li
 // Drafts wording for one insight slot with Gemini and stores it as 'draft'.
 //
 // This runs at authoring time, never while a player is looking at their stats.
-// The prompt is built from quiz content the admin wrote (behavior_meaning on
-// point-losing choices) — no player answers, no personal data, which is what
-// makes a free-tier model acceptable here. The result still has to be approved
-// by a human in the CMS before any player can see it.
+// The prompt is built from quiz content the admin wrote (questions, every
+// choice, and optional behavior_meaning) — no player answers, no personal data,
+// which is what makes a free-tier model acceptable here. The result still has
+// to be approved by a human in the CMS before any player can see it.
 // ---------------------------------------------------------------------------
 
 const Body = z.object({

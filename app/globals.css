@@ -791,6 +791,22 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
   border-left-color: #2bb39a;
 }
 
+.nq-insight-question {
+  border-color: rgba(4, 96, 169, 0.12);
+  background: #f4f8fd;
+}
+
+.nq-insight-question-label { color: #5d7ea1; }
+.nq-insight-question-text { color: #16324f; }
+
+[data-theme="dark"] .nq-insight-question {
+  border-color: rgba(156, 173, 255, 0.14);
+  background: rgba(7, 14, 42, 0.72);
+}
+
+[data-theme="dark"] .nq-insight-question-label { color: #8fa9ca; }
+[data-theme="dark"] .nq-insight-question-text { color: #eaf3ff; }
+
 /* ─── Mobile: stop the browser's pull-to-refresh firing on a scroll ──
    `contain` keeps normal scrolling and only blocks the overscroll gesture
    the browser turns into a page reload. */
@@ -1140,3 +1156,75 @@ body {
 .nq-dashboard-shell.nq-theme-light .nq-dashboard-logo {
   filter: none !important;
 }
+
+/* Desktop vertical navigation follows the dark New Design sidebar in Figma,
+   independently from the content theme. */
+.nq-dashboard-sidebar {
+  color-scheme: dark;
+  border-color: rgba(98, 126, 226, 0.22);
+  background:
+    radial-gradient(circle at 20% 102%, rgba(35, 80, 198, 0.2), transparent 22rem),
+    linear-gradient(180deg, #080d2b 0%, #050924 100%);
+  box-shadow: 10px 0 32px rgba(0, 0, 0, 0.16);
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-dashboard-sidebar {
+  border-color: rgba(98, 126, 226, 0.22) !important;
+  background:
+    radial-gradient(circle at 20% 102%, rgba(35, 80, 198, 0.2), transparent 22rem),
+    linear-gradient(180deg, #080d2b 0%, #050924 100%) !important;
+  box-shadow: 10px 0 32px rgba(0, 0, 0, 0.16) !important;
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-dashboard-sidebar .nq-dashboard-logo {
+  filter: brightness(0) invert(1) !important;
+}
+
+.nq-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(101, 126, 213, 0.35) transparent;
+}
+
+.nq-sidebar-profile { border-color: rgba(255, 255, 255, 0.1); }
+.nq-sidebar-label { color: #f0f3ff; }
+.nq-sidebar-name { color: #f7f8ff !important; }
+.nq-sidebar-muted { color: #8d97bd !important; }
+
+.nq-sidebar-link:hover { background: rgba(255, 255, 255, 0.045); }
+
+.nq-sidebar-link-active {
+  background: linear-gradient(90deg, rgba(57, 66, 115, 0.72), rgba(43, 49, 91, 0.58));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+
+.nq-sidebar-icon {
+  color: #6685ed;
+  background: rgba(31, 58, 139, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(112, 142, 255, 0.08);
+}
+
+.nq-sidebar-link-active .nq-sidebar-icon {
+  color: #ffffff;
+  background: linear-gradient(135deg, #3078f2, #5458e9);
+  box-shadow: 0 5px 14px rgba(50, 91, 232, 0.38);
+}
+
+.nq-sidebar-help { padding-inline: 0.25rem; }
+
+/* The explicit React theme class updates before the root data attribute in
+   some transitions, so cover both and keep Related Question readable. */
+.nq-dashboard-shell.nq-theme-light .nq-insight-question {
+  border-color: rgba(4, 96, 169, 0.12);
+  background: #f4f8fd;
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-insight-question-label { color: #5d7ea1; }
+.nq-dashboard-shell.nq-theme-light .nq-insight-question-text { color: #16324f; }
+
+.nq-dashboard-shell:not(.nq-theme-light) .nq-insight-question {
+  border-color: rgba(156, 173, 255, 0.14);
+  background: rgba(7, 14, 42, 0.72);
+}
+
+.nq-dashboard-shell:not(.nq-theme-light) .nq-insight-question-label { color: #8fa9ca; }
+.nq-dashboard-shell:not(.nq-theme-light) .nq-insight-question-text { color: #eaf3ff; }

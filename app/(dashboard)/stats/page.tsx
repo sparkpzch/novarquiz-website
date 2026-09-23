@@ -168,11 +168,11 @@ function InsightCard({ stats }: { stats: StatsResponse }) {
               { choice: choiceInsight.choice },
             )}
           </h2>
-          <div className="rounded-[16px] border border-[#0460A9]/12 bg-[#F4F8FD] px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#5D7EA1]">
+          <div className="nq-insight-question rounded-[16px] border px-4 py-3">
+            <p className="nq-insight-question-label text-xs font-semibold uppercase tracking-wide">
               {t("stats.insight_question")}
             </p>
-            <p className="mt-1 text-sm font-semibold leading-relaxed text-[#16324F] md:text-[15px]">
+            <p className="nq-insight-question-text mt-1 text-sm font-semibold leading-relaxed md:text-[15px]">
               {choiceInsight.question}
             </p>
           </div>
