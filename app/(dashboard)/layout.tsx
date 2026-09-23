@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, Suspense, useCallback, useEffect } from 'react';
+import { ReactNode, Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -10,7 +10,7 @@ import {
   useSearchParams,
 } from 'next/navigation';
 import { signOut } from 'firebase/auth';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { auth } from '@/lib/firebase/config';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
@@ -113,6 +113,8 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { theme } = useTheme();
   const { user, loading, isAdmin, cachedProfile } = useAuth();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const avatarName = user?.displayName ?? cachedProfile?.displayName;
   const avatarPhoto = user?.photoURL ?? cachedProfile?.photoURL;
   const isProfileDetail =
@@ -127,10 +129,27 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
     if (!loading && !user) router.push('/sign-in');
   }, [loading, router, user]);
 
+  useEffect(() => {
+    if (!showLogoutConfirm) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isSigningOut) setShowLogoutConfirm(false);
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isSigningOut, showLogoutConfirm]);
+
   const handleSignOut = async () => {
-    await fetch('/api/auth/session', { method: 'DELETE' });
-    await signOut(auth);
-    router.push('/sign-in');
+    setIsSigningOut(true);
+
+    try {
+      await fetch('/api/auth/session', { method: 'DELETE' });
+      await signOut(auth);
+      router.push('/sign-in');
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   if (loading || !user) {
@@ -256,7 +275,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
             <div className="nq-sidebar-footer mt-auto pt-6">
               <button
                 type="button"
-                onClick={handleSignOut}
+                onClick={() => setShowLogoutConfirm(true)}
                 className="nq-sidebar-logout flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition"
               >
                 <span className="nq-sidebar-logout-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
@@ -331,6 +350,65 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
           </div>
         </nav>
       )}
+
+      <AnimatePresence>
+        {showLogoutConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#050b20]/55 p-4 backdrop-blur-md"
+            onClick={() => {
+              if (!isSigningOut) setShowLogoutConfirm(false);
+            }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="logout-confirm-title"
+              aria-describedby="logout-confirm-description"
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.98 }}
+              onClick={(event) => event.stopPropagation()}
+              className="nq-card w-full max-w-sm rounded-[30px] p-7 text-center"
+            >
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#ef6363]/12 text-[#d84d63]">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m-3-3h9m0 0-3-3m3 3-3 3" />
+                </svg>
+              </span>
+              <h2 id="logout-confirm-title" className="mt-4 text-xl font-bold text-[#16324F]">
+                {t('auth.logout_confirm_title')}
+              </h2>
+              <p id="logout-confirm-description" className="mt-2 text-sm leading-6 text-[#5D7EA1]">
+                {t('auth.logout_confirm_description')}
+              </p>
+              <div className="mt-7 flex gap-3">
+                <button
+                  type="button"
+                  autoFocus
+                  disabled={isSigningOut}
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="flex-1 rounded-2xl border border-[#92BFFF]/45 bg-white/70 px-4 py-3 text-sm font-semibold text-[#16324F] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {t('auth.logout_cancel')}
+                </button>
+                <button
+                  type="button"
+                  disabled={isSigningOut}
+                  onClick={handleSignOut}
+                  className="nq-always-dark flex-1 rounded-2xl bg-linear-to-r from-[#D84D63] to-[#BA2F54] px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(186,47,84,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span className="text-white">
+                    {isSigningOut ? t('auth.logging_out') : t('auth.logout_confirm')}
+                  </span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
