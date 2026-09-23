@@ -39,6 +39,12 @@ env:
     availability:
       - RUNTIME
 
+  # Gemini is called only from the server-side insight drafting route.
+  - variable: GEMINI_API_KEY
+    secret: GEMINI_API_KEY
+    availability:
+      - RUNTIME
+
   # Firebase web config. Public by design (it ships in the client bundle) and
   # inlined at build time, so BUILD needs it as well as RUNTIME.
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY

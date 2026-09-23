@@ -1,7 +1,7 @@
 {
   "apphosting": [
     {
-      "backendId": "novarquiz-website",
+      "backendId": "novarquiz-website-sg",
       "rootDir": "/",
       "ignore": [
         "node_modules",
