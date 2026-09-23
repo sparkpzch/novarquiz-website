@@ -1,5 +1,5 @@
-// scripts/set-admin.ts
-// Usage: npx tsx scripts/set-admin.ts --email=user@example.com
+// scripts/admin/set-admin.ts
+// Usage: npm run set-admin -- --email=user@example.com
 
 import admin from 'firebase-admin';
 import path from 'path';
@@ -9,7 +9,7 @@ const args = process.argv.slice(2);
 const emailArg = args.find((a) => a.startsWith('--email='));
 
 if (!emailArg) {
-  console.error('Usage: npx tsx scripts/set-admin.ts --email=user@example.com');
+  console.error('Usage: npm run set-admin -- --email=user@example.com');
   process.exit(1);
 }
 

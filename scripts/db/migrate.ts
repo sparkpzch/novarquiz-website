@@ -1,7 +1,7 @@
-// scripts/migrate.ts
+// scripts/db/migrate.ts
 // Bootstraps the database from the 005 base schema, then applies forward
 // migrations tracked in schema_migrations.
-// Usage: npx tsx scripts/migrate.ts
+// Usage: npm run migrate (local Docker) or npm run migrate:neon
 
 import { Pool } from 'pg';
 import { getDatabaseConnectionOptions } from '@/lib/db/config';

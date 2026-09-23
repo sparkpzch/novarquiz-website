@@ -47,9 +47,6 @@ next-env.d.ts
 AGENTS.md
 CLAUDE.md
 
-# scripts folder and its contents
-/scripts
-
 # Firebase json
 novartis-decisionlab-firebase-adminsdk-fbsvc-449068ab1a.json
 
@@ -57,3 +54,7 @@ novartis-decisionlab-firebase-adminsdk-fbsvc-449068ab1a.json
 .agents
 .claude
 summary.md
+
+# Local editor configuration and generated database exports
+.idea/
+db/backups/

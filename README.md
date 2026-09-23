@@ -29,102 +29,82 @@ The app is built on **Next.js 16 (App Router)** and **React 19**, with **Postgre
 | Animation | Motion |
 | Media | Sharp, FFmpeg (WASM) |
 
-## Requirements
+## Prerequisites
 
-- Node.js 20+
-- `npm` or `bun`
-- A Firebase project with:
-  - Web app credentials
-  - Realtime Database enabled
-  - Storage enabled
-  - A service account for server routes
-- Either Docker Desktop (local Postgres) **or** a Neon Postgres database
+- Node.js 20.9 or newer and either npm or Bun
+- A Firebase project with Web app credentials, Realtime Database, and Storage enabled
+- Firebase Admin credentials for server routes
+- PostgreSQL via Docker or Neon
 
-## Environment Setup
+Install dependencies with `npm ci` or `bun install`. The repository contains lockfiles for both package managers.
 
-Two local database setups are supported:
+## Environment variables
 
-- `docker` — local PostgreSQL via `docker-compose.yml`
-- `neon` — hosted PostgreSQL via Neon
-
-Copy one of the example env files:
+Copy the example for the database you will use:
 
 ```bash
-cp .env.local.example .env.local
+cp .env.local.example .env.local  # Docker PostgreSQL
 # or
-cp .env.neon.example .env.neon
+cp .env.neon.example .env.neon    # Neon PostgreSQL
 ```
 
-Fill in:
+Set `DATABASE_URL`, the `NEXT_PUBLIC_FIREBASE_*` values, Firebase Admin credentials, and a strong `SESSION_SECRET`. The examples also describe optional Upstash rate limiting. Set `GEMINI_API_KEY` to enable AI drafted summaries; without it, the app uses reviewed explanations or score based feedback. The Neon example does not include this optional key, so add it there if needed.
 
-- `DATABASE_URL`
-- Firebase client variables (`NEXT_PUBLIC_FIREBASE_*`)
-- Firebase Admin credentials (see below)
-- `SESSION_SECRET`
+For local Firebase Admin access, set one of `FIREBASE_SERVICE_ACCOUNT_JSON`, `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64`, `FIREBASE_SERVICE_ACCOUNT_KEY`, or `GOOGLE_APPLICATION_CREDENTIALS`. Keep key files outside this repository. Google hosted runtimes can use Application Default Credentials. Do not commit populated env files or service account keys.
 
-Do **not** commit any populated `.env*` files or service account JSON.
+## Run locally
 
-## Firebase Admin Credentials
+### Docker PostgreSQL
 
-Server routes use the Firebase Admin SDK for session verification, admin stats, uploads, and Realtime Database access.
+Docker Compose reads its own `.env` file for PostgreSQL container settings. Create `.env` at the repository root with values matching the `DATABASE_URL` in `.env.local`:
 
-Pick one credential strategy:
+```dotenv
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=novarquiz_db
+```
 
-1. Set `FIREBASE_SERVICE_ACCOUNT_JSON` to the full service account JSON.
-2. Set `GOOGLE_APPLICATION_CREDENTIALS` to an absolute path **outside** the repo.
-3. Set `FIREBASE_SERVICE_ACCOUNT_KEY` only if you must point at a key file, and keep that file outside the repository.
-
-On Firebase App Hosting, Cloud Run, App Engine, or Cloud Functions, prefer **Application Default Credentials** instead of shipping a key file.
-
-## Install
+Then start only the database service and run the app on your host:
 
 ```bash
-npm install
-# or
-bun install
+cp .env.local.example .env.local  # fill in Firebase and session values
+docker compose up -d NovartisDB
+npm run migrate
+npm run dev:docker
 ```
 
-## Run Locally
+`npm run db:up` starts both the database and the containerized API service; use the command above when developing with Next.js on your host. `npm run db:down` stops both services.
 
-### Option 1 — Docker Postgres
+### Neon PostgreSQL
 
 ```bash
-cp .env.local.example .env.local   # fill in values
-npm run db:up                       # start local Postgres
-npm run migrate                     # apply migrations
-npm run dev:docker                  # start Next.js
+cp .env.neon.example .env.neon  # fill in database, Firebase, and session values
+npm run migrate:neon
+npm run dev:neon
 ```
 
-### Option 2 — Neon Postgres
-
-```bash
-cp .env.neon.example .env.neon      # fill in values
-npm run migrate:neon                # apply migrations
-npm run dev                         # start Next.js (uses .env.neon)
-```
-
-The app runs at [http://localhost:3000](http://localhost:3000).
+The development app is available at [http://localhost:3000](http://localhost:3000).
 
 ## Scripts
 
 | Script | Purpose |
 | --- | --- |
-| `npm run dev` | Start Next.js with `.env.neon` |
+| `npm run dev` / `npm run dev:neon` | Start Next.js with `.env.neon` |
 | `npm run dev:docker` | Start Next.js with `.env.local` |
 | `npm run build` | Production build |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
 | `npm run migrate` | Apply migrations against `.env.local` |
 | `npm run migrate:neon` | Apply migrations against `.env.neon` |
-| `npm run db:up` / `db:down` | Start / stop local Postgres |
+| `npm run db:up` / `npm run db:down` | Start / stop all Docker Compose services |
 | `npm run set-admin -- --email=user@example.com` | Grant Firebase admin claims |
 
 ## Database Notes
 
-- `DB_PROVIDER` supports `docker` and `neon`. If omitted, it is inferred from `DATABASE_URL`.
-- Base schema lives in `db/migrations/005_somchai_refac.sql`; forward-only migrations sit alongside it.
-- Schema metadata: `lib/db/schema.ts`.
-- Migration entry point: `scripts/migrate.ts`.
+- `DB_PROVIDER` supports `docker` and `neon`; if omitted, the provider is inferred from `DATABASE_URL`.
+- `db/migrations/005_somchai_refac.sql` is the base schema. `006_rename_quiz_tables.sql` and the later numbered files are applied in order by `scripts/db/migrate.ts`.
+- On first creation of the Docker volume, `docker/postgres/init/01-bootstrap-005.sh` loads the base schema. Run `npm run migrate` afterward to apply the remaining migrations.
+- Applied filenames are recorded in the database's `schema_migrations` table. Migration metadata and ordering live in `lib/db/schema.ts`.
 
 ## Player feedback
 
@@ -147,24 +127,26 @@ lib/
   db/               Postgres config, queries, migrations helpers
   firebase/         Firebase client + admin integrations
   i18n/             i18next configuration
-db/migrations/      SQL migrations
-scripts/            Migration, admin, and export scripts
+db/migrations/      Numbered SQL migrations
+docker/postgres/     Local database bootstrap
+scripts/db/         Database migration command
+scripts/admin/      Admin account command
+public/image/        Static images
 ```
 
 ## Security Practices
 
-- All API routes validate input with **Zod** before any work.
-- Endpoints are **rate limited** via `lib/ratelimit.ts` (auth-keyed where a session exists, IP-keyed only when `TRUST_PROXY` is set).
+- API routes use Zod validation and rate limiting where appropriate; shared rate limit logic lives in `lib/ratelimit.ts`.
 - Identity (`uid`, `role`, `isAdmin`) is read only from verified session cookies or Firebase Admin tokens — never trusted from the client.
-- Persistent data lives in Postgres; live room/presence in Firebase Realtime Database. State is not duplicated across the two without reason.
+- Persistent data lives in Postgres; live room and presence state uses Firebase Realtime Database.
 - Secrets are loaded from environment variables; service account JSON must never be committed.
 
 ## Admin Setup
 
-Promote a user to admin:
+The admin script reads a service account JSON file through `FIREBASE_SERVICE_ACCOUNT_KEY`. Pass an absolute path outside the repository:
 
 ```bash
-npm run set-admin -- --email=user@example.com
+FIREBASE_SERVICE_ACCOUNT_KEY=/absolute/path/to/service-account.json npm run set-admin -- --email=user@example.com
 ```
 
 The user must sign out and sign back in before the new custom claims take effect.
