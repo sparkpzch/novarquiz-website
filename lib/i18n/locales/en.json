@@ -152,7 +152,7 @@
     "archetype_diagnostic_evidence_builder_desc": "You like to get the facts confirmed before acting. That habit catches problems early.",
     "archetype_balanced_clinician": "a balanced approach",
     "archetype_balanced_clinician_desc": "Your answers do not lean strongly in any one direction — you weigh each situation on its own.",
-    "disclaimer": "These results are estimated only from your quiz answers. They may not reflect your actual knowledge or health, and are not medical advice.",
+    "disclaimer": "Based on your quiz answers and reviewed content. This is not medical advice.",
     "progress": "Progress {{value}}%",
     "progress_aria": "Completed {{done}} of {{total}} quizzes",
     "health_knowledge": "Health knowledge",
