@@ -78,7 +78,8 @@ export default function JoinPage({
       try {
         // Fast path: API resolves pin_code / session.id in ~200 ms.
         // Show the modal immediately; verify room status in the background.
-        const apiRes = await fetch(`/api/join/${token}`).catch(() => null);
+        const guestHeaders = user.isAnonymous ? { Authorization: `Bearer ${await user.getIdToken()}` } : undefined;
+        const apiRes = await fetch(`/api/join/${token}`, { headers: guestHeaders }).catch(() => null);
         if (cancelled) return;
 
         if (apiRes?.ok) {
@@ -114,11 +115,12 @@ export default function JoinPage({
   }, [token, user]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session || !user) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/sessions/${session.id}/preview`);
+        const guestHeaders = user.isAnonymous ? { Authorization: `Bearer ${await user.getIdToken()}` } : undefined;
+        const res = await fetch(`/api/sessions/${session.id}/preview`, { headers: guestHeaders });
         const data = res.ok ? await res.json() : null;
         if (cancelled) return;
         if (data?.media_type === "video" && data?.media_url) {
@@ -132,7 +134,7 @@ export default function JoinPage({
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session, user]);
 
   useEffect(() => {
     if (!firstVideoUrl) return;
@@ -154,9 +156,11 @@ export default function JoinPage({
       }
 
       // 1. Call RESTful Join API
+      const headers = new Headers({ "Content-Type": "application/json" });
+      if (user.isAnonymous) headers.set('Authorization', `Bearer ${await user.getIdToken()}`);
       const res = await fetch(`/api/sessions/${session.id}/join`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           displayName: user.displayName || guestName.trim() || "Anonymous",
           photoURL: user.photoURL,

@@ -37,6 +37,8 @@ export interface Quiz {
 
 export interface Question {
   id: string;
+  /** Server-issued proof that this player reached this question. */
+  question_token?: string;
   session_id: string;
   question_order: number;
   question_text: string;

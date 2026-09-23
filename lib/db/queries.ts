@@ -205,6 +205,7 @@ export async function getExistingAnswer(
   questionId: string,
 ): Promise<{
   id: string;
+  chosen_label: string;
   points_earned: number;
   explanation: string | null;
   behavior_meaning: string | null;
@@ -213,7 +214,7 @@ export async function getExistingAnswer(
   const layered = await hasLayeredAnalyticsSchema();
   const result = await pool.query(
     layered
-      ? `SELECT ua.id, ua.utility_score, ua.behavior_meaning_snapshot, ua.allowed_usage_snapshot,
+      ? `SELECT ua.id, ua.chosen_label, ua.utility_score, ua.behavior_meaning_snapshot, ua.allowed_usage_snapshot,
                 c.explanation
          FROM user_answers ua
          LEFT JOIN choices c ON c.question_id = ua.question_id AND c.label = ua.chosen_label
@@ -223,8 +224,8 @@ export async function getExistingAnswer(
               WHERE le.session_id = $1 AND le.user_id = $2),
              '-infinity'::timestamptz
            )
-         ORDER BY ua.answered_at ASC LIMIT 1`
-      : `SELECT ua.id, ua.utility_score, c.explanation
+         ORDER BY ua.answered_at ASC, ua.id ASC LIMIT 1`
+      : `SELECT ua.id, ua.chosen_label, ua.utility_score, c.explanation
          FROM user_answers ua
          LEFT JOIN choices c ON c.question_id = ua.question_id AND c.label = ua.chosen_label
          WHERE ua.session_id = $1 AND ua.user_id = $2 AND ua.question_id = $3
@@ -233,13 +234,14 @@ export async function getExistingAnswer(
               WHERE le.session_id = $1 AND le.user_id = $2),
              '-infinity'::timestamptz
            )
-         ORDER BY ua.answered_at ASC LIMIT 1`,
+         ORDER BY ua.answered_at ASC, ua.id ASC LIMIT 1`,
     [sessionId, userId, questionId],
   );
   const row = result.rows[0];
   if (!row) return null;
   return {
     id: row.id as string,
+    chosen_label: row.chosen_label as string,
     points_earned: (row.utility_score as number | undefined) ?? 0,
     explanation: typeof row.explanation === 'string' ? row.explanation : null,
     behavior_meaning:
@@ -249,6 +251,35 @@ export async function getExistingAnswer(
         ? (row.allowed_usage_snapshot as AllowedUsage)
         : DEFAULT_CHOICE_METADATA.allowed_usage,
   };
+}
+
+// Serialize answers for one player in one session across concurrent requests.
+// The lock spans the existing-answer check and insert, including retries.
+export async function withPlayerAnswerLock<T>(sessionId: string, userId: string, work: () => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`${sessionId}:${userId}`]);
+    const result = await work();
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+// A completed run changes this value, invalidating question proofs from that
+// run before the next run starts.
+export async function getAttemptBoundary(sessionId: string, userId: string): Promise<string> {
+  const result = await pool.query(
+    'SELECT completed_at FROM leaderboard_entries WHERE session_id = $1 AND user_id = $2',
+    [sessionId, userId],
+  );
+  const completedAt = result.rows[0]?.completed_at;
+  return completedAt instanceof Date ? completedAt.toISOString() : (completedAt ? String(completedAt) : 'first');
 }
 
 // Removed: getSessionByShareToken — share tokens now live in Firebase RTDB (joinTokens/{token})
@@ -1423,7 +1454,16 @@ export async function saveUserAnswer(data: {
 
 export async function getUserCumulativeScore(sessionId: string, userId: string): Promise<number> {
   const result = await pool.query(
-    `SELECT COALESCE(SUM(utility_score), 0)::int AS total FROM user_answers WHERE session_id = $1 AND user_id = $2`,
+    `SELECT COALESCE(SUM(utility_score), 0)::int AS total FROM (
+       SELECT DISTINCT ON (question_id) utility_score
+       FROM user_answers
+       WHERE session_id = $1 AND user_id = $2
+         AND answered_at > COALESCE(
+           (SELECT le.completed_at FROM leaderboard_entries le WHERE le.session_id = $1 AND le.user_id = $2),
+           '-infinity'::timestamptz
+         )
+       ORDER BY question_id, answered_at ASC, id ASC
+     ) first_answers`,
     [sessionId, userId],
   );
   return (result.rows[0]?.total as number) ?? 0;
@@ -1431,7 +1471,7 @@ export async function getUserCumulativeScore(sessionId: string, userId: string):
 
 // Aggregates a player's user_answers into a single leaderboard_entries row.
 // Called when a player reaches the end of their path (or runs out of time).
-// Idempotent — re-running for the same user just refreshes the snapshot.
+// Called once after the route verifies the player reached the end of a run.
 export async function completeSession(data: {
   session_id: string;
   user_id: string;
@@ -1451,7 +1491,11 @@ export async function completeSession(data: {
        SELECT DISTINCT ON (question_id) utility_score, time_taken_ms
        FROM user_answers
        WHERE session_id = $1 AND user_id = $2
-       ORDER BY question_id, answered_at DESC
+         AND answered_at > COALESCE(
+           (SELECT le.completed_at FROM leaderboard_entries le WHERE le.session_id = $1 AND le.user_id = $2),
+           '-infinity'::timestamptz
+         )
+       ORDER BY question_id, answered_at ASC, id ASC
      ) latest_answers`,
     [data.session_id, data.user_id],
   );
@@ -1465,7 +1509,11 @@ export async function completeSession(data: {
        SELECT DISTINCT ON (question_id) utility_score, answered_at
        FROM user_answers
        WHERE session_id = $1 AND user_id = $2
-       ORDER BY question_id, answered_at DESC
+         AND answered_at > COALESCE(
+           (SELECT le.completed_at FROM leaderboard_entries le WHERE le.session_id = $1 AND le.user_id = $2),
+           '-infinity'::timestamptz
+         )
+       ORDER BY question_id, answered_at ASC, id ASC
      ) latest_answers
      ORDER BY answered_at ASC`,
     [data.session_id, data.user_id],
@@ -1487,7 +1535,11 @@ export async function completeSession(data: {
          SELECT DISTINCT ON (question_id) vector_scores, allowed_usage_snapshot, answered_at
          FROM user_answers
          WHERE session_id = $1 AND user_id = $2
-         ORDER BY question_id, answered_at DESC
+           AND answered_at > COALESCE(
+             (SELECT le.completed_at FROM leaderboard_entries le WHERE le.session_id = $1 AND le.user_id = $2),
+             '-infinity'::timestamptz
+           )
+         ORDER BY question_id, answered_at ASC, id ASC
        ) latest_answers`,
       [data.session_id, data.user_id],
     );
@@ -1719,6 +1771,9 @@ export async function getUserChoiceInsight(
   preferredTag: string | null = null,
 ): Promise<ChoiceInsight | null> {
   const layered = await hasLayeredAnalyticsSchema();
+  // Older schemas have no review_status, so their explanations cannot be
+  // treated as approved player-facing feedback.
+  if (!layered) return null;
   const result = await queryWithRetry<{
     question_text: string;
     choice_text: string;
@@ -1726,11 +1781,12 @@ export async function getUserChoiceInsight(
     utility_score: number;
   }>(
     `WITH latest AS (
-       SELECT DISTINCT ON (ua.session_id, ua.question_id)
+       SELECT DISTINCT ON (ua.question_id)
               ua.question_id, ua.chosen_label, ua.utility_score, ua.answered_at
        FROM user_answers ua
-       WHERE ua.user_id = $1
-       ORDER BY ua.session_id, ua.question_id, ua.answered_at DESC
+       JOIN questions answered_question ON answered_question.id = ua.question_id
+       WHERE ua.user_id = $1 AND answered_question.session_id = $2
+       ORDER BY ua.question_id, ua.answered_at DESC, ua.id DESC
      )
      SELECT q.question_text, c.choice_text, c.explanation, latest.utility_score
      FROM latest
@@ -1740,14 +1796,13 @@ export async function getUserChoiceInsight(
      WHERE q.session_id = $2
        AND latest.utility_score <= 0
        AND NULLIF(BTRIM(c.explanation), '') IS NOT NULL
-       ${layered ? "AND c.review_status = 'approved'" : ''}
-     ORDER BY ${layered
-       ? "CASE WHEN NULLIF($3, '') IS NOT NULL AND COALESCE(c.clinical_tags, '[]'::jsonb) ? $3 THEN 0 ELSE 1 END, c.confidence_weight DESC,"
-       : ''}
+       AND c.review_status = 'approved'
+     ORDER BY CASE WHEN NULLIF($3, '') IS NOT NULL AND COALESCE(c.clinical_tags, '[]'::jsonb) ? $3 THEN 0 ELSE 1 END,
+              c.confidence_weight DESC,
               latest.utility_score ASC,
               latest.answered_at DESC
      LIMIT 1`,
-    layered ? [userId, quizId, preferredTag] : [userId, quizId],
+    [userId, quizId, preferredTag],
   );
 
   const row = result.rows[0];
@@ -2115,6 +2170,7 @@ export async function deleteInsightTemplate(id: string): Promise<boolean> {
 export async function getQuizDraftContext(
   quizId: string,
   clinicalTag: string,
+  options: { includeAllQuestions?: boolean } = {},
 ): Promise<{
   quizName: string;
   quizDescription: string | null;
@@ -2137,7 +2193,9 @@ export async function getQuizDraftContext(
   // A tag narrows the questions, not the choices. Once a question is relevant,
   // Gemini needs every option (including the good one) to make a grounded
   // comparison instead of filling the missing answer in from general knowledge.
-  const questionFilter = layered && clinicalTag
+  const questionFilter = options.includeAllQuestions
+    ? ''
+    : layered && clinicalTag
     ? `AND EXISTS (
          SELECT 1 FROM choices tagged
          WHERE tagged.question_id = q.id

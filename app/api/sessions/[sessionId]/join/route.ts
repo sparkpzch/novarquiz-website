@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { adminRtdb } from '@/lib/firebase/admin';
 import { getSessionById } from '@/lib/db/queries';
-import { getSessionUser } from '@/lib/auth';
+import { getPlayUser } from '@/lib/play-auth';
 import { ROOM_STATUS } from '@/lib/constants/session';
 import { sanitizePhotoUrl } from '@/lib/security/photo-url';
 
@@ -19,7 +19,7 @@ export async function POST(
   
   try {
     // 1. Authenticate user
-    const user = await getSessionUser();
+    const user = await getPlayUser(request);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

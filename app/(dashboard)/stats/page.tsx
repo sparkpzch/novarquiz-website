@@ -3,16 +3,15 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { motion } from "motion/react";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { WEAK_TOPIC_THRESHOLD, type HealthStats } from "@/lib/stats/health";
 import { summarizeGameStats } from "@/lib/stats/game";
-import type { ChoiceInsight, InsightSummary } from "@/lib/analytics/insights";
+import type { PersonalFeedback } from "@/lib/analytics/personal-feedback";
 
-/** health-stats returns the aggregate plus whichever reviewed summary matched. */
+/** health-stats returns the aggregate and feedback composed from approved text. */
 type StatsResponse = HealthStats & {
-  choiceInsight: ChoiceInsight | null;
-  summary: InsightSummary | null;
+  feedback: PersonalFeedback | null;
 };
 
 type HistoryEntry = {
@@ -146,82 +145,61 @@ function KnowledgeGauge({ stats }: { stats: HealthStats }) {
 
 function InsightCard({ stats }: { stats: StatsResponse }) {
   const { t } = useTranslation();
-  const { choiceInsight, summary, archetype, weakestTopic } = stats;
-  const hl = <span className="text-[#E67E22]" />;
+  const { feedback } = stats;
 
   return (
     <section className="nq-card space-y-3 rounded-[24px] px-5 py-5 md:rounded-[28px] md:px-8 md:py-7">
       <p className="nq-insight-eyebrow text-[12px] font-semibold uppercase tracking-wide md:text-[13px]">
         {t("stats.insight_label")}
       </p>
+      {feedback?.reviewStatus === "provisional" && (
+        <span className="inline-flex rounded-full border border-[#C4661A]/30 bg-[#E67E22]/10 px-3 py-1 text-xs font-semibold text-[#A65213]">
+          {t("stats.provisional_badge")}
+        </span>
+      )}
 
-      {/* A reviewed explanation tied to the player's actual choice wins. The
-          generic reviewed summary remains the fallback, followed by the
-          behavioural segment and the plain weakest-topic line. */}
-      {choiceInsight ? (
+      {feedback ? (
         <>
           <h2 className="nq-insight-headline font-display text-[26px] font-bold leading-tight tracking-tight md:text-[34px]">
-            {t(
-              choiceInsight.signal === "incorrect"
-                ? "stats.insight_choice_incorrect"
-                : "stats.insight_choice_off_target",
-              { choice: choiceInsight.choice },
-            )}
+            {feedback.headline}
           </h2>
-          <div className="nq-insight-question rounded-[16px] border px-4 py-3">
-            <p className="nq-insight-question-label text-xs font-semibold uppercase tracking-wide">
-              {t("stats.insight_question")}
-            </p>
-            <p className="nq-insight-question-text mt-1 text-sm font-semibold leading-relaxed md:text-[15px]">
-              {choiceInsight.question}
-            </p>
-          </div>
+          {feedback.question && (
+            <div className="nq-insight-question rounded-[16px] border px-4 py-3">
+              <p className="nq-insight-question-label text-xs font-semibold uppercase tracking-wide">
+                {t("stats.insight_question")}
+              </p>
+              <p className="nq-insight-question-text mt-1 text-sm font-semibold leading-relaxed md:text-[15px]">
+                {feedback.question}
+              </p>
+            </div>
+          )}
           <p className="nq-insight-body text-[15px] font-medium leading-relaxed md:text-[17px]">
-            {choiceInsight.reason}
+            {feedback.body}
           </p>
-        </>
-      ) : summary ? (
-        <>
-          <h2 className="nq-insight-headline font-display text-[26px] font-bold leading-tight tracking-tight md:text-[34px]">
-            {summary.headline}
-          </h2>
-          <p className="nq-insight-body text-[15px] font-medium leading-relaxed md:text-[17px]">{summary.body}</p>
-          {summary.suggestion && (
+          {feedback.context && (
+            <p className="nq-insight-body text-[15px] font-medium leading-relaxed md:text-[17px]">
+              {feedback.context}
+            </p>
+          )}
+          {feedback.suggestion && (
             <p className="nq-insight-suggestion flex gap-2.5 rounded-[14px] px-3.5 py-3 text-[13px] font-semibold leading-relaxed md:text-[15px]">
               <span aria-hidden="true">👉</span>
-              {summary.suggestion}
+              {feedback.suggestion}
             </p>
           )}
         </>
-      ) : archetype ? (
-        <>
-          <h2 className="nq-insight-headline font-display text-[26px] font-bold leading-tight tracking-tight md:text-[34px]">
-            <Trans
-              i18nKey="stats.insight_archetype"
-              values={{ label: t(`stats.archetype_${archetype}`) }}
-              components={{ hl }}
-            />
-          </h2>
-          <p className="nq-insight-body text-[15px] font-medium leading-relaxed md:text-[17px]">
-            {t(`stats.archetype_${archetype}_desc`)}
-          </p>
-        </>
-      ) : weakestTopic ? (
+      ) : (
         <h2 className="nq-insight-headline font-display text-[26px] font-bold leading-tight tracking-tight md:text-[34px]">
-          <Trans
-            i18nKey={stats.topics.length > 1 ? "stats.insight_weakest" : "stats.insight_single"}
-            values={{ topic: weakestTopic.name, score: weakestTopic.score }}
-            components={{ hl }}
-          />
+          {t("dashboard.feedback_empty_headline")}
         </h2>
-      ) : null}
+      )}
 
       <p className="nq-insight-note flex gap-2 rounded-[14px] px-3 py-2.5 text-xs leading-relaxed md:text-[13px]">
         <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={1.8} />
           <path d="M12 11v5M12 8h.01" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
         </svg>
-        {t("stats.disclaimer")}
+        {t(feedback?.reviewStatus === "provisional" ? "stats.provisional_note" : "stats.disclaimer")}
       </p>
     </section>
   );

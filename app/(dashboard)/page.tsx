@@ -19,7 +19,7 @@ import { ROOM_STATUS } from "@/lib/constants/session";
 import { useToast } from "@/components/ui/Toast";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
 import { summarizeGameStats, type GameHistoryScore } from "@/lib/stats/game";
-import type { InsightSummary } from "@/lib/analytics/insights";
+import type { PersonalFeedback } from "@/lib/analytics/personal-feedback";
 import "@/lib/i18n";
 
 type ParsedJoinInput =
@@ -40,8 +40,7 @@ type UserStats = {
 
 type DashboardHealthStats = {
   knowledgeScore: number;
-  summary: InsightSummary | null;
-  weakestTopic: { name: string; score: number } | null;
+  feedback: PersonalFeedback | null;
 };
 
 type DashboardSession = {
@@ -338,21 +337,15 @@ function QuizCard({ session, onClick }: { session: DashboardSession; onClick: ()
   );
 }
 
-function AiSummaryCard({
+function PersonalFeedbackCard({
   healthStats,
   onViewStats,
 }: {
   healthStats: DashboardHealthStats | null;
   onViewStats: () => void;
 }) {
-  const reviewed = healthStats?.summary;
-  const fallback = healthStats?.weakestTopic;
-  const headline = reviewed?.headline
-    ?? (fallback ? `หัวข้อที่ควรทบทวน: ${fallback.name}` : "ทำแบบทดสอบเพื่อรับข้อมูลสรุปเฉพาะคุณ");
-  const body = reviewed?.body
-    ?? (fallback
-      ? `จากคำตอบล่าสุด คุณทำคะแนนหัวข้อนี้ได้ ${fallback.score}% ลองทบทวนประเด็นสำคัญก่อนเล่นครั้งถัดไป`
-      : "เมื่อทำแบบทดสอบเสร็จ ระบบจะแสดงภาพรวมจากคำตอบและหัวข้อที่ควรทบทวนที่นี่");
+  const { t } = useTranslation();
+  const feedback = healthStats?.feedback;
 
   return (
     <motion.section
@@ -366,25 +359,38 @@ function AiSummaryCard({
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#705cff]/15 text-[#8f83ff]" aria-hidden="true">✦</span>
             <div>
-              <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#7898ff]">Personal insight</p>
-              <h2 className="text-sm font-semibold text-white">AI Summary</h2>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#7898ff]">{t("dashboard.feedback_eyebrow")}</p>
+              <h2 className="text-sm font-semibold text-white">{t("dashboard.feedback_title")}</h2>
             </div>
           </div>
-          <h3 className="mt-4 text-base font-semibold leading-snug text-white sm:text-lg">{headline}</h3>
-          <p className="mt-2 max-w-4xl text-xs leading-5 text-[#9aa8d1] sm:text-sm">{body}</p>
-          {reviewed?.suggestion && (
-            <p className="nq-ai-suggestion mt-3 rounded-lg border border-[#2bb39a]/20 bg-[#2bb39a]/10 px-3 py-2 text-xs font-medium leading-5 text-[#65d7b9]">
-              <span aria-hidden="true">→ </span>{reviewed.suggestion}
+          {feedback?.reviewStatus === "provisional" && (
+            <span className="mt-3 inline-flex rounded-full border border-amber-300/35 bg-amber-300/10 px-2.5 py-1 text-[10px] font-semibold text-amber-200">
+              {t("stats.provisional_badge")}
+            </span>
+          )}
+          <h3 className="mt-4 text-base font-semibold leading-snug text-white sm:text-lg">{feedback?.headline ?? t("dashboard.feedback_empty_headline")}</h3>
+          {feedback?.question && (
+            <p className="mt-2 max-w-4xl text-xs leading-5 text-[#9aa8d1] sm:text-sm">
+              {t("stats.insight_question")}: {feedback.question}
             </p>
           )}
-          <p className="mt-3 text-[9px] leading-4 text-[#7180ad]">อ้างอิงจากคำตอบในแบบทดสอบและข้อความที่ผ่านการตรวจทานแล้ว ไม่ใช่คำแนะนำทางการแพทย์</p>
+          <p className="mt-2 max-w-4xl text-xs leading-5 text-[#9aa8d1] sm:text-sm">{feedback?.body ?? t("dashboard.feedback_empty_body")}</p>
+          {feedback?.context && <p className="mt-2 max-w-4xl text-xs leading-5 text-[#9aa8d1] sm:text-sm">{feedback.context}</p>}
+          {feedback?.suggestion && (
+            <p className="nq-ai-suggestion mt-3 rounded-lg border border-[#2bb39a]/20 bg-[#2bb39a]/10 px-3 py-2 text-xs font-medium leading-5 text-[#65d7b9]">
+              <span aria-hidden="true">→ </span>{feedback.suggestion}
+            </p>
+          )}
+          <p className="mt-3 text-[9px] leading-4 text-[#7180ad]">
+            {t(feedback?.reviewStatus === "provisional" ? "stats.provisional_note" : "stats.disclaimer")}
+          </p>
         </div>
         <button
           type="button"
           onClick={onViewStats}
           className="shrink-0 self-start rounded-lg border border-[#557cff]/35 px-3 py-2 text-[10px] font-semibold text-[#7898ff] transition hover:border-[#557cff]/70 hover:text-white"
         >
-          View full insight →
+          {t("dashboard.feedback_view_details")} →
         </button>
       </div>
     </motion.section>
@@ -544,7 +550,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <AiSummaryCard healthStats={healthStats} onViewStats={() => router.push("/stats")} />
+      <PersonalFeedbackCard healthStats={healthStats} onViewStats={() => router.push("/stats")} />
 
       <section className="grid gap-4 xl:grid-cols-[0.42fr_1.58fr]">
         <div className="nq-dashboard-panel rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">

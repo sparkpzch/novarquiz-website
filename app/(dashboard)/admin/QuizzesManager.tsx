@@ -359,7 +359,7 @@ export default function QuizzesManager({
   };
 
   return (
-    <div className="flex h-full w-full flex-col gap-6 pb-12 lg:gap-8">
+    <div className="nq-quiz-manager flex h-full w-full flex-col gap-6 pb-12 lg:gap-8">
       {/* Control Bar */}
       <div className="nq-card rounded-[34px] p-4 flex flex-col sm:flex-row sm:flex-wrap items-center gap-4 justify-between">
         <div className="flex items-center gap-2">

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getQuizForQuestion, getQuizById, resolveSessionToQuizId, getExistingAnswer } from '@/lib/db/queries';
+import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getQuizForQuestion, getQuizById, resolveSessionToQuizId, getExistingAnswer, getAttemptBoundary, withPlayerAnswerLock } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
-import { DEFAULT_CHOICE_METADATA } from '@/lib/analytics/hcp';
 import { hasProfilingConsent } from '@/lib/analytics/consent';
 import type { Choice } from '@/lib/types';
+import { createQuestionToken, readQuestionToken, verifyQuestionToken } from '@/lib/security/question-token';
+import { getPlayUser } from '@/lib/play-auth';
 
 const StartBody = z.object({
   action: z.literal('start'),
@@ -16,6 +17,7 @@ const StartBody = z.object({
 const AnswerBody = z.object({
   question_id: z.string().uuid(),
   chosen_label: z.string().min(1).max(10),
+  question_token: z.string().optional(),
   time_taken_ms: z.number().int().min(0).max(300_000),
   is_guest: z.boolean().optional(),
 });
@@ -63,44 +65,40 @@ function shuffleChoices<T>(choices: T[], seed: string): T[] {
 // shuffle_choices on. Each choice keeps its own `label`, so branching
 // (question_connections.from_choice_label) and scoring (user_answers.chosen_label)
 // are unaffected by the order the player sees.
-function sanitizeQuestion(question: Record<string, unknown> | null, shuffleSeed?: string) {
+function sanitizeQuestion(question: Record<string, unknown> | null, shuffleSeed?: string, questionToken?: string) {
   if (!question) return question;
   const choices = Array.isArray(question.choices)
     ? question.choices.map((choice) => {
-        const rest = { ...(choice as Record<string, unknown>) };
-        delete rest.score_impact;
-        delete rest.points;
-        delete rest.explanation;
-        delete rest.behavior_meaning;
-        delete rest.vector_deltas;
-        delete rest.clinical_tags;
-        delete rest.confidence_weight;
-        delete rest.allowed_usage;
-        delete rest.requires_hcp_version;
-        delete rest.review_status;
-        return rest;
+        const item = choice as Record<string, unknown>;
+        return { id: item.id, label: item.label, choice_text: item.choice_text };
       })
-    : question.choices;
+    : [];
   const orderedChoices =
-    shuffleSeed && Array.isArray(choices) ? shuffleChoices(choices, shuffleSeed) : choices;
-  const restQuestion = { ...question };
-  delete restQuestion.intended_audience;
-  delete restQuestion.presentation_mode;
-  delete restQuestion.reading_level;
-  delete restQuestion.jurisdiction_tags;
-  delete restQuestion.medical_review_version;
-  delete restQuestion.legal_document_versions_required;
-  return { ...restQuestion, choices: orderedChoices };
+    shuffleSeed ? shuffleChoices(choices, shuffleSeed) : choices;
+  return {
+    id: question.id,
+    question_order: question.question_order,
+    question_text: question.question_text,
+    node_type: question.node_type,
+    media_type: question.media_type,
+    media_url: question.media_url,
+    poster_url: question.poster_url,
+    thumbnail_url: question.thumbnail_url,
+    session_timer_seconds: question.session_timer_seconds,
+    choices: orderedChoices,
+    question_token: questionToken,
+  };
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
-  const user = await getSessionUser();
+  const user = await getPlayUser(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { sessionId } = await params;
   const searchParams = request.nextUrl.searchParams;
 
   try {
+    const attemptBoundary = user.isGuest ? 'guest' : await getAttemptBoundary(sessionId, user.uid);
     if (searchParams.get('entry') === 'true') {
       const quizId = await resolveSessionToQuizId(sessionId);
       if (!quizId) return NextResponse.json(null, { status: 404 });
@@ -111,39 +109,42 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       const question = await getEntryQuestion(sessionId);
       if (!question) return NextResponse.json(null, { status: 404 });
       return NextResponse.json(
-        sanitizeQuestion(question, quiz.shuffle_choices ? `${user.uid}:${question.id}` : undefined),
+        sanitizeQuestion(question, quiz.shuffle_choices ? `${user.uid}:${question.id}` : undefined,
+          createQuestionToken(sessionId, user.uid, question.id, attemptBoundary)),
+        { headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
     const fromQuestionId = searchParams.get('fromQuestionId');
     const choiceLabel = searchParams.get('choiceLabel');
     if (fromQuestionId && choiceLabel) {
+      const fromToken = searchParams.get('questionToken') ?? '';
+      if (!verifyQuestionToken(fromToken, sessionId, user.uid, fromQuestionId, attemptBoundary)) {
+        return NextResponse.json({ error: 'Invalid question' }, { status: 403 });
+      }
       const access = await getQuizForQuestion(fromQuestionId);
       if (!access) return NextResponse.json(null, { status: 404 });
+      const sessionQuizId = await resolveSessionToQuizId(sessionId);
+      if (sessionQuizId !== access.quiz_id) return NextResponse.json(null, { status: 404 });
       if (!access.is_published && !user.isAdmin && access.created_by !== user.uid) {
         return NextResponse.json(null, { status: 404 });
+      }
+      const fromQuestion = await getQuestionById(fromQuestionId);
+      if (fromQuestion?.node_type === 'situation') {
+        if (choiceLabel !== 'continue') return NextResponse.json({ error: 'Invalid path' }, { status: 403 });
+      } else if (!user.isGuest) {
+        const answer = await getExistingAnswer(sessionId, user.uid, fromQuestionId);
+        if (!answer || answer.chosen_label !== choiceLabel) {
+          return NextResponse.json({ error: 'Answer required' }, { status: 403 });
+        }
       }
       const next = await getNextQuestion(fromQuestionId, choiceLabel);
-      if (!next) return NextResponse.json(null, { status: 404 });
+      if (!next) return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
       // `next` is reachable only via a connection, so it shares fromQuestionId's quiz.
       return NextResponse.json(
-        sanitizeQuestion(next, access.shuffle_choices ? `${user.uid}:${next.id}` : undefined),
-      );
-    }
-
-    const questionId = searchParams.get('questionId');
-    if (questionId) {
-      // Authorize: the question's parent quiz must be published, or the
-      // caller must own/admin it. Prevents enumeration of draft quizzes.
-      const access = await getQuizForQuestion(questionId);
-      if (!access) return NextResponse.json(null, { status: 404 });
-      if (!access.is_published && !user.isAdmin && access.created_by !== user.uid) {
-        return NextResponse.json(null, { status: 404 });
-      }
-      const question = await getQuestionById(questionId);
-      if (!question) return NextResponse.json(null, { status: 404 });
-      return NextResponse.json(
-        sanitizeQuestion(question, access.shuffle_choices ? `${user.uid}:${question.id}` : undefined),
+        sanitizeQuestion(next, access.shuffle_choices ? `${user.uid}:${next.id}` : undefined,
+          createQuestionToken(sessionId, user.uid, next.id, attemptBoundary)),
+        { headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
@@ -171,13 +172,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     const parsed = AnswerBody.safeParse(raw);
     if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 
-    const user = await getSessionUser();
+    const user = await getPlayUser(request);
 
     // An authenticated caller is ALWAYS routed through the non-guest path so
     // the one-answer-per-(session,user,question) guard applies. Otherwise a
     // logged-in player could set is_guest:true to probe every label, learn
     // score_impact, then resubmit the best label non-guest for a perfect score.
-    if (parsed.data.is_guest && !user) {
+    if (user?.isGuest) {
       const access = await getQuizForQuestion(parsed.data.question_id);
       if (!access || !access.is_published) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -187,15 +188,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
       }
       const question = await getQuestionById(parsed.data.question_id);
+      if (!verifyQuestionToken(parsed.data.question_token ?? '', sessionId, user.uid, parsed.data.question_id, 'guest')) {
+        return NextResponse.json({ error: 'Invalid question' }, { status: 403 });
+      }
       const selectedChoice = question?.choices?.find(
         (choice: Choice) => choice.label === parsed.data.chosen_label,
       );
+      if (!selectedChoice || question?.node_type !== 'normal') {
+        return NextResponse.json({ error: 'Invalid answer' }, { status: 400 });
+      }
       return NextResponse.json({
         is_guest: true,
         points_earned: selectedChoice?.score_impact ?? 0,
         explanation: selectedChoice?.explanation ?? null,
-        behavior_meaning: selectedChoice?.behavior_meaning ?? null,
-        allowed_usage: selectedChoice?.allowed_usage ?? DEFAULT_CHOICE_METADATA.allowed_usage,
       });
     }
 
@@ -218,39 +223,49 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     // takes the LATEST row per question, so without this guard a player can
     // probe every label, observe points_earned, and resubmit the best label
     // last to walk away with a perfect score.
-    const existing = await getExistingAnswer(sessionId, user.uid, parsed.data.question_id);
-    if (existing) {
-      return NextResponse.json(existing, { status: 200 });
-    }
-
-    const result = await saveUserAnswer({
-      session_id: sessionId,
-      user_id: user.uid,
-      question_id: parsed.data.question_id,
-      chosen_label: parsed.data.chosen_label,
-      time_taken_ms: parsed.data.time_taken_ms,
-      profiling_consent: await hasProfilingConsent(user.uid),
+    const saved = await withPlayerAnswerLock(sessionId, user.uid, async () => {
+      const boundary = await getAttemptBoundary(sessionId, user.uid);
+      if (readQuestionToken(parsed.data.question_token ?? '', sessionId, user.uid, parsed.data.question_id, boundary) === null) {
+        return { invalidToken: true } as const;
+      }
+      const existing = await getExistingAnswer(sessionId, user.uid, parsed.data.question_id);
+      if (existing) return { answer: existing, score: await getUserCumulativeScore(sessionId, user.uid) };
+      const question = await getQuestionById(parsed.data.question_id);
+      if (!question || question.node_type === 'situation' || question.node_type === 'end' ||
+          !question.choices?.some((choice: Choice) => choice.label === parsed.data.chosen_label)) {
+        return null;
+      }
+      const answer = await saveUserAnswer({
+        session_id: sessionId,
+        user_id: user.uid,
+        question_id: parsed.data.question_id,
+        chosen_label: parsed.data.chosen_label,
+        time_taken_ms: parsed.data.time_taken_ms,
+        profiling_consent: await hasProfilingConsent(user.uid),
+      });
+      return { answer, score: await getUserCumulativeScore(sessionId, user.uid) };
     });
+    if (saved && 'invalidToken' in saved) return NextResponse.json({ error: 'Invalid question' }, { status: 403 });
+    if (!saved) return NextResponse.json({ error: 'Invalid answer' }, { status: 400 });
+    const { answer: result, score: cumScore } = saved;
 
     // Fire-and-forget: server writes authoritative score to RTDB so clients
     // cannot spoof the live leaderboard by writing arbitrary values directly.
     void (async () => {
       try {
-        const cumScore = await getUserCumulativeScore(sessionId, user.uid);
         await adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).update({
           score: cumScore,
           displayName: 'Player',
-          currentQuestionId: parsed.data.question_id,
-          currentQuestionLabel: '',
           updatedAt: Date.now(),
         });
       } catch { /* non-fatal — live leaderboard degrades gracefully */ }
     })();
 
-    // Profiling vectors are admin-only; don't echo them to the player.
-    const playerResult: Partial<typeof result> = { ...result };
-    delete playerResult.vector_scores;
-    return NextResponse.json(playerResult);
+    return NextResponse.json({
+      chosen_label: 'chosen_label' in result ? result.chosen_label : parsed.data.chosen_label,
+      points_earned: result.points_earned,
+      explanation: result.explanation,
+    });
   } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }

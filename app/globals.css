@@ -87,7 +87,7 @@
 }
 
 html {
-  background-color: #92BFFF;
+  background-color: var(--background);
 }
 
 body {
@@ -1119,6 +1119,23 @@ body {
 
 .nq-dashboard-shell.nq-theme-light .text-white {
   color: #16324f !important;
+}
+
+/* Quiz Manager cards follow the layout theme immediately, including while
+   the root data-theme attribute is catching up with a theme switch. */
+.nq-dashboard-shell.nq-theme-light .nq-quiz-manager {
+  color: #16324f;
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-quiz-manager [class~="text-[#16324F]"] {
+  color: #16324f !important;
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-quiz-manager [class~="text-[#5D7EA1]"],
+.nq-dashboard-shell.nq-theme-light .nq-quiz-manager [class~="text-[#5D7EA1]/70"],
+.nq-dashboard-shell.nq-theme-light .nq-quiz-manager [class~="text-[#4D6F93]"],
+.nq-dashboard-shell.nq-theme-light .nq-quiz-manager [class~="text-[#8AA4C0]"] {
+  color: #456786 !important;
 }
 
 .nq-dashboard-shell.nq-theme-light [class~="text-[#8391bc]"],

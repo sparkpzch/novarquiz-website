@@ -2,12 +2,16 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import {
   getApprovedInsightSummary,
+  getUserConsent,
   getUserChoiceInsight,
   getUserHealthStatsInput,
 } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { summarizeHealthStats } from '@/lib/stats/health';
 import { INSIGHT_LOCALES } from '@/lib/analytics/insights';
+import { composePersonalFeedback } from '@/lib/analytics/personal-feedback';
+import { getOrGenerateProvisionalInsight } from '@/lib/ai/auto-provisional-insight';
+import { PRIVACY_VERSION } from '@/components/ui/TermsModal';
 
 const Params = z.object({ uid: z.string().min(1).max(128) });
 const Query = z.object({ locale: z.enum(INSIGHT_LOCALES).default('th') });
@@ -44,9 +48,10 @@ export async function GET(
       ? await getUserChoiceInsight(uid, stats.latestTopic.quiz_id, stats.gapTags[0] ?? null)
       : null;
 
-    // The narrative is looked up, never generated here: only rows a human
-    // approved in the CMS can reach a player. No approved match is a normal
-    // outcome — the page falls back to its own rule-based line.
+    // Approved CMS copy always wins. Only when absent do we use a separately
+    // marked AI draft based on the player's recorded selections, the answer
+    // key, and authored explanations. The UID is used only for DB lookup;
+    // answer patterns, rather than user IDs, key the shared cache.
     //
     // A null archetype is the common case, not an error: the six HCP vectors
     // describe clinical decision style, which a public quiz never produces.
@@ -63,7 +68,28 @@ export async function GET(
         })
       : null;
 
-    return NextResponse.json({ ...stats, choiceInsight, summary });
+    const maySendAnswersToGemini = !summary && stats.latestTopic
+      ? (await getUserConsent(uid))?.privacy_version === PRIVACY_VERSION
+      : false;
+
+    const provisional = maySendAnswersToGemini && stats.latestTopic
+      ? await getOrGenerateProvisionalInsight({
+          userId: uid,
+          quizId: stats.latestTopic.quiz_id,
+          audience: stats.latestTopic.audience === 'hcp' ? 'hcp' : 'public',
+          locale: query.data.locale,
+        })
+      : null;
+
+    const feedback = composePersonalFeedback({
+      choiceInsight,
+      summary: summary ?? provisional?.summary ?? null,
+      summaryStatus: provisional?.status ?? (summary ? 'approved' : null),
+      latestTopic: stats.latestTopic,
+      locale: query.data.locale,
+    });
+
+    return NextResponse.json({ ...stats, choiceInsight, summary, feedback });
   } catch (err) {
     console.error('health-stats failed:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

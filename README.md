@@ -126,6 +126,10 @@ The app runs at [http://localhost:3000](http://localhost:3000).
 - Schema metadata: `lib/db/schema.ts`.
 - Migration entry point: `scripts/migrate.ts`.
 
+## Player feedback
+
+After a quiz, feedback combines reviewed explanations for the player's choices with a summary. Approved admin summaries take priority. If no approved summary matches a published quiz, Gemini can use the player's recorded selections, the answer key, and authored explanations to create feedback after the player accepts the current privacy notice. Identical answer patterns share one cached summary per quiz, audience, and language. Players see an "awaiting review" label until an admin approves or rejects it in **Admin → Insight Summaries**. Rejection hides it for that answer pattern. If Gemini is unavailable, the app falls back to reviewed choice explanations or a score overview. The Gemini request contains no player identifiers, scores, or profiles.
+
 ## Project Layout
 
 ```

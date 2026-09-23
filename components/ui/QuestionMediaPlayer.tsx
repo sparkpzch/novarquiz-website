@@ -1,12 +1,29 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import AutoPlayVideo from './AutoPlayVideo';
+
+function showPreparedVideo(video: HTMLVideoElement, container: HTMLDivElement, onError?: () => void) {
+  video.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+  video.controls = true;
+  video.loop = true;
+  video.onloadeddata = null;
+  video.onerror = () => onError?.();
+  container.appendChild(video);
+  void video.play().catch(() => {});
+  return () => {
+    video.pause();
+    video.onerror = null;
+    video.remove();
+  };
+}
 
 type QuestionMediaPlayerProps = {
   src: string;
   preload: 'auto' | 'metadata';
   poster?: string;
   onError?: () => void;
+  preparedVideo?: HTMLVideoElement | null;
 };
 
 export default function QuestionMediaPlayer({
@@ -14,10 +31,20 @@ export default function QuestionMediaPlayer({
   preload,
   poster,
   onError,
+  preparedVideo,
 }: QuestionMediaPlayerProps) {
+  const preparedContainer = useRef<HTMLDivElement>(null);
+  const errorHandlerRef = useRef(onError);
+  useEffect(() => { errorHandlerRef.current = onError; }, [onError]);
+
+  useEffect(() => {
+    if (!preparedVideo || !preparedContainer.current) return;
+    return showPreparedVideo(preparedVideo, preparedContainer.current, () => errorHandlerRef.current?.());
+  }, [preparedVideo]);
+
   return (
     <div className="nq-question-player h-44 w-full md:h-56">
-      <AutoPlayVideo
+      {preparedVideo ? <div ref={preparedContainer} className="h-full w-full" /> : <AutoPlayVideo
         key={src}
         src={src}
         controls
@@ -28,7 +55,7 @@ export default function QuestionMediaPlayer({
         preload={preload}
         poster={poster}
         onError={onError}
-      />
+      />}
     </div>
   );
 }

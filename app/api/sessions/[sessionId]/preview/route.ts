@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getEntryQuestion } from '@/lib/db/queries';
-import { getSessionUser } from '@/lib/auth';
+import { getPlayUser } from '@/lib/play-auth';
 
-export async function GET(_: Request, { params }: { params: Promise<{ sessionId: string }> }) {
-  const user = await getSessionUser();
+export async function GET(request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
+  const user = await getPlayUser(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { sessionId } = await params;

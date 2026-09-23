@@ -7,7 +7,7 @@
     "dev": "dotenv -e .env.neon -- next dev",
     "dev:docker": "dotenv -e .env.local -- next dev",
     "dev:neon": "dotenv -e .env.neon -- next dev",
-    "build": "next build --webpack",
+    "build": "next build",
     "analyze": "ANALYZE=true next build --webpack",
     "start": "next start",
     "lint": "eslint",

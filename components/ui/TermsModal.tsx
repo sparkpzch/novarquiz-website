@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '@/lib/hooks/useTheme';
 
 export const TOS_VERSION = '2026-09-17';
-export const PRIVACY_VERSION = '2026-09-17';
+export const PRIVACY_VERSION = '2026-09-23';
 export const ANALYTICS_NOTICE_VERSION = '2026-05-25';
 export const PROFILING_NOTICE_VERSION = '2026-09-17';
 
@@ -317,7 +317,7 @@ function TermsContent({ c }: { c: Palette }) {
 function PrivacyContent({ c }: { c: Palette }) {
   return (
     <div>
-      <p className="text-xs mb-4" style={{ color: c.subtle }}>Last updated: September 17, 2026 · Version {PRIVACY_VERSION}</p>
+      <p className="text-xs mb-4" style={{ color: c.subtle }}>Last updated: September 23, 2026 · Version {PRIVACY_VERSION}</p>
 
       <div
         className="rounded-xl p-3 mb-4 text-xs"
@@ -380,8 +380,16 @@ function PrivacyContent({ c }: { c: Palette }) {
         </ul>
         <p className="mt-1">
           Clinical profiling vectors are calculated from your choices in HCP or mixed-audience
-          quizzes while Analytics &amp; Profiling is on. If you turn it off, only your scores are
-          recorded.
+          quizzes while Analytics &amp; Profiling is on. If you turn it off, clinical
+          profiling vectors are no longer calculated; quiz answers and scores remain
+          available for quiz history and feedback.
+        </p>
+        <p className="mt-1">
+          When a published quiz has no approved feedback summary, your selected answers,
+          the answer key, and authored explanations may be sent to Google Gemini to draft
+          feedback marked as awaiting review. Your name, email, account ID, scores, and
+          clinical profile are not included in that request. The answer pattern and draft
+          are stored without an account ID for review and reuse.
         </p>
       </Section>
 
@@ -441,8 +449,8 @@ function PrivacyContent({ c }: { c: Palette }) {
         <ul className="list-disc list-inside space-y-0.5 mt-1">
           <li><strong>Google Firebase</strong> — Authentication, real-time database, file storage</li>
           <li><strong>Neon / PostgreSQL</strong> — Quiz data and user profiles</li>
+          <li><strong>Google Gemini</strong> — Draft feedback from selected quiz answers and authored explanations</li>
         </ul>
-        <p className="mt-1">All processors operate under appropriate data protection agreements.</p>
       </Section>
 
       <Section title="6. Your Rights Under PDPA" c={c}>

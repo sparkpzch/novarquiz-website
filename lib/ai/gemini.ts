@@ -1,9 +1,7 @@
-// Minimal Gemini text client, used only to draft insight wording in the CMS.
+// Minimal Gemini text client for CMS drafts and provisional quiz feedback.
 //
-// Nothing a player typed or answered is ever sent here: the prompt is built
-// from quiz content an admin authored. That is what makes the free tier
-// acceptable — Google may train on free-tier traffic, so personal data must
-// not reach it.
+// Callers build prompts from quiz content. Provisional feedback can include
+// recorded choices and explanations, but never player IDs or profiles.
 
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 

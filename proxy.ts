@@ -4,6 +4,7 @@ import { checkRateLimit } from '@/lib/ratelimit';
 
 const COOKIE_NAME = 'session';
 const PUBLIC_PATHS = ['/sign-in', '/sign-up', '/forgot-password'];
+const GUEST_PLAY_PATHS = ['/join/', '/play/'];
 
 function getSecret() {
   const secret = process.env.SESSION_SECRET;
@@ -86,6 +87,13 @@ export async function proxy(request: NextRequest) {
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   const session = request.cookies.get(COOKIE_NAME)?.value;
+
+  // Guest pages render a client shell. Their APIs verify the Firebase
+  // anonymous ID token, so a missing application cookie must not redirect
+  // an invited player before anonymous sign-in can run.
+  if (GUEST_PLAY_PATHS.some((p) => pathname.startsWith(p))) {
+    return withCsp(request, nonce);
+  }
 
   // Authenticated users are redirected away from auth pages
   if (isPublic) {

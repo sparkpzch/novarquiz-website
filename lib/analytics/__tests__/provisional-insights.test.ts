@@ -1,0 +1,49 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+import { answerPatternSignature, buildProvisionalInsightPrompt, parseProvisionalInsight } from '../provisional-insights';
+
+const context = {
+  quizName: 'Food labels',
+  quizDescription: 'Read serving sizes',
+  audience: 'public' as const,
+  locale: 'th' as const,
+  answers: [{
+    question: 'What should you check?',
+    selected: 'Only the front label',
+    selectedExplanation: 'Check the serving size before comparing products.',
+    selectedAligned: false,
+    alignedChoices: [{ text: 'The serving size', explanation: 'Use the table on the package.' }],
+  }],
+};
+
+test('provisional prompt contains the recorded selection, key and explanation, but no user ID', () => {
+  const prompt = buildProvisionalInsightPrompt(context);
+  assert.match(prompt, /Food labels/);
+  assert.match(prompt, /The serving size/);
+  assert.match(prompt, /Player selected: Only the front label/);
+  assert.match(prompt, /Check the serving size before comparing products/);
+  assert.match(prompt, /Do not invent any other selection/);
+});
+
+test('accepts feedback about a selected answer but rejects invented score and medical claims', () => {
+  const general = { headline: 'อ่านฉลากให้ครบ', body: 'ลองดูปริมาณต่อหนึ่งหน่วยบริโภคในตารางก่อนเปรียบเทียบผลิตภัณฑ์', suggestion: 'ทบทวนคำอธิบายของแต่ละข้อ' };
+  assert.equal(parseProvisionalInsight(JSON.stringify(general)).ok, true);
+  assert.equal(parseProvisionalInsight(JSON.stringify({ ...general, body: 'คุณเลือกดูแค่หน้าซอง' })).ok, true);
+  assert.equal(parseProvisionalInsight(JSON.stringify({ ...general, body: 'You scored poorly on this quiz.' })).ok, false);
+  assert.equal(parseProvisionalInsight(JSON.stringify({ ...general, body: 'คุณมีอาการของโรคนี้' })).ok, false);
+});
+
+test('cache signature changes with the selected answer and source explanation', () => {
+  const input = { ...context, quizId: 'quiz-1' };
+  const first = answerPatternSignature(input);
+  assert.equal(first, answerPatternSignature({ ...input }));
+  assert.notEqual(first, answerPatternSignature({
+    ...input,
+    answers: [{ ...input.answers[0], selected: 'The serving size' }],
+  }));
+  assert.notEqual(first, answerPatternSignature({
+    ...input,
+    answers: [{ ...input.answers[0], selectedExplanation: 'Updated explanation' }],
+  }));
+});

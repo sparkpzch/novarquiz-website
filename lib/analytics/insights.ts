@@ -1,9 +1,7 @@
-// Player-facing insight summaries.
-//
-// The division of labour this module exists to enforce: the *claim* a player
-// reads is picked deterministically from reviewed rows (insight_templates),
-// and an LLM only ever drafts wording for a human to approve beforehand. No
-// request-time generation, so nothing a player sees has skipped review.
+// Reviewed insight templates and the shared validation used by AI drafts.
+// Player-specific claims come from reviewed choice explanations. A separate
+// provisional flow can show clearly marked answer-pattern feedback before
+// human review; it receives recorded selections but no player identifier.
 
 import type { IntendedAudience } from './hcp';
 
@@ -147,9 +145,9 @@ function trimmed(value: unknown) {
 }
 
 /**
- * Validate a model-drafted summary before it is stored, even as a draft.
- * Rejecting here keeps text a reviewer would have to reject anyway out of the
- * table entirely, so nothing unsafe is one accidental "approve" click away.
+ * Validate a model-drafted summary before it is stored or displayed.
+ * This catches basic risky claims; provisional copy remains visibly marked
+ * until a human reviews it.
  */
 export function validateInsightDraft(input: unknown): DraftValidation {
   if (!input || typeof input !== 'object') return { ok: false, reason: 'not an object' };

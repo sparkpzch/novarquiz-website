@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getSessionByToken } from '@/lib/db/queries';
-import { getSessionUser } from '@/lib/auth';
+import { getPlayUser } from '@/lib/play-auth';
 import { checkRateLimit } from '@/lib/ratelimit';
 
 // Join tokens are resolved via Firebase RTDB (resolveJoinToken).
 // The client resolves the token to a sessionId client-side, then fetches
 // the session by ID. This route provides a server-side fallback for full tokens.
 export async function GET(
-  _: Request,
+  request: Request,
   { params }: { params: Promise<{ token: string }> },
 ) {
-  const user = await getSessionUser();
+  const user = await getPlayUser(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { allowed, retryAfter } = await checkRateLimit(`uid:${user.uid}`, '/api/join');

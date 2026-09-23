@@ -2,8 +2,9 @@
 
 // Authoring and review desk for the summaries players read on /stats.
 //
-// Nothing here reaches a player until its row is approved — the Gemini button
-// only ever produces a 'draft'. That split is the whole point of the screen.
+// Manually drafted templates remain private until approval. Automatically
+// generated summaries have their own review queue and a visible provisional
+// label on player pages while awaiting a decision.
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -21,6 +22,7 @@ import {
   type InsightTemplate,
 } from "@/lib/analytics/insights";
 import type { Quiz } from "@/lib/types";
+import type { ProvisionalInsight } from "@/lib/db/provisional-insights";
 
 // '*' first: a public quiz produces no archetype, so it is the usual choice.
 const ARCHETYPE_LABELS: Record<string, string> = {
@@ -52,6 +54,8 @@ export default function InsightsAdminPage() {
 
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [templates, setTemplates] = useState<InsightTemplate[]>([]);
+  const [provisional, setProvisional] = useState<ProvisionalInsight[]>([]);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [quizId, setQuizId] = useState<string>("");
   const [archetypeId, setArchetypeId] = useState<string>(ANY_ARCHETYPE);
   const [clinicalTag, setClinicalTag] = useState("");
@@ -59,6 +63,7 @@ export default function InsightsAdminPage() {
   const [editor, setEditor] = useState<Editor>(EMPTY_EDITOR);
   const [busy, setBusy] = useState<"" | "save" | "draft">("");
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
+  const [reviewMessage, setReviewMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) router.push("/");
@@ -72,14 +77,46 @@ export default function InsightsAdminPage() {
     [],
   );
 
+  const fetchProvisional = useCallback(
+    (): Promise<ProvisionalInsight[]> =>
+      fetch("/api/admin/provisional-insights")
+        .then((r) => (r.ok ? r.json() : []))
+        .catch(() => []),
+    [],
+  );
+
   useEffect(() => {
     if (!isAdmin) return;
     void fetchTemplates().then(setTemplates);
+    void fetchProvisional().then(setProvisional);
     void fetch("/api/quizzes?all=true")
       .then((r) => (r.ok ? r.json() : []))
       .then((rows: Quiz[]) => setQuizzes(Array.isArray(rows) ? rows : []))
       .catch(() => setQuizzes([]));
-  }, [isAdmin, fetchTemplates]);
+  }, [isAdmin, fetchTemplates, fetchProvisional]);
+
+  const reviewAutoSummary = async (id: string, status: "approved" | "rejected") => {
+    setReviewingId(id);
+    setReviewMessage(null);
+    try {
+      const response = await fetch("/api/admin/provisional-insights", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setReviewMessage({ kind: "error", text: data.error ?? `Review failed (${response.status})` });
+        return;
+      }
+      setProvisional(await fetchProvisional());
+      setReviewMessage({ kind: "ok", text: status === "approved" ? "AI summary approved." : "AI summary rejected." });
+    } catch {
+      setReviewMessage({ kind: "error", text: "Could not save the review. Please try again." });
+    } finally {
+      setReviewingId(null);
+    }
+  };
 
   const run = async (kind: "save" | "draft", request: () => Promise<Response>) => {
     setBusy(kind);
@@ -160,8 +197,8 @@ export default function InsightsAdminPage() {
       <header>
         <h1 className="text-[22px] font-bold text-[#16324F] lg:text-4xl">Insight Summaries</h1>
         <p className="mt-1 text-sm text-[#5D7EA1]">
-          Text shown on a player&apos;s stats page. Only <strong>approved</strong> rows are ever served;
-          Gemini drafts are stored unapproved and never reach a player on their own.
+          Approved templates take priority. When a published quiz has no approved summary,
+          Gemini may summarize each distinct answer pattern with a clear awaiting-review label.
         </p>
       </header>
 
@@ -269,6 +306,68 @@ export default function InsightsAdminPage() {
             </span>
           )}
         </div>
+      </section>
+
+      <section className="nq-card space-y-3 rounded-[24px] p-5 md:rounded-[28px] md:p-7">
+        <h2 className="text-[17px] font-bold text-[#16324F]">Automatic AI summaries ({provisional.length})</h2>
+        <p className="text-sm text-[#5D7EA1]">
+          When no approved template matches, provisional text is visible to players with an AI label. Approve it to remove the label,
+          or reject it to hide it for that answer pattern. The same answer pattern reuses one summary.
+        </p>
+        {reviewMessage && (
+          <p role="status" className={`text-sm font-medium ${reviewMessage.kind === "error" ? "text-[#D63A3D]" : "text-[#0D6B54]"}`}>
+            {reviewMessage.text}
+          </p>
+        )}
+        {provisional.length === 0 && <p className="text-sm text-[#5D7EA1]">No automatic summaries yet.</p>}
+        {provisional.map((item) => (
+          <div key={item.id} className="space-y-2 rounded-[18px] border border-[#0460A9]/12 p-4">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[#5D7EA1]">
+              <span className={`rounded-full px-2 py-0.5 font-semibold ${item.status === "approved" ? STATUS_THEME.approved : item.status === "rejected" ? "bg-[#D63A3D]/10 text-[#D63A3D]" : STATUS_THEME.draft}`}>
+                {item.status}
+              </span>
+              <span>{item.quiz_name}</span>
+              <span>· {item.locale.toUpperCase()}</span>
+              <span>· {item.audience}</span>
+              <span>· pattern {item.answer_signature.slice(0, 8)}</span>
+              {item.model && <span>· 🤖 {item.model}</span>}
+            </div>
+            <p className="text-sm font-bold text-[#16324F]">{item.headline}</p>
+            <p className="text-sm text-[#5D7EA1]">{item.body}</p>
+            {item.suggestion && <p className="text-sm text-[#0D6B54]">👉 {item.suggestion}</p>}
+            {item.answer_context?.answers?.length ? (
+              <details className="rounded-xl bg-[#F4F8FC] p-3 text-xs text-[#45627E]">
+                <summary className="cursor-pointer font-semibold">Review recorded answers and answer key ({item.answer_context.answers.length})</summary>
+                <ol className="mt-3 list-decimal space-y-3 pl-5">
+                  {item.answer_context.answers.map((answer, index) => (
+                    <li key={`${index}-${answer.question}`}>
+                      <p className="font-semibold">{answer.question}</p>
+                      <p>Selected: {answer.selected} · {answer.selectedAligned ? "aligned" : "off target"}</p>
+                      {answer.selectedExplanation && <p>Explanation: {answer.selectedExplanation}</p>}
+                      {answer.alignedChoices.map((choice, choiceIndex) => (
+                        <p key={choiceIndex}>Aligned answer: {choice.text}{choice.explanation ? ` — ${choice.explanation}` : ""}</p>
+                      ))}
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            ) : null}
+            <div className="flex gap-2 pt-1">
+              {item.status !== "approved" && (
+                <button type="button" disabled={reviewingId !== null} onClick={() => reviewAutoSummary(item.id, "approved")}
+                  className="rounded-full bg-[#0D8C6D] px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">
+                  Approve
+                </button>
+              )}
+              {item.status !== "rejected" && (
+                <button type="button" disabled={reviewingId !== null} onClick={() => reviewAutoSummary(item.id, "rejected")}
+                  className="rounded-full border border-[#D63A3D]/30 px-3 py-1 text-xs font-semibold text-[#D63A3D] disabled:opacity-40">
+                  Reject
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
       </section>
 
       <section className="nq-card space-y-3 rounded-[24px] p-5 md:rounded-[28px] md:p-7">

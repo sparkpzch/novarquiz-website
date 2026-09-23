@@ -39,7 +39,7 @@ env:
     availability:
       - RUNTIME
 
-  # Gemini is called only from the server-side insight drafting route.
+  # Gemini drafts CMS copy and provisional feedback from recorded choices and answer keys.
   - variable: GEMINI_API_KEY
     secret: GEMINI_API_KEY
     availability:
