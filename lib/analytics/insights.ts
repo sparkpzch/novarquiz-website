@@ -58,6 +58,18 @@ export type InsightTemplate = {
 /** What a player is shown. A strict subset of the template — no review metadata. */
 export type InsightSummary = Pick<InsightTemplate, 'headline' | 'body' | 'suggestion'>;
 
+/**
+ * A reviewed explanation tied to an answer the current player actually chose.
+ * This is resolved locally from user_answers + choices; it is never generated
+ * from personal data at request time.
+ */
+export type ChoiceInsight = {
+  question: string;
+  choice: string;
+  reason: string;
+  signal: 'incorrect' | 'off_target';
+};
+
 export const HEADLINE_MAX = 120;
 // 200, not 400: at 400 a Thai body runs ~6 lines on a phone and pushes the
 // gauge and the topic bars off the first screen. This bound is enforced twice —

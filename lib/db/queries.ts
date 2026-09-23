@@ -19,8 +19,9 @@ import {
   type HcpVectorMap,
   type IntendedAudience,
 } from '../analytics/hcp';
-import { ANY_ARCHETYPE, pickInsightTemplate } from '../analytics/insights';
+import { pickInsightTemplate } from '../analytics/insights';
 import type {
+  ChoiceInsight,
   DraftScenario,
   InsightLocale,
   InsightReviewStatus,
@@ -1705,6 +1706,56 @@ export async function getUserHealthStatsInput(userId: string): Promise<HealthSta
 }
 
 // ===================== Insight templates =====================
+
+/**
+ * Pick one reviewed, non-positive answer from the player's latest quiz topic.
+ * confidence_weight is the author's "Insight Impact", so a medically or
+ * educationally important miss wins over an incidental one. Negative utility
+ * is an incorrect choice; zero utility is useful but off-target/neutral.
+ */
+export async function getUserChoiceInsight(
+  userId: string,
+  quizId: string,
+): Promise<ChoiceInsight | null> {
+  const layered = await hasLayeredAnalyticsSchema();
+  const result = await queryWithRetry<{
+    question_text: string;
+    choice_text: string;
+    explanation: string;
+    utility_score: number;
+  }>(
+    `WITH latest AS (
+       SELECT DISTINCT ON (ua.session_id, ua.question_id)
+              ua.question_id, ua.chosen_label, ua.utility_score, ua.answered_at
+       FROM user_answers ua
+       WHERE ua.user_id = $1
+       ORDER BY ua.session_id, ua.question_id, ua.answered_at DESC
+     )
+     SELECT q.question_text, c.choice_text, c.explanation, latest.utility_score
+     FROM latest
+     JOIN questions q ON q.id = latest.question_id
+     JOIN choices c
+       ON c.question_id = latest.question_id AND c.label = latest.chosen_label
+     WHERE q.session_id = $2
+       AND latest.utility_score <= 0
+       AND NULLIF(BTRIM(c.explanation), '') IS NOT NULL
+       ${layered ? "AND c.review_status = 'approved'" : ''}
+     ORDER BY ${layered ? 'c.confidence_weight DESC,' : ''}
+              latest.utility_score ASC,
+              latest.answered_at DESC
+     LIMIT 1`,
+    [userId, quizId],
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    question: row.question_text,
+    choice: row.choice_text,
+    reason: row.explanation.trim(),
+    signal: row.utility_score < 0 ? 'incorrect' : 'off_target',
+  };
+}
 
 // Same lazy probe as hasLayeredAnalyticsSchema(): the app has to keep working
 // on a database where migration 010 has not been applied yet.

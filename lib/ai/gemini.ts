@@ -53,6 +53,15 @@ export async function generateText(prompt: string): Promise<string> {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              headline: { type: 'STRING' },
+              body: { type: 'STRING' },
+              suggestion: { type: 'STRING' },
+            },
+            required: ['headline', 'body', 'suggestion'],
+          },
           temperature: 0.4,
           maxOutputTokens: 600,
         },

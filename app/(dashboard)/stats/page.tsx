@@ -7,10 +7,13 @@ import { Trans, useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { WEAK_TOPIC_THRESHOLD, type HealthStats } from "@/lib/stats/health";
 import { summarizeGameStats } from "@/lib/stats/game";
-import type { InsightSummary } from "@/lib/analytics/insights";
+import type { ChoiceInsight, InsightSummary } from "@/lib/analytics/insights";
 
 /** health-stats returns the aggregate plus whichever reviewed summary matched. */
-type StatsResponse = HealthStats & { summary: InsightSummary | null };
+type StatsResponse = HealthStats & {
+  choiceInsight: ChoiceInsight | null;
+  summary: InsightSummary | null;
+};
 
 type HistoryEntry = {
   session_id: string;
@@ -143,7 +146,7 @@ function KnowledgeGauge({ stats }: { stats: HealthStats }) {
 
 function InsightCard({ stats }: { stats: StatsResponse }) {
   const { t } = useTranslation();
-  const { summary, archetype, weakestTopic } = stats;
+  const { choiceInsight, summary, archetype, weakestTopic } = stats;
   const hl = <span className="text-[#E67E22]" />;
 
   return (
@@ -152,10 +155,32 @@ function InsightCard({ stats }: { stats: StatsResponse }) {
         {t("stats.insight_label")}
       </p>
 
-      {/* A reviewed summary wins. Without one we fall back to the behavioural
-          segment, then to the plain weakest-topic line — every branch is text
-          the app itself owns, none of it generated at request time. */}
-      {summary ? (
+      {/* A reviewed explanation tied to the player's actual choice wins. The
+          generic reviewed summary remains the fallback, followed by the
+          behavioural segment and the plain weakest-topic line. */}
+      {choiceInsight ? (
+        <>
+          <h2 className="nq-insight-headline font-display text-[26px] font-bold leading-tight tracking-tight md:text-[34px]">
+            {t(
+              choiceInsight.signal === "incorrect"
+                ? "stats.insight_choice_incorrect"
+                : "stats.insight_choice_off_target",
+              { choice: choiceInsight.choice },
+            )}
+          </h2>
+          <div className="rounded-[16px] border border-[#0460A9]/12 bg-[#F4F8FD] px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#5D7EA1]">
+              {t("stats.insight_question")}
+            </p>
+            <p className="mt-1 text-sm font-semibold leading-relaxed text-[#16324F] md:text-[15px]">
+              {choiceInsight.question}
+            </p>
+          </div>
+          <p className="nq-insight-body text-[15px] font-medium leading-relaxed md:text-[17px]">
+            {choiceInsight.reason}
+          </p>
+        </>
+      ) : summary ? (
         <>
           <h2 className="nq-insight-headline font-display text-[26px] font-bold leading-tight tracking-tight md:text-[34px]">
             {summary.headline}

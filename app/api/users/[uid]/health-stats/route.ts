@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
-import { getApprovedInsightSummary, getUserHealthStatsInput } from '@/lib/db/queries';
+import {
+  getApprovedInsightSummary,
+  getUserChoiceInsight,
+  getUserHealthStatsInput,
+} from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { summarizeHealthStats } from '@/lib/stats/health';
 import { INSIGHT_LOCALES } from '@/lib/analytics/insights';
@@ -33,6 +37,13 @@ export async function GET(
     const input = await getUserHealthStatsInput(uid);
     const stats = summarizeHealthStats(input);
 
+    // Prefer a reviewed explanation for a choice this player actually made.
+    // This includes both negative choices and zero-impact choices that were
+    // reasonable but did not answer the question's learning objective.
+    const choiceInsight = stats.latestTopic
+      ? await getUserChoiceInsight(uid, stats.latestTopic.quiz_id)
+      : null;
+
     // The narrative is looked up, never generated here: only rows a human
     // approved in the CMS can reach a player. No approved match is a normal
     // outcome — the page falls back to its own rule-based line.
@@ -52,7 +63,7 @@ export async function GET(
         })
       : null;
 
-    return NextResponse.json({ ...stats, summary });
+    return NextResponse.json({ ...stats, choiceInsight, summary });
   } catch (err) {
     console.error('health-stats failed:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
