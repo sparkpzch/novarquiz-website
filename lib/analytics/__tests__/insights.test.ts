@@ -11,6 +11,7 @@ import {
   buildInsightPrompt,
   parseDraftResponse,
   validateInsightDraft,
+  validateInsightLanguage,
 } from '../insights';
 
 const good = {
@@ -68,6 +69,14 @@ test('parseDraftResponse reports non-JSON rather than throwing', () => {
   const result = parseDraftResponse('Sure! Here is your summary.');
   assert.equal(result.ok, false);
   assert.equal(result.ok === false && result.reason, 'response was not valid JSON');
+});
+
+test('AI draft language matches its selected locale', () => {
+  assert.equal(validateInsightLanguage(good, 'th'), true);
+  assert.equal(validateInsightLanguage(good, 'en'), false);
+  const english = { headline: 'Review your choices', body: 'Check the explanation for each answer before your next quiz.', suggestion: 'Read the answer key once more.' };
+  assert.equal(validateInsightLanguage(english, 'en'), true);
+  assert.equal(validateInsightLanguage(english, 'th'), false);
 });
 
 const scenario = {

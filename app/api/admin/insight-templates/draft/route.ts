@@ -9,6 +9,7 @@ import {
   INSIGHT_LOCALES,
   buildInsightPrompt,
   parseDraftResponse,
+  validateInsightLanguage,
 } from '@/lib/analytics/insights';
 import { GeminiError, generateText, geminiModel, isGeminiConfigured } from '@/lib/ai/gemini';
 
@@ -76,8 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     const audience = context.audience === 'hcp' ? 'hcp' : 'public';
-    const text = await generateText(
-      buildInsightPrompt({
+    const prompt = buildInsightPrompt({
         quizName: context.quizName,
         quizDescription: context.quizDescription,
         archetypeId,
@@ -85,11 +85,18 @@ export async function POST(request: NextRequest) {
         audience,
         locale,
         scenarios: context.scenarios,
-      }),
-    );
+      });
 
-    const draft = parseDraftResponse(text);
+    let draft = parseDraftResponse(await generateText(prompt));
+    if (draft.ok && !validateInsightLanguage(draft.value, locale)) {
+      draft = parseDraftResponse(await generateText(
+        `${prompt}\n\nReturn the JSON again. Every value MUST be in ${locale === 'th' ? 'Thai' : 'English'}.`,
+      ));
+    }
     if (!draft.ok) return NextResponse.json({ error: `Rejected draft: ${draft.reason}` }, { status: 422 });
+    if (!validateInsightLanguage(draft.value, locale)) {
+      return NextResponse.json({ error: `Rejected draft: response is not in ${locale === 'th' ? 'Thai' : 'English'}` }, { status: 422 });
+    }
 
     const template = await upsertInsightTemplate({
       quizId,

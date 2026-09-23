@@ -1,4 +1,4 @@
-import type { ChoiceInsight, InsightLocale, InsightSummary } from './insights';
+import { matchesInsightLanguage, type ChoiceInsight, type InsightLocale, type InsightSummary } from './insights';
 
 export type PersonalFeedback = {
   headline: string;
@@ -20,7 +20,7 @@ export function composePersonalFeedback(input: {
   const { choiceInsight, summary, latestTopic, locale } = input;
   const reviewStatus = input.summaryStatus === 'provisional' ? 'provisional' : 'approved';
 
-  if (choiceInsight) {
+  if (choiceInsight && matchesInsightLanguage(choiceInsight.reason, locale)) {
     const headline = locale === 'th'
       ? choiceInsight.signal === 'incorrect'
         ? `คำตอบ “${choiceInsight.choice}” ยังไม่สอดคล้องกับเป้าหมายของข้อนี้`

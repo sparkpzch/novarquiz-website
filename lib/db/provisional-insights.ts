@@ -121,6 +121,17 @@ export async function getProvisionalInsight(
   return result.rows[0] ?? null;
 }
 
+/** A model can ignore the requested language. Reclaim only unreviewed text. */
+export async function invalidateProvisionalLanguage(id: string): Promise<void> {
+  await queryWithRetry(
+    `UPDATE provisional_insight_summaries
+     SET status = 'failed', updated_at = now() - interval '16 minutes'
+     WHERE id = $1 AND status = 'provisional'`,
+    [id],
+    { allowWriteRetry: true },
+  );
+}
+
 /** Claim a single model call across app instances; rejected rows never retry. */
 export async function claimProvisionalInsight(
   quizId: string,

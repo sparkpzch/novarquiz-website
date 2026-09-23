@@ -37,11 +37,29 @@ test('does not repeat identical answer explanation and summary body', () => {
     choiceInsight: answer,
     summary: { ...approvedSummary, body: answer.reason },
     latestTopic: null,
-    locale: 'th',
+    locale: 'en',
   });
 
   assert.equal(feedback?.context, null);
   assert.match(feedback?.headline ?? '', /Wait and see/);
+});
+
+test('uses Thai summary prose when the reviewed choice explanation is English', () => {
+  const thaiSummary = {
+    headline: 'ทบทวนคำตอบของคุณ',
+    body: 'ลองอ่านเฉลยของข้อนี้และเปรียบเทียบเหตุผลของแต่ละตัวเลือกก่อนทำแบบทดสอบอีกครั้ง',
+    suggestion: 'ทบทวนคำอธิบายของแต่ละข้อ',
+  };
+  const feedback = composePersonalFeedback({
+    choiceInsight: answer,
+    summary: thaiSummary,
+    summaryStatus: 'provisional',
+    latestTopic: { name: 'A quiz', score: 50 },
+    locale: 'th',
+  });
+  assert.equal(feedback?.body, thaiSummary.body);
+  assert.equal(feedback?.headline, thaiSummary.headline);
+  assert.equal(feedback?.reviewStatus, 'provisional');
 });
 
 test('uses approved summary, then a score-only fallback when no answer explanation exists', () => {

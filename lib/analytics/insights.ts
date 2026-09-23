@@ -181,6 +181,25 @@ export function parseDraftResponse(text: string): DraftValidation {
   }
 }
 
+export function matchesInsightLanguage(value: string, locale: InsightLocale): boolean {
+  const thai = (value.match(/[\u0E01-\u0E5B]/g) ?? []).length;
+  const latin = (value.match(/[A-Za-z]/g) ?? []).length;
+  return locale === 'th'
+    ? thai >= 2 && thai >= latin * 0.15
+    : latin >= 3 && latin >= thai * 0.5;
+}
+
+/** Check the generated prose, not the quiz source, before saving an AI draft. */
+export function validateInsightLanguage(summary: InsightSummary, locale: InsightLocale): boolean {
+  const fields = [summary.headline, summary.body, summary.suggestion].filter((value): value is string => Boolean(value));
+  return fields.every((value, index) => {
+    const thai = (value.match(/[\u0E01-\u0E5B]/g) ?? []).length;
+    const latin = (value.match(/[A-Za-z]/g) ?? []).length;
+    const minimum = index === 1 ? 12 : 2;
+    return matchesInsightLanguage(value, locale) && (locale === 'th' ? thai >= minimum : latin >= (index === 1 ? 15 : 3));
+  });
+}
+
 // ── Prompt ──────────────────────────────────────────────────────────────────
 
 /** One quiz scenario and every authored answer the model may compare. */
@@ -241,7 +260,10 @@ export function buildInsightPrompt(context: DraftContext): string {
     context.clinicalTag ? `Topic they most often got wrong: ${context.clinicalTag}` : '',
     '',
     'Rules:',
-    `- Write in ${language}, in plain everyday words. No clinical jargon.`,
+    `- Write headline, body, and suggestion in ${language}, in plain everyday words. No clinical jargon.`,
+    context.locale === 'th'
+      ? '- สำคัญ: ทั้งสามช่องต้องเป็นภาษาไทย แม้คำถามหรือคำตอบต้นทางจะเป็นภาษาอังกฤษ'
+      : '- Important: all three fields must be in English even when the quiz source is Thai.',
     '- Describe what their ANSWERS showed. Never state or imply that they have a condition.',
     '- Never name a medicine, a dose, or tell them to start, stop or change any treatment.',
     '- Do not introduce any fact that is not in the list above.',

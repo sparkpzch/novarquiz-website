@@ -1,11 +1,13 @@
 import { answerPatternSignature, buildProvisionalInsightPrompt, parseProvisionalInsight } from '../analytics/provisional-insights';
 import type { InsightLocale, InsightSummary } from '../analytics/insights';
+import { validateInsightLanguage } from '../analytics/insights';
 import {
   claimProvisionalInsight,
   failProvisionalInsight,
   finishProvisionalInsight,
   getProvisionalInsight,
   getUserAnswerReviewContext,
+  invalidateProvisionalLanguage,
 } from '../db/provisional-insights';
 import { generateText, geminiModel, isGeminiConfigured } from './gemini';
 
@@ -33,10 +35,12 @@ export async function getOrGenerateProvisionalInsight(input: {
 
   const existing = await getProvisionalInsight(input.quizId, input.audience, input.locale, answerSignature);
   if (existing) {
-    return {
-      summary: { headline: existing.headline, body: existing.body, suggestion: existing.suggestion },
-      status: existing.status as 'provisional' | 'approved',
-    };
+    const summary = { headline: existing.headline, body: existing.body, suggestion: existing.suggestion };
+    if (validateInsightLanguage(summary, input.locale)) {
+      return { summary, status: existing.status as 'provisional' | 'approved' };
+    }
+    if (existing.status === 'approved') return null;
+    await invalidateProvisionalLanguage(existing.id);
   }
   if (!isGeminiConfigured()) return null;
 
@@ -44,11 +48,15 @@ export async function getOrGenerateProvisionalInsight(input: {
   if (!claim) return null;
 
   try {
-    const drafted = parseProvisionalInsight(await generateText(buildProvisionalInsightPrompt({
+    const prompt = buildProvisionalInsightPrompt({
       ...context,
       audience: input.audience,
       locale: input.locale,
-    })));
+    });
+    let drafted = parseProvisionalInsight(await generateText(prompt), input.locale);
+    if (!drafted.ok && drafted.reason.startsWith('summary is not in ')) {
+      drafted = parseProvisionalInsight(await generateText(`${prompt}\n\nReturn the JSON again. Every value MUST be in ${input.locale === 'th' ? 'Thai' : 'English'}.`), input.locale);
+    }
     if (!drafted.ok) {
       console.warn(`Provisional insight rejected: ${drafted.reason}`);
       await failProvisionalInsight(claim.id, claim.claim_token);

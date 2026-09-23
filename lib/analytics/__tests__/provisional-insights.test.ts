@@ -28,10 +28,19 @@ test('provisional prompt contains the recorded selection, key and explanation, b
 
 test('accepts feedback about a selected answer but rejects invented score and medical claims', () => {
   const general = { headline: 'อ่านฉลากให้ครบ', body: 'ลองดูปริมาณต่อหนึ่งหน่วยบริโภคในตารางก่อนเปรียบเทียบผลิตภัณฑ์', suggestion: 'ทบทวนคำอธิบายของแต่ละข้อ' };
-  assert.equal(parseProvisionalInsight(JSON.stringify(general)).ok, true);
-  assert.equal(parseProvisionalInsight(JSON.stringify({ ...general, body: 'คุณเลือกดูแค่หน้าซอง' })).ok, true);
-  assert.equal(parseProvisionalInsight(JSON.stringify({ ...general, body: 'You scored poorly on this quiz.' })).ok, false);
-  assert.equal(parseProvisionalInsight(JSON.stringify({ ...general, body: 'คุณมีอาการของโรคนี้' })).ok, false);
+  assert.equal(parseProvisionalInsight(JSON.stringify(general), 'th').ok, true);
+  assert.equal(parseProvisionalInsight(JSON.stringify({ ...general, body: 'คุณเลือกดูแค่หน้าซองและควรอ่านปริมาณต่อหน่วยบริโภค' }), 'th').ok, true);
+  assert.equal(parseProvisionalInsight(JSON.stringify({ ...general, body: 'You scored poorly on this quiz.' }), 'th').ok, false);
+  assert.equal(parseProvisionalInsight(JSON.stringify({ ...general, body: 'คุณมีอาการของโรคนี้' }), 'th').ok, false);
+});
+
+test('rejects an English summary for Thai and a Thai summary for English', () => {
+  const thai = { headline: 'อ่านฉลากให้ครบ', body: 'ลองดูปริมาณต่อหนึ่งหน่วยบริโภคในตารางก่อนเปรียบเทียบผลิตภัณฑ์', suggestion: 'ทบทวนคำอธิบายของแต่ละข้อ' };
+  const english = { headline: 'Read the whole label', body: 'Check the serving size in the nutrition table before comparing products.', suggestion: 'Review each answer explanation.' };
+  assert.equal(parseProvisionalInsight(JSON.stringify(thai), 'th').ok, true);
+  assert.equal(parseProvisionalInsight(JSON.stringify(english), 'en').ok, true);
+  assert.equal(parseProvisionalInsight(JSON.stringify(english), 'th').ok, false);
+  assert.equal(parseProvisionalInsight(JSON.stringify(thai), 'en').ok, false);
 });
 
 test('cache signature changes with the selected answer and source explanation', () => {

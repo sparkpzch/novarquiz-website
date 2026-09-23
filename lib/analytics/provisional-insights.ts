@@ -1,8 +1,10 @@
+import { createHash } from 'node:crypto';
 import {
   BODY_MAX,
   HEADLINE_MAX,
   SUGGESTION_MAX,
   parseDraftResponse,
+  validateInsightLanguage,
   type InsightLocale,
   type InsightSummary,
 } from './insights';
@@ -44,7 +46,10 @@ export function buildProvisionalInsightPrompt(context: AnswerReviewContext & {
     'Do not infer medical conditions, clinical competence, knowledge level, or intent from these answers.',
     'Do not name a medicine, a dose, or recommend a diagnosis or treatment change.',
     'Do not add facts beyond the authored quiz material. Keep the next step educational.',
-    `Write in ${language}, with plain, calm language.`,
+    `Write every JSON text field (headline, body, suggestion) in ${language}, with plain, calm language.`,
+    context.locale === 'th'
+      ? 'สำคัญ: เขียน headline, body และ suggestion เป็นภาษาไทยทั้งหมด แม้ข้อมูลต้นทางจะเป็นภาษาอังกฤษ'
+      : 'Important: write headline, body, and suggestion in English even if the source material is Thai.',
     `headline: at most ${HEADLINE_MAX} characters.`,
     `body: 2-3 sentences, at most ${BODY_MAX} characters.`,
     `suggestion: one educational next step, at most ${SUGGESTION_MAX} characters.`,
@@ -54,7 +59,7 @@ export function buildProvisionalInsightPrompt(context: AnswerReviewContext & {
 
 /** Personal claims are allowed only for recorded answers; the prompt limits
  * the source and this validator rejects unsupported score/medical claims. */
-export function parseProvisionalInsight(text: string): { ok: true; value: InsightSummary } | { ok: false; reason: string } {
+export function parseProvisionalInsight(text: string, locale: InsightLocale): { ok: true; value: InsightSummary } | { ok: false; reason: string } {
   const parsed = parseDraftResponse(text);
   if (!parsed.ok) return parsed;
   const joined = `${parsed.value.headline}\n${parsed.value.body}\n${parsed.value.suggestion ?? ''}`;
@@ -62,6 +67,8 @@ export function parseProvisionalInsight(text: string): { ok: true; value: Insigh
       /คุณ(ได้คะแนน|มีอาการ|เป็นโรค)|คะแนนของคุณ/.test(joined)) {
     return { ok: false, reason: 'summary invents a score or medical state' };
   }
+  if (!validateInsightLanguage(parsed.value, locale)) {
+    return { ok: false, reason: `summary is not in ${locale === 'th' ? 'Thai' : 'English'}` };
+  }
   return parsed;
 }
-import { createHash } from 'node:crypto';

@@ -1423,7 +1423,7 @@ export default function MedicalAnalyticsDashboard({
   const dominantVector = insights?.dominant_vector || 'balanced_clinician';
 
   return (
-    <div className="w-full min-h-screen bg-[#F4F8FC] text-[#16324F] font-sans antialiased p-3 sm:p-5 md:p-6 lg:p-8 space-y-6">
+    <div className="nq-full-report w-full min-h-screen bg-[#F4F8FC] text-[#16324F] font-sans antialiased p-3 sm:p-5 md:p-6 lg:p-8 space-y-6">
 
       {/* =============================================================
           1. TOP: SESSION OVERVIEW COMPONENT (Merged Single-View Header)
@@ -1479,7 +1479,7 @@ export default function MedicalAnalyticsDashboard({
             <button
               onClick={() => setShowCompareModal(true)}
               className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all border shadow-2xs ${selectedCompareSession
-                ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
+                ? 'nq-report-dark-panel bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
                 : 'bg-[#F8FAFC] text-[#16324F] border-[#0460A9]/20 hover:bg-[#EBF3FA]'
                 }`}
               title="Compare with another session in this same quiz"
@@ -1511,7 +1511,7 @@ export default function MedicalAnalyticsDashboard({
 
         {/* Row 1.5: ACTIVE SESSION BENCHMARK COMPARISON BANNER */}
         {selectedCompareSession && benchmarkComparisonMetrics && (
-          <div className="rounded-2xl bg-gradient-to-r from-indigo-900 via-indigo-950 to-[#16324F] text-white p-4 sm:p-5 shadow-lg border border-indigo-500/30 space-y-3.5 animate-fadeIn">
+          <div className="nq-report-dark-panel rounded-2xl bg-gradient-to-r from-indigo-900 via-indigo-950 to-[#16324F] text-white p-4 sm:p-5 shadow-lg border border-indigo-500/30 space-y-3.5 animate-fadeIn">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-700/50 pb-3">
               <div className="flex items-center gap-2.5">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-white shadow-sm">
@@ -1625,7 +1625,7 @@ export default function MedicalAnalyticsDashboard({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
           {/* Card 1 (Leftmost): Whose Data Is Displayed */}
-          <div className="rounded-2xl bg-gradient-to-br from-[#0460A9] to-[#03508C] text-white p-4 shadow-sm flex flex-col justify-between">
+          <div className="nq-report-dark-panel rounded-2xl bg-gradient-to-br from-[#0460A9] to-[#03508C] text-white p-4 shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs text-white/80">
               <span className="font-bold uppercase tracking-wider text-[10px]">ACTIVE DATA SCOPE</span>
               <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded font-mono font-bold">

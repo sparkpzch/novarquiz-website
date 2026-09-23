@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/hooks/useAuth";
 import {
   ANY_ARCHETYPE,
@@ -34,6 +35,15 @@ const ARCHETYPE_LABELS: Record<string, string> = {
   balanced_clinician: "Balanced clinician",
 };
 
+const ARCHETYPE_LABELS_TH: Record<string, string> = {
+  [ANY_ARCHETYPE]: "ผู้เล่นทุกคน",
+  conservative_guideline_follower: "ใช้แนวทางอย่างระมัดระวัง",
+  evidence_seeking_early_adopter: "เปิดรับแนวทางใหม่โดยดูหลักฐาน",
+  qol_driven_prescriber: "คำนึงถึงคุณภาพชีวิต",
+  diagnostic_evidence_builder: "รวบรวมหลักฐานก่อนวินิจฉัย",
+  balanced_clinician: "พิจารณาหลายปัจจัยอย่างสมดุล",
+};
+
 const STATUS_THEME: Record<InsightReviewStatus, string> = {
   draft: "bg-[#FFB020]/20 text-[#8A5A00]",
   reviewed: "bg-[#0460A9]/12 text-[#0460A9]",
@@ -48,8 +58,33 @@ type Editor = {
 
 const EMPTY_EDITOR: Editor = { headline: "", body: "", suggestion: "" };
 
+const COPY = {
+  th: {
+    title: "สรุปผลแบบทดสอบ", intro: "ข้อความที่อนุมัติแล้วจะถูกใช้ก่อน หากแบบทดสอบที่เผยแพร่ยังไม่มีสรุป Gemini อาจสร้างสรุปตามชุดคำตอบและทำเครื่องหมายว่ารอตรวจทาน",
+    quiz: "แบบทดสอบ", global: "ใช้กับทุกแบบทดสอบ", archetype: "รูปแบบผู้เล่น", clinicalTag: "แท็กหัวข้อ (เว้นว่าง = ทุกหัวข้อ)", clinicalPlaceholder: "เช่น screening", language: "ภาษา", publicAudience: "ทั่วไป", hcpAudience: "บุคลากรสุขภาพ",
+    headline: "หัวข้อ", body: "เนื้อหา", suggestion: "คำแนะนำ", draft: "✨ ร่างด้วย Gemini", drafting: "กำลังร่าง…", save: "บันทึกเป็นฉบับร่าง", saving: "กำลังบันทึก…", pickQuiz: "เลือกแบบทดสอบก่อนสร้างร่าง",
+    draftReady: "สร้างร่างแล้ว กรุณาตรวจและอนุมัติ", saved: "บันทึกฉบับร่างแล้ว", approvedMessage: "อนุมัติสรุป AI แล้ว", rejectedMessage: "ปฏิเสธสรุป AI แล้ว", reviewError: "บันทึกผลตรวจไม่ได้ โปรดลองอีกครั้ง",
+    automatic: "สรุป AI อัตโนมัติ", automaticIntro: "เมื่อไม่มีข้อความที่อนุมัติแล้ว ผู้เล่นจะเห็นสรุปที่ยังไม่ผ่านการตรวจทานพร้อมป้าย AI อนุมัติเพื่อนำป้ายออก หรือปฏิเสธเพื่อซ่อนสรุปของชุดคำตอบนั้น", noneAutomatic: "ยังไม่มีสรุปอัตโนมัติ",
+    pattern: "ชุดคำตอบ", reviewAnswers: "ดูคำตอบและเฉลยที่ใช้สร้างสรุป", selected: "เลือก", aligned: "ตรงเป้าหมาย", offTarget: "ไม่ตรงเป้าหมาย", explanation: "คำอธิบาย", alignedAnswer: "เฉลยที่ตรงเป้าหมาย", approve: "อนุมัติ", reject: "ปฏิเสธ", unapprove: "ถอนการอนุมัติ", load: "นำเข้าแบบฟอร์ม", remove: "ลบ",
+    all: "สรุปที่เขียนไว้", noneTemplates: "ยังไม่มีสรุป ลองร่างหรือเขียนจากแบบฟอร์มด้านบน", quizScoped: "เฉพาะแบบทดสอบ", status: { draft: "ฉบับร่าง", reviewed: "ตรวจแล้ว", approved: "อนุมัติแล้ว", provisional: "รอตรวจทาน", rejected: "ปฏิเสธแล้ว" },
+  },
+  en: {
+    title: "Insight Summaries", intro: "Approved templates take priority. When a published quiz has no approved summary, Gemini may summarize each distinct answer pattern with an awaiting-review label.",
+    quiz: "Quiz", global: "Global (any quiz)", archetype: "Archetype", clinicalTag: "Clinical tag (blank = any)", clinicalPlaceholder: "e.g. screening", language: "Language", publicAudience: "public", hcpAudience: "HCP",
+    headline: "Headline", body: "Body", suggestion: "Suggestion", draft: "✨ Draft with Gemini", drafting: "Drafting…", save: "Save as draft", saving: "Saving…", pickQuiz: "Pick a quiz to draft from its authored text",
+    draftReady: "Draft written — review it, then approve.", saved: "Saved as draft.", approvedMessage: "AI summary approved.", rejectedMessage: "AI summary rejected.", reviewError: "Could not save the review. Please try again.",
+    automatic: "Automatic AI summaries", automaticIntro: "When no approved template matches, provisional text is visible with an AI label. Approve it to remove the label, or reject it to hide it for that answer pattern.", noneAutomatic: "No automatic summaries yet.",
+    pattern: "pattern", reviewAnswers: "Review recorded answers and answer key", selected: "Selected", aligned: "aligned", offTarget: "off target", explanation: "Explanation", alignedAnswer: "Aligned answer", approve: "Approve", reject: "Reject", unapprove: "Unapprove", load: "Load into editor", remove: "Delete",
+    all: "All summaries", noneTemplates: "Nothing yet. Draft or write one above.", quizScoped: "quiz-scoped", status: { draft: "draft", reviewed: "reviewed", approved: "approved", provisional: "provisional", rejected: "rejected" },
+  },
+} as const;
+
 export default function InsightsAdminPage() {
   const router = useRouter();
+  const { i18n } = useTranslation();
+  const language = i18n.language?.startsWith("th") ? "th" : "en";
+  const copy = COPY[language];
+  const archetypeLabels = language === "th" ? ARCHETYPE_LABELS_TH : ARCHETYPE_LABELS;
   const { isAdmin, loading: authLoading } = useAuth();
 
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -59,7 +94,7 @@ export default function InsightsAdminPage() {
   const [quizId, setQuizId] = useState<string>("");
   const [archetypeId, setArchetypeId] = useState<string>(ANY_ARCHETYPE);
   const [clinicalTag, setClinicalTag] = useState("");
-  const [locale, setLocale] = useState<InsightLocale>("th");
+  const [locale, setLocale] = useState<InsightLocale>(language);
   const [editor, setEditor] = useState<Editor>(EMPTY_EDITOR);
   const [busy, setBusy] = useState<"" | "save" | "draft">("");
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
@@ -68,6 +103,12 @@ export default function InsightsAdminPage() {
   useEffect(() => {
     if (!authLoading && !isAdmin) router.push("/");
   }, [authLoading, isAdmin, router]);
+
+  useEffect(() => {
+    const onLanguageChanged = (next: string) => setLocale(next.startsWith("th") ? "th" : "en");
+    i18n.on("languageChanged", onLanguageChanged);
+    return () => i18n.off("languageChanged", onLanguageChanged);
+  }, [i18n]);
 
   const fetchTemplates = useCallback(
     (): Promise<InsightTemplate[]> =>
@@ -110,9 +151,9 @@ export default function InsightsAdminPage() {
         return;
       }
       setProvisional(await fetchProvisional());
-      setReviewMessage({ kind: "ok", text: status === "approved" ? "AI summary approved." : "AI summary rejected." });
+      setReviewMessage({ kind: "ok", text: status === "approved" ? copy.approvedMessage : copy.rejectedMessage });
     } catch {
-      setReviewMessage({ kind: "error", text: "Could not save the review. Please try again." });
+      setReviewMessage({ kind: "error", text: copy.reviewError });
     } finally {
       setReviewingId(null);
     }
@@ -137,7 +178,7 @@ export default function InsightsAdminPage() {
       }
       setMessage({
         kind: "ok",
-        text: kind === "draft" ? "Draft written — review it, then approve." : "Saved as draft.",
+        text: kind === "draft" ? copy.draftReady : copy.saved,
       });
       setTemplates(await fetchTemplates());
     } finally {
@@ -190,27 +231,27 @@ export default function InsightsAdminPage() {
     setTemplates(await fetchTemplates());
   };
 
+  const visibleProvisional = provisional.filter((item) => item.locale === locale);
+  const visibleTemplates = templates.filter((item) => item.locale === locale);
+
   if (authLoading || !isAdmin) return null;
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       <header>
-        <h1 className="text-[22px] font-bold text-[#16324F] lg:text-4xl">Insight Summaries</h1>
-        <p className="mt-1 text-sm text-[#5D7EA1]">
-          Approved templates take priority. When a published quiz has no approved summary,
-          Gemini may summarize each distinct answer pattern with a clear awaiting-review label.
-        </p>
+        <h1 className="text-[22px] font-bold text-[#16324F] lg:text-4xl">{copy.title}</h1>
+        <p className="mt-1 text-sm text-[#5D7EA1]">{copy.intro}</p>
       </header>
 
       <section className="nq-card space-y-4 rounded-[24px] p-5 md:rounded-[28px] md:p-7">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Quiz">
+          <Field label={copy.quiz}>
             <select
               value={quizId}
               onChange={(e) => setQuizId(e.target.value)}
               className="nq-input w-full rounded-xl border border-[#0460A9]/20 px-3 py-2 text-sm"
             >
-              <option value="">Global (any quiz)</option>
+              <option value="">{copy.global}</option>
               {quizzes.map((quiz) => (
                 <option key={quiz.id} value={quiz.id}>
                   {quiz.name}
@@ -218,7 +259,7 @@ export default function InsightsAdminPage() {
               ))}
             </select>
           </Field>
-          <Field label="Archetype">
+          <Field label={copy.archetype}>
             <select
               value={archetypeId}
               onChange={(e) => setArchetypeId(e.target.value)}
@@ -226,35 +267,39 @@ export default function InsightsAdminPage() {
             >
               {ARCHETYPE_KEYS.map((id) => (
                 <option key={id} value={id}>
-                  {ARCHETYPE_LABELS[id]}
+                  {archetypeLabels[id]}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Clinical tag (blank = any)">
+          <Field label={copy.clinicalTag}>
             <input
               value={clinicalTag}
               onChange={(e) => setClinicalTag(e.target.value)}
-              placeholder="e.g. screening"
+              placeholder={copy.clinicalPlaceholder}
               className="nq-input w-full rounded-xl border border-[#0460A9]/20 px-3 py-2 text-sm"
             />
           </Field>
-          <Field label="Language">
+          <Field label={copy.language}>
             <select
               value={locale}
-              onChange={(e) => setLocale(e.target.value as InsightLocale)}
+              onChange={(e) => {
+                setLocale(e.target.value as InsightLocale);
+                setEditor(EMPTY_EDITOR);
+                setMessage(null);
+              }}
               className="nq-input w-full rounded-xl border border-[#0460A9]/20 px-3 py-2 text-sm"
             >
               {INSIGHT_LOCALES.map((code) => (
                 <option key={code} value={code}>
-                  {code.toUpperCase()}
+                  {code === "th" ? "ไทย (TH)" : "English (EN)"}
                 </option>
               ))}
             </select>
           </Field>
         </div>
 
-        <Field label={`Headline (${editor.headline.length}/${HEADLINE_MAX})`}>
+        <Field label={`${copy.headline} (${editor.headline.length}/${HEADLINE_MAX})`}>
           <input
             value={editor.headline}
             maxLength={HEADLINE_MAX}
@@ -262,7 +307,7 @@ export default function InsightsAdminPage() {
             className="nq-input w-full rounded-xl border border-[#0460A9]/20 px-3 py-2 text-sm"
           />
         </Field>
-        <Field label={`Body (${editor.body.length}/${BODY_MAX})`}>
+        <Field label={`${copy.body} (${editor.body.length}/${BODY_MAX})`}>
           <textarea
             value={editor.body}
             maxLength={BODY_MAX}
@@ -271,7 +316,7 @@ export default function InsightsAdminPage() {
             className="nq-input w-full rounded-xl border border-[#0460A9]/20 px-3 py-2 text-sm"
           />
         </Field>
-        <Field label={`Suggestion (${editor.suggestion.length}/${SUGGESTION_MAX})`}>
+        <Field label={`${copy.suggestion} (${editor.suggestion.length}/${SUGGESTION_MAX})`}>
           <input
             value={editor.suggestion}
             maxLength={SUGGESTION_MAX}
@@ -285,10 +330,10 @@ export default function InsightsAdminPage() {
             type="button"
             onClick={draft}
             disabled={!quizId || busy !== ""}
-            title={quizId ? "" : "Pick a quiz — a draft is grounded in that quiz's authored text"}
+            title={quizId ? "" : copy.pickQuiz}
             className="rounded-full border border-[#0460A9]/25 px-4 py-2 text-sm font-semibold text-[#0460A9] disabled:opacity-40"
           >
-            {busy === "draft" ? "Drafting…" : "✨ Draft with Gemini"}
+            {busy === "draft" ? copy.drafting : copy.draft}
           </button>
           <button
             type="button"
@@ -296,7 +341,7 @@ export default function InsightsAdminPage() {
             disabled={!editor.headline || !editor.body || busy !== ""}
             className="rounded-full bg-gradient-to-r from-[#0460A9] to-[#2F7FD0] px-5 py-2 text-sm font-semibold text-white disabled:opacity-40"
           >
-            {busy === "save" ? "Saving…" : "Save as draft"}
+            {busy === "save" ? copy.saving : copy.save}
           </button>
           {message && (
             <span
@@ -309,27 +354,24 @@ export default function InsightsAdminPage() {
       </section>
 
       <section className="nq-card space-y-3 rounded-[24px] p-5 md:rounded-[28px] md:p-7">
-        <h2 className="text-[17px] font-bold text-[#16324F]">Automatic AI summaries ({provisional.length})</h2>
-        <p className="text-sm text-[#5D7EA1]">
-          When no approved template matches, provisional text is visible to players with an AI label. Approve it to remove the label,
-          or reject it to hide it for that answer pattern. The same answer pattern reuses one summary.
-        </p>
+        <h2 className="text-[17px] font-bold text-[#16324F]">{copy.automatic} ({visibleProvisional.length})</h2>
+        <p className="text-sm text-[#5D7EA1]">{copy.automaticIntro}</p>
         {reviewMessage && (
           <p role="status" className={`text-sm font-medium ${reviewMessage.kind === "error" ? "text-[#D63A3D]" : "text-[#0D6B54]"}`}>
             {reviewMessage.text}
           </p>
         )}
-        {provisional.length === 0 && <p className="text-sm text-[#5D7EA1]">No automatic summaries yet.</p>}
-        {provisional.map((item) => (
+        {visibleProvisional.length === 0 && <p className="text-sm text-[#5D7EA1]">{copy.noneAutomatic}</p>}
+        {visibleProvisional.map((item) => (
           <div key={item.id} className="space-y-2 rounded-[18px] border border-[#0460A9]/12 p-4">
             <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[#5D7EA1]">
               <span className={`rounded-full px-2 py-0.5 font-semibold ${item.status === "approved" ? STATUS_THEME.approved : item.status === "rejected" ? "bg-[#D63A3D]/10 text-[#D63A3D]" : STATUS_THEME.draft}`}>
-                {item.status}
+                {copy.status[item.status as keyof typeof copy.status] ?? item.status}
               </span>
               <span>{item.quiz_name}</span>
               <span>· {item.locale.toUpperCase()}</span>
-              <span>· {item.audience}</span>
-              <span>· pattern {item.answer_signature.slice(0, 8)}</span>
+              <span>· {item.audience === "hcp" ? copy.hcpAudience : copy.publicAudience}</span>
+              <span>· {copy.pattern} {item.answer_signature.slice(0, 8)}</span>
               {item.model && <span>· 🤖 {item.model}</span>}
             </div>
             <p className="text-sm font-bold text-[#16324F]">{item.headline}</p>
@@ -337,15 +379,15 @@ export default function InsightsAdminPage() {
             {item.suggestion && <p className="text-sm text-[#0D6B54]">👉 {item.suggestion}</p>}
             {item.answer_context?.answers?.length ? (
               <details className="rounded-xl bg-[#F4F8FC] p-3 text-xs text-[#45627E]">
-                <summary className="cursor-pointer font-semibold">Review recorded answers and answer key ({item.answer_context.answers.length})</summary>
+                <summary className="cursor-pointer font-semibold">{copy.reviewAnswers} ({item.answer_context.answers.length})</summary>
                 <ol className="mt-3 list-decimal space-y-3 pl-5">
                   {item.answer_context.answers.map((answer, index) => (
                     <li key={`${index}-${answer.question}`}>
                       <p className="font-semibold">{answer.question}</p>
-                      <p>Selected: {answer.selected} · {answer.selectedAligned ? "aligned" : "off target"}</p>
-                      {answer.selectedExplanation && <p>Explanation: {answer.selectedExplanation}</p>}
+                      <p>{copy.selected}: {answer.selected} · {answer.selectedAligned ? copy.aligned : copy.offTarget}</p>
+                      {answer.selectedExplanation && <p>{copy.explanation}: {answer.selectedExplanation}</p>}
                       {answer.alignedChoices.map((choice, choiceIndex) => (
-                        <p key={choiceIndex}>Aligned answer: {choice.text}{choice.explanation ? ` — ${choice.explanation}` : ""}</p>
+                        <p key={choiceIndex}>{copy.alignedAnswer}: {choice.text}{choice.explanation ? ` — ${choice.explanation}` : ""}</p>
                       ))}
                     </li>
                   ))}
@@ -356,13 +398,13 @@ export default function InsightsAdminPage() {
               {item.status !== "approved" && (
                 <button type="button" disabled={reviewingId !== null} onClick={() => reviewAutoSummary(item.id, "approved")}
                   className="rounded-full bg-[#0D8C6D] px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">
-                  Approve
+                  {copy.approve}
                 </button>
               )}
               {item.status !== "rejected" && (
                 <button type="button" disabled={reviewingId !== null} onClick={() => reviewAutoSummary(item.id, "rejected")}
                   className="rounded-full border border-[#D63A3D]/30 px-3 py-1 text-xs font-semibold text-[#D63A3D] disabled:opacity-40">
-                  Reject
+                  {copy.reject}
                 </button>
               )}
             </div>
@@ -371,11 +413,11 @@ export default function InsightsAdminPage() {
       </section>
 
       <section className="nq-card space-y-3 rounded-[24px] p-5 md:rounded-[28px] md:p-7">
-        <h2 className="text-[17px] font-bold text-[#16324F]">All summaries ({templates.length})</h2>
-        {templates.length === 0 && (
-          <p className="text-sm text-[#5D7EA1]">Nothing yet. Draft or write one above.</p>
+        <h2 className="text-[17px] font-bold text-[#16324F]">{copy.all} ({visibleTemplates.length})</h2>
+        {visibleTemplates.length === 0 && (
+          <p className="text-sm text-[#5D7EA1]">{copy.noneTemplates}</p>
         )}
-        {templates.map((template) => (
+        {visibleTemplates.map((template) => (
           <motion.div
             key={template.id}
             initial={{ opacity: 0, y: 6 }}
@@ -384,13 +426,13 @@ export default function InsightsAdminPage() {
           >
             <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[#5D7EA1]">
               <span className={`rounded-full px-2 py-0.5 font-semibold ${STATUS_THEME[template.review_status]}`}>
-                {template.review_status}
+                {copy.status[template.review_status]}
               </span>
-              <span>{ARCHETYPE_LABELS[template.archetype_id] ?? template.archetype_id}</span>
+              <span>{archetypeLabels[template.archetype_id] ?? template.archetype_id}</span>
               <span>· {template.locale.toUpperCase()}</span>
-              <span>· {template.audience}</span>
+              <span>· {template.audience === "hcp" ? copy.hcpAudience : copy.publicAudience}</span>
               {template.clinical_tag && <span>· #{template.clinical_tag}</span>}
-              <span>· {template.quiz_id ? "quiz-scoped" : "global"}</span>
+              <span>· {template.quiz_id ? copy.quizScoped : copy.global}</span>
               {template.source === "llm_draft" && <span>· 🤖 {template.model}</span>}
             </div>
             <p className="text-sm font-bold text-[#16324F]">{template.headline}</p>
@@ -403,7 +445,7 @@ export default function InsightsAdminPage() {
                   onClick={() => review(template.id, "approved")}
                   className="rounded-full bg-[#0D8C6D] px-3 py-1 text-xs font-semibold text-white"
                 >
-                  Approve
+                  {copy.approve}
                 </button>
               )}
               {template.review_status === "approved" && (
@@ -412,7 +454,7 @@ export default function InsightsAdminPage() {
                   onClick={() => review(template.id, "draft")}
                   className="rounded-full border border-[#0460A9]/25 px-3 py-1 text-xs font-semibold text-[#0460A9]"
                 >
-                  Unapprove
+                  {copy.unapprove}
                 </button>
               )}
               <button
@@ -426,14 +468,14 @@ export default function InsightsAdminPage() {
                 }
                 className="rounded-full border border-[#0460A9]/25 px-3 py-1 text-xs font-semibold text-[#0460A9]"
               >
-                Load into editor
+                {copy.load}
               </button>
               <button
                 type="button"
                 onClick={() => remove(template.id)}
                 className="rounded-full border border-[#D63A3D]/30 px-3 py-1 text-xs font-semibold text-[#D63A3D]"
               >
-                Delete
+                {copy.remove}
               </button>
             </div>
           </motion.div>

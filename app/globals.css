@@ -1317,3 +1317,166 @@ body {
 
 .nq-dashboard-shell:not(.nq-theme-light) .nq-insight-question-label { color: #8fa9ca; }
 .nq-dashboard-shell:not(.nq-theme-light) .nq-insight-question-text { color: #eaf3ff; }
+
+/* Full report has its own surface hierarchy. Keep its small labels, tables,
+   status chips and the dark comparison panels legible in both themes. */
+.nq-dashboard-shell .nq-full-report {
+  --report-page: #0b1630;
+  --report-card: #172744;
+  --report-subtle: #203452;
+  --report-tint: #203c60;
+  --report-ink: #f2f7ff;
+  --report-muted: #bed0e7;
+  --report-accent: #8acbff;
+  --report-border: rgba(177, 205, 239, 0.24);
+  color-scheme: dark;
+  color: var(--report-ink) !important;
+  background: var(--report-page) !important;
+}
+
+.nq-dashboard-shell.nq-theme-light .nq-full-report {
+  --report-page: #eaf2fb;
+  --report-card: #ffffff;
+  --report-subtle: #f0f5fb;
+  --report-tint: #e4effb;
+  --report-ink: #142d49;
+  --report-muted: #49647e;
+  --report-accent: #075b95;
+  --report-border: rgba(36, 83, 127, 0.22);
+  color-scheme: light;
+}
+
+.nq-dashboard-shell .nq-full-report [class~="bg-white"] {
+  background-color: var(--report-card) !important;
+}
+
+.nq-dashboard-shell .nq-full-report [class~="bg-[#F8FAFC]"],
+.nq-dashboard-shell .nq-full-report [class~="bg-[#F4F8FC]"],
+.nq-dashboard-shell .nq-full-report [class~="bg-[#F4F8FC]/80"],
+.nq-dashboard-shell .nq-full-report [class~="bg-gray-50"],
+.nq-dashboard-shell .nq-full-report [class~="bg-gray-100"] {
+  background-color: var(--report-subtle) !important;
+}
+
+.nq-dashboard-shell .nq-full-report [class~="bg-[#EBF3FA]"],
+.nq-dashboard-shell .nq-full-report [class~="bg-white/70"] {
+  background-color: var(--report-tint) !important;
+}
+
+.nq-dashboard-shell .nq-full-report [class~="text-[#16324F]"],
+.nq-dashboard-shell .nq-full-report [class~="text-gray-700"],
+.nq-dashboard-shell .nq-full-report [class~="text-gray-800"] {
+  color: var(--report-ink) !important;
+}
+
+.nq-dashboard-shell .nq-full-report [class~="text-[#5D7EA1]"],
+.nq-dashboard-shell .nq-full-report [class~="text-gray-400"],
+.nq-dashboard-shell .nq-full-report [class~="text-gray-500"],
+.nq-dashboard-shell .nq-full-report [class~="text-gray-600"] {
+  color: var(--report-muted) !important;
+}
+
+.nq-dashboard-shell .nq-full-report [class~="text-[#0460A9]"],
+.nq-dashboard-shell .nq-full-report [class~="text-[#0284C7]"] {
+  color: var(--report-accent) !important;
+}
+
+.nq-dashboard-shell .nq-full-report [class~="border-[#0460A9]/10"],
+.nq-dashboard-shell .nq-full-report [class~="border-[#0460A9]/15"],
+.nq-dashboard-shell .nq-full-report [class~="border-[#0460A9]/20"],
+.nq-dashboard-shell .nq-full-report [class~="border-[#0460A9]/30"] {
+  border-color: var(--report-border) !important;
+}
+
+/* Status colours need a dark surface as well as brighter text. */
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-rose-50"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-rose-100"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-rose-100/90"] {
+  background-color: #442739 !important;
+}
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-amber-50"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-amber-100"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-amber-100/90"] {
+  background-color: #483821 !important;
+}
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-emerald-50"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-emerald-100"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-emerald-50/60"] {
+  background-color: #1b403c !important;
+}
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-sky-50"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-sky-50/70"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-sky-100"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-sky-100/90"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-indigo-50"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-indigo-50/80"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-indigo-50/30"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-indigo-100"] {
+  background-color: #243b61 !important;
+}
+
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-gray-200"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-gray-200/80"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-gray-100/90"] {
+  background-color: #344764 !important;
+}
+
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="border-gray-200"] {
+  border-color: var(--report-border) !important;
+}
+
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-rose-700"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-rose-800"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-rose-900"] { color: #ffb3bd !important; }
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-amber-700"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-amber-800"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-amber-900"] { color: #ffdc98 !important; }
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-emerald-700"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-emerald-800"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-emerald-900"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-[#0D8C6D]"] { color: #8ce1c6 !important; }
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-indigo-700"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-indigo-800"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-indigo-900"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-sky-700"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-sky-800"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-sky-900"] { color: #a9d5ff !important; }
+
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="from-rose-50/70"] {
+  background-image: linear-gradient(135deg, #34243c, #242e4a) !important;
+}
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="from-amber-50/70"] {
+  background-image: linear-gradient(135deg, #403528, #27334b) !important;
+}
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="from-sky-50/70"],
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="from-gray-50/70"] {
+  background-image: linear-gradient(135deg, #213a59, #1b2c49) !important;
+}
+
+/* Keep text white on the report's solid colour controls and dark panels. */
+.nq-dashboard-shell .nq-full-report .nq-report-dark-panel,
+.nq-dashboard-shell .nq-full-report .nq-report-dark-panel [class~="text-white"],
+.nq-dashboard-shell .nq-full-report [class~="text-white"][class~="bg-[#0460A9]"],
+.nq-dashboard-shell .nq-full-report [class~="text-white"][class~="bg-[#0D8C6D]"],
+.nq-dashboard-shell .nq-full-report [class~="text-white"][class~="bg-indigo-600"],
+.nq-dashboard-shell .nq-full-report [class~="text-white"][class~="bg-indigo-500"],
+.nq-dashboard-shell .nq-full-report [class~="text-white"][class~="bg-rose-500/80"],
+.nq-dashboard-shell .nq-full-report [class~="text-white"][class~="bg-rose-600"] {
+  color: #ffffff !important;
+}
+
+.nq-dashboard-shell .nq-full-report .nq-report-dark-panel [class~="bg-white/5"],
+.nq-dashboard-shell .nq-full-report .nq-report-dark-panel [class~="bg-white/10"],
+.nq-dashboard-shell .nq-full-report .nq-report-dark-panel [class~="bg-white/15"],
+.nq-dashboard-shell .nq-full-report .nq-report-dark-panel [class~="bg-white/20"],
+.nq-dashboard-shell .nq-full-report .nq-report-dark-panel [class~="bg-white/30"] {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.nq-dashboard-shell .nq-full-report [class~="bg-white"][class~="animate-pulse"] {
+  background-color: #ffffff !important;
+}
+
+.nq-dashboard-shell .nq-full-report [class~="hover:text-white"]:hover {
+  color: #ffffff !important;
+}
