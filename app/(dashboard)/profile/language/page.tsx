@@ -74,7 +74,6 @@ export default function LanguagePage() {
             className="flex w-full items-center justify-between gap-4 text-left"
           >
             <div className="flex items-center gap-4">
-              <span className="text-[2rem]">🇬🇧</span>
               <span className="text-xl font-medium text-[#202A3F]">{t("language.english")}</span>
             </div>
             <CheckMark active={i18n.language === "en"} />
@@ -86,7 +85,6 @@ export default function LanguagePage() {
             className="flex w-full items-center justify-between gap-4 text-left"
           >
             <div className="flex items-center gap-4">
-              <span className="text-[2rem]">🇹🇭</span>
               <span className="text-xl font-medium text-[#202A3F]">{t("language.thai")}</span>
             </div>
             <CheckMark active={i18n.language === "th"} />
