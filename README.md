@@ -94,10 +94,21 @@ The development app is available at [http://localhost:3000](http://localhost:300
 | `npm run build` | Production build |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
+| `npm run lint:ci` | Fail on ESLint errors beyond the recorded baseline |
+| `npm run typecheck` | Check TypeScript without emitting files |
+| `npm test` | Run unit tests |
 | `npm run migrate` | Apply migrations against `.env.local` |
 | `npm run migrate:neon` | Apply migrations against `.env.neon` |
 | `npm run db:up` / `npm run db:down` | Start / stop all Docker Compose services |
 | `npm run set-admin -- --email=user@example.com` | Grant Firebase admin claims |
+
+## CI/CD
+
+GitHub Actions runs lint regression checks, TypeScript, unit tests, and a production build for pull requests and pushes to `main`. The build uses placeholder environment variables and does not connect to the production database or Firebase project.
+
+`npm run lint` currently reports 32 existing errors. `npm run lint:ci` compares error counts by file and rule with `scripts/ci/lint-baseline.json` and fails when a count exceeds its baseline. Remove baseline entries as those errors are fixed.
+
+Firebase App Hosting is connected to this repository and automatically rolls out commits pushed to `main` to backend `novarquiz-website-sg`. Its rollout starts independently of the GitHub Actions result. Require the CI check before merging into `main` if production should receive only verified pull requests.
 
 ## Database Notes
 
@@ -155,7 +166,7 @@ The user must sign out and sign back in before the new custom claims take effect
 
 - Uses App Router conventions under `app/`.
 - Match existing code style; prefer surgical changes.
-- Run `npm run lint` and `npm run build` before opening a PR.
+- Run `npm run lint:ci`, `npm run typecheck`, `npm test`, and `npm run build` before opening a PR.
 - New API routes must include Zod validation and an appropriate rate limit.
 
 ## License
