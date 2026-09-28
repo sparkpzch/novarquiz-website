@@ -41,6 +41,8 @@ export default function CompareSessionsModal({
       }
       if (initialSelectedSessionIds && initialSelectedSessionIds.length > 0) {
         setSelectedSessionIds(initialSelectedSessionIds);
+      } else {
+        setSelectedSessionIds([]);
       }
     }
   }, [isOpen, initialQuizId, initialSelectedSessionIds, allQuizzes]);
@@ -58,20 +60,20 @@ export default function CompareSessionsModal({
   // Filter available quizzes to only those that have at least 1 session
   const quizzesWithSessions = useMemo(() => {
     return allQuizzes.map((q) => {
-      const sessionCount = allSessions.filter((s) => s.session_id === q.id).length;
+      const sessionCount = allSessions.filter((s) => String(s.session_id) === String(q.id)).length;
       return { ...q, sessionCount };
     });
   }, [allQuizzes, allSessions]);
 
   // Current active quiz object
   const activeQuiz = useMemo(() => {
-    return allQuizzes.find((q) => q.id === selectedQuizId) || null;
+    return allQuizzes.find((q) => String(q.id) === String(selectedQuizId)) || null;
   }, [allQuizzes, selectedQuizId]);
 
   // Sessions for currently selected quiz
   const sessionsForQuiz = useMemo(() => {
     if (!selectedQuizId) return [];
-    return allSessions.filter((s) => s.session_id === selectedQuizId);
+    return allSessions.filter((s) => String(s.session_id) === String(selectedQuizId));
   }, [allSessions, selectedQuizId]);
 
   // Filtered sessions
@@ -180,6 +182,11 @@ export default function CompareSessionsModal({
                         {q.name} ({q.sessionCount} session{q.sessionCount === 1 ? '' : 's'})
                       </option>
                     ))}
+                    {selectedQuizId && !quizzesWithSessions.some((q) => String(q.id) === String(selectedQuizId)) && (
+                      <option value={selectedQuizId}>
+                        {activeQuiz?.name || 'Selected Quiz'} ({sessionsForQuiz.length} session{sessionsForQuiz.length === 1 ? '' : 's'})
+                      </option>
+                    )}
                   </select>
                   <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-[#5D7EA1]">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

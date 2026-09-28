@@ -84,7 +84,13 @@ function ComparePageContent({ params }: { params: Promise<{ quizId: string }> })
       comparedSessions={data.comparedSessions}
       allQuizzes={allQuizzes}
       allSessions={allSessions}
-      onBack={() => router.push('/admin?tab=quizzes-manager')}
+      onBack={() => {
+        if (typeof window !== 'undefined' && window.history.length > 1) {
+          router.back();
+        } else {
+          router.push('/admin?tab=quizzes-manager');
+        }
+      }}
     />
   );
 }

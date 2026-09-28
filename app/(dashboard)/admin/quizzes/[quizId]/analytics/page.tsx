@@ -1,22 +1,18 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import QuizSessionsCompareView from '@/components/admin/QuizSessionsCompareView';
+import { useEffect, useState, use, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
+import type { Quiz } from '@/lib/types';
+import type { CompareSessionsModalProps } from '@/components/admin/CompareSessionsModal';
+import QuizOverallAnalyticsView, { type QuizOverallAnalyticsData } from '@/components/admin/QuizOverallAnalyticsView';
 
-function SessionCompareContent() {
+function QuizAnalyticsContent({ params }: { params: Promise<{ quizId: string }> }) {
+  const { quizId } = use(params);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const sessionIdsParam = searchParams.get('sessions') || searchParams.get('sessionIds') || '';
-  const quizIdParam = searchParams.get('quizId') || '';
 
-  const [data, setData] = useState<{
-    quiz: any;
-    comparedSessions: any[];
-    availableQuizSessions: any[];
-  } | null>(null);
-  const [allQuizzes, setAllQuizzes] = useState<any[]>([]);
-  const [allSessions, setAllSessions] = useState<any[]>([]);
+  const [data, setData] = useState<QuizOverallAnalyticsData | null>(null);
+  const [allQuizzes, setAllQuizzes] = useState<Quiz[]>([]);
+  const [allSessions, setAllSessions] = useState<CompareSessionsModalProps['allSessions']>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,30 +21,32 @@ function SessionCompareContent() {
     setError(null);
 
     Promise.all([
-      fetch(`/api/admin/sessions/compare?quizId=${quizIdParam}&sessionIds=${sessionIdsParam}`).then(async (res) => {
-        if (!res.ok) throw new Error('Failed to load comparison data');
+      fetch(`/api/admin/quizzes/${quizId}/analytics`).then(async (res) => {
+        if (!res.ok) throw new Error('Failed to load quiz analytics');
         return res.json();
       }),
-      fetch('/api/quizzes').then((res) => (res.ok ? res.json() : [])).catch(() => []),
+      fetch('/api/quizzes?all=true').then((res) => (res.ok ? res.json() : [])).catch(() => []),
       fetch('/api/sessions').then((res) => (res.ok ? res.json() : [])).catch(() => []),
     ])
-      .then(([compareRes, quizzesRes, sessionsRes]) => {
-        setData(compareRes);
+      .then(([analyticsRes, quizzesRes, sessionsRes]) => {
+        setData(analyticsRes);
         setAllQuizzes(quizzesRes || []);
         setAllSessions(sessionsRes || []);
       })
-      .catch((err) => {
-        console.error('Error fetching comparison:', err);
-        setError(err.message || 'Failed to load comparison');
+      .catch((err: Error) => {
+        console.error('Error fetching quiz analytics:', err);
+        setError(err.message || 'Failed to load quiz analytics');
       })
       .finally(() => setLoading(false));
-  }, [quizIdParam, sessionIdsParam]);
+  }, [quizId]);
 
   if (loading) {
     return (
       <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#0460A9] border-t-transparent" />
-        <p className="text-sm font-semibold text-[#5D7EA1]">Generating multi-cohort comparative overview...</p>
+        <p className="text-sm font-semibold text-[#5D7EA1]">
+          Consolidating multi-session telemetry for this quiz...
+        </p>
       </div>
     );
   }
@@ -62,8 +60,8 @@ function SessionCompareContent() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-[#16324F]">Comparison Unavailable</h2>
-          <p className="mt-2 text-sm text-[#5D7EA1]">{error || 'Could not load comparative data.'}</p>
+          <h2 className="text-xl font-bold text-[#16324F]">Quiz Analytics Unavailable</h2>
+          <p className="mt-2 text-sm text-[#5D7EA1]">{error || 'Could not load comparative data for this quiz.'}</p>
           <div className="mt-6 flex justify-center gap-3">
             <button
               onClick={() => router.push('/admin?tab=quizzes-manager')}
@@ -78,9 +76,8 @@ function SessionCompareContent() {
   }
 
   return (
-    <QuizSessionsCompareView
-      quiz={data.quiz}
-      comparedSessions={data.comparedSessions}
+    <QuizOverallAnalyticsView
+      data={data}
       allQuizzes={allQuizzes}
       allSessions={allSessions}
       onBack={() => {
@@ -94,7 +91,7 @@ function SessionCompareContent() {
   );
 }
 
-export default function SessionComparePage() {
+export default function QuizAnalyticsPage({ params }: { params: Promise<{ quizId: string }> }) {
   return (
     <Suspense
       fallback={
@@ -103,7 +100,7 @@ export default function SessionComparePage() {
         </div>
       }
     >
-      <SessionCompareContent />
+      <QuizAnalyticsContent params={params} />
     </Suspense>
   );
 }

@@ -3,8 +3,9 @@
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import type { HcpVectorMap } from '@/lib/analytics/hcp';
-import { Session, LeaderboardEntry } from '@/lib/types';
+import { Session, LeaderboardEntry, Quiz } from '@/lib/types';
 import MedicalAnalyticsDashboard from '@/components/admin/MedicalAnalyticsDashboard';
+import type { CompareSessionsModalProps } from '@/components/admin/CompareSessionsModal';
 
 interface AnalyticsData {
   session: Session & {
@@ -59,16 +60,25 @@ export default function SessionAnalyticsPage({ params }: { params: Promise<{ ses
   const { sessionId } = use(params);
   const router = useRouter();
   const [data, setData] = useState<AnalyticsData | null>(null);
+  const [allQuizzes, setAllQuizzes] = useState<Quiz[]>([]);
+  const [allSessions, setAllSessions] = useState<CompareSessionsModalProps['allSessions']>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/admin/sessions/${sessionId}/analytics`)
-      .then(async (res) => {
+    Promise.all([
+      fetch(`/api/admin/sessions/${sessionId}/analytics`).then(async (res) => {
         if (!res.ok) throw new Error('Failed to fetch analytics');
         return res.json();
+      }),
+      fetch('/api/quizzes?all=true').then((res) => (res.ok ? res.json() : [])).catch(() => []),
+      fetch('/api/sessions').then((res) => (res.ok ? res.json() : [])).catch(() => []),
+    ])
+      .then(([analyticsRes, quizzesRes, sessionsRes]) => {
+        setData(analyticsRes);
+        setAllQuizzes(quizzesRes || []);
+        setAllSessions(sessionsRes || []);
       })
-      .then(setData)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [sessionId]);
@@ -110,6 +120,8 @@ export default function SessionAnalyticsPage({ params }: { params: Promise<{ ses
         insights={insights}
         insightBreakdown={insightBreakdown}
         peerSessions={peerSessions}
+        allQuizzes={allQuizzes}
+        allSessions={allSessions}
         onBack={() => router.back()}
       />
     </div>

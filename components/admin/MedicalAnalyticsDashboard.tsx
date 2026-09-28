@@ -1,9 +1,13 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
-import type { Session, LeaderboardEntry } from '@/lib/types';
+import type { Session, LeaderboardEntry, Quiz } from '@/lib/types';
 import type { HcpVectorMap } from '@/lib/analytics/hcp';
+import CompareSessionsModal, { type CompareSessionsModalProps } from './CompareSessionsModal';
+
+type CompareSessionItem = CompareSessionsModalProps['allSessions'][number];
 
 // ==========================================
 // TYPES & DATA CONTRACTS
@@ -111,6 +115,8 @@ export interface MedicalAnalyticsDashboardProps {
     suggestion: string | null;
   }>;
   peerSessions?: PeerSessionOption[];
+  allQuizzes?: Quiz[];
+  allSessions?: CompareSessionsModalProps['allSessions'];
   onBack?: () => void;
 }
 
@@ -970,8 +976,41 @@ export default function MedicalAnalyticsDashboard({
   insights,
   insightBreakdown,
   peerSessions = [],
+  allQuizzes: initialAllQuizzes,
+  allSessions: initialAllSessions,
   onBack,
 }: MedicalAnalyticsDashboardProps = {}) {
+  const router = useRouter();
+
+  // Multi-session Compare Modal State (Matching QuizManage)
+  const [compareModal, setCompareModal] = useState<{
+    isOpen: boolean;
+    quizId: string | null;
+    selectedSessionIds: string[];
+  }>({
+    isOpen: false,
+    quizId: null,
+    selectedSessionIds: [],
+  });
+
+  const [fetchedQuizzes, setFetchedQuizzes] = useState<Quiz[]>([]);
+  const [fetchedSessions, setFetchedSessions] = useState<CompareSessionsModalProps['allSessions']>([]);
+
+  useEffect(() => {
+    if (!initialAllQuizzes?.length || !initialAllSessions?.length) {
+      Promise.all([
+        fetch('/api/quizzes?all=true').then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        fetch('/api/sessions').then((r) => (r.ok ? r.json() : [])).catch(() => []),
+      ]).then(([quizzes, sessions]) => {
+        if (Array.isArray(quizzes) && quizzes.length > 0) setFetchedQuizzes(quizzes);
+        if (Array.isArray(sessions) && sessions.length > 0) setFetchedSessions(sessions);
+      });
+    }
+  }, [initialAllQuizzes, initialAllSessions]);
+
+  const allQuizzes = initialAllQuizzes && initialAllQuizzes.length > 0 ? initialAllQuizzes : fetchedQuizzes;
+  const allSessions = initialAllSessions && initialAllSessions.length > 0 ? initialAllSessions : fetchedSessions;
+
   // Active Filter State: Selected Player (null = Entire Cohort)
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerProfile | null>(null);
 
@@ -1129,11 +1168,71 @@ export default function MedicalAnalyticsDashboard({
     return Number(avgSec.toFixed(1));
   }, [effectivePlayers, effectiveQuestions]);
 
+  // Fallback lists guaranteeing current quiz and current session are available
+  const effectiveQuizzes = useMemo(() => {
+    const list = [...allQuizzes];
+    if (session?.session_id && !list.some((q) => String(q.id) === String(session.session_id))) {
+      list.unshift({
+        id: session.session_id,
+        name: session.quiz_name || 'Current Quiz',
+        description: session.quiz_description || '',
+      } as unknown as Quiz);
+    }
+    return list;
+  }, [allQuizzes, session]);
+
+  const effectiveAllSessions = useMemo(() => {
+    const list: CompareSessionsModalProps['allSessions'] = [...allSessions];
+    const avgScore = effectivePlayers.length > 0
+      ? Math.round(effectivePlayers.reduce((sum, p) => sum + p.score, 0) / effectivePlayers.length)
+      : 0;
+
+    if (session?.id && !list.some((s) => String(s.id) === String(session.id))) {
+      const fallbackItem: CompareSessionItem = {
+        ...session,
+        id: session.id,
+        session_id: session.session_id || '',
+        name: session.name || session.quiz_name || 'Current Session',
+        raw_session_name: session.name || null,
+        quiz_name: session.quiz_name,
+        status: session.status,
+        started_at: session.started_at,
+        play_count: effectivePlayers.length,
+        avg_score: avgScore,
+      };
+      list.unshift(fallbackItem);
+    }
+    (peerSessions || []).forEach((ps) => {
+      if (!list.some((s) => String(s.id) === String(ps.id))) {
+        const peerItem: CompareSessionItem = {
+          id: ps.id,
+          session_id: session?.session_id || '',
+          name: ps.name,
+          raw_session_name: ps.name,
+          quiz_name: session?.quiz_name,
+          pin_code: ps.pin_code || null,
+          user_id: '',
+          current_question_id: null,
+          current_score: ps.avg_score || 0,
+          current_streak: 0,
+          is_private: false,
+          share_token: null,
+          status: (ps.status as Session['status']) || 'closed',
+          started_at: ps.started_at || new Date().toISOString(),
+          finished_at: ps.ended_at || null,
+          play_count: ps.participant_count,
+          avg_score: ps.avg_score,
+        };
+        list.push(peerItem);
+      }
+    });
+    return list;
+  }, [allSessions, session, effectivePlayers, peerSessions]);
+
   // -------------------------------------------------------------
   // SESSION BENCHMARK COMPARISON STATE
   // -------------------------------------------------------------
   const [selectedCompareSession, setSelectedCompareSession] = useState<PeerSessionOption | null>(null);
-  const [showCompareModal, setShowCompareModal] = useState<boolean>(false);
   const [activeLeaderboardCohort, setActiveLeaderboardCohort] = useState<'current' | 'compare'>('current');
 
   // Available peer sessions for the same quiz (combines live DB peer sessions & realistic cohorts)
@@ -1457,6 +1556,15 @@ export default function MedicalAnalyticsDashboard({
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
                   REAL SESSION DATA
                 </span>
+                {session?.session_id && (
+                  <button
+                    onClick={() => router.push(`/admin/quizzes/${session.session_id}/analytics`)}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0460A9] bg-[#0460A9]/10 hover:bg-[#0460A9]/20 border border-[#0460A9]/25 px-2.5 py-0.5 rounded-md transition"
+                    title="View overall aggregated analytics across all sessions of this quiz template"
+                  >
+                    <span>✦ Quiz Overall Analytics</span>
+                  </button>
+                )}
                 {selectedCompareSession && (
                   <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-md animate-fadeIn">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
@@ -1475,23 +1583,22 @@ export default function MedicalAnalyticsDashboard({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
-            {/* Session Compare Button */}
+            {/* Session Compare Button (Matching QuizManage) */}
             <button
-              onClick={() => setShowCompareModal(true)}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all border shadow-2xs ${selectedCompareSession
-                ? 'nq-report-dark-panel bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
-                : 'bg-[#F8FAFC] text-[#16324F] border-[#0460A9]/20 hover:bg-[#EBF3FA]'
-                }`}
-              title="Compare with another session in this same quiz"
+              onClick={() => {
+                setCompareModal({
+                  isOpen: true,
+                  quizId: session?.session_id || null,
+                  selectedSessionIds: session?.id ? [session.id] : [],
+                });
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all bg-[#0460A9]/10 text-[#0460A9] hover:bg-[#0460A9]/20 border border-[#0460A9]/20 shadow-2xs"
+              title="Compare session with peers"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
-              <span>{selectedCompareSession ? `Benchmark: ${selectedCompareSession.cohort_label || selectedCompareSession.name.slice(0, 18)}` : 'Compare Sessions'}</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${selectedCompareSession ? 'bg-white/20 text-white font-bold' : 'bg-[#EBF3FA] text-[#0460A9]'
-                }`}>
-                {availableCompareSessions.length}
-              </span>
+              <span>Compare</span>
             </button>
 
             <button
@@ -1538,7 +1645,13 @@ export default function MedicalAnalyticsDashboard({
 
               <div className="flex items-center gap-2 self-start sm:self-auto">
                 <button
-                  onClick={() => setShowCompareModal(true)}
+                  onClick={() => {
+                    setCompareModal({
+                      isOpen: true,
+                      quizId: session?.session_id || null,
+                      selectedSessionIds: session?.id ? [session.id] : [],
+                    });
+                  }}
                   className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white border border-white/20 transition"
                 >
                   ⇄ Switch Benchmark
@@ -2661,142 +2774,19 @@ export default function MedicalAnalyticsDashboard({
       </div>
 
       {/* =============================================================
-          MODAL: SESSION BENCHMARK & COMPARISON SELECTOR
+          MODAL: COMPARE SESSIONS (MATCHING QUIZMANAGE)
       ============================================================== */}
-      {showCompareModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-3xl border border-[#0460A9]/20 shadow-2xl max-w-2xl w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto">
-
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-[#0460A9]/10 pb-4">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 font-bold">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                  </svg>
-                </span>
-                <div>
-                  <h3 className="text-lg font-bold text-[#16324F]">
-                    Compare With Another Session (Same Quiz)
-                  </h3>
-                  <p className="text-xs text-[#5D7EA1]">
-                    Select any past or parallel session running this quiz to compare cohort guideline adherence, clinical domains, and friction deltas.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowCompareModal(false)}
-                className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Current Active Session Card */}
-            <div className="p-3.5 rounded-2xl bg-sky-50/70 border border-sky-200 text-xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono font-bold uppercase text-[#0460A9] tracking-wider">
-                  Current Session (Anchor)
-                </span>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#0460A9] text-white">
-                  Active
-                </span>
-              </div>
-              <div className="font-bold text-sm text-[#16324F]">{sessionTitle}</div>
-              <div className="text-[11px] text-[#5D7EA1] flex flex-wrap items-center gap-2">
-                <span>{session?.id || 'SES-NOVAR-7841'}</span>
-                <span>·</span>
-                <span>{activePlayersCount} Attendees</span>
-                <span>·</span>
-                <span className="text-emerald-700 font-semibold">68.2% Accuracy</span>
-              </div>
-            </div>
-
-            {/* Available Sessions for Comparison */}
-            <div className="space-y-3">
-              <div className="text-xs font-bold uppercase tracking-wider text-[#5D7EA1]">
-                Available Peer Sessions ({availableCompareSessions.length}):
-              </div>
-
-              <div className="space-y-2.5">
-                {availableCompareSessions.map((peer) => {
-                  const isSelected = selectedCompareSession?.id === peer.id;
-
-                  return (
-                    <div
-                      key={peer.id}
-                      className={`p-4 rounded-2xl border transition-all text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${isSelected
-                        ? 'bg-indigo-50/80 border-indigo-500 ring-2 ring-indigo-300'
-                        : 'bg-[#F8FAFC] border-[#0460A9]/15 hover:border-indigo-300 hover:bg-indigo-50/30'
-                        }`}
-                    >
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-[#16324F] truncate">
-                            {peer.name}
-                          </span>
-                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-indigo-100 text-indigo-800 border border-indigo-200">
-                            {peer.cohort_label || 'Peer Session'}
-                          </span>
-                        </div>
-
-                        <div className="text-[11px] text-[#5D7EA1] flex flex-wrap items-center gap-2">
-                          <span className="font-mono">{peer.id}</span>
-                          <span>·</span>
-                          <span>{peer.participant_count || 24} Attendees</span>
-                          <span>·</span>
-                          <span className="font-semibold text-indigo-700">{peer.avg_accuracy || 65}% Accuracy</span>
-                          <span>·</span>
-                          <span>Dominant: {peer.dominant_archetype || 'Balanced Clinician'}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {isSelected ? (
-                          <button
-                            onClick={() => {
-                              setSelectedCompareSession(null);
-                              setShowCompareModal(false);
-                            }}
-                            className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold hover:bg-rose-100 transition"
-                          >
-                            Disconnect
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setSelectedCompareSession(peer);
-                              setShowCompareModal(false);
-                            }}
-                            className="px-4 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition shadow-xs"
-                          >
-                            Compare
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="pt-3 border-t border-[#0460A9]/10 flex items-center justify-between text-xs">
-              <span className="text-[#5D7EA1] text-[11px]">
-                Comparing calculates live cross-cohort deltas across all clinical domains and question traps.
-              </span>
-              <button
-                onClick={() => setShowCompareModal(false)}
-                className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition"
-              >
-                Close
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
+      <CompareSessionsModal
+        isOpen={compareModal.isOpen}
+        onClose={() => setCompareModal({ isOpen: false, quizId: null, selectedSessionIds: [] })}
+        allQuizzes={effectiveQuizzes}
+        allSessions={effectiveAllSessions}
+        initialQuizId={compareModal.quizId}
+        initialSelectedSessionIds={compareModal.selectedSessionIds}
+        onLaunchCompare={(quizId, sessionIds) => {
+          router.push(`/admin/quizzes/${quizId}/compare?sessions=${sessionIds.join(',')}`);
+        }}
+      />
 
     </div>
   );
