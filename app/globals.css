@@ -1388,6 +1388,27 @@ body {
   border-color: var(--report-border) !important;
 }
 
+.nq-dashboard-shell .nq-full-report .nq-report-control {
+  background-color: var(--report-card) !important;
+  border-color: var(--report-border) !important;
+  color: var(--report-ink) !important;
+}
+
+.nq-dashboard-shell .nq-full-report .nq-report-control option {
+  background: var(--report-card);
+  color: var(--report-ink);
+}
+
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="hover:bg-[#F4F8FC]"]:hover,
+.nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="hover:bg-[#EBF3FA]"]:hover {
+  background-color: var(--report-tint) !important;
+}
+
+.nq-dashboard-shell .nq-full-report [class~="bg-[#F8FAFC]"] thead,
+.nq-dashboard-shell .nq-full-report [class~="bg-[#F8FAFC]"] tr[class~="bg-[#F8FAFC]"] {
+  background-color: var(--report-subtle) !important;
+}
+
 /* Status colours need a dark surface as well as brighter text. */
 .nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-rose-50"],
 .nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="bg-rose-100"],

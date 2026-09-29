@@ -25,7 +25,7 @@ export interface AnalyticsQuestion {
   primaryDistractorKey: string;
   primaryDistractorSummary: string;
   pedagogicalAction: string;
-  distractors: Array<{ key: string; text: string; percentage: number; isCorrect: boolean; clinicalNote?: string }>;
+  distractors: Array<{ key: string; text: string; percentage: number; isCorrect: boolean; utilityScore?: number; clinicalNote?: string }>;
   userResponses: Record<string, { selectedOption: string; isCorrect: boolean; utilityScore: number; timeSeconds: number }>;
 }
 
@@ -53,6 +53,18 @@ export function TopicUnderstandingBreakdown({
   selectedTag,
   onToggleTag,
 }: TopicUnderstandingBreakdownProps) {
+  const [sortBy, setSortBy] = useState<'lowest' | 'highest' | 'responses' | 'name'>('lowest');
+  const sortedItems = [...items].sort((a, b) => {
+    if (sortBy === 'name') return a.tag.localeCompare(b.tag);
+    if (sortBy === 'responses') return b.responses - a.responses || a.tag.localeCompare(b.tag);
+    const aHasScore = a.percentage !== null && a.maxUtility > 0;
+    const bHasScore = b.percentage !== null && b.maxUtility > 0;
+    if (aHasScore !== bHasScore) return aHasScore ? -1 : 1;
+    if (!aHasScore || !bHasScore) return a.tag.localeCompare(b.tag);
+    const scoreOrder = (a.percentage ?? 0) - (b.percentage ?? 0);
+    return (sortBy === 'lowest' ? scoreOrder : -scoreOrder) || a.tag.localeCompare(b.tag);
+  });
+
   return (
     <section className="rounded-3xl bg-white border border-[#0460A9]/15 p-4 sm:p-5 shadow-[0_4px_24px_rgba(4,96,169,0.04)] space-y-4">
       <div className="flex flex-col gap-3 border-b border-[#0460A9]/10 pb-3.5 sm:flex-row sm:items-center sm:justify-between">
@@ -63,21 +75,32 @@ export function TopicUnderstandingBreakdown({
           </div>
           <p className="mt-0.5 text-xs text-[#5D7EA1]">{description}</p>
         </div>
-        {selectedTag && onToggleTag && (
-          <div className="flex items-center gap-2 self-start rounded-xl border border-[#0460A9]/15 bg-[#F4F8FC] px-3 py-1.5 text-xs sm:self-auto">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#5D7EA1]">Filter:</span>
-            <button onClick={() => onToggleTag(selectedTag)} className="inline-flex items-center gap-1 rounded border border-[#0460A9]/20 bg-white px-2 py-0.5 font-mono font-bold text-[#0460A9] hover:text-rose-700" title="Clear topic filter">
-              {selectedTag} <span aria-hidden="true">×</span>
-            </button>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[#5D7EA1]">
+            Sort
+            <select aria-label="Sort topics" value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)} className="nq-report-control rounded-lg border border-[#0460A9]/20 bg-white px-2.5 py-1.5 text-xs font-medium normal-case tracking-normal text-[#16324F] focus:outline-none focus:ring-2 focus:ring-[#0460A9]">
+              <option value="lowest">Lowest utility</option>
+              <option value="highest">Highest utility</option>
+              <option value="responses">Most responses</option>
+              <option value="name">Topic name</option>
+            </select>
+          </label>
+          {selectedTag && onToggleTag && (
+            <div className="flex items-center gap-2 rounded-xl border border-[#0460A9]/15 bg-[#F4F8FC] px-3 py-1.5 text-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5D7EA1]">Filter:</span>
+              <button onClick={() => onToggleTag(selectedTag)} className="inline-flex items-center gap-1 rounded border border-[#0460A9]/20 bg-white px-2 py-0.5 font-mono font-bold text-[#0460A9] hover:text-rose-700" title="Clear topic filter">
+                {selectedTag} <span aria-hidden="true">×</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {items.length === 0 ? (
         <p className="rounded-xl bg-[#F8FAFC] p-4 text-xs text-[#5D7EA1]">No topic tags are present in this report.</p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {items.map((item) => {
+          {sortedItems.map((item) => {
             const hasData = item.percentage !== null && item.maxUtility > 0;
             const score = item.percentage ?? 0;
             const meta = TOPIC_META[item.tag] ?? { description: item.tag.replace(/^#/, '').replace(/[-_]/g, ' '), icon: '📊' };
@@ -102,7 +125,7 @@ export function TopicUnderstandingBreakdown({
                 className={`w-full overflow-hidden rounded-2xl border bg-white text-left transition-all duration-200 focus:outline-none ${selected ? `ring-2 ring-[#0460A9]/40 shadow-md ${theme.border}` : `${theme.border} hover:shadow-md hover:border-[#0460A9]/30`} ${onToggleTag ? 'cursor-pointer' : 'cursor-default'}`}
               >
                 {selected && <div className="h-1 w-full" style={{ backgroundColor: theme.fill }} />}
-                <div className="flex min-h-[112px] flex-col justify-between gap-2.5 bg-gradient-to-br from-[#F8FAFC] to-white p-3">
+                <div className="flex min-h-[112px] flex-col justify-between gap-2.5 bg-[#F8FAFC] p-3">
                   <div className="flex items-center justify-between gap-1.5">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <span className="shrink-0 text-sm">{meta.icon}</span>
@@ -192,7 +215,7 @@ export function FilteredQuestionAnalysisTable({
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left">
           <thead><tr className="border-b border-[#0460A9]/15 bg-[#F8FAFC] font-mono text-[10px] font-bold uppercase tracking-wider text-[#5D7EA1]">
-            <th className="w-48 px-3 py-3">Branch View & Node</th><th className="min-w-[340px] px-3 py-3">Question Text & Context</th><th className="w-28 px-2 py-3 text-center">{selectedPlayer ? 'Time' : 'Avg Time'}</th><th className="w-36 px-2 py-3 text-center">{selectedPlayer ? 'Utility Result' : selectedCompareSession ? 'Error Rate & Delta' : 'Error Rate %'}</th><th className="w-64 px-3 py-3">Distractor Breakdown</th><th className="w-24 px-3 py-3 text-right" />
+            <th className="w-48 px-3 py-3">Branch View & Node</th><th className="min-w-[340px] px-3 py-3">Question Text & Context</th><th className="w-28 px-2 py-3 text-center">{selectedPlayer ? 'Time' : 'Avg Time'}</th><th className="w-36 px-2 py-3 text-center">{selectedPlayer ? 'Utility Result' : selectedCompareSession ? 'Accuracy Rate & Delta' : 'Accuracy Rate'}</th><th className="w-64 px-3 py-3">Distractor Breakdown</th><th className="w-24 px-3 py-3 text-right" />
           </tr></thead>
           <tbody className="divide-y divide-[#0460A9]/10 text-xs">
             {questions.length === 0 ? <tr><td colSpan={6} className="py-10 text-center text-xs text-[#5D7EA1]">No question nodes match the selected topic and search.</td></tr> : questions.map((question) => {
@@ -200,20 +223,22 @@ export function FilteredQuestionAnalysisTable({
               const response = selectedPlayer ? question.userResponses[selectedPlayer.id] : null;
               const benchmarkError = selectedCompareSession?.node_error_rates?.[question.id];
               const benchmarkTime = selectedCompareSession?.node_avg_times?.[question.id];
-              const errorDelta = benchmarkError === undefined ? null : question.errorRatePercent - benchmarkError;
+              const accuracyRate = Math.max(0, Math.min(100, 100 - question.errorRatePercent));
+              const benchmarkAccuracy = benchmarkError === undefined ? undefined : Math.max(0, Math.min(100, 100 - benchmarkError));
+              const accuracyDelta = benchmarkAccuracy === undefined ? null : accuracyRate - benchmarkAccuracy;
               const selectedChoice = question.distractors.find((choice) => choice.key === response?.selectedOption);
               return <React.Fragment key={question.id}>
                 <tr onClick={() => setExpandedRowId(expanded ? null : question.id)} className={`cursor-pointer transition-colors hover:bg-[#F4F8FC] ${expanded ? 'bg-[#F4F8FC]/80' : ''}`}>
                   <td className="px-3 py-3.5 align-top"><span className="inline-flex w-fit items-center rounded-md border border-[#0460A9]/20 bg-[#EBF3FA] px-2 py-0.5 font-mono text-[11px] font-bold text-[#0460A9]">{question.nodeCode}</span><div className="mt-1 truncate font-mono text-[10px] text-[#5D7EA1]">{question.branchLabel}</div></td>
                   <td className="min-w-[340px] max-w-xl px-3 py-3.5 align-top"><div className="text-xs font-semibold leading-relaxed text-[#16324F] sm:text-[13px]">{question.questionText}</div><div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-[#5D7EA1]"><span className="rounded bg-[#EBF3FA] px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#0460A9]">{question.tags.length ? question.tags.join(', ') : 'No topic tag'}</span>{question.clinicalScenario && question.clinicalScenario !== question.questionText && <span className="italic">{question.clinicalScenario}</span>}</div></td>
                   <td className="px-2 py-3.5 text-center align-top">{response ? <span className="font-mono text-xs font-bold text-[#16324F]">{response.timeSeconds}s</span> : <span className="font-mono text-xs font-bold text-[#16324F]">{question.avgTimeSeconds > 0 ? `${selectedCompareSession && benchmarkTime !== undefined ? `${question.avgTimeSeconds}s vs ${benchmarkTime}s` : `${question.avgTimeSeconds}s`}` : '—'}</span>}</td>
-                  <td className="px-2 py-3.5 text-center align-top">{response ? <span className="inline-flex rounded-full border border-[#0460A9]/20 bg-[#EBF3FA] px-2 py-0.5 font-mono text-[10px] font-bold text-[#0460A9]">{response.utilityScore} utility</span> : <span className={`inline-flex rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${question.errorRatePercent >= 50 ? 'border border-rose-200 bg-rose-50 text-rose-800' : 'border border-amber-200 bg-amber-50 text-amber-800'}`}>{question.sampleSize > 0 ? `${question.errorRatePercent}%${selectedCompareSession && benchmarkError !== undefined ? ` vs ${benchmarkError}% (${errorDelta! > 0 ? '+' : ''}${errorDelta}%)` : ''}` : '—'}</span>}</td>
+                  <td className="px-2 py-3.5 text-center align-top">{response ? <span className={`inline-flex rounded-full border px-2 py-0.5 font-mono text-[10px] font-bold ${response.utilityScore < 0 ? 'border-rose-200 bg-rose-50 text-rose-800' : response.utilityScore > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-[#0460A9]/20 bg-[#EBF3FA] text-[#0460A9]'}`}>{response.utilityScore} utility</span> : <span className={`inline-flex rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${accuracyRate < 50 ? 'border border-rose-200 bg-rose-50 text-rose-800' : 'border border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{question.sampleSize > 0 ? `${accuracyRate}%${selectedCompareSession && benchmarkAccuracy !== undefined ? ` vs ${benchmarkAccuracy}% (${accuracyDelta! > 0 ? '+' : ''}${accuracyDelta}%)` : ''}` : '—'}</span>}</td>
                   <td className="px-3 py-3.5 align-top">{response ? <div className="space-y-1"><span className="rounded border border-[#0460A9]/20 bg-[#EBF3FA] px-2 py-0.5 font-mono text-[10px] font-bold text-[#0460A9]">Option {response.selectedOption}</span><p className="truncate text-[10px] text-[#5D7EA1]">{selectedChoice?.text || 'Selected answer'}</p></div> : <div className="space-y-1.5"><div className="flex h-2.5 w-full overflow-hidden rounded border border-gray-200 bg-gray-100">{question.distractors.map((choice) => <span key={choice.key} title={`${choice.key}: ${choice.percentage}%`} className={`h-full ${choice.isCorrect ? 'bg-[#0D8C6D]' : 'bg-rose-400/80'}`} style={{ width: `${Math.min(100, Math.max(0, choice.percentage))}%` }} />)}</div><div className="flex justify-between gap-2 text-[10px] text-[#5D7EA1]"><span className="truncate">Top distractor: {question.primaryDistractorKey || '—'}</span><span className="shrink-0">{question.sampleSize} answers</span></div></div>}</td>
                   <td className="px-3 py-3.5 text-right align-middle"><button className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-all ${expanded ? 'border-[#0460A9] bg-[#0460A9] text-white' : 'border-[#0460A9]/20 bg-[#F4F8FC] text-[#0460A9] hover:bg-[#EBF3FA]'}`}>{expanded ? 'Hide' : 'Details'} <span aria-hidden="true">⌄</span></button></td>
                 </tr>
                 {expanded && <tr className="bg-[#F8FAFC]"><td colSpan={6} className="border-y border-[#0460A9]/10 p-4"><div className="space-y-3 rounded-2xl border border-[#0460A9]/15 bg-white p-4 shadow-2xs"><div className="flex items-center justify-between gap-2 border-b border-gray-100 pb-2"><span className="text-xs font-bold text-[#16324F]">Choice Distribution & Utility Scores</span><span className="font-mono text-[11px] text-[#5D7EA1]">Node: {question.nodeCode} · {question.branchLabel}</span></div>{question.distractors.length === 0 ? <p className="text-xs text-[#5D7EA1]">No answer choice data is available.</p> : <div className="space-y-1.5">{question.distractors.map((choice) => {
                   const selected = response?.selectedOption === choice.key;
-                  return <div key={choice.key} className={`flex flex-col justify-between gap-2 rounded-xl border p-2 text-xs sm:flex-row sm:items-center ${selected ? 'border-[#0460A9] bg-[#EBF3FA]' : choice.isCorrect ? 'border-emerald-200 bg-emerald-50/60' : 'border-gray-200 bg-gray-50'}`}><div className="flex items-start gap-2"><span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded font-mono text-xs font-bold ${choice.isCorrect ? 'bg-[#0D8C6D] text-white' : 'bg-gray-200 text-gray-800'}`}>{choice.key}</span><div><span className="font-medium text-[#16324F]">{choice.text}</span>{selectedPlayer && selected && <span className="ml-2 rounded bg-[#0460A9] px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">Selected by {selectedPlayer.displayName}</span>}{choice.clinicalNote && <div className="mt-0.5 text-[10px] italic text-rose-700">{choice.clinicalNote}</div>}</div></div><div className="flex shrink-0 items-center gap-2"><span className="font-mono text-xs font-bold">{question.sampleSize > 0 ? `${choice.percentage}%` : '—'}</span><span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${choice.isCorrect ? 'bg-[#0D8C6D] text-white' : 'bg-gray-200 text-gray-700'}`}>{choice.isCorrect ? 'Positive utility' : 'Non-positive utility'}</span></div></div>;
+                  return <div key={choice.key} className={`flex flex-col justify-between gap-2 rounded-xl border p-2 text-xs sm:flex-row sm:items-center ${selected ? 'border-[#0460A9] bg-[#EBF3FA]' : choice.isCorrect ? 'border-emerald-200 bg-emerald-50/60' : 'border-gray-200 bg-gray-50'}`}><div className="flex items-start gap-2"><span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded font-mono text-xs font-bold ${choice.isCorrect ? 'bg-[#0D8C6D] text-white' : 'bg-gray-200 text-gray-800'}`}>{choice.key}</span><div><span className="font-medium text-[#16324F]">{choice.text}</span>{selectedPlayer && selected && <span className="ml-2 rounded bg-[#0460A9] px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">Selected by {selectedPlayer.displayName}</span>}{choice.clinicalNote && <div className="mt-0.5 text-[10px] italic text-rose-700">{choice.clinicalNote}</div>}</div></div><div className="flex shrink-0 items-center gap-2"><span className="font-mono text-xs font-bold">{question.sampleSize > 0 ? `${choice.percentage}%` : '—'}</span><span className={`rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase ${choice.utilityScore !== undefined && choice.utilityScore < 0 ? 'border-rose-200 bg-rose-50 text-rose-800' : choice.utilityScore !== undefined && choice.utilityScore > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-gray-200 bg-gray-100 text-gray-700'}`}>Utility: {choice.utilityScore ?? 0}</span></div></div>;
                 })}</div>}<div className="flex items-start gap-2 rounded-xl border border-[#0460A9]/20 bg-[#EBF3FA] p-2.5 text-xs"><span className="font-bold text-[#0460A9]">Learning note:</span><span className="text-[#16324F]">{question.pedagogicalAction || 'No additional review note is available for this question.'}</span></div></div></td></tr>}
               </React.Fragment>;
             })}

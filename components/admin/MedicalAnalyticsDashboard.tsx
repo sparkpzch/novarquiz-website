@@ -23,6 +23,7 @@ export interface DistractorItem {
   text: string;
   percentage: number;
   isCorrect: boolean;
+  utilityScore?: number;
   clinicalNote?: string;
 }
 
@@ -97,6 +98,19 @@ export interface MedicalAnalyticsDashboardProps {
     participantCount: number;
     avgScore: number;
     avgAccuracy: number;
+    avgTimeSeconds?: number;
+  }>;
+  aggregateSessionBreakdowns?: Record<string, {
+    topics: Array<{ tag: string; percentage: number; sampleSize: number; earnedUtility: number; maxPossibleUtility: number }>;
+    questions: Array<{
+      id: string;
+      question_text: string;
+      node_type: string;
+      totalResponses: number;
+      totalUtilityScore: number;
+      errorRate: number;
+      choices: Array<{ label: string; text: string; score_impact: number; count: number; percentage: number; clinical_tags?: string[] }>;
+    }>;
   }>;
   session?: Session & {
     quiz_name: string;
@@ -209,6 +223,7 @@ export default function MedicalAnalyticsDashboard({
   aggregateMetrics,
   aggregateTopics = [],
   aggregateSessions = [],
+  aggregateSessionBreakdowns,
   session,
   leaderboard,
   questions,
@@ -261,6 +276,9 @@ export default function MedicalAnalyticsDashboard({
   const [playerSearchQuery, setPlayerSearchQuery] = useState<string>('');
   const [leaderboardFilterTab, setLeaderboardFilterTab] = useState<'all' | 'gaps' | 'high'>('all');
   const [questionSearch, setQuestionSearch] = useState<string>('');
+  const [selectedAggregateSessionId, setSelectedAggregateSessionId] = useState<string | null>(null);
+  const [aggregateSessionSearch, setAggregateSessionSearch] = useState('');
+  const [aggregateSessionFilter, setAggregateSessionFilter] = useState<'all' | 'high' | 'developing' | 'review'>('all');
   const [showCohortInsightsDrawer, setShowCohortInsightsDrawer] = useState<boolean>(false);
   const [isLiveTelemetry, setIsLiveTelemetry] = useState<boolean>(false);
 
@@ -310,9 +328,24 @@ export default function MedicalAnalyticsDashboard({
   }, [leaderboard, insightBreakdown]);
 
   const realQuestions = useMemo<QuestionDataNode[]>(() => {
-    if (!questions || questions.length === 0) return [];
+    const selectedBreakdownQuestions = selectedAggregateSessionId
+      ? aggregateSessionBreakdowns?.[selectedAggregateSessionId]?.questions
+      : undefined;
+    const sourceQuestions = aggregateOnly && selectedBreakdownQuestions
+      ? selectedBreakdownQuestions.map((question) => ({
+          id: question.id,
+          question_text: question.question_text,
+          node_type: question.node_type,
+          total_responses: question.totalResponses,
+          total_utility_score: question.totalUtilityScore,
+          error_rate_percent: question.errorRate,
+          avg_time_ms: 0,
+          choices: question.choices,
+        }))
+      : questions;
+    if (!sourceQuestions || sourceQuestions.length === 0) return [];
 
-    return questions.map((q: any, idx: number) => {
+    return sourceQuestions.map((q: any, idx: number) => {
       const totalResponses = q.total_responses ?? 0;
       const rawChoices = Array.isArray(q.choices) ? q.choices : [];
       const choiceTags = rawChoices.flatMap((choice: any) => Array.isArray(choice.clinical_tags) ? choice.clinical_tags : []);
@@ -342,6 +375,7 @@ export default function MedicalAnalyticsDashboard({
             text: c.text || c.choice_text || '',
             percentage: pct,
             isCorrect,
+            utilityScore: Number(c.score_impact) || 0,
             clinicalNote: c.behavior_meaning || (!isCorrect && pct > 20 ? 'High selection distractor trap.' : undefined),
           };
         });
@@ -373,7 +407,7 @@ export default function MedicalAnalyticsDashboard({
         userResponses: q.user_responses ?? {},
       };
     });
-  }, [questions, leaderboard]);
+  }, [aggregateOnly, aggregateSessionBreakdowns, selectedAggregateSessionId, questions, leaderboard]);
 
   // Use only records returned for the current session or quiz.
   const effectivePlayers = useMemo(() => {
@@ -707,6 +741,26 @@ export default function MedicalAnalyticsDashboard({
       avgTimeSeconds: 0,
       accuracySpread: 0,
     };
+    const selectedAggregateSession = aggregateSessions.find((item) => item.id === selectedAggregateSessionId) ?? null;
+    const displayMetrics = selectedAggregateSession ? {
+      totalSessions: 1,
+      totalParticipants: selectedAggregateSession.participantCount,
+      avgScore: selectedAggregateSession.avgScore,
+      avgAccuracy: selectedAggregateSession.avgAccuracy,
+      avgTimeSeconds: selectedAggregateSession.avgTimeSeconds ?? 0,
+      accuracySpread: 0,
+    } : metrics;
+    const displayTopics = selectedAggregateSessionId
+      ? aggregateSessionBreakdowns?.[selectedAggregateSessionId]?.topics ?? aggregateTopics
+      : aggregateTopics;
+    const visibleAggregateSessions = aggregateSessions.filter((item) => {
+      const matchesSearch = `${item.name} ${item.status}`.toLowerCase().includes(aggregateSessionSearch.trim().toLowerCase());
+      const matchesFilter = aggregateSessionFilter === 'all'
+        || (aggregateSessionFilter === 'high' && item.avgAccuracy >= 75)
+        || (aggregateSessionFilter === 'developing' && item.avgAccuracy >= 50 && item.avgAccuracy < 75)
+        || (aggregateSessionFilter === 'review' && item.avgAccuracy < 50);
+      return matchesSearch && matchesFilter;
+    });
     return (
       <div className="nq-full-report w-full min-h-screen bg-[#F4F8FC] p-3 font-sans text-[#16324F] antialiased sm:p-5 md:p-6 lg:p-8">
         <div className="mx-auto max-w-[1700px] space-y-5">
@@ -716,44 +770,50 @@ export default function MedicalAnalyticsDashboard({
                 {onBack && <button onClick={onBack} className="mt-1 rounded-xl border border-[#0460A9]/15 bg-[#F8FAFC] px-3 py-1.5 text-xs font-semibold text-[#5D7EA1] hover:bg-[#EBF3FA] hover:text-[#0460A9]">← Back</button>}
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-[#0460A9]/20 bg-[#EBF3FA] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#0460A9]">Quiz-wide overview</span>
-                    <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-800">{metrics.totalSessions} sessions aggregated</span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#0460A9]/20 bg-[#EBF3FA] px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wide text-[#0460A9]"><span className="h-2 w-2 rounded-full bg-[#0D8C6D]" />{selectedAggregateSession ? 'SESSION FILTER' : 'QUIZ ANALYTICS'}</span>
+                    <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-800">AGGREGATED SESSION DATA</span>
                   </div>
                   <h1 className="mt-2 text-xl font-bold tracking-tight text-[#16324F] sm:text-2xl">{sessionTitle}</h1>
-                  <p className="mt-0.5 text-xs text-[#5D7EA1] sm:text-sm">Aggregated understanding and question performance. Participant identities are not shown.</p>
+                  <p className="mt-0.5 text-xs text-[#5D7EA1] sm:text-sm">{selectedAggregateSession ? `Filtered to ${selectedAggregateSession.name}. Individual participant details are not shown.` : `Quiz-wide understanding and question performance across ${metrics.totalSessions} sessions. Individual participant details are not shown.`}</p>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {aggregateSessions.length > 0 && <button onClick={() => setCompareModal({ isOpen: true, quizId: session?.session_id || null, selectedSessionIds: aggregateSessions.slice(0, 2).map((item) => item.id) })} className="rounded-xl border border-[#0460A9]/20 bg-[#0460A9]/10 px-3.5 py-2 text-xs font-semibold text-[#0460A9] hover:bg-[#0460A9]/20">Compare sessions</button>}
-                <button onClick={() => window.print()} className="rounded-xl bg-[#16324F] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#0d2238]">Export report</button>
+              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                {aggregateSessions.length > 0 && <button onClick={() => setCompareModal({ isOpen: true, quizId: session?.session_id || null, selectedSessionIds: selectedAggregateSession ? [selectedAggregateSession.id] : aggregateSessions.slice(0, 2).map((item) => item.id) })} className="inline-flex items-center gap-1.5 rounded-xl border border-[#0460A9]/20 bg-[#0460A9]/10 px-3.5 py-2 text-xs font-semibold text-[#0460A9] hover:bg-[#0460A9]/20">Compare sessions</button>}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               {[
-                { label: 'Sessions', value: metrics.totalSessions, detail: 'Quiz runs' },
-                { label: 'Participants', value: metrics.totalParticipants, detail: 'Combined count' },
-                { label: 'Average accuracy', value: metrics.totalParticipants > 0 ? `${metrics.avgAccuracy}%` : '—', detail: metrics.totalParticipants > 0 ? `Session spread: ${metrics.accuracySpread}%` : 'No participant responses' },
-                { label: 'Average score', value: metrics.totalParticipants > 0 ? metrics.avgScore : '—', detail: metrics.totalParticipants > 0 ? `Response time: ${metrics.avgTimeSeconds}s average` : 'No participant responses' },
+                { label: 'Sessions', value: displayMetrics.totalSessions, detail: selectedAggregateSession ? 'Selected run' : 'Quiz runs' },
+                { label: 'Participants', value: displayMetrics.totalParticipants, detail: selectedAggregateSession ? 'In selected run' : 'Combined count' },
+                { label: 'Average accuracy', value: displayMetrics.totalParticipants > 0 ? `${displayMetrics.avgAccuracy}%` : '—', detail: displayMetrics.totalParticipants > 0 ? (selectedAggregateSession ? 'Selected session' : `Session spread: ${displayMetrics.accuracySpread}%`) : 'No participant responses' },
+                { label: 'Average score', value: displayMetrics.totalParticipants > 0 ? displayMetrics.avgScore : '—', detail: displayMetrics.totalParticipants > 0 ? `Response time: ${displayMetrics.avgTimeSeconds}s average` : 'No participant responses' },
               ].map((item) => <div key={item.label} className="rounded-2xl border border-[#0460A9]/10 bg-[#F8FAFC] p-3.5"><p className="text-[10px] font-bold uppercase tracking-wide text-[#5D7EA1]">{item.label}</p><p className="mt-1 text-2xl font-extrabold text-[#16324F]">{item.value}</p><p className="text-[10px] text-[#5D7EA1]">{item.detail}</p></div>)}
             </div>
           </header>
 
           <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
             <aside className="space-y-3 rounded-3xl border border-[#0460A9]/15 bg-white p-4 shadow-[0_4px_24px_rgba(4,96,169,0.04)] lg:col-span-3">
-              <div className="border-b border-[#0460A9]/10 pb-3"><h2 className="text-sm font-bold text-[#16324F]">Session overview</h2><p className="mt-0.5 text-[11px] text-[#5D7EA1]">Cohort-level results for each run.</p></div>
-              {aggregateSessions.length === 0 ? <p className="py-3 text-xs text-[#5D7EA1]">No sessions recorded yet.</p> : aggregateSessions.map((item, index) => (
-                <article key={item.id} className="rounded-2xl border border-[#0460A9]/10 bg-[#F8FAFC] p-3">
+              <div className="border-b border-[#0460A9]/10 pb-3"><h2 className="text-sm font-bold text-[#16324F]">Session overview</h2><p className="mt-0.5 text-[11px] text-[#5D7EA1]">Search sessions or filter them by accuracy.</p></div>
+              {selectedAggregateSession && <button onClick={() => setSelectedAggregateSessionId(null)} className="w-full rounded-lg border border-[#0460A9]/20 bg-[#0460A9]/10 px-3 py-2 text-xs font-semibold text-[#0460A9] hover:bg-[#0460A9]/20">Clear session filter · Show all sessions</button>}
+              {aggregateSessions.length > 0 && <div className="space-y-2">
+                <input type="search" value={aggregateSessionSearch} onChange={(event) => setAggregateSessionSearch(event.target.value)} placeholder="Search sessions..." aria-label="Search sessions" className="nq-report-control w-full rounded-xl border border-[#0460A9]/20 bg-white px-3 py-2 text-xs text-[#16324F] placeholder-[#5D7EA1] focus:outline-none focus:ring-2 focus:ring-[#0460A9]" />
+                <select value={aggregateSessionFilter} onChange={(event) => setAggregateSessionFilter(event.target.value as typeof aggregateSessionFilter)} aria-label="Filter sessions by accuracy" className="nq-report-control w-full rounded-xl border border-[#0460A9]/20 bg-white px-3 py-2 text-xs text-[#16324F] focus:outline-none focus:ring-2 focus:ring-[#0460A9]">
+                  <option value="all">All accuracy levels</option><option value="high">Strong · 75% and above</option><option value="developing">Developing · 50–74%</option><option value="review">Priority review · below 50%</option>
+                </select>
+              </div>}
+              {aggregateSessions.length === 0 ? <p className="py-3 text-xs text-[#5D7EA1]">No sessions recorded yet.</p> : visibleAggregateSessions.length === 0 ? <p className="py-3 text-xs text-[#5D7EA1]">No sessions match your search and accuracy filter.</p> : visibleAggregateSessions.map((item, index) => (
+                <button key={item.id} type="button" aria-pressed={selectedAggregateSessionId === item.id} onClick={() => setSelectedAggregateSessionId((current) => current === item.id ? null : item.id)} className={`w-full rounded-2xl border p-3 text-left transition hover:border-[#0460A9]/40 hover:shadow-sm ${selectedAggregateSessionId === item.id ? 'border-[#0460A9] bg-[#EBF3FA] ring-2 ring-[#0460A9]/20' : 'border-[#0460A9]/10 bg-[#F8FAFC]'}`}>
                   <p className="text-[9px] font-bold uppercase tracking-wide text-[#5D7EA1]">Session {index + 1}</p><h3 className="truncate text-xs font-bold text-[#16324F]">{item.name}</h3>
                   <p className="mt-1 text-[10px] text-[#5D7EA1]">{new Date(item.started_at).toLocaleDateString()} · {item.participantCount} participants</p>
                   <div className="mt-2 grid grid-cols-2 gap-2"><div className="rounded-lg bg-white p-2"><p className="text-[9px] uppercase text-[#5D7EA1]">Accuracy</p><p className={`text-sm font-bold ${item.avgAccuracy >= 75 ? 'text-emerald-700' : item.avgAccuracy >= 50 ? 'text-amber-700' : 'text-rose-700'}`}>{item.avgAccuracy}%</p></div><div className="rounded-lg bg-white p-2"><p className="text-[9px] uppercase text-[#5D7EA1]">Avg score</p><p className="text-sm font-bold text-[#16324F]">{item.avgScore}</p></div></div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"><div className={`h-full rounded-full ${item.avgAccuracy >= 75 ? 'bg-emerald-500' : item.avgAccuracy >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${Math.min(100, Math.max(0, item.avgAccuracy))}%` }} /></div>
-                </article>
+                </button>
               ))}
             </aside>
 
             <main className="space-y-5 lg:col-span-9">
               <TopicUnderstandingBreakdown
-                items={aggregateTopics.map((topic) => ({
+                items={displayTopics.map((topic) => ({
                   tag: topic.tag,
                   percentage: topic.maxPossibleUtility && topic.maxPossibleUtility > 0 ? topic.percentage : null,
                   earnedUtility: topic.earnedUtility ?? 0,
@@ -761,7 +821,7 @@ export default function MedicalAnalyticsDashboard({
                   responses: topic.sampleSize,
                   questionCount: 0,
                 }))}
-                description="Utility earned versus maximum available utility, aggregated across all quiz sessions."
+                description={selectedAggregateSession ? `Utility earned versus maximum available utility for ${selectedAggregateSession.name}.` : 'Utility earned versus maximum available utility, aggregated across all quiz sessions.'}
                 selectedTag={selectedTag}
                 onToggleTag={handleTagToggle}
               />
@@ -769,7 +829,7 @@ export default function MedicalAnalyticsDashboard({
                 questions={filteredQuestions}
                 questionSearch={questionSearch}
                 onQuestionSearchChange={setQuestionSearch}
-                description="Question responses and utility scoring combined across all quiz sessions."
+                description={selectedAggregateSession ? `Question responses and utility scoring for ${selectedAggregateSession.name}.` : 'Question responses and utility scoring combined across all quiz sessions.'}
               />
             </main>
           </div>

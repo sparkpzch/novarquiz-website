@@ -355,6 +355,49 @@ export async function GET(
         avgAccuracy: c.macroMetrics.avgAccuracy,
         avgTimeSeconds: c.macroMetrics.avgTimeSeconds,
       })),
+      sessionBreakdowns: Object.fromEntries(validComparedSessions.map((cohort) => {
+        const sessionTopics: Record<string, { tag: string; totalResponses: number; totalUtilityScore: number; maxPossibleScore: number }> = {};
+        cohort.questions.forEach((q) => {
+          const tags = new Set(q.choices.flatMap((choice) => choice.clinical_tags || []));
+          if (tags.size === 0) return;
+          const maxScore = Math.max(0, ...q.choices.map((choice) => choice.score_impact));
+          tags.forEach((tag) => {
+            sessionTopics[tag] ??= { tag, totalResponses: 0, totalUtilityScore: 0, maxPossibleScore: 0 };
+            sessionTopics[tag].totalResponses += q.total_responses;
+            sessionTopics[tag].totalUtilityScore += Number(q.total_utility_score) || 0;
+            sessionTopics[tag].maxPossibleScore += q.total_responses * maxScore;
+          });
+        });
+        return [cohort.session.id, {
+          topics: Object.values(sessionTopics).map((topic) => ({
+            tag: topic.tag,
+            percentage: topic.maxPossibleScore > 0 ? Math.min(100, Math.max(0, Math.round((topic.totalUtilityScore / topic.maxPossibleScore) * 100))) : 0,
+            sampleSize: topic.totalResponses,
+            earnedUtility: topic.totalUtilityScore,
+            maxPossibleUtility: topic.maxPossibleScore,
+          })),
+          questions: cohort.questions.map((q) => ({
+            id: q.id,
+            question_text: q.question_text,
+            node_type: q.node_type,
+            totalResponses: q.total_responses,
+            totalUtilityScore: Number(q.total_utility_score) || 0,
+            errorRate: q.total_responses > 0
+              ? Math.round(100 - (q.choices.length > 0
+                ? q.choices.filter((choice) => choice.score_impact > 0).reduce((sum, choice) => sum + choice.count, 0) / q.total_responses
+                : 0) * 100)
+              : 0,
+            choices: q.choices.map((choice) => ({
+              label: choice.label,
+              text: choice.text,
+              score_impact: choice.score_impact,
+              count: choice.count,
+              percentage: q.total_responses > 0 ? Math.round((choice.count / q.total_responses) * 100) : 0,
+              clinical_tags: choice.clinical_tags || [],
+            })),
+          })),
+        }];
+      })),
       questions: consolidatedQuestions,
       domainMastery,
     });

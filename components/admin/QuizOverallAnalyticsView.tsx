@@ -28,6 +28,18 @@ export interface QuizOverallAnalyticsData {
     avgAccuracy: number;
     avgTimeSeconds: number;
   }>;
+  sessionBreakdowns?: Record<string, {
+    topics: Array<{ tag: string; percentage: number; sampleSize: number; earnedUtility: number; maxPossibleUtility: number }>;
+    questions: Array<{
+      id: string;
+      question_text: string;
+      node_type: string;
+      totalResponses: number;
+      totalUtilityScore: number;
+      errorRate: number;
+      choices: Array<{ label: string; text: string; score_impact: number; count: number; percentage: number; clinical_tags?: string[] }>;
+    }>;
+  }>;
   domainMastery?: Array<{ tag: string; percentage: number; sampleSize: number; earnedUtility?: number; maxPossibleUtility?: number }>;
   questions: Array<{
     id: string;
@@ -79,6 +91,7 @@ export default function QuizOverallAnalyticsView({
       aggregateMetrics={data.overall}
       aggregateTopics={data.domainMastery ?? []}
       aggregateSessions={data.sessions}
+      aggregateSessionBreakdowns={data.sessionBreakdowns}
       session={aggregateSession}
       leaderboard={[]}
       questions={data.questions.map((question) => ({
