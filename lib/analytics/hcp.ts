@@ -36,14 +36,6 @@ export type ChoiceMetadata = {
   review_status: ReviewStatus;
 };
 
-export type QuestionMetadata = {
-  intended_audience: IntendedAudience;
-  reading_level: string | null;
-  jurisdiction_tags: string[];
-  medical_review_version: string | null;
-  legal_document_versions_required: Record<string, string>;
-};
-
 export type ConsentPurposes = {
   platform_account: boolean;
   analytics_profiling: boolean;
@@ -84,14 +76,6 @@ export function emptyHcpVectorMap(): HcpVectorMap {
   };
 }
 
-export const DEFAULT_QUESTION_METADATA: QuestionMetadata = {
-  intended_audience: 'public',
-  reading_level: null,
-  jurisdiction_tags: [],
-  medical_review_version: null,
-  legal_document_versions_required: {},
-};
-
 export const DEFAULT_CHOICE_METADATA: ChoiceMetadata = {
   behavior_meaning: null,
   vector_deltas: emptyHcpVectorMap(),
@@ -127,33 +111,6 @@ export function normalizeStringArray(value: unknown): string[] {
     .filter((item): item is string => typeof item === 'string')
     .map((item) => item.trim())
     .filter(Boolean);
-}
-
-export function normalizeQuestionMetadata(
-  input: Partial<QuestionMetadata> | Record<string, unknown> | null | undefined,
-): QuestionMetadata {
-  const readingLevel = typeof input?.reading_level === 'string' ? input.reading_level : null;
-  const medicalReviewVersion =
-    typeof input?.medical_review_version === 'string' ? input.medical_review_version : null;
-  const legalDocumentVersions =
-    input?.legal_document_versions_required &&
-    typeof input.legal_document_versions_required === 'object'
-      ? Object.fromEntries(
-          Object.entries(input.legal_document_versions_required).filter(
-            ([key, value]) => key.trim() && typeof value === 'string' && value.trim(),
-          ),
-        )
-      : {};
-
-  return {
-    intended_audience: AUDIENCE_OPTIONS.includes(input?.intended_audience as IntendedAudience)
-      ? (input?.intended_audience as IntendedAudience)
-      : DEFAULT_QUESTION_METADATA.intended_audience,
-    reading_level: readingLevel?.trim() || null,
-    jurisdiction_tags: normalizeStringArray(input?.jurisdiction_tags),
-    medical_review_version: medicalReviewVersion?.trim() || null,
-    legal_document_versions_required: legalDocumentVersions,
-  };
 }
 
 export function normalizeChoiceMetadata(

@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import {
   ALLOWED_USAGE_OPTIONS,
-  AUDIENCE_OPTIONS,
   HCP_VECTOR_KEYS,
   REVIEW_STATUS_OPTIONS,
 } from '@/lib/analytics/hcp';
@@ -58,12 +57,7 @@ export const QuestionSchema = z.object({
   // final leaderboard.
   is_entry_point: z.boolean().optional(),
   timer_override: z.number().int().min(0).max(3600).nullable().optional(),
-  intended_audience: z.enum(AUDIENCE_OPTIONS).optional(),
-  presentation_mode: z.string().optional(),
-  reading_level: z.string().max(120).nullable().optional(),
-  jurisdiction_tags: z.array(z.string().max(80)).max(20).optional(),
-  medical_review_version: z.string().max(120).nullable().optional(),
-  legal_document_versions_required: z.record(z.string().max(80), z.string().max(120)).optional(),
+
   media_url: z.string().max(500).optional().nullable().refine(
     (v) => !v || isAllowedMediaUrl(v),
     { message: 'media_url must be an https URL from an allowed storage domain' },

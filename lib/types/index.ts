@@ -3,7 +3,6 @@ import type {
   AllowedUsage,
   ConsentPurposes,
   HcpVectorMap,
-  IntendedAudience,
   ReviewStatus,
 } from '../analytics/hcp';
 
@@ -27,13 +26,8 @@ export interface Quiz {
   play_count?: number;
   avg_score?: number;
   creator_name?: string;
-  intended_audience?: IntendedAudience;
-  presentation_mode?: string;
-  reading_level?: string | null;
-  jurisdiction_tags?: string[];
-  medical_review_version?: string | null;
-  legal_document_versions_required?: Record<string, string>;
 }
+
 
 export interface Question {
   id: string;
@@ -55,13 +49,8 @@ export interface Question {
   created_at: string;
   updated_at: string;
   choices: Choice[];
-  intended_audience?: IntendedAudience;
-  presentation_mode?: string;
-  reading_level?: string | null;
-  jurisdiction_tags?: string[];
-  medical_review_version?: string | null;
-  legal_document_versions_required?: Record<string, string>;
 }
+
 
 
 export interface Choice {

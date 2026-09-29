@@ -6,19 +6,12 @@ import {
   DEFAULT_CHOICE_METADATA,
   type AllowedUsage,
   type HcpVectorMap,
-  type IntendedAudience,
   type ReviewStatus,
 } from '@/lib/analytics/hcp';
 
 export type NormalNodeData = {
   node_name: string | null;
   question_text: string;
-  intended_audience: IntendedAudience;
-  presentation_mode?: string;
-  reading_level: string | null;
-  jurisdiction_tags: string[];
-  medical_review_version: string | null;
-  legal_document_versions_required: Record<string, string>;
   // score_impact: signed integer for utility scoring (positive = healthy, negative = risk/danger).
   // explanation: narrative/medical feedback shown after the player picks this choice.
   choices: Array<{

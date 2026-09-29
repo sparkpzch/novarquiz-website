@@ -58,8 +58,6 @@ export interface SessionComparisonItem {
   session: Session & {
     quiz_name?: string;
     quiz_description?: string;
-    intended_audience?: string;
-    presentation_mode?: string;
   };
   macroMetrics: {
     participantCount: number;
@@ -72,6 +70,7 @@ export interface SessionComparisonItem {
     question_text: string;
     node_type: string;
     total_responses: number;
+    total_utility_score?: number;
     avg_time_ms: number;
     node_friction_score: number;
     choices: Array<{
@@ -102,7 +101,7 @@ export interface SessionComparisonItem {
 }
 
 export interface QuizSessionsCompareViewProps {
-  quiz: Quiz | { id: string; name: string; description?: string | null; intended_audience?: string; created_at?: string };
+  quiz: Quiz | { id: string; name: string; description?: string | null; created_at?: string };
   comparedSessions: SessionComparisonItem[];
   allQuizzes?: Quiz[];
   allSessions?: any[];

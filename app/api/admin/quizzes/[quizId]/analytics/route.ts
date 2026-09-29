@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionAnalytics, getQuizInsightBreakdown, getQuizById } from '@/lib/db/queries';
+import { getSessionAnalytics, getQuizById } from '@/lib/db/queries';
 import pool from '@/lib/db/postgres';
 import { getSessionUser } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/ratelimit';
@@ -69,8 +69,6 @@ export async function GET(
     );
     const sessionRows = allSessionsResult.rows || [];
 
-    const insightBreakdown = await getQuizInsightBreakdown(quiz.id).catch(() => []);
-
     // Fetch analytics for each session in parallel
     const sessionAnalyticsPromises = sessionRows.map(async (sRow): Promise<SessionComparisonItem | null> => {
       try {
@@ -120,8 +118,6 @@ export async function GET(
             finished_at: analytics.session.finished_at,
             quiz_name: analytics.session.quiz_name,
             quiz_description: analytics.session.quiz_description,
-            intended_audience: analytics.session.intended_audience,
-            presentation_mode: analytics.session.presentation_mode,
           },
           macroMetrics: {
             participantCount,
@@ -134,6 +130,7 @@ export async function GET(
             question_text: q.question_text,
             node_type: q.node_type,
             total_responses: q.total_responses,
+            total_utility_score: q.total_utility_score,
             avg_time_ms: q.avg_time_ms,
             node_friction_score: q.node_friction_score,
             choices: (q.choices || []).map((c: Record<string, unknown>) => ({
@@ -145,22 +142,6 @@ export async function GET(
               behavior_meaning: c.behavior_meaning as string | undefined,
             })),
           })),
-          insights: analytics.insights,
-          insightBreakdownSummary: {
-            totalProfiled: insightBreakdown.length,
-            topArchetypes: insightBreakdown.reduce((acc: Record<string, number>, item) => {
-              if (item.archetype_id) {
-                acc[item.archetype_id] = (acc[item.archetype_id] || 0) + 1;
-              }
-              return acc;
-            }, {}),
-            frequentGaps: insightBreakdown
-              .flatMap((i) => i.gap_tags || [])
-              .reduce((acc: Record<string, number>, tag: string) => {
-                acc[tag] = (acc[tag] || 0) + 1;
-                return acc;
-              }, {}),
-          },
         };
       } catch (err) {
         console.error(`Error processing session ${sRow.id} for quiz ${quizId}:`, err);
@@ -234,7 +215,7 @@ export async function GET(
         question_text: string;
         node_type: string;
         totalResponses: number;
-        incorrectResponses: number;
+        totalUtilityScore: number;
         choicesMap: Map<string, { label: string; text: string; score_impact: number; count: number; clinical_tags: string[]; behavior_meaning?: string }>;
       }
     >();
@@ -262,17 +243,13 @@ export async function GET(
             question_text: q.question_text,
             node_type: q.node_type,
             totalResponses: q.total_responses,
-            incorrectResponses: q.choices
-              .filter((c) => c.score_impact <= 0)
-              .reduce((acc, c) => acc + c.count, 0),
+            totalUtilityScore: Number(q.total_utility_score) || 0,
             choicesMap,
           });
         } else {
           const existing = questionMap.get(q.id)!;
           existing.totalResponses += q.total_responses;
-          existing.incorrectResponses += q.choices
-            .filter((c) => c.score_impact <= 0)
-            .reduce((acc, c) => acc + c.count, 0);
+          existing.totalUtilityScore += Number(q.total_utility_score) || 0;
 
           q.choices.forEach((c) => {
             if (existing.choicesMap.has(c.label)) {
@@ -294,7 +271,9 @@ export async function GET(
 
     const consolidatedQuestions = Array.from(questionMap.values()).map((q) => {
       const errorRate = q.totalResponses > 0
-        ? Math.round((q.incorrectResponses / q.totalResponses) * 100)
+        ? Math.round(100 - (q.choicesMap.size > 0
+          ? Array.from(q.choicesMap.values()).filter((choice) => choice.score_impact > 0).reduce((sum, choice) => sum + choice.count, 0) / q.totalResponses
+          : 0) * 100)
         : 0;
 
       const choicesList = Array.from(q.choicesMap.values()).map((c) => ({
@@ -311,43 +290,44 @@ export async function GET(
         question_text: q.question_text,
         node_type: q.node_type,
         totalResponses: q.totalResponses,
+        totalUtilityScore: q.totalUtilityScore,
         errorRate,
-        frictionScore: Math.round(errorRate * 0.9),
         choices: choicesList,
         distractors,
       };
     });
 
-    // Clinical Domain Tag Mastery across all sessions
-    const tagScores: Record<string, { tag: string; totalResponses: number; correctResponses: number }> = {
-      '#SGLT2i-Dosage': { tag: '#SGLT2i-Dosage', totalResponses: 0, correctResponses: 0 },
-      '#LDL-Targets': { tag: '#LDL-Targets', totalResponses: 0, correctResponses: 0 },
-      '#HeartDisease-Symptoms': { tag: '#HeartDisease-Symptoms', totalResponses: 0, correctResponses: 0 },
-      '#Nutrition-Guidelines': { tag: '#Nutrition-Guidelines', totalResponses: 0, correctResponses: 0 },
-    };
+    // Treat a topic as attached to a question when any answer choice carries
+    // that topic tag. Score every response to that question so incorrect
+    // choices without the tag still count in the topic's denominator.
+    const tagScores: Record<string, { tag: string; totalResponses: number; totalUtilityScore: number; maxPossibleScore: number }> = {};
 
     consolidatedQuestions.forEach((q) => {
-      q.choices.forEach((c) => {
-        (c.clinical_tags || []).forEach((t) => {
-          if (!tagScores[t]) {
-            tagScores[t] = { tag: t, totalResponses: 0, correctResponses: 0 };
-          }
-          tagScores[t].totalResponses += c.count;
-          if (c.score_impact > 0) {
-            tagScores[t].correctResponses += c.count;
-          }
-        });
+      const questionTags = new Set(q.choices.flatMap((choice) => choice.clinical_tags || []));
+      if (questionTags.size === 0) return;
+
+      const maxScore = Math.max(0, ...q.choices.map((choice) => choice.score_impact));
+
+      questionTags.forEach((tag) => {
+        if (!tagScores[tag]) {
+          tagScores[tag] = { tag, totalResponses: 0, totalUtilityScore: 0, maxPossibleScore: 0 };
+        }
+        tagScores[tag].totalResponses += q.totalResponses;
+        tagScores[tag].totalUtilityScore += q.totalUtilityScore;
+        tagScores[tag].maxPossibleScore += q.totalResponses * maxScore;
       });
     });
 
     const domainMastery = Object.values(tagScores).map((ts) => {
-      const percentage = ts.totalResponses > 0
-        ? Math.round((ts.correctResponses / ts.totalResponses) * 100)
-        : 65;
+      const percentage = ts.maxPossibleScore > 0
+        ? Math.min(100, Math.max(0, Math.round((ts.totalUtilityScore / ts.maxPossibleScore) * 100)))
+        : 0;
       return {
         tag: ts.tag,
         percentage,
         sampleSize: ts.totalResponses,
+        earnedUtility: ts.totalUtilityScore,
+        maxPossibleUtility: ts.maxPossibleScore,
       };
     });
 
@@ -362,7 +342,6 @@ export async function GET(
         maxAccuracy,
         minAccuracy,
         accuracySpread,
-        dominantArchetype: 'Conservative Guideline Follower',
       },
       sessions: validComparedSessions.map((c) => ({
         id: c.session.id,
@@ -376,10 +355,8 @@ export async function GET(
         avgAccuracy: c.macroMetrics.avgAccuracy,
         avgTimeSeconds: c.macroMetrics.avgTimeSeconds,
       })),
-      comparedSessions: validComparedSessions,
       questions: consolidatedQuestions,
       domainMastery,
-      insightBreakdown,
     });
   } catch (error) {
     console.error('Failed to generate quiz overall analytics:', error);

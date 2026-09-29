@@ -7,12 +7,10 @@ import {
   accumulateVectors,
   classifyArchetype,
   DEFAULT_CHOICE_METADATA,
-  DEFAULT_QUESTION_METADATA,
   emptyHcpVectorMap,
   mostExpressiveVector,
   normalizeChoiceMetadata,
   normalizeProfileVectors,
-  normalizeQuestionMetadata,
   normalizeVectorMap,
   type AllowedUsage,
   type ConsentPurposes,
@@ -31,6 +29,7 @@ import type {
 import type { HealthStatsInput, HealthTopicRow } from '../stats/health';
 
 let layeredAnalyticsSchemaPromise: Promise<boolean> | null = null;
+let intendedAudienceSchemaPromise: Promise<boolean> | null = null;
 
 async function hasLayeredAnalyticsSchema() {
   if (!layeredAnalyticsSchemaPromise) {
@@ -40,19 +39,35 @@ async function hasLayeredAnalyticsSchema() {
          FROM information_schema.columns
          WHERE table_schema = 'public'
            AND (
-             (table_name = 'quizzes' AND column_name = 'intended_audience') OR
-             (table_name = 'questions' AND column_name = 'intended_audience') OR
              (table_name = 'choices' AND column_name = 'behavior_meaning') OR
              (table_name = 'user_answers' AND column_name = 'vector_scores') OR
              (table_name = 'leaderboard_entries' AND column_name = 'profile_vector_scores')
            )`,
       );
 
-      return Number(result.rows[0]?.count ?? 0) === 5;
+      return Number(result.rows[0]?.count ?? 0) === 3;
     })().catch(() => false);
   }
 
   return layeredAnalyticsSchemaPromise;
+}
+
+// Migration 014 removes quiz/question audience metadata while retaining the
+// layered analytics columns. Keep this capability independent of that schema.
+async function hasIntendedAudienceSchema() {
+  if (!intendedAudienceSchemaPromise) {
+    intendedAudienceSchemaPromise = pool
+      .query<{ exists: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_schema = 'public' AND table_name = 'quizzes'
+             AND column_name = 'intended_audience'
+         ) AS exists`,
+      )
+      .then((result) => result.rows[0]?.exists === true)
+      .catch(() => false);
+  }
+  return intendedAudienceSchemaPromise;
 }
 
 // ===================== Quizzes =====================
@@ -125,12 +140,6 @@ export async function getSessionByToken(token: string) {
        q.cover_image_url as cover_image_url,
        q.share_token as share_token,
        q.timer_seconds as timer_seconds,
-       ${layered ? "q.intended_audience" : "'public'"} as intended_audience,
-       ${layered ? "q.presentation_mode" : "'shared'"} as presentation_mode,
-       ${layered ? 'q.reading_level' : 'NULL'} as reading_level,
-       ${layered ? 'q.jurisdiction_tags' : "'[]'::jsonb"} as jurisdiction_tags,
-       ${layered ? 'q.medical_review_version' : 'NULL'} as medical_review_version,
-       ${layered ? 'q.legal_document_versions_required' : "'{}'::jsonb"} as legal_document_versions_required,
        (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count,
        p.display_name as user_name
      FROM sessions s
@@ -477,50 +486,22 @@ export async function duplicateQuiz(sourceIdOrSlug: string, createdBy: string, i
 
     for (const q of qRows) {
       const { rows: newQRows } = await client.query(
-        layered
-          ? `INSERT INTO questions (
-               session_id, question_order, question_text, node_name, intended_audience, presentation_mode,
-               reading_level, jurisdiction_tags, medical_review_version, legal_document_versions_required,
-               media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
-             )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id`
-          : `INSERT INTO questions (session_id, question_order, question_text, node_name, media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
-        layered
-          ? [
-              newSession.id,
-              q.question_order,
-              q.question_text,
-              q.node_name,
-              q.intended_audience ?? DEFAULT_QUESTION_METADATA.intended_audience,
-              'shared',
-              q.reading_level ?? null,
-              JSON.stringify(q.jurisdiction_tags ?? []),
-              q.medical_review_version ?? null,
-              JSON.stringify(q.legal_document_versions_required ?? {}),
-              q.media_type,
-              q.media_url,
-              q.media_path,
-              q.timer_override,
-              q.is_entry_point,
-              q.node_x,
-              q.node_y,
-              q.node_type,
-            ]
-          : [
-              newSession.id,
-              q.question_order,
-              q.question_text,
-              q.node_name,
-              q.media_type,
-              q.media_url,
-              q.media_path,
-              q.timer_override,
-              q.is_entry_point,
-              q.node_x,
-              q.node_y,
-              q.node_type,
-            ]
+        `INSERT INTO questions (session_id, question_order, question_text, node_name, media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+        [
+          newSession.id,
+          q.question_order,
+          q.question_text,
+          q.node_name,
+          q.media_type,
+          q.media_url,
+          q.media_path,
+          q.timer_override,
+          q.is_entry_point,
+          q.node_x,
+          q.node_y,
+          q.node_type,
+        ]
       );
       if (q.media_path) {
         await incrementMediaUsage(client, q.media_path);
@@ -611,12 +592,6 @@ export async function getQuestionsByQuiz(sessionId: string) {
   const choiceJson = layered ? buildChoiceJsonSql('c') : buildLegacyChoiceJsonSql('c');
   const result = await queryWithRetry(
     `SELECT q.*, 
-      ${layered ? "q.intended_audience" : "'public'"} as intended_audience,
-      ${layered ? "q.presentation_mode" : "'shared'"} as presentation_mode,
-      ${layered ? 'q.reading_level' : 'NULL'} as reading_level,
-      ${layered ? 'q.jurisdiction_tags' : "'[]'::jsonb"} as jurisdiction_tags,
-      ${layered ? 'q.medical_review_version' : 'NULL'} as medical_review_version,
-      ${layered ? 'q.legal_document_versions_required' : "'{}'::jsonb"} as legal_document_versions_required,
       COALESCE(json_agg(${choiceJson} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
      FROM questions q
      JOIN quizzes qs ON qs.id = q.session_id
@@ -662,12 +637,6 @@ export async function getQuestionById(questionId: string) {
   const choiceJson = layered ? buildChoiceJsonSql('c') : buildLegacyChoiceJsonSql('c');
   const result = await queryWithRetry(
     `SELECT q.*, 
-      ${layered ? "q.intended_audience" : "'public'"} as intended_audience,
-      ${layered ? "q.presentation_mode" : "'shared'"} as presentation_mode,
-      ${layered ? 'q.reading_level' : 'NULL'} as reading_level,
-      ${layered ? 'q.jurisdiction_tags' : "'[]'::jsonb"} as jurisdiction_tags,
-      ${layered ? 'q.medical_review_version' : 'NULL'} as medical_review_version,
-      ${layered ? 'q.legal_document_versions_required' : "'{}'::jsonb"} as legal_document_versions_required,
       COALESCE(json_agg(${choiceJson} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
      FROM questions q
      LEFT JOIN choices c ON c.question_id = q.id
@@ -687,12 +656,6 @@ export async function getEntryQuestion(id: string) {
   const choiceJson = layered ? buildChoiceJsonSql('c') : buildLegacyChoiceJsonSql('c');
   const result = await queryWithRetry(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
-      ${layered ? "q.intended_audience" : "'public'"} as intended_audience,
-      ${layered ? "q.presentation_mode" : "'shared'"} as presentation_mode,
-      ${layered ? 'q.reading_level' : 'NULL'} as reading_level,
-      ${layered ? 'q.jurisdiction_tags' : "'[]'::jsonb"} as jurisdiction_tags,
-      ${layered ? 'q.medical_review_version' : 'NULL'} as medical_review_version,
-      ${layered ? 'q.legal_document_versions_required' : "'{}'::jsonb"} as legal_document_versions_required,
       COALESCE(json_agg(${choiceJson} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
      FROM questions q
      JOIN quizzes qs ON qs.id = q.session_id
@@ -712,12 +675,6 @@ export async function createQuestion(data: {
   question_order: number;
   question_text: string;
   node_name?: string;
-  intended_audience?: string;
-  presentation_mode?: string;
-  reading_level?: string | null;
-  jurisdiction_tags?: string[];
-  medical_review_version?: string | null;
-  legal_document_versions_required?: Record<string, string>;
   media_type?: 'image' | 'gif' | 'video';
   media_url?: string;
   media_path?: string;
@@ -732,27 +689,18 @@ export async function createQuestion(data: {
     await client.query('BEGIN');
     const layered = await hasLayeredAnalyticsSchema();
     const questionId = data.id ?? randomUUID();
-    const metadata = normalizeQuestionMetadata(data);
     const result = await client.query(
       layered
         ? `INSERT INTO questions (
              id, session_id, question_order, question_text, node_name,
-             intended_audience, presentation_mode, reading_level, jurisdiction_tags,
-             medical_review_version, legal_document_versions_required,
              media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11::jsonb, $12, $13, $14, $15, $16, $17, $18, $19)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
            ON CONFLICT (id) DO UPDATE SET
              session_id = EXCLUDED.session_id,
              question_order = EXCLUDED.question_order,
              question_text = EXCLUDED.question_text,
              node_name = EXCLUDED.node_name,
-             intended_audience = EXCLUDED.intended_audience,
-             presentation_mode = EXCLUDED.presentation_mode,
-             reading_level = EXCLUDED.reading_level,
-             jurisdiction_tags = EXCLUDED.jurisdiction_tags,
-             medical_review_version = EXCLUDED.medical_review_version,
-             legal_document_versions_required = EXCLUDED.legal_document_versions_required,
              media_type = EXCLUDED.media_type,
              media_url = EXCLUDED.media_url,
              media_path = EXCLUDED.media_path,
@@ -783,43 +731,21 @@ export async function createQuestion(data: {
              node_type = EXCLUDED.node_type,
              updated_at = NOW()
            RETURNING *`,
-      layered
-        ? [
-            questionId,
-            data.session_id,
-            data.question_order,
-            data.question_text,
-            data.node_name || null,
-            metadata.intended_audience,
-            'shared',
-            metadata.reading_level,
-            JSON.stringify(metadata.jurisdiction_tags),
-            metadata.medical_review_version,
-            JSON.stringify(metadata.legal_document_versions_required),
-            data.media_type || null,
-            data.media_url || null,
-            data.media_path || null,
-            data.timer_override || null,
-            data.is_entry_point || false,
-            data.node_x || 0,
-            data.node_y || 0,
-            data.node_type || 'normal',
-          ]
-        : [
-            questionId,
-            data.session_id,
-            data.question_order,
-            data.question_text,
-            data.node_name || null,
-            data.media_type || null,
-            data.media_url || null,
-            data.media_path || null,
-            data.timer_override || null,
-            data.is_entry_point || false,
-            data.node_x || 0,
-            data.node_y || 0,
-            data.node_type || 'normal',
-          ],
+      [
+        questionId,
+        data.session_id,
+        data.question_order,
+        data.question_text,
+        data.node_name || null,
+        data.media_type || null,
+        data.media_url || null,
+        data.media_path || null,
+        data.timer_override || null,
+        data.is_entry_point || false,
+        data.node_x || 0,
+        data.node_y || 0,
+        data.node_type || 'normal',
+      ],
     );
     
     if (data.media_path) {
@@ -898,19 +824,6 @@ function buildLegacyChoiceJsonSql(alias: string) {
 function hydrateQuestionRow<T extends Record<string, unknown>>(row: T): T {
   return {
     ...row,
-    intended_audience:
-      typeof row.intended_audience === 'string'
-        ? row.intended_audience
-        : DEFAULT_QUESTION_METADATA.intended_audience,
-    presentation_mode:
-      typeof row.presentation_mode === 'string'
-        ? row.presentation_mode
-        : 'shared',
-    reading_level: typeof row.reading_level === 'string' ? row.reading_level : null,
-    jurisdiction_tags: parseStringArray(row.jurisdiction_tags),
-    medical_review_version:
-      typeof row.medical_review_version === 'string' ? row.medical_review_version : null,
-    legal_document_versions_required: parseRecord(row.legal_document_versions_required),
     choices: Array.isArray(row.choices)
       ? row.choices.map((choice) => {
           const rawChoice = (choice ?? {}) as Record<string, unknown>;
@@ -949,12 +862,6 @@ type GraphQuestionInput = {
   question_order: number;
   question_text: string;
   node_name?: string | null;
-  intended_audience?: string;
-  presentation_mode?: string;
-  reading_level?: string | null;
-  jurisdiction_tags?: string[];
-  medical_review_version?: string | null;
-  legal_document_versions_required?: Record<string, string>;
   media_type?: 'image' | 'gif' | 'video' | null;
   media_url?: string | null;
   media_path?: string | null;
@@ -1015,59 +922,34 @@ export async function replaceQuizGraph(
     for (const question of questions) {
       const sourceId = question.id ?? randomUUID();
       const questionId = sourceId && UUID_RE.test(sourceId) ? sourceId : randomUUID();
-      const questionMetadata = normalizeQuestionMetadata(question);
 
       await client.query(
         layered
           ? `INSERT INTO questions (
                id, session_id, question_order, question_text, node_name,
-               intended_audience, presentation_mode, reading_level, jurisdiction_tags,
-               medical_review_version, legal_document_versions_required,
                media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
              )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11::jsonb, $12, $13, $14, $15, $16, $17, $18, $19)`
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
           : `INSERT INTO questions (
                id, session_id, question_order, question_text, node_name,
                media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
              )
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-        layered
-          ? [
-              questionId,
-              sessionId,
-              question.question_order,
-              question.question_text,
-              question.node_name ?? null,
-              questionMetadata.intended_audience,
-              'shared',
-              questionMetadata.reading_level,
-              JSON.stringify(questionMetadata.jurisdiction_tags),
-              questionMetadata.medical_review_version,
-              JSON.stringify(questionMetadata.legal_document_versions_required),
-              question.media_type ?? null,
-              question.media_url ?? null,
-              question.media_path ?? null,
-              question.timer_override ?? null,
-              question.is_entry_point ?? false,
-              question.node_x ?? 0,
-              question.node_y ?? 0,
-              question.node_type ?? 'normal',
-            ]
-          : [
-              questionId,
-              sessionId,
-              question.question_order,
-              question.question_text,
-              question.node_name ?? null,
-              question.media_type ?? null,
-              question.media_url ?? null,
-              question.media_path ?? null,
-              question.timer_override ?? null,
-              question.is_entry_point ?? false,
-              question.node_x ?? 0,
-              question.node_y ?? 0,
-              question.node_type ?? 'normal',
-            ],
+        [
+          questionId,
+          sessionId,
+          question.question_order,
+          question.question_text,
+          question.node_name ?? null,
+          question.media_type ?? null,
+          question.media_url ?? null,
+          question.media_path ?? null,
+          question.timer_override ?? null,
+          question.is_entry_point ?? false,
+          question.node_x ?? 0,
+          question.node_y ?? 0,
+          question.node_type ?? 'normal',
+        ],
       );
 
       idMap[sourceId] = questionId;
@@ -1342,12 +1224,6 @@ export async function getNextQuestion(fromQuestionId: string, choiceLabel: strin
   const choiceJson = layered ? buildChoiceJsonSql('c') : buildLegacyChoiceJsonSql('c');
   const result = await queryWithRetry(
     `SELECT q.*, qs.timer_seconds AS session_timer_seconds,
-      ${layered ? "q.intended_audience" : "'public'"} as intended_audience,
-      ${layered ? "q.presentation_mode" : "'shared'"} as presentation_mode,
-      ${layered ? 'q.reading_level' : 'NULL'} as reading_level,
-      ${layered ? 'q.jurisdiction_tags' : "'[]'::jsonb"} as jurisdiction_tags,
-      ${layered ? 'q.medical_review_version' : 'NULL'} as medical_review_version,
-      ${layered ? 'q.legal_document_versions_required' : "'{}'::jsonb"} as legal_document_versions_required,
       COALESCE(json_agg(${choiceJson} ORDER BY c.label) FILTER (WHERE c.id IS NOT NULL), '[]'::json) as choices
      FROM question_connections qc
      JOIN questions q ON q.id = qc.to_question_id
@@ -1677,7 +1553,7 @@ export async function getUserHealthStatsInput(userId: string): Promise<HealthSta
     queryWithRetry<HealthTopicRow>(
       `SELECT qz.id AS quiz_id,
               qz.name AS quiz_name,
-              ${layered ? 'qz.intended_audience' : "'public'"} AS audience,
+              'public' AS audience,
               COUNT(*)::int AS answered,
               COUNT(*) FILTER (WHERE latest.utility_score > 0)::int AS positive,
               MAX(latest.answered_at)::text AS last_answered_at
@@ -1689,7 +1565,7 @@ export async function getUserHealthStatsInput(userId: string): Promise<HealthSta
        ) latest
        JOIN questions q ON q.id = latest.question_id
        JOIN quizzes qz ON qz.id = q.session_id
-       GROUP BY qz.id, qz.name${layered ? ', qz.intended_audience' : ''}`,
+       GROUP BY qz.id, qz.name`,
       [userId],
     ),
     queryWithRetry<{ day: string }>(
@@ -1969,8 +1845,9 @@ export async function getQuizInsightBreakdown(
     [quizId],
   );
 
+  const hasAudience = await hasIntendedAudienceSchema();
   const quiz = await queryWithRetry<{ intended_audience: string | null }>(
-    `SELECT ${layered ? 'intended_audience' : "'public' AS intended_audience"} FROM quizzes WHERE id = $1`,
+    `SELECT ${hasAudience ? 'intended_audience' : "'public' AS intended_audience"} FROM quizzes WHERE id = $1`,
     [quizId],
   );
   const audience = (quiz.rows[0]?.intended_audience ?? 'public') as IntendedAudience;
@@ -2178,13 +2055,14 @@ export async function getQuizDraftContext(
   scenarios: DraftScenario[];
 } | null> {
   const layered = await hasLayeredAnalyticsSchema();
+  const hasAudience = await hasIntendedAudienceSchema();
 
   const quiz = await queryWithRetry<{
     name: string;
     description: string | null;
     intended_audience: string | null;
   }>(
-    `SELECT name, description, ${layered ? 'intended_audience' : "'public' AS intended_audience"}
+    `SELECT name, description, ${hasAudience ? 'intended_audience' : "'public' AS intended_audience"}
      FROM quizzes WHERE id = $1`,
     [quizId],
   );
@@ -2464,12 +2342,6 @@ export async function getSessionById(id: string) {
        q.cover_image_url as cover_image_url,
        q.share_token as share_token,
        q.timer_seconds as timer_seconds,
-       ${layered ? "q.intended_audience" : "'public'"} as intended_audience,
-       ${layered ? "q.presentation_mode" : "'shared'"} as presentation_mode,
-       ${layered ? 'q.reading_level' : 'NULL'} as reading_level,
-       ${layered ? 'q.jurisdiction_tags' : "'[]'::jsonb"} as jurisdiction_tags,
-       ${layered ? 'q.medical_review_version' : 'NULL'} as medical_review_version,
-       ${layered ? 'q.legal_document_versions_required' : "'{}'::jsonb"} as legal_document_versions_required,
        (SELECT COUNT(*) FROM questions q2 WHERE q2.session_id = q.id)::int AS question_count,
        p.display_name as user_name
      FROM sessions s
@@ -2515,13 +2387,8 @@ export async function getSessionAnalytics(sessionId: string) {
        q.question_text,
        q.question_order,
        q.node_type,
-       ${layered ? "q.intended_audience" : "'public'"} as intended_audience,
-       ${layered ? "q.presentation_mode" : "'shared'"} as presentation_mode,
-       ${layered ? 'q.reading_level' : 'NULL'} as reading_level,
-       ${layered ? 'q.jurisdiction_tags' : "'[]'::jsonb"} as jurisdiction_tags,
-       ${layered ? 'q.medical_review_version' : 'NULL'} as medical_review_version,
-       ${layered ? 'q.legal_document_versions_required' : "'{}'::jsonb"} as legal_document_versions_required,
        (SELECT COUNT(*) FROM user_answers WHERE question_id = q.id AND session_id = $1)::int as total_responses,
+       (SELECT COALESCE(SUM(utility_score), 0)::int FROM user_answers WHERE question_id = q.id AND session_id = $1) as total_utility_score,
        (SELECT COALESCE(AVG(time_taken_ms), 0)::int FROM user_answers WHERE question_id = q.id AND session_id = $1) as avg_time_ms,
        COALESCE((
          SELECT json_agg(json_build_object(
@@ -2539,6 +2406,40 @@ export async function getSessionAnalytics(sessionId: string) {
      ORDER BY q.question_order ASC`,
     [actualId]
   );
+
+  const individualAnswersResult = await pool.query(
+    `SELECT DISTINCT ON (ua.user_id, ua.question_id)
+       ua.user_id,
+       ua.question_id,
+       ua.chosen_label,
+       ua.time_taken_ms,
+       ua.utility_score,
+       ua.utility_score > 0 AS is_correct
+     FROM user_answers ua
+     WHERE ua.session_id = $1
+       AND ua.user_id IS NOT NULL
+     ORDER BY ua.user_id, ua.question_id, ua.answered_at DESC, ua.id DESC`,
+    [actualId],
+  );
+
+  const responsesByQuestion = new Map<string, Record<string, {
+    selectedOption: string;
+    isCorrect: boolean;
+    utilityScore: number;
+    timeSeconds: number;
+  }>>();
+  individualAnswersResult.rows.forEach((answer) => {
+    const questionId = String(answer.question_id);
+    const userId = String(answer.user_id);
+    const responses = responsesByQuestion.get(questionId) ?? {};
+    responses[userId] = {
+      selectedOption: String(answer.chosen_label ?? ''),
+      isCorrect: Boolean(answer.is_correct),
+      utilityScore: Number(answer.utility_score) || 0,
+      timeSeconds: Math.round((Number(answer.time_taken_ms) || 0) / 1000),
+    };
+    responsesByQuestion.set(questionId, responses);
+  });
 
   // Admin-only: rows are returned unmasked (every participant, real identity).
   const leaderboard = leaderboardResult.rows
@@ -2577,13 +2478,12 @@ export async function getSessionAnalytics(sessionId: string) {
     return {
       ...hydrated,
       total_responses: totalResponses,
+      total_utility_score: Number(row.total_utility_score) || 0,
       avg_time_ms: (row.avg_time_ms as number) ?? 0,
       divergence_rate: divergenceRate,
       node_friction_score: nodeFrictionScore,
-      content_quality_flag:
-        hydrated.intended_audience === 'hcp' && !hydrated.medical_review_version
-          ? 'needs_medical_review'
-          : 'shared_ready',
+      content_quality_flag: 'shared_ready',
+      user_responses: responsesByQuestion.get(String(row.id)) ?? {},
     };
   });
 
@@ -2644,7 +2544,7 @@ export async function getPeerSessionsForQuiz(currentSessionId: string, quizId: s
          s.pin_code,
          s.status,
          s.started_at,
-         s.ended_at,
+         s.finished_at AS ended_at,
          (SELECT COUNT(*) FROM leaderboard_entries le WHERE le.session_id = s.id)::int as participant_count,
          (SELECT COALESCE(AVG(total_score), 0)::int FROM leaderboard_entries le WHERE le.session_id = s.id) as avg_score
        FROM sessions s
@@ -2669,7 +2569,7 @@ export async function getSessionsByQuizId(quizId: string) {
          s.pin_code,
          s.status,
          s.started_at,
-         s.ended_at,
+         s.finished_at AS ended_at,
          s.created_at,
          s.is_private,
          (SELECT COUNT(*) FROM leaderboard_entries le WHERE le.session_id = s.id)::int as participant_count,

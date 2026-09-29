@@ -19,21 +19,8 @@ import { HCP_VECTOR_KEYS } from "@/lib/analytics/hcp";
 
 function validateGraph(nodes: AppNode[]) {
   for (const node of nodes) {
-    const data = node.data as AppNodeData;
-    if (!data.intended_audience || !(data.jurisdiction_tags?.length)) {
-      return "Every node needs an audience and at least one jurisdiction tag.";
-    }
-    if (!data.legal_document_versions_required || Object.keys(data.legal_document_versions_required).length === 0) {
-      return "Every node needs legal document version references.";
-    }
-    if (
-      data.intended_audience === "hcp" &&
-      !data.medical_review_version
-    ) {
-      return "HCP nodes need a medical review version.";
-    }
-
     if (node.type === "normalNode") {
+      const data = node.data as AppNodeData;
       const choices = (data as NormalNodeData).choices ?? [];
       for (const choice of choices) {
         if (!choice.behavior_meaning?.trim()) {
@@ -69,12 +56,6 @@ function serializeGraph(nodes: AppNode[], edges: AppEdge[]) {
         question_order: index,
         question_text: data.question_text,
         node_name: data.node_name ?? null,
-        intended_audience: data.intended_audience,
-        presentation_mode: "shared",
-        reading_level: data.reading_level,
-        jurisdiction_tags: data.jurisdiction_tags,
-        medical_review_version: data.medical_review_version,
-        legal_document_versions_required: data.legal_document_versions_required,
         media_type: data.media_type,
         media_url: data.media_url,
         media_path: data.media_path,

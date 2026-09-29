@@ -69,15 +69,6 @@ function serializeGraph(nodes: AppNode[], edges: AppEdge[]) {
         question_order: index,
         question_text: data.question_text,
         node_name: data.node_name ?? null,
-        // Sensible defaults for enterprise fields
-        intended_audience: data.intended_audience || "public",
-        presentation_mode: "shared",
-        reading_level: data.reading_level || null,
-        jurisdiction_tags: (data.jurisdiction_tags?.length) ? data.jurisdiction_tags : ["GLOBAL"],
-        medical_review_version: data.medical_review_version || null,
-        legal_document_versions_required: (data.legal_document_versions_required && Object.keys(data.legal_document_versions_required).length) 
-          ? data.legal_document_versions_required 
-          : { "terms": "v1.0" },
         media_type: data.media_type,
         media_url: data.media_url,
         media_path: data.media_path,
@@ -128,12 +119,6 @@ function toFlowNodes(questions: Question[]): AppNode[] {
     const common = {
       node_name: q.node_name ?? null,
       question_text: q.question_text,
-      intended_audience: q.intended_audience ?? "public",
-      presentation_mode: "shared",
-      reading_level: q.reading_level ?? null,
-      jurisdiction_tags: q.jurisdiction_tags ?? [],
-      medical_review_version: q.medical_review_version ?? null,
-      legal_document_versions_required: q.legal_document_versions_required ?? {},
       media_type: q.media_type,
       media_url: q.media_url,
       media_path: q.media_path,

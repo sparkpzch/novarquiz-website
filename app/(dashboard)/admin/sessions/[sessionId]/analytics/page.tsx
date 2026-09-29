@@ -11,8 +11,6 @@ interface AnalyticsData {
   session: Session & {
     quiz_name: string;
     quiz_description: string;
-    intended_audience?: string;
-    presentation_mode?: string;
   };
   leaderboard: (LeaderboardEntry & { profile_photo?: string })[];
   questions: Array<{

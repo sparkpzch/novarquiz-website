@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
         pin_code: s.pin_code,
         status: s.status,
         started_at: s.started_at,
-        ended_at: s.ended_at,
+        ended_at: s.finished_at,
         created_at: s.created_at,
         is_private: s.is_private,
       }));
@@ -107,8 +107,6 @@ export async function GET(request: NextRequest) {
             ended_at: analytics.session.ended_at,
             quiz_name: analytics.session.quiz_name,
             quiz_description: analytics.session.quiz_description,
-            intended_audience: analytics.session.intended_audience,
-            presentation_mode: analytics.session.presentation_mode,
           },
           macroMetrics: {
             participantCount,
@@ -160,7 +158,6 @@ export async function GET(request: NextRequest) {
         id: quiz.id,
         name: quiz.name,
         description: quiz.description,
-        intended_audience: quiz.intended_audience,
         created_at: quiz.created_at,
       } : null,
       comparedSessions: results,

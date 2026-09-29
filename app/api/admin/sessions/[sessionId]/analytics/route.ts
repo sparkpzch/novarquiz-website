@@ -51,21 +51,19 @@ export async function GET(
     }
 
     // 3. Emit structured audit log when HCP profiling data is accessed.
-    //    Covers sessions with HCP audience or entries with non-aggregate classification.
-    const isHcpSession = analytics.session?.intended_audience === 'hcp';
+    //    Covers sessions with entries with non-aggregate classification.
     const pseudonymousCount = analytics.leaderboard.filter(
       (row) =>
         (row as Record<string, unknown>).insight_classification === 'pseudonymous' ||
         (row as Record<string, unknown>).insight_classification === 'identified',
     ).length;
 
-    if (isHcpSession || pseudonymousCount > 0) {
+    if (pseudonymousCount > 0) {
       console.error(
         JSON.stringify({
           event: 'admin_hcp_profile_read',
           admin_uid: user.uid,
           session_id: sessionId,
-          hcp_session: isHcpSession,
           profiled_entry_count: pseudonymousCount,
           timestamp: new Date().toISOString(),
         }),

@@ -16,12 +16,6 @@ import { storage } from '@/lib/firebase/config';
 import { useFFmpeg } from '@/lib/hooks/useFFmpeg';
 import { useToast } from '@/components/ui/Toast';
 import AutoPlayVideo from '@/components/ui/AutoPlayVideo';
-import {
-  ALLOWED_USAGE_OPTIONS,
-  HCP_VECTOR_KEYS,
-  REVIEW_STATUS_OPTIONS,
-  AUDIENCE_OPTIONS,
-} from '@/lib/analytics/hcp';
 import type { NormalNodeData } from './NormalNode';
 import type { SituationNodeData } from './SituationNode';
 import type { EndNodeData } from './EndNode';
@@ -161,7 +155,6 @@ export function LeftInspector({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [imgLoadError, setImgLoadError] = useState(false);
   const [compressing, setCompressing] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { load: loadFFmpeg, progress: ffmpegProgress, compressVideo } = useFFmpeg();
   const { showToast } = useToast();
@@ -467,80 +460,6 @@ export function LeftInspector({
 
         <Divider />
 
-        {/* ── Advanced Settings Trigger ── */}
-        <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          style={{
-            width: '100%', padding: '8px 12px', borderRadius: 8, marginBottom: 12,
-            background: 'rgba(112,162,249,0.08)', border: '1px solid rgba(112,162,249,0.15)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            cursor: 'pointer', color: '#35527e', fontSize: 11, fontWeight: 700,
-          }}
-        >
-          <span>Advanced / Novartis Settings</span>
-          <span style={{ transition: 'transform 0.2s', transform: showAdvanced ? 'rotate(180deg)' : 'none' }}>▼</span>
-        </button>
-
-        {showAdvanced && (
-          <div style={{ padding: '0 4px 12px', borderBottom: '1px solid rgba(112,162,249,0.1)', marginBottom: 12 }}>
-            <div style={{ marginBottom: 12 }}>
-              <FieldLabel hint="Public vs HCP audience">Intended Audience</FieldLabel>
-              <select
-                value={draft.intended_audience ?? 'public'}
-                onChange={e => patch({ intended_audience: e.target.value as NodeData['intended_audience'] })}
-                style={selectStyle}
-              >
-                {AUDIENCE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <FieldLabel hint="Optional">Reading Level</FieldLabel>
-              <input
-                type="text"
-                value={draft.reading_level ?? ''}
-                onChange={e => patch({ reading_level: e.target.value || null })}
-                placeholder="e.g. general public / clinician"
-                style={inputStyle}
-              />
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <FieldLabel hint="Comma separated">Jurisdiction Tags</FieldLabel>
-              <input
-                type="text"
-                value={(draft.jurisdiction_tags ?? []).join(', ')}
-                onChange={e => patch({ jurisdiction_tags: parseCommaSeparated(e.target.value) })}
-                placeholder="GLOBAL, TH"
-                style={inputStyle}
-              />
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <FieldLabel hint="Required for HCP/distinct content">Medical Review Version</FieldLabel>
-              <input
-                type="text"
-                value={draft.medical_review_version ?? ''}
-                onChange={e => patch({ medical_review_version: e.target.value || null })}
-                placeholder="e.g. med-2026-01"
-                style={inputStyle}
-              />
-            </div>
-
-            <div style={{ marginBottom: 0 }}>
-              <FieldLabel hint="One per line: doc:version">Legal Document Versions</FieldLabel>
-              <textarea
-                rows={3}
-                value={formatKeyValueLines(draft.legal_document_versions_required)}
-                onChange={e => patch({ legal_document_versions_required: parseKeyValueLines(e.target.value) })}
-                placeholder={'terms:2026-05-19\nprivacy:2026-05-19'}
-                style={{ ...textareaStyle, fontSize: 10 }}
-              />
-            </div>
-          </div>
-        )}
 
         {/* ── Entry point toggle ── */}
         {!isEnd && (
@@ -626,38 +545,36 @@ export function LeftInspector({
                     </div>
 
 
-                    {/* Score impact - Only shown for Public or Mixed audiences */}
-                    {(draft.intended_audience === 'public' || draft.intended_audience === 'mixed') && (
-                      <div style={{ marginBottom: 6 }}>
-                        <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                          Utility Score
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                          {SCORE_PRESETS.map(p => (
-                            <ScoreButton
-                              key={p.value}
-                              value={p.value}
-                              active={score === p.value}
-                              onClick={() => updateChoice({ score_impact: p.value })}
-                            />
-                          ))}
-                          <input
-                            type="number"
-                            step={1}
-                            value={score}
-                            onChange={e => updateChoice({ score_impact: Math.trunc(Number(e.target.value)) || 0 })}
-                            title="Custom utility score"
-                            style={{
-                              width: 48, height: 22, borderRadius: 5,
-                              border: `1px solid ${score > 0 ? '#34d39940' : score < 0 ? '#fb718540' : 'rgba(255,255,255,0.1)'}`,
-                              background: score > 0 ? 'rgba(52,211,153,0.1)' : score < 0 ? 'rgba(251,113,133,0.1)' : 'rgba(255,255,255,0.05)',
-                              color: score > 0 ? '#34d399' : score < 0 ? '#fb7185' : '#9ca3af',
-                              fontSize: 10, textAlign: 'center', outline: 'none', fontFamily: 'monospace',
-                            }}
-                          />
-                        </div>
+                    {/* Score impact */}
+                    <div style={{ marginBottom: 6 }}>
+                      <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                        Utility Score
                       </div>
-                    )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                        {SCORE_PRESETS.map(p => (
+                          <ScoreButton
+                            key={p.value}
+                            value={p.value}
+                            active={score === p.value}
+                            onClick={() => updateChoice({ score_impact: p.value })}
+                          />
+                        ))}
+                        <input
+                          type="number"
+                          step={1}
+                          value={score}
+                          onChange={e => updateChoice({ score_impact: Math.trunc(Number(e.target.value)) || 0 })}
+                          title="Custom utility score"
+                          style={{
+                            width: 48, height: 22, borderRadius: 5,
+                            border: `1px solid ${score > 0 ? '#34d39940' : score < 0 ? '#fb718540' : 'rgba(255,255,255,0.1)'}`,
+                            background: score > 0 ? 'rgba(52,211,153,0.1)' : score < 0 ? 'rgba(251,113,133,0.1)' : 'rgba(255,255,255,0.05)',
+                            color: score > 0 ? '#34d399' : score < 0 ? '#fb7185' : '#9ca3af',
+                            fontSize: 10, textAlign: 'center', outline: 'none', fontFamily: 'monospace',
+                          }}
+                        />
+                      </div>
+                    </div>
 
                     {/* Explanation */}
                     <div style={{ marginBottom: 6 }}>
@@ -697,67 +614,6 @@ export function LeftInspector({
                       />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 6 }}>
-                      <div>
-                        <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                          Data Privacy Mode
-                        </div>
-                        <select
-                          value={c.allowed_usage ?? 'aggregate_only'}
-                          onChange={e => updateChoice({ allowed_usage: e.target.value as typeof c.allowed_usage })}
-                          style={selectStyle}
-                        >
-                          {ALLOWED_USAGE_OPTIONS.map((option) => (
-                            <option key={option} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                          Review Status
-                        </div>
-                        <select
-                          value={c.review_status ?? 'draft'}
-                          onChange={e => updateChoice({ review_status: e.target.value as typeof c.review_status })}
-                          style={selectStyle}
-                        >
-                          {REVIEW_STATUS_OPTIONS.map((option) => (
-                            <option key={option} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 6 }}>
-                      <div>
-                        <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                          Insight Impact (0-3)
-                        </div>
-                        <input
-                          type="number"
-                          min={0}
-                          max={3}
-                          step={0.1}
-                          value={c.confidence_weight ?? 1}
-                          onChange={e => updateChoice({ confidence_weight: Number(e.target.value) || 0 })}
-                          style={inputStyle}
-                        />
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'end' }}>
-                        {/* Only show "Requires HCP version" for Mixed audience */}
-                        {draft.intended_audience === 'mixed' && (
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#35527e', fontSize: 10, fontWeight: 600 }}>
-                            <input
-                              type="checkbox"
-                              checked={Boolean(c.requires_hcp_version)}
-                              onChange={e => updateChoice({ requires_hcp_version: e.target.checked })}
-                            />
-                            Requires HCP version
-                          </label>
-                        )}
-                      </div>
-                    </div>
-
                     <div style={{ marginBottom: 6 }}>
                       <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                         Keywords
@@ -770,34 +626,6 @@ export function LeftInspector({
                         style={inputStyle}
                       />
                     </div>
-
-                    {/* Behavioral Insights - Only shown for HCP or Mixed audiences */}
-                    {(draft.intended_audience === 'hcp' || draft.intended_audience === 'mixed') && (
-                      <div style={{ marginBottom: 6 }}>
-                        <div style={{ fontSize: 9, color: '#5f7699', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                          Doctor Behavioral Insights
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                          {HCP_VECTOR_KEYS.map((key) => (
-                            <label key={key} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                              <span style={{ fontSize: 9, color: '#35527e', fontWeight: 700 }}>{key}</span>
-                              <input
-                                type="number"
-                                step={0.1}
-                                value={c.vector_deltas?.[key] ?? 0}
-                                onChange={e => updateChoice({
-                                  vector_deltas: {
-                                    ...(c.vector_deltas ?? {}),
-                                    [key]: Number(e.target.value) || 0,
-                                  },
-                                })}
-                                style={inputStyle}
-                              />
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )}
 
                     {/* Routing */}
                     <div>

@@ -35,7 +35,6 @@ import Button from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import {
   DEFAULT_CHOICE_METADATA,
-  DEFAULT_QUESTION_METADATA,
 } from '@/lib/analytics/hcp';
 import { NormalNode, type NormalNodeData } from './NormalNode';
 import { SituationNode, type SituationNodeData } from './SituationNode';
@@ -95,7 +94,6 @@ const nodeTypes: NodeTypes = {
 export const defaultNormalData = (): NormalNodeData => ({
   node_name: null,
   question_text: '',
-  ...DEFAULT_QUESTION_METADATA,
   choices: [
     { label: 'A', choice_text: '', score_impact: 0, explanation: '', ...DEFAULT_CHOICE_METADATA },
     { label: 'B', choice_text: '', score_impact: 0, explanation: '', ...DEFAULT_CHOICE_METADATA },
@@ -112,7 +110,6 @@ export const defaultNormalData = (): NormalNodeData => ({
 export const defaultSituationData = (): SituationNodeData => ({
   node_name: null,
   question_text: '',
-  ...DEFAULT_QUESTION_METADATA,
   media_type: null,
   media_url: null,
   media_path: null,
@@ -122,7 +119,6 @@ export const defaultSituationData = (): SituationNodeData => ({
 export const defaultEndData = (): EndNodeData => ({
   node_name: null,
   question_text: '',
-  ...DEFAULT_QUESTION_METADATA,
   media_type: null,
   media_url: null,
   media_path: null,

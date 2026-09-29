@@ -2,7 +2,6 @@
 
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import type { IntendedAudience } from '@/lib/analytics/hcp';
 
 // End nodes terminate a branch. They render an optional final message/media
 // to the player, then finish the session. Target handle only — no outgoing
@@ -10,12 +9,6 @@ import type { IntendedAudience } from '@/lib/analytics/hcp';
 export type EndNodeData = {
   node_name: string | null;
   question_text: string;
-  intended_audience: IntendedAudience;
-  presentation_mode?: string;
-  reading_level: string | null;
-  jurisdiction_tags: string[];
-  medical_review_version: string | null;
-  legal_document_versions_required: Record<string, string>;
   media_type: string | null;
   media_url: string | null;
   media_path: string | null;
