@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import RefreshButton from '@/components/ui/RefreshButton';
 
 export interface TopicBreakdownItem {
   tag: string;
@@ -38,6 +39,10 @@ export interface TopicUnderstandingBreakdownProps {
   onToggleTag?: (tag: string) => void;
   variant?: 'report' | 'dashboard';
   emptyMessage?: string;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+  lastFetchedAt?: number | null;
+  refreshError?: boolean;
 }
 
 const TOPIC_META: Record<string, { description: string; icon: string }> = {
@@ -56,6 +61,10 @@ export function TopicUnderstandingBreakdown({
   onToggleTag,
   variant = 'report',
   emptyMessage = 'No topic tags are present in this report.',
+  onRefresh,
+  isRefreshing = false,
+  lastFetchedAt = null,
+  refreshError = false,
 }: TopicUnderstandingBreakdownProps) {
   const dashboardVariant = variant === 'dashboard';
   const [sortBy, setSortBy] = useState<'lowest' | 'highest' | 'responses' | 'name'>('lowest');
@@ -81,6 +90,15 @@ export function TopicUnderstandingBreakdown({
           <p className={`mt-0.5 text-xs ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>{description}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {dashboardVariant && onRefresh && (
+            <RefreshButton
+              onRefresh={onRefresh}
+              isRefreshing={isRefreshing}
+              lastFetchedAt={lastFetchedAt}
+              refreshError={refreshError}
+              theme="dark"
+            />
+          )}
           <label className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>
             Sort
             <select aria-label="Sort topics" value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium normal-case tracking-normal focus:outline-none focus:ring-2 ${dashboardVariant ? 'border-white/12 bg-[#0a1234] text-[#e4eaff] focus:ring-[#7898ff]' : 'nq-report-control border-[#0460A9]/20 bg-white text-[#16324F] focus:ring-[#0460A9]'}`}>

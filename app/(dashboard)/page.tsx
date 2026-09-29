@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "motion/react";
@@ -36,6 +36,42 @@ type DashboardHealthStats = {
   topicBreakdown: TopicBreakdownItem[];
   answered: number;
 };
+
+type CachedDashboardHealthStats = {
+  data: DashboardHealthStats;
+  fetchedAt: number;
+};
+
+const HEALTH_STATS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function dashboardHealthStatsCacheKey(uid: string, locale: string) {
+  return `novarquiz:health-stats:v1:${uid}:${locale}`;
+}
+
+function readDashboardHealthStatsCache(key: string): CachedDashboardHealthStats | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as CachedDashboardHealthStats;
+    if (
+      !value ||
+      typeof value.fetchedAt !== "number" ||
+      !value.data ||
+      !Array.isArray(value.data.topicBreakdown)
+    ) return null;
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+function writeDashboardHealthStatsCache(key: string, value: CachedDashboardHealthStats) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Keep analytics usable when browser storage is disabled or full.
+  }
+}
 
 type DashboardSession = {
   id: string;
@@ -390,37 +426,71 @@ export default function DashboardPage() {
   const [healthStats, setHealthStats] = useState<DashboardHealthStats | null>(null);
   const [healthStatsLoading, setHealthStatsLoading] = useState(true);
   const [healthStatsError, setHealthStatsError] = useState(false);
+  const [healthStatsRefreshing, setHealthStatsRefreshing] = useState(false);
+  const [healthStatsFetchedAt, setHealthStatsFetchedAt] = useState<number | null>(null);
+  const healthStatsRequestId = useRef(0);
   const [sessions, setSessions] = useState<DashboardSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
 
+  const healthStatsUid = user && !user.isAnonymous ? user.uid : null;
+  const healthStatsLocale = i18n.language?.startsWith("en") ? "en" : "th";
+
+  const refreshHealthStats = useCallback(async () => {
+    if (!healthStatsUid) return;
+    const requestId = ++healthStatsRequestId.current;
+    setHealthStatsRefreshing(true);
+    setHealthStatsError(false);
+    try {
+      const response = await fetch(
+        `/api/users/${healthStatsUid}/health-stats?locale=${healthStatsLocale}`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) throw new Error("Failed to load topic understanding");
+      const stats = await response.json() as DashboardHealthStats;
+      if (requestId !== healthStatsRequestId.current) return;
+      const fetchedAt = Date.now();
+      setHealthStats(stats);
+      setHealthStatsFetchedAt(fetchedAt);
+      setHealthStatsLoading(false);
+      writeDashboardHealthStatsCache(
+        dashboardHealthStatsCacheKey(healthStatsUid, healthStatsLocale),
+        { data: stats, fetchedAt },
+      );
+    } catch {
+      if (requestId === healthStatsRequestId.current) setHealthStatsError(true);
+    } finally {
+      if (requestId === healthStatsRequestId.current) {
+        setHealthStatsRefreshing(false);
+        setHealthStatsLoading(false);
+      }
+    }
+  }, [healthStatsUid, healthStatsLocale]);
+
   useEffect(() => {
-    if (!user || user.isAnonymous) {
+    if (!healthStatsUid) {
+      healthStatsRequestId.current += 1;
       setHealthStats(null);
       setHealthStatsLoading(false);
       setHealthStatsError(false);
+      setHealthStatsRefreshing(false);
+      setHealthStatsFetchedAt(null);
       return;
     }
-    let cancelled = false;
-    const locale = i18n.language?.startsWith("en") ? "en" : "th";
-    setHealthStats(null);
-    setHealthStatsLoading(true);
+    const cacheKey = dashboardHealthStatsCacheKey(healthStatsUid, healthStatsLocale);
+    const cached = readDashboardHealthStatsCache(cacheKey);
+    const cacheIsFresh = !!cached && Date.now() - cached.fetchedAt < HEALTH_STATS_CACHE_TTL_MS;
+    healthStatsRequestId.current += 1;
+    setHealthStats(cached?.data ?? null);
+    setHealthStatsFetchedAt(cached?.fetchedAt ?? null);
+    setHealthStatsLoading(!cached);
     setHealthStatsError(false);
-    fetch(`/api/users/${user.uid}/health-stats?locale=${locale}`)
-      .then((response) => {
-        if (!response.ok) throw new Error("Failed to load topic understanding");
-        return response.json();
-      })
-      .then((stats: DashboardHealthStats | null) => {
-        if (!cancelled) setHealthStats(stats);
-      })
-      .catch(() => {
-        if (!cancelled) setHealthStatsError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setHealthStatsLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [user, i18n.language]);
+    if (cacheIsFresh) {
+      setHealthStatsRefreshing(false);
+      return;
+    }
+    void refreshHealthStats();
+    return () => { healthStatsRequestId.current += 1; };
+  }, [healthStatsUid, healthStatsLocale, refreshHealthStats]);
 
   useEffect(() => {
     fetch("/api/sessions")
@@ -505,7 +575,7 @@ export default function DashboardPage() {
             <div className="h-24 rounded-xl bg-white/[0.04]" /><div className="h-24 rounded-xl bg-white/[0.04]" />
           </div>
         </section>
-      ) : healthStatsError ? (
+      ) : healthStatsError && !healthStats ? (
         <section role="status" className="nq-dashboard-panel flex min-h-[205px] items-center rounded-xl border border-white/8 bg-[#0d173e] p-5 text-xs leading-5 text-[#9aa8d1]">
           We couldn’t load your topic understanding. Refresh the page to try again.
         </section>
@@ -514,6 +584,10 @@ export default function DashboardPage() {
           variant="dashboard"
           items={healthStats?.topicBreakdown ?? []}
           description="Your utility earned compared with the maximum available across every session you answered."
+          onRefresh={refreshHealthStats}
+          isRefreshing={healthStatsRefreshing}
+          lastFetchedAt={healthStatsFetchedAt}
+          refreshError={healthStatsError}
           emptyMessage={user?.isAnonymous
             ? "Sign in to track topic understanding across your sessions."
             : healthStats?.answered
