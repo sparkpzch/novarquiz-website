@@ -18,8 +18,8 @@ import { canResumeRoom, hasRecentSessionPresence } from "@/lib/session-resume";
 import { ROOM_STATUS } from "@/lib/constants/session";
 import { useToast } from "@/components/ui/Toast";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
-import { summarizeGameStats, type GameHistoryScore } from "@/lib/stats/game";
 import type { PersonalFeedback } from "@/lib/analytics/personal-feedback";
+import { TopicUnderstandingBreakdown, type TopicBreakdownItem } from "@/components/admin/AnalyticsBreakdownComponents";
 import "@/lib/i18n";
 
 type ParsedJoinInput =
@@ -31,16 +31,10 @@ type SessionResumeSnapshot = {
   is_private?: boolean;
 };
 
-type UserStats = {
-  total_played: number;
-  best_score: number;
-  best_streak: number;
-  accuracy: number;
-};
-
 type DashboardHealthStats = {
-  knowledgeScore: number;
   feedback: PersonalFeedback | null;
+  topicBreakdown: TopicBreakdownItem[];
+  answered: number;
 };
 
 type DashboardSession = {
@@ -288,16 +282,7 @@ function JoinByCodeCard() {
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="nq-dashboard-metric rounded-lg border border-white/7 bg-[#0a1234] px-3 py-2.5">
-      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#62709d]">{label}</p>
-      <p className="mt-1 text-lg font-semibold tabular-nums text-white">{value}</p>
-    </div>
-  );
-}
-
-function QuizCard({ session, onClick }: { session: DashboardSession; onClick: () => void }) {
+function QuizCard({ session, onClick, eagerImage = false }: { session: DashboardSession; onClick: () => void; eagerImage?: boolean }) {
   return (
     <button
       type="button"
@@ -310,6 +295,7 @@ function QuizCard({ session, onClick }: { session: DashboardSession; onClick: ()
             src={session.cover_image_url}
             alt=""
             fill
+            loading={eagerImage ? "eager" : "lazy"}
             sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 24vw"
             className="object-cover transition duration-500 group-hover:scale-105"
           />
@@ -398,42 +384,42 @@ function PersonalFeedbackCard({
 }
 
 export default function DashboardPage() {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
-  const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [healthStats, setHealthStats] = useState<DashboardHealthStats | null>(null);
+  const [healthStatsLoading, setHealthStatsLoading] = useState(true);
+  const [healthStatsError, setHealthStatsError] = useState(false);
   const [sessions, setSessions] = useState<DashboardSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || user.isAnonymous) return;
-    fetch(`/api/users/${user.uid}/history`)
-      .then((response) => (response.ok ? response.json() : []))
-      .then((history: GameHistoryScore[]) => {
-        if (!history.length) return;
-        const summary = summarizeGameStats(history);
-        setUserStats({
-          total_played: summary.totalPlayed,
-          best_score: summary.bestScore,
-          best_streak: summary.bestStreak,
-          accuracy: summary.accuracy,
-        });
-      })
-      .catch(() => {});
-  }, [user]);
-
-  useEffect(() => {
-    if (!user || user.isAnonymous) return;
+    if (!user || user.isAnonymous) {
+      setHealthStats(null);
+      setHealthStatsLoading(false);
+      setHealthStatsError(false);
+      return;
+    }
+    let cancelled = false;
     const locale = i18n.language?.startsWith("en") ? "en" : "th";
+    setHealthStats(null);
+    setHealthStatsLoading(true);
+    setHealthStatsError(false);
     fetch(`/api/users/${user.uid}/health-stats?locale=${locale}`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((stats: DashboardHealthStats | null) => {
-        if (typeof stats?.knowledgeScore === "number") {
-          setHealthStats(stats);
-        }
+      .then((response) => {
+        if (!response.ok) throw new Error("Failed to load topic understanding");
+        return response.json();
       })
-      .catch(() => {});
+      .then((stats: DashboardHealthStats | null) => {
+        if (!cancelled) setHealthStats(stats);
+      })
+      .catch(() => {
+        if (!cancelled) setHealthStatsError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setHealthStatsLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [user, i18n.language]);
 
   useEffect(() => {
@@ -456,8 +442,7 @@ export default function DashboardPage() {
       .finally(() => setSessionsLoading(false));
   }, []);
 
-  const healthKnowledge = healthStats?.knowledgeScore ?? null;
-  const healthForRing = Math.max(0, Math.min(healthKnowledge ?? 0, 100));
+  const firstImageSessionId = sessions.find((session) => session.cover_image_url)?.id;
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-4 lg:space-y-5">
@@ -507,75 +492,37 @@ export default function DashboardPage() {
         </motion.div>
 
         <div className="grid gap-4 md:grid-cols-[1.3fr_0.8fr]">
-          <section className="nq-dashboard-panel rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold text-white">Performance overview</h2>
-                <p className="mt-1 text-xs text-[#7886b2]">Your health knowledge and latest quiz activity.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => router.push("/stats")}
-                className="shrink-0 text-[10px] font-semibold text-[#7898ff] hover:text-white"
-              >
-                View stats →
-              </button>
-            </div>
-
-            <div className="mt-4 grid grid-cols-[104px_1fr] items-center gap-4 sm:grid-cols-[120px_1fr]">
-              <div
-                className="relative mx-auto flex h-[98px] w-[98px] items-center justify-center rounded-full sm:h-[108px] sm:w-[108px]"
-                style={{
-                  background: `conic-gradient(var(--nq-performance-fill) ${healthForRing * 3.6}deg, var(--nq-performance-track) 0deg)`,
-                }}
-              >
-                <div className="nq-dashboard-metric flex h-[76px] w-[76px] flex-col items-center justify-center rounded-full bg-[#0d173e] sm:h-[84px] sm:w-[84px]">
-                  <span className="text-xl font-semibold tabular-nums text-white sm:text-2xl">
-                    {healthKnowledge ?? "—"}
-                  </span>
-                  <span className="mt-0.5 text-center text-[8px] uppercase leading-3 tracking-[0.1em] text-[#7180ad]">Health knowledge</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <MetricCard label="Best score" value={userStats?.best_score ?? "—"} />
-                <MetricCard label="Best streak" value={userStats?.best_streak ?? "—"} />
-                <MetricCard label={t("dashboard.total_played")} value={userStats?.total_played ?? "—"} />
-                <MetricCard label="Accuracy" value={userStats ? `${userStats.accuracy}%` : "—"} />
-              </div>
-            </div>
-          </section>
-
+          <PersonalFeedbackCard healthStats={healthStats} onViewStats={() => router.push("/stats")} />
           <JoinByCodeCard />
         </div>
       </section>
 
-      <PersonalFeedbackCard healthStats={healthStats} onViewStats={() => router.push("/stats")} />
-
-      <section className="grid gap-4 xl:grid-cols-[0.42fr_1.58fr]">
-        <div className="nq-dashboard-panel rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-white">Stat Summary</h2>
-            <span className="rounded-md bg-[#4f76ff]/15 px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-[#7898ff]">
-              Live
-            </span>
+      {healthStatsLoading ? (
+        <section aria-label="Loading topic understanding" className="nq-dashboard-panel min-h-[205px] animate-pulse rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
+          <div className="h-4 w-52 rounded bg-white/10" />
+          <div className="mt-2 h-3 w-72 max-w-full rounded bg-white/[0.06]" />
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="h-24 rounded-xl bg-white/[0.04]" /><div className="h-24 rounded-xl bg-white/[0.04]" />
           </div>
-          <div className="mt-4 space-y-3">
-            {[
-              ["Best score", userStats?.best_score ?? "—"],
-              ["Best streak", userStats?.best_streak ?? "—"],
-              ["Health knowledge", healthKnowledge === null ? "—" : `${healthKnowledge}/100`],
-              ["Total played", userStats?.total_played ?? "—"],
-            ].map(([label, value]) => (
-              <div key={label} className="flex items-center justify-between border-b border-white/6 pb-2.5 last:border-0 last:pb-0">
-                <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#7784ae]">{label}</span>
-                <span className="text-base font-semibold tabular-nums text-white">{value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        </section>
+      ) : healthStatsError ? (
+        <section role="status" className="nq-dashboard-panel flex min-h-[205px] items-center rounded-xl border border-white/8 bg-[#0d173e] p-5 text-xs leading-5 text-[#9aa8d1]">
+          We couldn’t load your topic understanding. Refresh the page to try again.
+        </section>
+      ) : (
+        <TopicUnderstandingBreakdown
+          variant="dashboard"
+          items={healthStats?.topicBreakdown ?? []}
+          description="Your utility earned compared with the maximum available across every session you answered."
+          emptyMessage={user?.isAnonymous
+            ? "Sign in to track topic understanding across your sessions."
+            : healthStats?.answered
+              ? `You’ve answered ${healthStats.answered} question${healthStats.answered === 1 ? '' : 's'}, but none has topic tags yet. Add topic tags to quiz choices to build this breakdown.`
+              : "No tagged answers yet. Answer topic-tagged questions to build your breakdown."}
+        />
+      )}
 
-        <section className="nq-dashboard-panel rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
+      <section className="nq-dashboard-panel rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
           <div className="mb-4 flex items-end justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-white">Quizzes</h2>
@@ -602,6 +549,7 @@ export default function DashboardPage() {
                 <QuizCard
                   key={session.id}
                   session={session}
+                  eagerImage={session.id === firstImageSessionId}
                   onClick={() => router.push(`/join/${session.pin_code || session.id}`)}
                 />
               ))}
@@ -617,7 +565,6 @@ export default function DashboardPage() {
               <span className="mt-1 text-xs text-[#7886b2]">New public sessions will appear here.</span>
             </button>
           )}
-        </section>
       </section>
     </div>
   );

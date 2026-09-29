@@ -36,6 +36,8 @@ export interface TopicUnderstandingBreakdownProps {
   selectedCompareLabel?: string | null;
   selectedTag?: string | null;
   onToggleTag?: (tag: string) => void;
+  variant?: 'report' | 'dashboard';
+  emptyMessage?: string;
 }
 
 const TOPIC_META: Record<string, { description: string; icon: string }> = {
@@ -52,7 +54,10 @@ export function TopicUnderstandingBreakdown({
   selectedCompareLabel,
   selectedTag,
   onToggleTag,
+  variant = 'report',
+  emptyMessage = 'No topic tags are present in this report.',
 }: TopicUnderstandingBreakdownProps) {
+  const dashboardVariant = variant === 'dashboard';
   const [sortBy, setSortBy] = useState<'lowest' | 'highest' | 'responses' | 'name'>('lowest');
   const sortedItems = [...items].sort((a, b) => {
     if (sortBy === 'name') return a.tag.localeCompare(b.tag);
@@ -66,19 +71,19 @@ export function TopicUnderstandingBreakdown({
   });
 
   return (
-    <section className="rounded-3xl bg-white border border-[#0460A9]/15 p-4 sm:p-5 shadow-[0_4px_24px_rgba(4,96,169,0.04)] space-y-4">
-      <div className="flex flex-col gap-3 border-b border-[#0460A9]/10 pb-3.5 sm:flex-row sm:items-center sm:justify-between">
+    <section className={`space-y-4 ${dashboardVariant ? 'nq-dashboard-panel rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5' : 'rounded-3xl border border-[#0460A9]/15 bg-white p-4 shadow-[0_4px_24px_rgba(4,96,169,0.04)] sm:p-5'}`}>
+      <div className={`flex flex-col gap-3 pb-3.5 sm:flex-row sm:items-center sm:justify-between ${dashboardVariant ? 'border-b border-white/8' : 'border-b border-[#0460A9]/10'}`}>
         <div>
           <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#0460A9]/10 text-[#0460A9]" aria-hidden="true">▦</span>
-            <h2 className="text-base sm:text-lg font-bold text-[#16324F] tracking-tight">Topic Understanding Breakdown</h2>
+            <span className={`flex h-6 w-6 items-center justify-center rounded-md ${dashboardVariant ? 'bg-[#4f76ff]/15 text-[#91a7ff]' : 'bg-[#0460A9]/10 text-[#0460A9]'}`} aria-hidden="true">▦</span>
+            <h2 className={`text-base font-bold tracking-tight sm:text-lg ${dashboardVariant ? 'text-white' : 'text-[#16324F]'}`}>Topic Understanding Breakdown</h2>
           </div>
-          <p className="mt-0.5 text-xs text-[#5D7EA1]">{description}</p>
+          <p className={`mt-0.5 text-xs ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>{description}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[#5D7EA1]">
+          <label className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>
             Sort
-            <select aria-label="Sort topics" value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)} className="nq-report-control rounded-lg border border-[#0460A9]/20 bg-white px-2.5 py-1.5 text-xs font-medium normal-case tracking-normal text-[#16324F] focus:outline-none focus:ring-2 focus:ring-[#0460A9]">
+            <select aria-label="Sort topics" value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium normal-case tracking-normal focus:outline-none focus:ring-2 ${dashboardVariant ? 'border-white/12 bg-[#0a1234] text-[#e4eaff] focus:ring-[#7898ff]' : 'nq-report-control border-[#0460A9]/20 bg-white text-[#16324F] focus:ring-[#0460A9]'}`}>
               <option value="lowest">Lowest utility</option>
               <option value="highest">Highest utility</option>
               <option value="responses">Most responses</option>
@@ -97,7 +102,7 @@ export function TopicUnderstandingBreakdown({
       </div>
 
       {items.length === 0 ? (
-        <p className="rounded-xl bg-[#F8FAFC] p-4 text-xs text-[#5D7EA1]">No topic tags are present in this report.</p>
+        <p className={`rounded-xl p-4 text-xs ${dashboardVariant ? 'border border-white/8 bg-[#0a1234] text-[#9aa8d1]' : 'bg-[#F8FAFC] text-[#5D7EA1]'}`}>{emptyMessage}</p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {sortedItems.map((item) => {
@@ -106,12 +111,20 @@ export function TopicUnderstandingBreakdown({
             const meta = TOPIC_META[item.tag] ?? { description: item.tag.replace(/^#/, '').replace(/[-_]/g, ' '), icon: '📊' };
             const selected = selectedTag === item.tag;
             const theme = !hasData
-              ? { border: 'border-gray-200', badge: 'bg-gray-100/90 text-gray-700 border-gray-300', score: 'text-gray-500', fill: '#9CA3AF', track: '#E5E7EB', status: 'No responses' }
+                ? dashboardVariant
+                ? { border: 'border-white/12', badge: 'bg-white/8 text-[#b8c4e8] border-white/12', score: 'text-[#b8c4e8]', fill: '#9CA3AF', track: '#344365', status: item.responses > 0 ? 'No max utility' : 'No responses' }
+                : { border: 'border-gray-200', badge: 'bg-gray-100/90 text-gray-700 border-gray-300', score: 'text-gray-500', fill: '#9CA3AF', track: '#E5E7EB', status: item.responses > 0 ? 'No max utility' : 'No responses' }
               : score < 50
-                ? { border: 'border-rose-200', badge: 'bg-rose-100/90 text-rose-800 border-rose-300', score: 'text-rose-700', fill: '#E11D48', track: '#FFE4E6', status: 'Priority review' }
+                ? dashboardVariant
+                  ? { border: 'border-rose-400/40', badge: 'bg-rose-400/15 text-rose-200 border-rose-400/30', score: 'text-rose-200', fill: '#FB7185', track: '#4c2942', status: 'Priority review' }
+                  : { border: 'border-rose-200', badge: 'bg-rose-100/90 text-rose-800 border-rose-300', score: 'text-rose-700', fill: '#E11D48', track: '#FFE4E6', status: 'Priority review' }
                 : score < 75
-                  ? { border: 'border-amber-200', badge: 'bg-amber-100/90 text-amber-800 border-amber-300', score: 'text-amber-700', fill: '#D97706', track: '#FEF3C7', status: 'Developing' }
-                  : { border: 'border-sky-200', badge: 'bg-sky-100/90 text-sky-800 border-sky-300', score: 'text-sky-700', fill: '#0284C7', track: '#E0F2FE', status: 'Strong' };
+                  ? dashboardVariant
+                    ? { border: 'border-amber-400/40', badge: 'bg-amber-400/15 text-amber-200 border-amber-400/30', score: 'text-amber-200', fill: '#FBBF24', track: '#4a3c2c', status: 'Developing' }
+                    : { border: 'border-amber-200', badge: 'bg-amber-100/90 text-amber-800 border-amber-300', score: 'text-amber-700', fill: '#D97706', track: '#FEF3C7', status: 'Developing' }
+                  : dashboardVariant
+                    ? { border: 'border-sky-400/40', badge: 'bg-sky-400/15 text-sky-200 border-sky-400/30', score: 'text-sky-200', fill: '#38BDF8', track: '#29445d', status: 'Strong' }
+                    : { border: 'border-sky-200', badge: 'bg-sky-100/90 text-sky-800 border-sky-300', score: 'text-sky-700', fill: '#0284C7', track: '#E0F2FE', status: 'Strong' };
             const radius = 15;
             const circumference = 2 * Math.PI * radius;
 
@@ -122,24 +135,24 @@ export function TopicUnderstandingBreakdown({
                 onClick={() => onToggleTag?.(item.tag)}
                 disabled={!onToggleTag}
                 title={onToggleTag ? (selected ? `Clear ${item.tag} filter` : `Filter questions by ${item.tag}`) : undefined}
-                className={`w-full overflow-hidden rounded-2xl border bg-white text-left transition-all duration-200 focus:outline-none ${selected ? `ring-2 ring-[#0460A9]/40 shadow-md ${theme.border}` : `${theme.border} hover:shadow-md hover:border-[#0460A9]/30`} ${onToggleTag ? 'cursor-pointer' : 'cursor-default'}`}
+                className={`w-full overflow-hidden rounded-2xl border text-left transition-all duration-200 focus:outline-none ${dashboardVariant ? 'bg-[#0a1234]' : 'bg-white'} ${selected ? `ring-2 ring-[#0460A9]/40 shadow-md ${theme.border}` : `${theme.border} hover:shadow-md hover:border-[#0460A9]/30`} ${onToggleTag ? 'cursor-pointer' : 'cursor-default'}`}
               >
                 {selected && <div className="h-1 w-full" style={{ backgroundColor: theme.fill }} />}
-                <div className="flex min-h-[112px] flex-col justify-between gap-2.5 bg-[#F8FAFC] p-3">
+                <div className={`flex min-h-[112px] flex-col justify-between gap-2.5 p-3 ${dashboardVariant ? 'bg-white/[0.025]' : 'bg-[#F8FAFC]'}`}>
                   <div className="flex items-center justify-between gap-1.5">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <span className="shrink-0 text-sm">{meta.icon}</span>
                       <span className={`truncate rounded-md border px-2 py-0.5 font-mono text-[11px] font-bold ${theme.badge}`}>{item.tag}</span>
                     </div>
-                    <span className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold ${theme.badge}`}>{hasData ? theme.status : 'No responses'}</span>
+                    <span className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold ${theme.badge}`}>{theme.status}</span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1 pr-1">
-                      <p className="line-clamp-2 text-[11px] font-semibold leading-tight text-[#16324F]">{meta.description}</p>
-                      <p className="mt-1 truncate font-mono text-[9px] text-[#5D7EA1]">
+                      <p className={`line-clamp-2 text-[11px] font-semibold leading-tight ${dashboardVariant ? 'text-[#e4eaff]' : 'text-[#16324F]'}`}>{meta.description}</p>
+                      <p className={`mt-1 truncate font-mono text-[9px] ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>
                         {item.earnedUtility}/{item.maxUtility} utility · {item.responses} responses
                       </p>
-                      {selectedPlayerName && <p className="mt-0.5 truncate text-[9px] text-[#5D7EA1]">For {selectedPlayerName}</p>}
+                      {selectedPlayerName && <p className={`mt-0.5 truncate text-[9px] ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>For {selectedPlayerName}</p>}
                       {selectedCompareLabel && item.benchmarkPercentage != null && <p className="mt-0.5 text-[9px] text-indigo-700">Compared with {selectedCompareLabel}: {item.benchmarkPercentage}%</p>}
                     </div>
                     <div className="relative flex shrink-0 items-center justify-center">
@@ -157,8 +170,8 @@ export function TopicUnderstandingBreakdown({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#0460A9]/10 pt-2.5 text-xs text-[#5D7EA1]">
-        <div className="flex flex-wrap items-center gap-3 text-[11px]"><span className="font-bold text-[#16324F]">Tiers:</span><span>🔴 &lt;50% Priority review</span><span>🟠 50–74% Developing</span><span>🔵 ≥75% Strong</span></div>
+      <div className={`flex flex-wrap items-center justify-between gap-2 border-t pt-2.5 text-xs ${dashboardVariant ? 'border-white/8 text-[#9aa8d1]' : 'border-[#0460A9]/10 text-[#5D7EA1]'}`}>
+        <div className="flex flex-wrap items-center gap-3 text-[11px]"><span className={`font-bold ${dashboardVariant ? 'text-white' : 'text-[#16324F]'}`}>Tiers:</span><span>🔴 &lt;50% Priority review</span><span>🟠 50–74% Developing</span><span>🔵 ≥75% Strong</span></div>
         {onToggleTag && <span className="text-[11px] italic">Click a topic card to filter questions · click again to clear.</span>}
       </div>
     </section>

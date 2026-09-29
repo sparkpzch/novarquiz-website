@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { dayStreak, knowledgeLevel, summarizeHealthStats } from '../health';
 
 const base = {
+  topicBreakdownRows: [],
   answerDays: [],
   today: '2026-09-17',
   completedQuizzes: 0,
@@ -51,6 +52,25 @@ test('topics with no answers are ignored', () => {
   assert.equal(s.topics.length, 1);
   assert.equal(s.knowledgeScore, 100);
   assert.equal(s.weakestTopic?.quiz_id, 'a');
+});
+
+test('topic breakdown percentages use earned utility over maximum and preserve answer counts', () => {
+  const s = summarizeHealthStats({
+    ...base,
+    topics: [],
+    topicBreakdownRows: [
+      { tag: '#Cardio', earned_utility: 7, max_utility: 10, responses: 3, question_count: 3 },
+      { tag: '#Nutrition', earned_utility: 12, max_utility: 10, responses: 2, question_count: 2 },
+      { tag: '#NoMax', earned_utility: -2, max_utility: 0, responses: 1, question_count: 1 },
+    ],
+  });
+  assert.deepEqual(s.topicBreakdown.map(({ tag, percentage, earnedUtility, maxUtility, responses }) => ({
+    tag, percentage, earnedUtility, maxUtility, responses,
+  })), [
+    { tag: '#NoMax', percentage: null, earnedUtility: -2, maxUtility: 0, responses: 1 },
+    { tag: '#Cardio', percentage: 70, earnedUtility: 7, maxUtility: 10, responses: 3 },
+    { tag: '#Nutrition', percentage: 100, earnedUtility: 12, maxUtility: 10, responses: 2 },
+  ]);
 });
 
 test('progress is completed / published, capped at 100', () => {

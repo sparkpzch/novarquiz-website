@@ -26,10 +26,11 @@ import type {
   InsightSummary,
   InsightTemplate,
 } from '../analytics/insights';
-import type { HealthStatsInput, HealthTopicRow } from '../stats/health';
+import type { HealthStatsInput, HealthTopicRow, TopicUnderstandingRow } from '../stats/health';
 
 let layeredAnalyticsSchemaPromise: Promise<boolean> | null = null;
 let intendedAudienceSchemaPromise: Promise<boolean> | null = null;
+let questionTopicTagsSchemaPromise: Promise<boolean> | null = null;
 
 async function hasLayeredAnalyticsSchema() {
   if (!layeredAnalyticsSchemaPromise) {
@@ -68,6 +69,16 @@ async function hasIntendedAudienceSchema() {
       .catch(() => false);
   }
   return intendedAudienceSchemaPromise;
+}
+
+async function hasQuestionTopicTagsSchema() {
+  if (!questionTopicTagsSchemaPromise) {
+    questionTopicTagsSchemaPromise = pool
+      .query<{ exists: boolean }>(`SELECT to_regclass('question_topic_tags') IS NOT NULL AS exists`)
+      .then((result) => result.rows[0]?.exists === true)
+      .catch(() => false);
+  }
+  return questionTopicTagsSchemaPromise;
 }
 
 // ===================== Quizzes =====================
@@ -1549,23 +1560,61 @@ export async function getUserHistory(userId: string) {
 // whether user_answers.session_id is a quiz id or a sessions.id.
 export async function getUserHealthStatsInput(userId: string): Promise<HealthStatsInput> {
   const layered = await hasLayeredAnalyticsSchema();
-  const [topics, days, totals, profile, gaps] = await Promise.all([
-    queryWithRetry<HealthTopicRow>(
-      `SELECT qz.id AS quiz_id,
-              qz.name AS quiz_name,
-              'public' AS audience,
-              COUNT(*)::int AS answered,
-              COUNT(*) FILTER (WHERE latest.utility_score > 0)::int AS positive,
-              MAX(latest.answered_at)::text AS last_answered_at
-       FROM (
-         SELECT DISTINCT ON (session_id, question_id) question_id, utility_score, answered_at
-         FROM user_answers
-         WHERE user_id = $1
-         ORDER BY session_id, question_id, answered_at DESC
-       ) latest
-       JOIN questions q ON q.id = latest.question_id
-       JOIN quizzes qz ON qz.id = q.session_id
-       GROUP BY qz.id, qz.name`,
+  const hasQuestionTopicTags = await hasQuestionTopicTagsSchema();
+  const questionTopicSourceCte = hasQuestionTopicTags
+    ? `question_tags AS (
+         SELECT question_id, tag
+         FROM question_topic_tags
+       )`
+    : `question_tags AS (
+         SELECT DISTINCT c.question_id, tags.tag
+         FROM choices c
+         CROSS JOIN LATERAL jsonb_array_elements_text(
+           COALESCE(c.clinical_tags, '[]'::jsonb)
+         ) AS tags(tag)
+       )`;
+  const topicBreakdownCte = `question_topics AS (
+         SELECT q.id AS question_id,
+                topic_tags.tag,
+                GREATEST(MAX(COALESCE(c.score_impact, 0)), 0)::int AS max_utility
+         FROM (SELECT DISTINCT question_id FROM latest_answers) answered_questions
+         JOIN questions q ON q.id = answered_questions.question_id
+         JOIN question_tags topic_tags ON topic_tags.question_id = q.id
+         JOIN choices c ON c.question_id = q.id
+         GROUP BY q.id, topic_tags.tag
+       )`;
+  const [topicAnalytics, days, totals, profile, gaps] = await Promise.all([
+    queryWithRetry<{ topics: HealthTopicRow[]; topic_breakdown: TopicUnderstandingRow[] }>(
+      `WITH latest_answers AS MATERIALIZED (
+         SELECT DISTINCT ON (ua.session_id, ua.question_id)
+                ua.session_id, ua.question_id, ua.utility_score, ua.answered_at
+         FROM user_answers ua
+         WHERE ua.user_id = $1
+         ORDER BY ua.session_id, ua.question_id, ua.answered_at DESC, ua.id DESC
+       ), ${questionTopicSourceCte}, ${topicBreakdownCte}, quiz_topics AS (
+         SELECT qz.id AS quiz_id,
+                qz.name AS quiz_name,
+                'public' AS audience,
+                COUNT(*)::int AS answered,
+                COUNT(*) FILTER (WHERE latest.utility_score > 0)::int AS positive,
+                MAX(latest.answered_at)::text AS last_answered_at
+         FROM latest_answers latest
+         JOIN questions q ON q.id = latest.question_id
+         JOIN quizzes qz ON qz.id = q.session_id
+         GROUP BY qz.id, qz.name
+       ), topic_breakdown_rows AS (
+         SELECT qt.tag,
+                COALESCE(SUM(latest.utility_score), 0)::int AS earned_utility,
+                COALESCE(SUM(qt.max_utility), 0)::int AS max_utility,
+                COUNT(*)::int AS responses,
+                COUNT(DISTINCT (latest.session_id, latest.question_id))::int AS question_count
+         FROM latest_answers latest
+         JOIN question_topics qt ON qt.question_id = latest.question_id
+         GROUP BY qt.tag
+       )
+       SELECT
+         (SELECT COALESCE(json_agg(quiz_topics ORDER BY quiz_name), '[]'::json) FROM quiz_topics) AS topics,
+         (SELECT COALESCE(json_agg(topic_breakdown_rows ORDER BY tag), '[]'::json) FROM topic_breakdown_rows) AS topic_breakdown`,
       [userId],
     ),
     queryWithRetry<{ day: string }>(
@@ -1623,7 +1672,8 @@ export async function getUserHealthStatsInput(userId: string): Promise<HealthSta
   ]);
 
   return {
-    topics: topics.rows,
+    topics: topicAnalytics.rows[0]?.topics ?? [],
+    topicBreakdownRows: topicAnalytics.rows[0]?.topic_breakdown ?? [],
     answerDays: days.rows.map((r) => r.day),
     today: totals.rows[0].today,
     completedQuizzes: totals.rows[0].completed,

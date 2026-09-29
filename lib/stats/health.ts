@@ -24,8 +24,26 @@ export type HealthTopicRow = {
   last_answered_at: string;
 };
 
+export type TopicUnderstandingRow = {
+  tag: string;
+  earned_utility: number;
+  max_utility: number;
+  responses: number;
+  question_count: number;
+};
+
+export type TopicUnderstanding = {
+  tag: string;
+  percentage: number | null;
+  earnedUtility: number;
+  maxUtility: number;
+  responses: number;
+  questionCount: number;
+};
+
 export type HealthStatsInput = {
   topics: HealthTopicRow[];
+  topicBreakdownRows: TopicUnderstandingRow[];
   /** Distinct local (Asia/Bangkok) days with at least one answer, YYYY-MM-DD. */
   answerDays: string[];
   /** Today's local date, YYYY-MM-DD. */
@@ -73,6 +91,7 @@ export type HealthStats = {
   dayStreak: number;
   /** Sorted by score, highest first. */
   topics: HealthTopic[];
+  topicBreakdown: TopicUnderstanding[];
   weakestTopic: HealthTopic | null;
   /**
    * The quiz answered most recently. The insight summary is about this one, not
@@ -167,6 +186,20 @@ export function summarizeHealthStats(input: HealthStatsInput): HealthStats {
     answered,
     dayStreak: dayStreak(input.answerDays, input.today),
     topics,
+    topicBreakdown: input.topicBreakdownRows.map((row) => {
+      const earnedUtility = Number(row.earned_utility) || 0;
+      const maxUtility = Number(row.max_utility) || 0;
+      return {
+        tag: row.tag,
+        percentage: maxUtility > 0
+          ? Math.min(100, Math.max(0, Math.round((earnedUtility / maxUtility) * 100)))
+          : null,
+        earnedUtility,
+        maxUtility,
+        responses: Number(row.responses) || 0,
+        questionCount: Number(row.question_count) || 0,
+      };
+    }).sort((a, b) => (a.percentage ?? -1) - (b.percentage ?? -1) || a.tag.localeCompare(b.tag)),
     weakestTopic: topics.at(-1) ?? null,
     latestTopic,
     archetype: profileVectors.length
