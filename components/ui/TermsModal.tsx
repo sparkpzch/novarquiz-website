@@ -5,9 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '@/lib/hooks/useTheme';
 
 export const TOS_VERSION = '2026-09-17';
-export const PRIVACY_VERSION = '2026-09-23';
-export const ANALYTICS_NOTICE_VERSION = '2026-05-25';
-export const PROFILING_NOTICE_VERSION = '2026-09-17';
+export const PRIVACY_VERSION = '2026-09-30';
 
 type Tab = 'terms' | 'privacy';
 
@@ -181,9 +179,8 @@ export default function TermsModal({ initialTab = 'terms', onClose, onAccept }: 
             {onAccept ? (
               <>
                 <p className="text-xs mb-3 text-center" style={{ color: c.muted }}>
-                  By continuing, you agree to our Terms of Service and consent to personal data
-                  processing under PDPA, including Analytics &amp; Profiling (you can turn this off
-                  in Profile settings).
+                  By continuing, you agree to our Terms of Service and consent to the personal
+                  data processing described in the Privacy Policy.
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -317,7 +314,7 @@ function TermsContent({ c }: { c: Palette }) {
 function PrivacyContent({ c }: { c: Palette }) {
   return (
     <div>
-      <p className="text-xs mb-4" style={{ color: c.subtle }}>Last updated: September 23, 2026 · Version {PRIVACY_VERSION}</p>
+      <p className="text-xs mb-4" style={{ color: c.subtle }}>Last updated: September 30, 2026 · Version {PRIVACY_VERSION}</p>
 
       <div
         className="rounded-xl p-3 mb-4 text-xs"
@@ -326,9 +323,8 @@ function PrivacyContent({ c }: { c: Palette }) {
         <p className="font-semibold mb-0.5" style={{ color: c.noticeTitle }}>PDPA Compliance Notice</p>
         <p style={{ color: c.noticeBody }}>
           This Privacy Policy complies with Thailand&apos;s Personal Data Protection Act B.E. 2562
-          (PDPA). NovarQuiz is the Data Controller. Accepting these documents enables Platform
-          Account and Analytics &amp; Profiling; Analytics &amp; Profiling can be turned off at any
-          time in Profile settings.
+          (PDPA). NovarQuiz is the Data Controller. This policy describes how we use account,
+          quiz response, score, and session participation data.
         </p>
       </div>
 
@@ -347,14 +343,8 @@ function PrivacyContent({ c }: { c: Palette }) {
           proof of consent), browser type, session cookies.
         </p>
         <p>
-          <strong>Clinical Profiling Data (HCP/mixed-audience quizzes, while Analytics &amp; Profiling is on):</strong> Behavioural
-          signals from your quiz choices, linked to your account and mapped to six practice-pattern vectors —
-          Guideline Adherence, Innovation Adoption, Patient Centricity, Diagnostic Proactivity,
-          Therapy Escalation, and Evidence Depth. No patient-identifiable data is collected.
-        </p>
-        <p>
           <strong>Legal Basis:</strong> Your consent (PDPA §19), given when you accept these
-          documents and manageable at any time via Profile settings.
+          documents.
         </p>
       </Section>
 
@@ -366,29 +356,15 @@ function PrivacyContent({ c }: { c: Palette }) {
             calculate scores, leaderboards, quiz history.
           </li>
           <li>
-            <strong>Analytics &amp; Profiling</strong> (on when you accept; can be turned off):
-            performance analytics to improve the Service.
-          </li>
-          <li>
-            <strong>CRM Linkage</strong> (optional): link account data with CRM systems for
-            product-related communications from authorised partners.
-          </li>
-          <li>
             <strong>Marketing Follow-Up</strong> (optional): product updates and promotional
             communications.
           </li>
         </ul>
         <p className="mt-1">
-          Clinical profiling vectors are calculated from your choices in HCP or mixed-audience
-          quizzes while Analytics &amp; Profiling is on. If you turn it off, clinical
-          profiling vectors are no longer calculated; quiz answers and scores remain
-          available for quiz history and feedback.
-        </p>
-        <p className="mt-1">
           When a published quiz has no approved feedback summary, your selected answers,
           the answer key, and authored explanations may be sent to Google Gemini to draft
-          feedback marked as awaiting review. Your name, email, account ID, scores, and
-          clinical profile are not included in that request. The answer pattern and draft
+          feedback marked as awaiting review. Your name, email, account ID, and scores are
+          not included in that request. The answer pattern and draft
           are stored without an account ID for review and reuse.
         </p>
       </Section>
@@ -397,35 +373,25 @@ function PrivacyContent({ c }: { c: Palette }) {
         <ul className="list-disc list-inside space-y-0.5">
           <li>
             <strong>NovarQuiz administrators</strong> — can access all personal data we collect
-            about you, including your email, display name, profile picture, quiz responses,
-            scores and clinical profiling vectors.
+            about you, including your email, display name, profile picture, quiz responses and scores.
           </li>
           <li>
             <strong>Other users and visitors</strong> — can see only your display name, profile
             picture and quiz results on session leaderboards (score, rank, correct answers, streak
-            and completion time). They cannot see your email, individual quiz responses or
-            clinical profiling data.
+            and completion time). They cannot see your email or individual quiz responses.
           </li>
         </ul>
       </Section>
 
       <Section title="Consent Choices" c={c}>
         <p>
-          Accepting these documents enables <strong>Platform Account</strong> and{' '}
-          <strong>Analytics &amp; Profiling</strong>. Other purposes are optional.
+          Accepting these documents enables the required <strong>Platform Account</strong> purpose.
+          Marketing follow-up remains optional.
         </p>
         <ul className="list-disc list-inside space-y-0.5 mt-1">
           <li><strong>Platform Account</strong> — required; withdrawal requires account deletion</li>
-          <li><strong>Analytics &amp; Profiling</strong> — on when you accept; turn off any time in Profile settings</li>
-          <li><strong>CRM Linkage</strong> — optional</li>
           <li><strong>Marketing Follow-Up</strong> — optional</li>
         </ul>
-        <p className="mt-1">
-          While Analytics &amp; Profiling is on, six clinical profiling vectors are calculated in
-          HCP or mixed-audience quizzes: Guideline
-          Adherence, Innovation Adoption, Patient Centricity, Diagnostic Proactivity, Therapy
-          Escalation, and Evidence Depth.
-        </p>
         <p className="mt-1">
           You may update or withdraw any optional consent at any time via Profile
           settings. Withdrawal is effective immediately and does not affect the lawfulness of

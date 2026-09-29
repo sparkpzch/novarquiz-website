@@ -9,7 +9,6 @@ import {
   upsertInsightTemplate,
 } from '@/lib/db/queries';
 import {
-  ARCHETYPE_KEYS,
   BODY_MAX,
   HEADLINE_MAX,
   INSIGHT_LOCALES,
@@ -17,7 +16,7 @@ import {
   SUGGESTION_MAX,
   validateInsightDraft,
 } from '@/lib/analytics/insights';
-import { AUDIENCE_OPTIONS } from '@/lib/analytics/hcp';
+import { AUDIENCE_OPTIONS } from '@/lib/analytics/quiz-metadata';
 
 // ---------------------------------------------------------------------------
 // SECURITY INVARIANT: uid and isAdmin come only from the server-signed session
@@ -29,7 +28,6 @@ const UUID = z.string().uuid();
 
 const Query = z.object({
   quizId: UUID.nullish(),
-  archetypeId: z.enum(ARCHETYPE_KEYS).optional(),
   audience: z.enum(AUDIENCE_OPTIONS.filter((a) => a !== 'mixed') as ['public', 'hcp']).optional(),
   locale: z.enum(INSIGHT_LOCALES).optional(),
   reviewStatus: z.enum(INSIGHT_REVIEW_STATUSES).optional(),
@@ -37,7 +35,6 @@ const Query = z.object({
 
 const UpsertBody = z.object({
   quizId: UUID.nullable(),
-  archetypeId: z.enum(ARCHETYPE_KEYS),
   clinicalTag: z.string().max(80).default(''),
   audience: z.enum(['public', 'hcp']),
   locale: z.enum(INSIGHT_LOCALES),

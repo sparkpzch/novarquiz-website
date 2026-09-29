@@ -12,8 +12,6 @@ import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/hooks/useAuth";
 import {
-  ANY_ARCHETYPE,
-  ARCHETYPE_KEYS,
   BODY_MAX,
   HEADLINE_MAX,
   INSIGHT_LOCALES,
@@ -24,25 +22,6 @@ import {
 } from "@/lib/analytics/insights";
 import type { Quiz } from "@/lib/types";
 import type { ProvisionalInsight } from "@/lib/db/provisional-insights";
-
-// '*' first: a public quiz produces no archetype, so it is the usual choice.
-const ARCHETYPE_LABELS: Record<string, string> = {
-  [ANY_ARCHETYPE]: "Any player (public quizzes)",
-  conservative_guideline_follower: "Conservative guideline follower",
-  evidence_seeking_early_adopter: "Evidence-seeking early adopter",
-  qol_driven_prescriber: "QoL-driven prescriber",
-  diagnostic_evidence_builder: "Diagnostic evidence builder",
-  balanced_clinician: "Balanced clinician",
-};
-
-const ARCHETYPE_LABELS_TH: Record<string, string> = {
-  [ANY_ARCHETYPE]: "ผู้เล่นทุกคน",
-  conservative_guideline_follower: "ใช้แนวทางอย่างระมัดระวัง",
-  evidence_seeking_early_adopter: "เปิดรับแนวทางใหม่โดยดูหลักฐาน",
-  qol_driven_prescriber: "คำนึงถึงคุณภาพชีวิต",
-  diagnostic_evidence_builder: "รวบรวมหลักฐานก่อนวินิจฉัย",
-  balanced_clinician: "พิจารณาหลายปัจจัยอย่างสมดุล",
-};
 
 const STATUS_THEME: Record<InsightReviewStatus, string> = {
   draft: "bg-[#FFB020]/20 text-[#8A5A00]",
@@ -61,7 +40,7 @@ const EMPTY_EDITOR: Editor = { headline: "", body: "", suggestion: "" };
 const COPY = {
   th: {
     title: "สรุปผลแบบทดสอบ", intro: "ข้อความที่อนุมัติแล้วจะถูกใช้ก่อน หากแบบทดสอบที่เผยแพร่ยังไม่มีสรุป Gemini อาจสร้างสรุปตามชุดคำตอบและทำเครื่องหมายว่ารอตรวจทาน",
-    quiz: "แบบทดสอบ", global: "ใช้กับทุกแบบทดสอบ", archetype: "รูปแบบผู้เล่น", clinicalTag: "แท็กหัวข้อ (เว้นว่าง = ทุกหัวข้อ)", clinicalPlaceholder: "เช่น screening", language: "ภาษา", publicAudience: "ทั่วไป", hcpAudience: "บุคลากรสุขภาพ",
+    quiz: "แบบทดสอบ", global: "ใช้กับทุกแบบทดสอบ", clinicalTag: "แท็กหัวข้อ (เว้นว่าง = ทุกหัวข้อ)", clinicalPlaceholder: "เช่น screening", language: "ภาษา", publicAudience: "ทั่วไป", hcpAudience: "บุคลากรสุขภาพ",
     headline: "หัวข้อ", body: "เนื้อหา", suggestion: "คำแนะนำ", draft: "✨ ร่างด้วย Gemini", drafting: "กำลังร่าง…", save: "บันทึกเป็นฉบับร่าง", saving: "กำลังบันทึก…", pickQuiz: "เลือกแบบทดสอบก่อนสร้างร่าง",
     draftReady: "สร้างร่างแล้ว กรุณาตรวจและอนุมัติ", saved: "บันทึกฉบับร่างแล้ว", approvedMessage: "อนุมัติสรุป AI แล้ว", rejectedMessage: "ปฏิเสธสรุป AI แล้ว", reviewError: "บันทึกผลตรวจไม่ได้ โปรดลองอีกครั้ง",
     automatic: "สรุป AI อัตโนมัติ", automaticIntro: "เมื่อไม่มีข้อความที่อนุมัติแล้ว ผู้เล่นจะเห็นสรุปที่ยังไม่ผ่านการตรวจทานพร้อมป้าย AI อนุมัติเพื่อนำป้ายออก หรือปฏิเสธเพื่อซ่อนสรุปของชุดคำตอบนั้น", noneAutomatic: "ยังไม่มีสรุปอัตโนมัติ",
@@ -70,7 +49,7 @@ const COPY = {
   },
   en: {
     title: "Insight Summaries", intro: "Approved templates take priority. When a published quiz has no approved summary, Gemini may summarize each distinct answer pattern with an awaiting-review label.",
-    quiz: "Quiz", global: "Global (any quiz)", archetype: "Archetype", clinicalTag: "Clinical tag (blank = any)", clinicalPlaceholder: "e.g. screening", language: "Language", publicAudience: "public", hcpAudience: "HCP",
+    quiz: "Quiz", global: "Global (any quiz)", clinicalTag: "Clinical tag (blank = any)", clinicalPlaceholder: "e.g. screening", language: "Language", publicAudience: "public", hcpAudience: "HCP",
     headline: "Headline", body: "Body", suggestion: "Suggestion", draft: "✨ Draft with Gemini", drafting: "Drafting…", save: "Save as draft", saving: "Saving…", pickQuiz: "Pick a quiz to draft from its authored text",
     draftReady: "Draft written — review it, then approve.", saved: "Saved as draft.", approvedMessage: "AI summary approved.", rejectedMessage: "AI summary rejected.", reviewError: "Could not save the review. Please try again.",
     automatic: "Automatic AI summaries", automaticIntro: "When no approved template matches, provisional text is visible with an AI label. Approve it to remove the label, or reject it to hide it for that answer pattern.", noneAutomatic: "No automatic summaries yet.",
@@ -84,7 +63,6 @@ export default function InsightsAdminPage() {
   const { i18n } = useTranslation();
   const language = i18n.language?.startsWith("th") ? "th" : "en";
   const copy = COPY[language];
-  const archetypeLabels = language === "th" ? ARCHETYPE_LABELS_TH : ARCHETYPE_LABELS;
   const { isAdmin, loading: authLoading } = useAuth();
 
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -92,7 +70,6 @@ export default function InsightsAdminPage() {
   const [provisional, setProvisional] = useState<ProvisionalInsight[]>([]);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [quizId, setQuizId] = useState<string>("");
-  const [archetypeId, setArchetypeId] = useState<string>(ANY_ARCHETYPE);
   const [clinicalTag, setClinicalTag] = useState("");
   const [locale, setLocale] = useState<InsightLocale>(language);
   const [editor, setEditor] = useState<Editor>(EMPTY_EDITOR);
@@ -193,7 +170,6 @@ export default function InsightsAdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           quizId: quizId || null,
-          archetypeId,
           clinicalTag,
           audience: "public",
           locale,
@@ -209,7 +185,7 @@ export default function InsightsAdminPage() {
       fetch("/api/admin/insight-templates/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quizId, archetypeId, clinicalTag, locale }),
+        body: JSON.stringify({ quizId, clinicalTag, locale }),
       }),
     );
 
@@ -255,19 +231,6 @@ export default function InsightsAdminPage() {
               {quizzes.map((quiz) => (
                 <option key={quiz.id} value={quiz.id}>
                   {quiz.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label={copy.archetype}>
-            <select
-              value={archetypeId}
-              onChange={(e) => setArchetypeId(e.target.value)}
-              className="nq-input w-full rounded-xl border border-[#0460A9]/20 px-3 py-2 text-sm"
-            >
-              {ARCHETYPE_KEYS.map((id) => (
-                <option key={id} value={id}>
-                  {archetypeLabels[id]}
                 </option>
               ))}
             </select>
@@ -428,7 +391,6 @@ export default function InsightsAdminPage() {
               <span className={`rounded-full px-2 py-0.5 font-semibold ${STATUS_THEME[template.review_status]}`}>
                 {copy.status[template.review_status]}
               </span>
-              <span>{archetypeLabels[template.archetype_id] ?? template.archetype_id}</span>
               <span>· {template.locale.toUpperCase()}</span>
               <span>· {template.audience === "hcp" ? copy.hcpAudience : copy.publicAudience}</span>
               {template.clinical_tag && <span>· #{template.clinical_tag}</span>}

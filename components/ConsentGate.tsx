@@ -34,7 +34,7 @@ function markAcceptedLocally(uid: string) {
 /**
  * Blocks signed-in users who have never consented, or who consented to an
  * older Terms/Privacy version, until they accept the current documents.
- * Declining signs them out. Accepting enables Analytics & Profiling.
+ * Declining signs them out.
  */
 export default function ConsentGate() {
   const { user } = useAuth();
@@ -69,8 +69,7 @@ export default function ConsentGate() {
 
   if (!uid || exempt || !pending) return null;
 
-  // GET merges defaults into consent_purposes, so only trust marketing from an
-  // existing consent record.
+  // Preserve a previously saved marketing choice when re-accepting documents.
   const stored = pending.consented ? pending.consent_purposes : undefined;
 
   const handleAccept = async () => {
@@ -81,10 +80,6 @@ export default function ConsentGate() {
         body: JSON.stringify({
           consent_purposes: {
             platform_account: true,
-            // Accepting the documents enables Analytics & Profiling; users can
-            // turn it off in Profile.
-            analytics_profiling: true,
-            hcp_vectors_acknowledged: true,
             marketing_follow_up: stored?.marketing_follow_up === true,
           },
         }),

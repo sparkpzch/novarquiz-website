@@ -3,25 +3,15 @@ import { z } from 'zod';
 import { getSessionUser } from '@/lib/auth';
 import { getUserConsent, upsertUserConsent } from '@/lib/db/queries';
 import { checkRateLimit } from '@/lib/ratelimit';
-import {
-  ANALYTICS_NOTICE_VERSION,
-  PRIVACY_VERSION,
-  PROFILING_NOTICE_VERSION,
-  TOS_VERSION,
-} from '@/components/ui/TermsModal';
-import { DEFAULT_CONSENT_PURPOSES } from '@/lib/analytics/hcp';
+import { PRIVACY_VERSION, TOS_VERSION } from '@/components/ui/TermsModal';
+import { DEFAULT_CONSENT_PURPOSES } from '@/lib/analytics/quiz-metadata';
 
 // ---------------------------------------------------------------------------
 // Zod schema — enforces unbundled opt-ins (PDPA Phase A requirement).
 //
 // Rules:
 //  • platform_account MUST be true — required to use the platform at all.
-//  • analytics_profiling is optional and defaults to false.
 //  • marketing_follow_up is optional and defaults to false (strict opt-in).
-//  • hcp_vectors_acknowledged is optional; must be true when submitting HCP
-//    session consent that covers clinical profiling vectors:
-//      Guideline Adherence, Innovation Adoption, Patient Centricity,
-//      Diagnostic Proactivity, Therapy Escalation, Evidence Depth.
 //
 // M2 FIX: consent_purposes is REQUIRED — callers must send it explicitly.
 // An absent body is rejected with 400 so consent cannot be silently recorded
@@ -31,9 +21,7 @@ const ConsentPurposesSchema = z.object({
   platform_account: z.literal(true, {
     error: 'platform_account must be accepted to use the platform',
   }),
-  analytics_profiling: z.boolean().optional().default(false),
   marketing_follow_up: z.boolean().optional().default(false),
-  hcp_vectors_acknowledged: z.boolean().optional().default(false),
 });
 
 const ConsentBodySchema = z.object({
@@ -80,12 +68,8 @@ export async function POST(request: NextRequest) {
 
   const consentPurposes = {
     platform_account: purposes.platform_account,
-    analytics_profiling: purposes.analytics_profiling,
     // Strict opt-in: marketing is never enabled by default.
     marketing_follow_up: purposes.marketing_follow_up,
-    // HCP clinical vector acknowledgement — stored even if false so the
-    // absence is auditable.
-    hcp_vectors_acknowledged: purposes.hcp_vectors_acknowledged,
   };
 
   try {
@@ -93,8 +77,6 @@ export async function POST(request: NextRequest) {
       uid: user.uid,
       tos_version: TOS_VERSION,
       privacy_version: PRIVACY_VERSION,
-      analytics_notice_version: ANALYTICS_NOTICE_VERSION,
-      profiling_notice_version: PROFILING_NOTICE_VERSION,
       consent_purposes: consentPurposes,
       ip_address: ip,
       user_agent: userAgent,
@@ -120,8 +102,6 @@ export async function GET() {
       consented: true,
       tos_version: data.tos_version,
       privacy_version: data.privacy_version,
-      analytics_notice_version: data.analytics_notice_version,
-      profiling_notice_version: data.profiling_notice_version,
       consent_purposes: { ...DEFAULT_CONSENT_PURPOSES, ...data.consent_purposes },
     });
   } catch (err) {

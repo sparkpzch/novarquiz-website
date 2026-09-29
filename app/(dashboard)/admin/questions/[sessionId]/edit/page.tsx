@@ -15,7 +15,6 @@ import {
   type AppNodeData,
 } from "@/components/node-editor/EditorCanvas";
 import type { NormalNodeData } from "@/components/node-editor/NormalNode";
-import { HCP_VECTOR_KEYS } from "@/lib/analytics/hcp";
 import type {
   Question,
   QuestionConnection,

@@ -1,10 +1,5 @@
 import { SessionStatus } from '../constants/session';
-import type {
-  AllowedUsage,
-  ConsentPurposes,
-  HcpVectorMap,
-  ReviewStatus,
-} from '../analytics/hcp';
+import type { ConsentPurposes } from '../analytics/quiz-metadata';
 
 // ===================== Database Types =====================
 
@@ -62,12 +57,7 @@ export interface Choice {
   /** @deprecated use score_impact */
   points?: number;
   behavior_meaning?: string | null;
-  vector_deltas?: HcpVectorMap;
   clinical_tags?: string[];
-  confidence_weight?: number;
-  allowed_usage?: AllowedUsage;
-  requires_hcp_version?: boolean;
-  review_status?: ReviewStatus;
 }
 
 export interface QuestionConnection {
@@ -90,9 +80,7 @@ export interface UserAnswer {
   // Equal to the picked choice's `points` value. Can be negative.
   points_earned: number;
   answered_at: string;
-  vector_scores?: HcpVectorMap;
   behavior_meaning_snapshot?: string | null;
-  allowed_usage_snapshot?: AllowedUsage;
 }
 
 export interface LeaderboardEntry {
@@ -111,10 +99,6 @@ export interface LeaderboardEntry {
   // Set by the public leaderboard API for the viewer's own row, since user_id
   // is anonymized there.
   is_me?: boolean;
-  profile_vector_scores?: HcpVectorMap;
-  normalized_vector_scores?: HcpVectorMap;
-  archetype_id?: string | null;
-  insight_classification?: 'aggregate' | 'pseudonymous' | 'identified';
 }
 
 export interface Session {
@@ -156,8 +140,6 @@ export interface UserConsentProfile {
   consented: boolean;
   tos_version: string | null;
   privacy_version: string | null;
-  analytics_notice_version?: string | null;
-  profiling_notice_version?: string | null;
   consent_purposes?: ConsentPurposes;
 }
 

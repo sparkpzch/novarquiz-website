@@ -3,7 +3,6 @@
 import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Quiz, Session } from '@/lib/types';
-import type { HcpVectorMap } from '@/lib/analytics/hcp';
 import CompareSessionsModal from './CompareSessionsModal';
 
 // Distinct color palette for cohorts in comparison
@@ -84,19 +83,11 @@ export interface SessionComparisonItem {
   }>;
   insights?: {
     audience_mode_summary?: Record<string, number>;
-    archetype_distribution?: Array<{ archetype_id: string; count: number }>;
-    vector_summary?: HcpVectorMap;
-    dominant_vector?: string;
     highest_friction_nodes?: Array<{
       question_id: string;
       question_text: string;
       node_friction_score: number;
     }>;
-  };
-  insightBreakdownSummary?: {
-    totalProfiled: number;
-    topArchetypes: Record<string, number>;
-    frequentGaps: Record<string, number>;
   };
 }
 
@@ -117,7 +108,7 @@ export default function QuizSessionsCompareView({
 }: QuizSessionsCompareViewProps) {
   const router = useRouter();
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'domains' | 'archetypes' | 'questions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'domains' | 'questions'>('overview');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   // Cohort metadata mapping
@@ -226,92 +217,6 @@ export default function QuizSessionsCompareView({
         averageMastery: Math.round(
           cohortScores.reduce((acc, cur) => acc + cur.masteryPercent, 0) / cohortScores.length
         ),
-      };
-    });
-  }, [cohorts]);
-
-  // Behavioral Archetypes Comparison
-  const archetypeComparison = useMemo(() => {
-    const archetypeList = [
-      {
-        id: 'guideline_adherent',
-        title: 'Guideline-Bound Practitioner',
-        description: 'Strict adherence to primary consensus pathways with high protocol consistency.',
-      },
-      {
-        id: 'early_adopter',
-        title: 'Evidence-Seeking Early Adopter',
-        description: 'Rapid integration of novel outcome trials and aggressive therapy intensification.',
-      },
-      {
-        id: 'cautious_titrator',
-        title: 'Cautious Step-Wise Titrator',
-        description: 'Prioritizes safety monitoring, conservative dosage ramps, and adverse effect mitigation.',
-      },
-      {
-        id: 'emergent_innovator',
-        title: 'Emergent Clinical Innovator',
-        description: 'Multidisciplinary case reasoning with proactive comorbid intervention.',
-      },
-    ];
-
-    return archetypeList.map((archetype, aIdx) => {
-      const cohortBreakdowns = cohorts.map((cohort, cIdx) => {
-        // Distribute percentage realistically across archetypes
-        const weights = [
-          [38, 22, 30, 10], // Cohort A
-          [18, 48, 14, 20], // Cohort B
-          [28, 32, 25, 15], // Cohort C
-          [30, 30, 25, 15], // Cohort D
-        ];
-        const cohortWeightRow = weights[cIdx % weights.length];
-        const percentage = cohortWeightRow[aIdx % cohortWeightRow.length];
-
-        return {
-          cohortLabel: cohort.cohortLabel,
-          cohortName: cohort.displayName,
-          color: cohort.color,
-          percentage,
-        };
-      });
-
-      return {
-        ...archetype,
-        cohortBreakdowns,
-      };
-    });
-  }, [cohorts]);
-
-  // Macro Vector Comparison
-  const vectorComparison = useMemo(() => {
-    const vectors = [
-      { key: 'protocol_strictness', label: 'Protocol Strictness', description: 'Degree of adherence to published clinical guideline sequences' },
-      { key: 'evidence_reliance', label: 'Evidence Reliance', description: 'Frequency of selecting RCT-backed high-potency interventions' },
-      { key: 'clinical_aggressiveness', label: 'Clinical Aggressiveness', description: 'Propensity for proactive multi-drug early therapy initiation' },
-      { key: 'risk_aversion', label: 'Risk Aversion', description: 'Emphasis on contraindication monitoring and safety pauses' },
-      { key: 'diagnostic_speed', label: 'Diagnostic Velocity', description: 'Efficiency in resolving branching differential decision nodes' },
-    ];
-
-    return vectors.map((v, vIdx) => {
-      const cohortValues = cohorts.map((cohort, cIdx) => {
-        const matrix = [
-          [48, 52, 42, 68, 55],
-          [76, 84, 78, 44, 82],
-          [62, 68, 58, 56, 70],
-          [58, 62, 52, 60, 65],
-        ];
-        const val = matrix[cIdx % matrix.length][vIdx % 5];
-        return {
-          cohortLabel: cohort.cohortLabel,
-          cohortName: cohort.displayName,
-          color: cohort.color,
-          value: val,
-        };
-      });
-
-      return {
-        ...v,
-        cohortValues,
       };
     });
   }, [cohorts]);
@@ -444,7 +349,7 @@ export default function QuizSessionsCompareView({
 
               <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[#0460A9]/10 pt-3 text-center">
                 <div>
-                  <p className="text-[9px] font-bold uppercase text-[#5D7EA1]">HCPs</p>
+                  <p className="text-[9px] font-bold uppercase text-[#5D7EA1]">Players</p>
                   <p className="text-base font-extrabold text-[#16324F]">{cohort.macroMetrics.participantCount}</p>
                 </div>
                 <div>
@@ -472,15 +377,15 @@ export default function QuizSessionsCompareView({
                 Multi-Cohort Educational Impact Overview
               </h2>
               <p className="mt-1 max-w-2xl text-xs md:text-sm text-blue-100/80 leading-relaxed">
-                Aggregated executive comparative analytics across {macroSummary.cohortCount} professional sessions.
-                Granular player identification has been excluded to highlight macro clinical practice patterns.
+                Aggregated comparison across {macroSummary.cohortCount} quiz sessions.
+                Player identities are excluded from this overview.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:gap-6">
               <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/10">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Combined Quorum</p>
-                <p className="mt-1 text-2xl font-black text-white">{macroSummary.totalParticipants} <span className="text-xs font-semibold text-blue-200">HCPs</span></p>
+                <p className="mt-1 text-2xl font-black text-white">{macroSummary.totalParticipants} <span className="text-xs font-semibold text-blue-200">players</span></p>
               </div>
               <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/10">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Avg Adherence</p>
@@ -512,20 +417,6 @@ export default function QuizSessionsCompareView({
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
             Clinical Domains Matrix
-          </button>
-
-          <button
-            onClick={() => setActiveTab('archetypes')}
-            className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition-all ${
-              activeTab === 'archetypes'
-                ? 'bg-[#0460A9] text-white shadow-md shadow-[#0460A9]/20'
-                : 'bg-white/60 text-[#5D7EA1] hover:bg-white hover:text-[#16324F]'
-            }`}
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            Practice Archetypes & Vectors
           </button>
 
           <button
@@ -648,95 +539,6 @@ export default function QuizSessionsCompareView({
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: Practice Archetypes & Macro Decision Vectors */}
-        {activeTab === 'archetypes' && (
-          <div className="space-y-8 animate-in fade-in duration-300">
-            {/* Archetypes Distribution */}
-            <div>
-              <div className="mb-4">
-                <h3 className="text-xl font-bold text-[#16324F]">
-                  Clinical Practice Archetype Distribution
-                </h3>
-                <p className="text-xs text-[#5D7EA1]">
-                  Aggregated distribution of HCP decision-making styles across compared cohorts.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                {archetypeComparison.map((archetype) => (
-                  <div
-                    key={archetype.id}
-                    className="flex flex-col justify-between rounded-[28px] border border-[#0460A9]/10 bg-white p-5 shadow-sm"
-                  >
-                    <div>
-                      <h4 className="text-sm font-bold text-[#16324F]">{archetype.title}</h4>
-                      <p className="mt-1 text-xs text-[#5D7EA1] leading-relaxed">{archetype.description}</p>
-                    </div>
-
-                    <div className="mt-5 space-y-3 border-t border-[#0460A9]/10 pt-4">
-                      {archetype.cohortBreakdowns.map((cb) => (
-                        <div key={cb.cohortLabel} className="space-y-1">
-                          <div className="flex items-center justify-between text-xs font-bold">
-                            <span className="text-[#5D7EA1]">{cb.cohortLabel}</span>
-                            <span style={{ color: cb.color.hex }}>{cb.percentage}%</span>
-                          </div>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-[#EBF3FB]">
-                            <div
-                              className="h-full rounded-full"
-                              style={{ width: `${cb.percentage}%`, backgroundColor: cb.color.hex }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Macro Clinical Decision Vectors */}
-            <div>
-              <div className="mb-4">
-                <h3 className="text-xl font-bold text-[#16324F]">
-                  Macro Clinical Decision Vectors
-                </h3>
-                <p className="text-xs text-[#5D7EA1]">
-                  Comparative index of clinical reasoning tendencies (0 - 100 benchmark scale).
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {vectorComparison.map((v) => (
-                  <div
-                    key={v.key}
-                    className="rounded-[28px] border border-[#0460A9]/10 bg-white p-5 shadow-sm"
-                  >
-                    <h4 className="text-sm font-bold text-[#16324F]">{v.label}</h4>
-                    <p className="mt-1 text-xs text-[#5D7EA1] line-clamp-2">{v.description}</p>
-
-                    <div className="mt-4 space-y-3 border-t border-[#0460A9]/10 pt-3">
-                      {v.cohortValues.map((cv) => (
-                        <div key={cv.cohortLabel} className="space-y-1">
-                          <div className="flex items-center justify-between text-xs font-bold">
-                            <span className="text-[#5D7EA1]">{cv.cohortLabel}</span>
-                            <span style={{ color: cv.color.hex }}>{cv.value} / 100</span>
-                          </div>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-[#EBF3FB]">
-                            <div
-                              className="h-full rounded-full"
-                              style={{ width: `${cv.value}%`, backgroundColor: cv.color.hex }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         )}

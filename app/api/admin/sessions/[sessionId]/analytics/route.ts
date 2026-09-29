@@ -50,26 +50,6 @@ export async function GET(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    // 3. Emit structured audit log when HCP profiling data is accessed.
-    //    Covers sessions with entries with non-aggregate classification.
-    const pseudonymousCount = analytics.leaderboard.filter(
-      (row) =>
-        (row as Record<string, unknown>).insight_classification === 'pseudonymous' ||
-        (row as Record<string, unknown>).insight_classification === 'identified',
-    ).length;
-
-    if (pseudonymousCount > 0) {
-      console.error(
-        JSON.stringify({
-          event: 'admin_hcp_profile_read',
-          admin_uid: user.uid,
-          session_id: sessionId,
-          profiled_entry_count: pseudonymousCount,
-          timestamp: new Date().toISOString(),
-        }),
-      );
-    }
-
     // What the insight engine decided for each player in this quiz.
     const quizId = await resolveSessionToQuizId(sessionId);
     const insightBreakdown = quizId ? await getQuizInsightBreakdown(quizId) : [];

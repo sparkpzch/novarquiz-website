@@ -1,14 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-
 import { composePersonalFeedback } from '../personal-feedback';
-
-const answer = {
-  question: 'Which option helps most?',
-  choice: 'Wait and see',
-  reason: 'This choice delays the check described in the question.',
-  signal: 'incorrect' as const,
-};
 
 const approvedSummary = {
   headline: 'Review the decision',
@@ -16,42 +8,25 @@ const approvedSummary = {
   suggestion: 'Review the approved explanation before trying again.',
 };
 
-test('combines a chosen answer with approved summary text without rewriting either', () => {
+test('uses the reviewed summary as written', () => {
   const feedback = composePersonalFeedback({
-    choiceInsight: answer,
     summary: approvedSummary,
     latestTopic: { name: 'A quiz', score: 50 },
     locale: 'en',
   });
-
-  assert.match(feedback?.headline ?? '', /Wait and see/);
-  assert.equal(feedback?.question, answer.question);
-  assert.equal(feedback?.body, answer.reason);
-  assert.equal(feedback?.context, approvedSummary.body);
+  assert.equal(feedback?.headline, approvedSummary.headline);
+  assert.equal(feedback?.body, approvedSummary.body);
   assert.equal(feedback?.suggestion, approvedSummary.suggestion);
   assert.equal(feedback?.reviewStatus, 'approved');
 });
 
-test('does not repeat identical answer explanation and summary body', () => {
-  const feedback = composePersonalFeedback({
-    choiceInsight: answer,
-    summary: { ...approvedSummary, body: answer.reason },
-    latestTopic: null,
-    locale: 'en',
-  });
-
-  assert.equal(feedback?.context, null);
-  assert.match(feedback?.headline ?? '', /Wait and see/);
-});
-
-test('uses Thai summary prose when the reviewed choice explanation is English', () => {
+test('uses the localized summary and marks provisional wording', () => {
   const thaiSummary = {
     headline: 'ทบทวนคำตอบของคุณ',
-    body: 'ลองอ่านเฉลยของข้อนี้และเปรียบเทียบเหตุผลของแต่ละตัวเลือกก่อนทำแบบทดสอบอีกครั้ง',
+    body: 'ลองอ่านเฉลยของข้อนี้ก่อนทำแบบทดสอบอีกครั้ง',
     suggestion: 'ทบทวนคำอธิบายของแต่ละข้อ',
   };
   const feedback = composePersonalFeedback({
-    choiceInsight: answer,
     summary: thaiSummary,
     summaryStatus: 'provisional',
     latestTopic: { name: 'A quiz', score: 50 },
@@ -62,18 +37,8 @@ test('uses Thai summary prose when the reviewed choice explanation is English', 
   assert.equal(feedback?.reviewStatus, 'provisional');
 });
 
-test('uses approved summary, then a score-only fallback when no answer explanation exists', () => {
-  const summaryFeedback = composePersonalFeedback({
-    choiceInsight: null,
-    summary: approvedSummary,
-    latestTopic: { name: 'A quiz', score: 100 },
-    locale: 'en',
-  });
-  assert.equal(summaryFeedback?.headline, approvedSummary.headline);
-  assert.equal(summaryFeedback?.body, approvedSummary.body);
-
+test('uses a score-only fallback when no reviewed summary exists', () => {
   const fallback = composePersonalFeedback({
-    choiceInsight: null,
     summary: null,
     latestTopic: { name: 'A quiz', score: 75 },
     locale: 'en',
@@ -84,21 +49,8 @@ test('uses approved summary, then a score-only fallback when no answer explanati
   assert.equal(fallback?.reviewStatus, 'metrics');
 });
 
-test('marks the whole card provisional when its summary context awaits review', () => {
-  const feedback = composePersonalFeedback({
-    choiceInsight: answer,
-    summary: approvedSummary,
-    summaryStatus: 'provisional',
-    latestTopic: null,
-    locale: 'en',
-  });
-  assert.equal(feedback?.reviewStatus, 'provisional');
-  assert.equal(feedback?.body, answer.reason);
-});
-
 test('returns no feedback before any quiz answer exists', () => {
   assert.equal(composePersonalFeedback({
-    choiceInsight: null,
     summary: null,
     latestTopic: null,
     locale: 'en',

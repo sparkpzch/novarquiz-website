@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getQuizForQuestion, getQuizById, resolveSessionToQuizId, getExistingAnswer, getAttemptBoundary, withPlayerAnswerLock } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
-import { hasProfilingConsent } from '@/lib/analytics/consent';
 import type { Choice } from '@/lib/types';
 import { createQuestionToken, readQuestionToken, verifyQuestionToken } from '@/lib/security/question-token';
 import { getPlayUser } from '@/lib/play-auth';
@@ -58,7 +57,7 @@ function shuffleChoices<T>(choices: T[], seed: string): T[] {
   return out;
 }
 
-// Strip answer-key and profiling fields from player-facing question payloads.
+// Strip answer-key fields from player-facing question payloads.
 // Choice outcomes are returned only after a player answers via POST.
 //
 // `shuffleSeed` reorders the choices for display when the quiz has
@@ -241,7 +240,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
         question_id: parsed.data.question_id,
         chosen_label: parsed.data.chosen_label,
         time_taken_ms: parsed.data.time_taken_ms,
-        profiling_consent: await hasProfilingConsent(user.uid),
       });
       return { answer, score: await getUserCumulativeScore(sessionId, user.uid) };
     });

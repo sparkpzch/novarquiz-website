@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionAnalytics, resolveSessionToQuizId, getQuizInsightBreakdown, getQuizById } from '@/lib/db/queries';
+import { getSessionAnalytics, resolveSessionToQuizId, getQuizById } from '@/lib/db/queries';
 import pool from '@/lib/db/postgres';
 import { getSessionUser } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/ratelimit';
@@ -79,9 +79,6 @@ export async function GET(request: NextRequest) {
         const analytics = await getSessionAnalytics(sessionId);
         if (!analytics) return null;
 
-        const quizId = await resolveSessionToQuizId(sessionId);
-        const insightBreakdown = quizId ? await getQuizInsightBreakdown(quizId) : [];
-
         // Exclude individual player leaderboards from comparison payload for high-level macro focus
         const leaderboard = analytics.leaderboard || [];
         const participantCount = leaderboard.length;
@@ -131,19 +128,6 @@ export async function GET(request: NextRequest) {
             })),
           })),
           insights: analytics.insights,
-          insightBreakdownSummary: {
-            totalProfiled: insightBreakdown.length,
-            topArchetypes: insightBreakdown.reduce((acc: Record<string, number>, item: any) => {
-              if (item.archetype_id) {
-                acc[item.archetype_id] = (acc[item.archetype_id] || 0) + 1;
-              }
-              return acc;
-            }, {}),
-            frequentGaps: insightBreakdown.flatMap((i: any) => i.gap_tags || []).reduce((acc: Record<string, number>, tag: string) => {
-              acc[tag] = (acc[tag] || 0) + 1;
-              return acc;
-            }, {}),
-          },
         };
       } catch (err) {
         console.error(`Failed to load analytics for session ${sessionId}:`, err);

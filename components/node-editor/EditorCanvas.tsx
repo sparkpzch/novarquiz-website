@@ -35,7 +35,7 @@ import Button from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import {
   DEFAULT_CHOICE_METADATA,
-} from '@/lib/analytics/hcp';
+} from '@/lib/analytics/quiz-metadata';
 import { NormalNode, type NormalNodeData } from './NormalNode';
 import { SituationNode, type SituationNodeData } from './SituationNode';
 import { EndNode, type EndNodeData } from './EndNode';

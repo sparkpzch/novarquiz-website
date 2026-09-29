@@ -2,12 +2,7 @@
 
 import { memo } from 'react';
 import { Handle, Position, useNodeConnections, type NodeProps } from '@xyflow/react';
-import {
-  DEFAULT_CHOICE_METADATA,
-  type AllowedUsage,
-  type HcpVectorMap,
-  type ReviewStatus,
-} from '@/lib/analytics/hcp';
+import { DEFAULT_CHOICE_METADATA } from '@/lib/analytics/quiz-metadata';
 
 export type NormalNodeData = {
   node_name: string | null;
@@ -20,12 +15,7 @@ export type NormalNodeData = {
     score_impact: number;
     explanation: string;
     behavior_meaning: string | null;
-    vector_deltas: HcpVectorMap;
     clinical_tags: string[];
-    confidence_weight: number;
-    allowed_usage: AllowedUsage;
-    requires_hcp_version: boolean;
-    review_status: ReviewStatus;
   }>;
   media_type: string | null;
   media_url: string | null;

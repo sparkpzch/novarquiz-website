@@ -4,8 +4,6 @@ import { getSessionUser } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/ratelimit';
 import { getQuizDraftContext, upsertInsightTemplate } from '@/lib/db/queries';
 import {
-  ANY_ARCHETYPE,
-  ARCHETYPE_KEYS,
   INSIGHT_LOCALES,
   buildInsightPrompt,
   parseDraftResponse,
@@ -25,9 +23,6 @@ import { GeminiError, generateText, geminiModel, isGeminiConfigured } from '@/li
 
 const Body = z.object({
   quizId: z.string().uuid(),
-  // '*' is the default: a public quiz produces no clinical archetype, so most
-  // rows are written against the wildcard.
-  archetypeId: z.enum(ARCHETYPE_KEYS).default(ANY_ARCHETYPE),
   clinicalTag: z.string().max(80).default(''),
   locale: z.enum(INSIGHT_LOCALES),
 });
@@ -55,7 +50,7 @@ export async function POST(request: NextRequest) {
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 
-  const { quizId, archetypeId, clinicalTag, locale } = parsed.data;
+  const { quizId, clinicalTag, locale } = parsed.data;
 
   try {
     const context = await getQuizDraftContext(quizId, clinicalTag);
@@ -80,7 +75,6 @@ export async function POST(request: NextRequest) {
     const prompt = buildInsightPrompt({
         quizName: context.quizName,
         quizDescription: context.quizDescription,
-        archetypeId,
         clinicalTag,
         audience,
         locale,
@@ -100,7 +94,6 @@ export async function POST(request: NextRequest) {
 
     const template = await upsertInsightTemplate({
       quizId,
-      archetypeId,
       clinicalTag,
       audience,
       locale,

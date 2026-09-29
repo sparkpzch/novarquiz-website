@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { completeSession, getAttemptBoundary, getExistingAnswer, getNextQuestion, getQuestionById, getQuizForQuestion, resolveSessionToQuizId, withPlayerAnswerLock } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
-import { hasProfilingConsent } from '@/lib/analytics/consent';
 import { verifyQuestionToken } from '@/lib/security/question-token';
 
 const CompletionBody = z.object({
@@ -74,7 +73,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
         user_id: user.uid,
         user_display_name: sanitizeDisplayName(body.data.user_display_name),
         user_photo_url: sanitizePhotoUrl(body.data.user_photo_url),
-        profiling_consent: await hasProfilingConsent(user.uid),
       });
     });
     if (!result) return NextResponse.json({ error: 'Quiz is not complete' }, { status: 403 });
@@ -85,7 +83,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       updatedAt: Date.now(),
     }).catch(() => {});
 
-    // HCP profiling fields are admin-only (admin analytics route); return scores only.
+    // Return only the score summary required by the player client.
     return NextResponse.json({
       total_score: result.total_score,
       streak: result.streak,

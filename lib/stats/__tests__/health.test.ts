@@ -11,7 +11,6 @@ const base = {
   today: '2026-09-17',
   completedQuizzes: 0,
   publishedQuizzes: 0,
-  profileVectors: [],
   gapTagRows: [],
 };
 
@@ -92,31 +91,6 @@ test('dayStreak counts back from today or yesterday', () => {
   assert.equal(dayStreak(['2026-09-15'], '2026-09-17'), 0);
   assert.equal(dayStreak(['2026-09-01', '2026-08-31'], '2026-09-01'), 2); // month boundary
   assert.equal(dayStreak([], '2026-09-17'), 0);
-});
-
-test('archetype stays null without profiling vectors', () => {
-  assert.equal(summarizeHealthStats({ ...base, topics: [] }).archetype, null);
-  // An opted-out player still has a row, just an empty vector — classifying it
-  // would label them from no evidence at all.
-  assert.equal(summarizeHealthStats({ ...base, topics: [], profileVectors: [{}] }).archetype, null);
-  assert.equal(
-    summarizeHealthStats({ ...base, topics: [], profileVectors: [{ guideline_adherence: 0 }] }).archetype,
-    null,
-  );
-});
-
-test('archetype sums raw vectors across quizzes before classifying', () => {
-  // 1.2 + 1.0 = 2.2 raw -> 22 normalized, over the 20 threshold; neither
-  // quiz would reach it alone.
-  const s = summarizeHealthStats({
-    ...base,
-    topics: [],
-    profileVectors: [
-      { guideline_adherence: 1.2, innovation_adoption: -0.5 },
-      { guideline_adherence: 1.0, innovation_adoption: -0.3 },
-    ],
-  });
-  assert.equal(s.archetype, 'conservative_guideline_follower');
 });
 
 test('gap tags come from the most recently answered quiz only', () => {

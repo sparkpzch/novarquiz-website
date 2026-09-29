@@ -1,10 +1,4 @@
 // Run with: npx tsx --test lib/db/__tests__/leaderboard-masking.test.ts
-//
-// Guards the privacy contract for the public leaderboard routes
-// (app/api/play/[sessionId]/leaderboard, app/api/sessions/[sessionId]/leaderboard).
-// These pure functions are what getLeaderboard() composes, so testing them here
-// covers the route output without needing a live Postgres pool.
-
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
@@ -12,100 +6,76 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET ?? 'test-secret-for-mask
 
 import { maskLeaderboardEntry, maskPublicLeaderboardEntry, toPublicLeaderboardEntry } from '../schema';
 
-// Mirrors the getLeaderboard() pipeline exactly.
 function publicLeaderboard(rows: Array<Record<string, unknown>>) {
   return rows
     .map((row) => maskPublicLeaderboardEntry(row))
     .filter((row): row is NonNullable<typeof row> => row !== null)
-    .map(toPublicLeaderboardEntry);
+    .map((row) => toPublicLeaderboardEntry(row));
 }
 
-function pseudonymousRow(userId: string) {
+function row(userId: string) {
   return {
     session_id: 's1',
     user_id: userId,
-    user_display_name: 'Dr. Jane Doe',
-    user_photo_url: 'https://example.com/jane.jpg',
+    user_display_name: 'Player Name',
+    user_photo_url: 'https://example.com/player.jpg',
     total_score: 90,
     correct_count: 9,
     streak: 3,
-    profile_vector_scores: { GuidelineAdherence: 0.8 },
-    normalized_vector_scores: { GuidelineAdherence: 0.9 },
-    archetype_id: 'innovator',
-    insight_classification: 'pseudonymous' as const,
   };
 }
 
-test('aggregate rows stay on the public board with name and photo, but no raw uid', () => {
-  const [row] = publicLeaderboard([
-    { ...pseudonymousRow('uid-keep'), insight_classification: 'aggregate' },
+test('public masking is independent of the retired profiling classification', () => {
+  const [publicRow, legacyRow] = publicLeaderboard([
+    { ...row('uid-public'), insight_classification: 'aggregate' },
+    { ...row('uid-legacy'), insight_classification: 'identified', user_display_name: 'Named Player' },
   ]);
-  assert.equal(row.user_display_name, 'Dr. Jane Doe');
-  assert.equal(row.user_photo_url, 'https://example.com/jane.jpg');
-  assert.notEqual(row.user_id, 'uid-keep');
-  assert.equal(row.total_score, 90);
-  assert.ok(!('insight_classification' in row));
+  assert.equal(publicRow.user_display_name, 'Player Name');
+  assert.equal(publicRow.user_photo_url, 'https://example.com/player.jpg');
+  assert.notEqual(publicRow.user_id, 'uid-public');
+  assert.equal(publicRow.total_score, 90);
+  assert.equal(legacyRow.user_display_name, 'Named Player');
+  assert.notEqual(legacyRow.user_id, 'uid-legacy');
 });
 
-test('rows without a classification keep their name but not their raw uid', () => {
-  const unclassified: Record<string, unknown> = pseudonymousRow('uid-none');
-  delete unclassified.insight_classification;
-  const [row] = publicLeaderboard([unclassified]);
-  assert.equal(row.user_display_name, 'Dr. Jane Doe');
-  assert.notEqual(row.user_id, 'uid-none');
+test('direct admin masker pseudonymizes identifiers consistently', () => {
+  const first = maskLeaderboardEntry(row('same-uid'));
+  const second = maskLeaderboardEntry(row('same-uid'));
+  assert.equal(first.user_id, second.user_id);
+  assert.notEqual(first.user_id, 'same-uid');
+  assert.equal(first.user_display_name, 'Participant');
+  assert.equal(first.user_photo_url, null);
 });
 
-test('admin masker still drops aggregate rows', () => {
-  assert.equal(
-    maskLeaderboardEntry({ ...pseudonymousRow('uid-x'), insight_classification: 'aggregate' }),
-    null,
-  );
+test('different players receive different pseudo-ids', () => {
+  assert.notEqual(maskLeaderboardEntry(row('user-a')).user_id, maskLeaderboardEntry(row('user-b')).user_id);
 });
 
-test('pseudonymous: keeps name and photo, never returns raw user_id', () => {
-  const [row] = publicLeaderboard([pseudonymousRow('firebase-uid-12345')]);
-  assert.equal(row.user_display_name, 'Dr. Jane Doe');
-  assert.equal(row.user_photo_url, 'https://example.com/jane.jpg');
-  assert.notEqual(row.user_id, 'firebase-uid-12345');
-  // total_score etc. survive — pseudonymous keeps behavioural/score data.
-  assert.equal(row.total_score, 90);
-  assert.equal(row.correct_count, 9);
-});
-
-test('pseudonymous: distinct user_ids yield distinct pseudo-ids (field-bug guard)', () => {
-  const [a] = publicLeaderboard([pseudonymousRow('user-aaa')]);
-  const [b] = publicLeaderboard([pseudonymousRow('user-bbb')]);
-  assert.notEqual(a.user_id, b.user_id);
-});
-
-test('no HCP profiling columns leave the public boundary (any classification)', () => {
-  const out = publicLeaderboard([
-    pseudonymousRow('user-1'),
-    { ...pseudonymousRow('user-2'), insight_classification: 'identified', user_display_name: 'Dr. Consented' },
-  ]);
-  assert.equal(out.length, 2);
-  for (const row of out) {
-    assert.ok(!('profile_vector_scores' in row), 'profile_vector_scores leaked');
-    assert.ok(!('normalized_vector_scores' in row), 'normalized_vector_scores leaked');
-    assert.ok(!('archetype_id' in row), 'archetype_id leaked');
-    assert.ok(!('insight_classification' in row), 'insight_classification leaked');
+test('retired profile columns are stripped from the public boundary', () => {
+  const [result] = publicLeaderboard([{
+    ...row('uid-x'),
+    profile_vector_scores: { old: 1 },
+    normalized_vector_scores: { old: 1 },
+    archetype_id: 'legacy',
+    insight_classification: 'identified',
+  }]);
+  for (const field of ['profile_vector_scores', 'normalized_vector_scores', 'archetype_id', 'insight_classification']) {
+    assert.ok(!(field in result), `${field} leaked`);
   }
 });
 
-test('identified rows keep their real display name but still drop HCP cols', () => {
-  const [row] = publicLeaderboard([
-    { ...pseudonymousRow('user-x'), insight_classification: 'identified', user_display_name: 'Dr. Consented' },
+test('viewer flag survives pseudonymization', () => {
+  const [mine, other] = publicLeaderboard([
+    { ...row('viewer'), is_me: true },
+    { ...row('other'), is_me: false },
   ]);
-  assert.equal(row.user_display_name, 'Dr. Consented');
-  assert.ok(!('archetype_id' in row));
+  assert.equal(mine.is_me, true);
+  assert.equal(other.is_me, false);
+  assert.notEqual(mine.user_id, 'viewer');
 });
 
-test('is_me survives masking so the viewer can find their anonymized row', () => {
-  const out = publicLeaderboard([
-    { ...pseudonymousRow('viewer'), insight_classification: 'aggregate', is_me: true },
-    { ...pseudonymousRow('other'), insight_classification: 'aggregate', is_me: false },
-  ]);
-  assert.equal(out[0].is_me, true);
-  assert.equal(out[1].is_me, false);
-  assert.notEqual(out[0].user_id, 'viewer');
+// Legacy profile keys are removed even when the caller bypasses the public mask.
+test('public serializer omits legacy profile fields', () => {
+  const result = toPublicLeaderboardEntry({ ...row('uid'), archetype_id: 'legacy' });
+  assert.ok(!('archetype_id' in result));
 });

@@ -6,12 +6,7 @@
 // utility_score is positive — the same rule completeSession() uses for
 // correct_count.
 
-import {
-  accumulateVectors,
-  classifyArchetype,
-  normalizeProfileVectors,
-  type IntendedAudience,
-} from '../analytics/hcp';
+import type { IntendedAudience } from '../analytics/quiz-metadata';
 
 export type HealthTopicRow = {
   quiz_id: string;
@@ -50,12 +45,6 @@ export type HealthStatsInput = {
   today: string;
   completedQuizzes: number;
   publishedQuizzes: number;
-  /**
-   * Raw profile vectors, one per completed quiz. Only quizzes the player gave
-   * profiling consent for reach this array — completeSession() leaves the
-   * vector empty and archetype_id NULL otherwise.
-   */
-  profileVectors: Array<Partial<Record<string, number>>>;
   /**
    * Clinical tags on non-positive answers, one row per (quiz, tag), already
    * ordered most-missed first within each quiz. Kept per-quiz so the tags a
@@ -100,8 +89,6 @@ export type HealthStats = {
    * older quiz — or vanish, when that quiz had no approved wording.
    */
   latestTopic: HealthTopic | null;
-  /** Behavioural segment across every profiled quiz, or null without consent. */
-  archetype: string | null;
   /** What the player most often got wrong, most-missed first. */
   gapTags: string[];
 };
@@ -157,12 +144,6 @@ export function summarizeHealthStats(input: HealthStatsInput): HealthStats {
     ? Math.round(topics.reduce((sum, t) => sum + t.score, 0) / topics.length)
     : 0;
 
-  // An opted-out player has no vectors at all; classifying an all-zero vector
-  // would label them "balanced" on the strength of no evidence.
-  const profileVectors = input.profileVectors.filter((vector) =>
-    Object.values(vector).some((value) => typeof value === 'number' && value !== 0),
-  );
-
   const latestTopic =
     topics.reduce<HealthTopic | null>(
       (latest, t) => (!latest || t.lastAnsweredAt > latest.lastAnsweredAt ? t : latest),
@@ -202,9 +183,6 @@ export function summarizeHealthStats(input: HealthStatsInput): HealthStats {
     }).sort((a, b) => (a.percentage ?? -1) - (b.percentage ?? -1) || a.tag.localeCompare(b.tag)),
     weakestTopic: topics.at(-1) ?? null,
     latestTopic,
-    archetype: profileVectors.length
-      ? classifyArchetype(normalizeProfileVectors(accumulateVectors(profileVectors)))
-      : null,
     gapTags,
   };
 }

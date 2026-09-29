@@ -15,7 +15,6 @@ import {
   type AppNodeData,
 } from "@/components/node-editor/EditorCanvas";
 import type { NormalNodeData } from "@/components/node-editor/NormalNode";
-import { HCP_VECTOR_KEYS } from "@/lib/analytics/hcp";
 
 function validateGraph(nodes: AppNode[]) {
   for (const node of nodes) {
@@ -23,16 +22,6 @@ function validateGraph(nodes: AppNode[]) {
       const data = node.data as AppNodeData;
       const choices = (data as NormalNodeData).choices ?? [];
       for (const choice of choices) {
-        if (!choice.behavior_meaning?.trim()) {
-          return `Choice ${choice.label} on "${data.node_name || data.question_text.slice(0, 24) || node.id}" needs a behavior meaning.`;
-        }
-        if (!choice.allowed_usage || !choice.review_status) {
-          return `Choice ${choice.label} needs usage and review metadata.`;
-        }
-        const hasVector = HCP_VECTOR_KEYS.some((key) => Math.abs(choice.vector_deltas?.[key] ?? 0) > 0);
-        if (!hasVector) {
-          return `Choice ${choice.label} needs at least one non-zero vector delta.`;
-        }
       }
     }
   }

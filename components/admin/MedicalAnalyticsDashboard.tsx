@@ -4,7 +4,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 import type { Session, LeaderboardEntry, Quiz } from '@/lib/types';
-import type { HcpVectorMap } from '@/lib/analytics/hcp';
 import CompareSessionsModal, { type CompareSessionsModalProps } from './CompareSessionsModal';
 import { FilteredQuestionAnalysisTable, TopicUnderstandingBreakdown } from './AnalyticsBreakdownComponents';
 
@@ -56,8 +55,6 @@ export interface PlayerProfile {
   id: string;
   displayName: string;
   specialty: string;
-  archetypeId: string;
-  archetypeTitle: string;
   score: number;
   accuracy: number;
   totalTimeSeconds: number;
@@ -133,9 +130,6 @@ export interface MedicalAnalyticsDashboardProps {
   }>;
   insights?: {
     audience_mode_summary: Record<string, number>;
-    archetype_distribution: Array<{ archetype_id: string; count: number }>;
-    vector_summary: HcpVectorMap;
-    dominant_vector: string;
     highest_friction_nodes: Array<{
       question_id: string;
       question_text: string;
@@ -148,7 +142,6 @@ export interface MedicalAnalyticsDashboardProps {
     answered: number;
     missed: number;
     gap_tags: string[];
-    archetype_id: string | null;
     headline: string | null;
     suggestion: string | null;
   }>;
@@ -169,7 +162,6 @@ export interface PeerSessionOption {
   avg_score?: number;
   avg_accuracy?: number;
   avg_time_seconds?: number;
-  dominant_archetype?: string;
   cohort_label?: string;
   tag_scores?: Record<MedicalTag, number>;
   node_error_rates?: Record<string, number>;
@@ -302,20 +294,10 @@ export default function MedicalAnalyticsDashboard({
       const totalTimeSeconds = Math.round((entry.total_time_ms || 0) / 1000);
       const gapTags = (bd?.gap_tags || []) as MedicalTag[];
 
-      let archetypeTitle = '';
-      if (bd?.archetype_id) {
-        archetypeTitle = bd.archetype_id
-          .split('_')
-          .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(' ');
-      }
-
       return {
         id: String(entry.user_id),
         displayName: entry.user_display_name || 'Unnamed participant',
         specialty: '',
-        archetypeId: bd?.archetype_id || '',
-        archetypeTitle: archetypeTitle.replace(/Clinician/gi, 'Performer'),
         score: entry.total_score || 0,
         accuracy,
         totalTimeSeconds,
@@ -550,10 +532,8 @@ export default function MedicalAnalyticsDashboard({
       currentTime,
       compareTime,
       timeDelta,
-      currentDominant: insights?.dominant_vector?.replace(/_/g, ' ') ?? '',
-      compareDominant: selectedCompareSession.dominant_archetype?.replace(/_/g, ' ') ?? '',
     };
-  }, [selectedCompareSession, effectivePlayers, cohortAccuracy, cohortVelocity, insights?.dominant_vector]);
+  }, [selectedCompareSession, effectivePlayers, cohortAccuracy, cohortVelocity]);
 
   // -------------------------------------------------------------
   // INTERACTIVE TOGGLE HANDLERS (CLICK AGAIN TO UNFILTER)
@@ -612,7 +592,6 @@ export default function MedicalAnalyticsDashboard({
       return (
         player.displayName.toLowerCase().includes(query) ||
         player.specialty.toLowerCase().includes(query) ||
-        player.archetypeTitle.toLowerCase().includes(query) ||
         player.gapTags.some((tag) => tag.toLowerCase().includes(query))
       );
     });
@@ -1034,20 +1013,6 @@ export default function MedicalAnalyticsDashboard({
                 </div>
               </div>
 
-              {/* Delta 4: Dominant Archetype Shift */}
-              <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-                <div className="text-[10px] uppercase tracking-wider text-indigo-200 font-semibold">
-                  Dominant Archetype
-                </div>
-                <div className="mt-1 text-xs">
-                  <div className="font-bold text-sky-300 truncate">
-                    Current: {benchmarkComparisonMetrics.currentDominant}
-                  </div>
-                  <div className="text-gray-300 text-[10px] truncate mt-0.5">
-                    Benchmark: {benchmarkComparisonMetrics.compareDominant}
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         )}
@@ -1194,12 +1159,12 @@ export default function MedicalAnalyticsDashboard({
 
         </div>
 
-        {/* Row 3: Merged Cohort & Vector Insights Expandable Panel */}
+        {/* Row 3: Cohort insights */}
         {showCohortInsightsDrawer && (
           <div className="rounded-2xl bg-[#F8FAFC] border border-[#0460A9]/15 p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-[#0460A9]/10 pb-2">
               <span className="text-xs font-bold text-[#16324F] uppercase tracking-wider">
-                Audience Modes & HCP Archetype Distribution
+                Audience Modes
               </span>
               <button
                 onClick={() => setShowCohortInsightsDrawer(false)}
@@ -1209,7 +1174,7 @@ export default function MedicalAnalyticsDashboard({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="bg-white p-3 rounded-xl border border-[#0460A9]/10">
                 <p className="text-[10px] font-bold uppercase text-[#5D7EA1]">Audience Modes</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1219,19 +1184,6 @@ export default function MedicalAnalyticsDashboard({
                     </span>
                   ))}
                   {Object.keys(insights?.audience_mode_summary ?? {}).length === 0 && <span className="text-[11px] text-[#5D7EA1]">No audience summary data.</span>}
-                </div>
-              </div>
-
-              <div className="bg-white p-3 rounded-xl border border-[#0460A9]/10">
-                <p className="text-[10px] font-bold uppercase text-[#5D7EA1]">Top Archetypes</p>
-                <div className="mt-2 space-y-1">
-                  {(insights?.archetype_distribution ?? []).slice(0, 3).map((row) => (
-                    <div key={row.archetype_id} className="flex justify-between items-center text-[11px]">
-                      <span className="text-[#16324F] truncate">{row.archetype_id.replace(/_/g, ' ')}</span>
-                      <span className="font-bold text-[#0460A9] font-mono">{row.count}</span>
-                    </div>
-                  ))}
-                  {(insights?.archetype_distribution ?? []).length === 0 && <span className="text-[11px] text-[#5D7EA1]">No archetype data.</span>}
                 </div>
               </div>
 

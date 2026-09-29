@@ -83,7 +83,7 @@ export default function QuizOverallAnalyticsView({
     status: 'completed',
     quiz_name: data.quiz.name,
     quiz_description: data.quiz.description ?? '',
-  } as Session & { quiz_name: string; quiz_description: string };
+  } as unknown as Session & { quiz_name: string; quiz_description: string };
 
   return (
     <MedicalAnalyticsDashboard

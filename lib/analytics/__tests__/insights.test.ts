@@ -92,7 +92,6 @@ test('prompt carries the authored scenarios and forbids inventing facts', () => 
   const prompt = buildInsightPrompt({
     quizName: 'Heart Health',
     quizDescription: 'A day in the life of a 55-year-old with ASCVD risk',
-    archetypeId: 'balanced_clinician',
     clinicalTag: 'screening',
     audience: 'public',
     locale: 'th',
@@ -107,7 +106,6 @@ test('prompt carries the authored scenarios and forbids inventing facts', () => 
   assert.match(prompt, /Thai/);
   assert.match(prompt, /not in the list above/);
   assert.match(prompt, /Never name a medicine/);
-  assert.match(prompt, /balanced_clinician/);
 });
 
 // The story is about a character; the summary is about the reader. Without
@@ -116,15 +114,12 @@ test('prompt tells the model not to name the story character', () => {
   const prompt = buildInsightPrompt({
     quizName: 'Heart Health',
     quizDescription: null,
-    archetypeId: ANY_ARCHETYPE,
     clinicalTag: '',
     audience: 'public',
     locale: 'th',
     scenarios: [scenario],
   });
   assert.match(prompt, /Do not name any character/);
-  // A public player has no archetype, so the wildcard must not leak into the text.
-  assert.doesNotMatch(prompt, /Behavioural segment/);
   assert.doesNotMatch(prompt, /Topic they most often got wrong/);
 });
 
@@ -135,34 +130,23 @@ const T = (quiz_id: string | null, archetype_id: string, clinical_tag: string) =
 
 test('quiz-scoped beats global', () => {
   const rows = [T(null, ANY_ARCHETYPE, ''), T('q1', ANY_ARCHETYPE, '')];
-  const got = pickInsightTemplate(rows, { quizId: 'q1', archetypeId: null, tags: [] });
+  const got = pickInsightTemplate(rows, { quizId: 'q1', tags: [] });
   assert.equal(got?.quiz_id, 'q1');
 });
 
 test('a tag the player missed beats the tag-agnostic row', () => {
   const rows = [T('q1', ANY_ARCHETYPE, ''), T('q1', ANY_ARCHETYPE, 'diet')];
-  const got = pickInsightTemplate(rows, { quizId: 'q1', archetypeId: null, tags: ['diet'] });
+  const got = pickInsightTemplate(rows, { quizId: 'q1', tags: ['diet'] });
   assert.equal(got?.clinical_tag, 'diet');
 });
 
 test('among tags, the one missed most often wins', () => {
   const rows = [T('q1', ANY_ARCHETYPE, 'diet'), T('q1', ANY_ARCHETYPE, 'emergency')];
-  const got = pickInsightTemplate(rows, { quizId: 'q1', archetypeId: null, tags: ['emergency', 'diet'] });
+  const got = pickInsightTemplate(rows, { quizId: 'q1', tags: ['emergency', 'diet'] });
   assert.equal(got?.clinical_tag, 'emergency');
-});
-
-test('a real archetype beats the wildcard', () => {
-  const rows = [T('q1', ANY_ARCHETYPE, ''), T('q1', 'balanced_clinician', '')];
-  const got = pickInsightTemplate(rows, { quizId: 'q1', archetypeId: 'balanced_clinician', tags: [] });
-  assert.equal(got?.archetype_id, 'balanced_clinician');
 });
 
 test('rows for another quiz or an unmatched tag are never eligible', () => {
   const rows = [T('other', ANY_ARCHETYPE, ''), T('q1', ANY_ARCHETYPE, 'screening')];
-  assert.equal(pickInsightTemplate(rows, { quizId: 'q1', archetypeId: null, tags: ['diet'] }), null);
-});
-
-test('an archetype-specific row is not served to a player without one', () => {
-  const rows = [T('q1', 'balanced_clinician', '')];
-  assert.equal(pickInsightTemplate(rows, { quizId: 'q1', archetypeId: null, tags: [] }), null);
+  assert.equal(pickInsightTemplate(rows, { quizId: 'q1', tags: ['diet'] }), null);
 });

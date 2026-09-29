@@ -2,7 +2,6 @@
 
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import type { HcpVectorMap } from '@/lib/analytics/hcp';
 import { Session, LeaderboardEntry, Quiz } from '@/lib/types';
 import MedicalAnalyticsDashboard from '@/components/admin/MedicalAnalyticsDashboard';
 import type { CompareSessionsModalProps } from '@/components/admin/CompareSessionsModal';
@@ -27,7 +26,6 @@ interface AnalyticsData {
     answered: number;
     missed: number;
     gap_tags: string[];
-    archetype_id: string | null;
     headline: string | null;
     suggestion: string | null;
   }>;
@@ -43,9 +41,6 @@ interface AnalyticsData {
   }>;
   insights: {
     audience_mode_summary: Record<string, number>;
-    archetype_distribution: Array<{ archetype_id: string; count: number }>;
-    vector_summary: HcpVectorMap;
-    dominant_vector: string;
     highest_friction_nodes: Array<{
       question_id: string;
       question_text: string;

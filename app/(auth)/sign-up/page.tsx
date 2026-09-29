@@ -57,8 +57,6 @@ export default function SignUpPage() {
         body: JSON.stringify({
           consent_purposes: {
             platform_account: true,
-            analytics_profiling: true,
-            hcp_vectors_acknowledged: true,
           },
         }),
       });

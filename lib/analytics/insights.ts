@@ -1,32 +1,11 @@
 // Reviewed insight templates and the shared validation used by AI drafts.
-// Player-specific claims come from reviewed choice explanations. A separate
-// provisional flow can show clearly marked answer-pattern feedback before
-// human review; it receives recorded selections but no player identifier.
+// Player feedback uses reviewed summary templates and clearly marked drafts.
 
-import type { IntendedAudience } from './hcp';
+import type { IntendedAudience } from './quiz-metadata';
 
-/** Every id classifyArchetype() can return. */
-export const ARCHETYPE_IDS = [
-  'conservative_guideline_follower',
-  'evidence_seeking_early_adopter',
-  'qol_driven_prescriber',
-  'diagnostic_evidence_builder',
-  'balanced_clinician',
-] as const;
-
-export type ArchetypeId = (typeof ARCHETYPE_IDS)[number];
-
-/**
- * Archetype wildcard. The six HCP vectors only describe clinical decision
- * style, so a public quiz — a diet or symptom-response journey — produces no
- * archetype at all. Rows keyed '*' apply to any player, which is what lets the
- * whole feature work on an ordinary public quiz. A real archetype still wins
- * over the wildcard when one is known.
- */
+/** All reviewed summary templates now apply to any player. */
 export const ANY_ARCHETYPE = '*';
-
-/** What the CMS offers and the API accepts for archetype_id. */
-export const ARCHETYPE_KEYS = [ANY_ARCHETYPE, ...ARCHETYPE_IDS] as const;
+export const ARCHETYPE_KEYS = [ANY_ARCHETYPE] as const;
 
 export const INSIGHT_LOCALES = ['th', 'en'] as const;
 export type InsightLocale = (typeof INSIGHT_LOCALES)[number];
@@ -56,18 +35,6 @@ export type InsightTemplate = {
 /** What a player is shown. A strict subset of the template — no review metadata. */
 export type InsightSummary = Pick<InsightTemplate, 'headline' | 'body' | 'suggestion'>;
 
-/**
- * A reviewed explanation tied to an answer the current player actually chose.
- * This is resolved locally from user_answers + choices; it is never generated
- * from personal data at request time.
- */
-export type ChoiceInsight = {
-  question: string;
-  choice: string;
-  reason: string;
-  signal: 'incorrect' | 'off_target';
-};
-
 export const HEADLINE_MAX = 120;
 // 200, not 400: at 400 a Thai body runs ~6 lines on a phone and pushes the
 // gauge and the topic bars off the first screen. This bound is enforced twice —
@@ -87,8 +54,8 @@ export type ResolvableTemplate = {
 
 /**
  * Pick the one summary a player should read, most specific first:
- * quiz-scoped over global, a real archetype over the '*' wildcard, tag-scoped
- * over tag-agnostic, and among tag-scoped rows the tag the player missed most.
+ * quiz-scoped over global, tag-scoped over tag-agnostic, and among tagged
+ * rows the tag the player missed most.
  *
  * Callers pass only rows that are already approved and already filtered to the
  * right audience and locale. Shared by the player lookup and the admin
@@ -96,19 +63,17 @@ export type ResolvableTemplate = {
  */
 export function pickInsightTemplate<T extends ResolvableTemplate>(
   rows: readonly T[],
-  opts: { quizId: string | null; archetypeId: string | null; tags: readonly string[] },
+  opts: { quizId: string | null; tags: readonly string[] },
 ): T | null {
   const eligible = rows.filter(
     (r) =>
       (r.quiz_id === null || r.quiz_id === opts.quizId) &&
-      (r.archetype_id === ANY_ARCHETYPE ||
-        (opts.archetypeId !== null && r.archetype_id === opts.archetypeId)) &&
+      r.archetype_id === ANY_ARCHETYPE &&
       (r.clinical_tag === '' || opts.tags.includes(r.clinical_tag)),
   );
 
   const rank = (r: T) => [
     r.quiz_id !== null ? 0 : 1,
-    r.archetype_id !== ANY_ARCHETYPE ? 0 : 1,
     r.clinical_tag !== '' ? 0 : 1,
     r.clinical_tag !== '' ? opts.tags.indexOf(r.clinical_tag) : Number.MAX_SAFE_INTEGER,
   ];
@@ -217,14 +182,13 @@ export type DraftScenario = {
 export type DraftContext = {
   quizName: string;
   quizDescription: string | null;
-  archetypeId: string;
   clinicalTag: string;
   audience: IntendedAudience;
   locale: InsightLocale;
   /**
    * The grounding material. Question and choice text is authored content that
    * exists in every quiz, so drafting works without anyone filling in the
-   * optional HCP metadata first.
+   * choice profile metadata first.
    */
   scenarios: DraftScenario[];
 };
@@ -254,9 +218,6 @@ export function buildInsightPrompt(context: DraftContext): string {
     'The labels say whether each choice meets the learning objective. This is your ONLY source of fact:',
     ...scenarios,
     '',
-    context.archetypeId && context.archetypeId !== ANY_ARCHETYPE
-      ? `Behavioural segment: ${context.archetypeId}`
-      : '',
     context.clinicalTag ? `Topic they most often got wrong: ${context.clinicalTag}` : '',
     '',
     'Rules:',

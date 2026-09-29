@@ -3,7 +3,6 @@ import { z } from 'zod';
 import {
   getApprovedInsightSummary,
   getUserConsent,
-  getUserChoiceInsight,
   getUserHealthStatsInput,
 } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
@@ -41,27 +40,16 @@ export async function GET(
     const input = await getUserHealthStatsInput(uid);
     const stats = summarizeHealthStats(input);
 
-    // Prefer a reviewed explanation for a choice this player actually made.
-    // This includes both negative choices and zero-impact choices that were
-    // reasonable but did not answer the question's learning objective.
-    const choiceInsight = stats.latestTopic
-      ? await getUserChoiceInsight(uid, stats.latestTopic.quiz_id, stats.gapTags[0] ?? null)
-      : null;
-
     // Approved CMS copy always wins. Only when absent do we use a separately
     // marked AI draft based on the player's recorded selections, the answer
     // key, and authored explanations. The UID is used only for DB lookup;
     // answer patterns, rather than user IDs, key the shared cache.
     //
-    // A null archetype is the common case, not an error: the six HCP vectors
-    // describe clinical decision style, which a public quiz never produces.
-    // Those players resolve against '*' rows instead.
     // Anchored on the quiz answered most recently, not the weakest one: the
     // player has just finished something and expects to read about that.
     const summary = stats.latestTopic
       ? await getApprovedInsightSummary({
           quizId: stats.latestTopic.quiz_id,
-          archetypeId: stats.archetype,
           tags: stats.gapTags,
           audience: stats.latestTopic.audience,
           locale: query.data.locale,
@@ -82,14 +70,13 @@ export async function GET(
       : null;
 
     const feedback = composePersonalFeedback({
-      choiceInsight,
       summary: summary ?? provisional?.summary ?? null,
       summaryStatus: provisional?.status ?? (summary ? 'approved' : null),
       latestTopic: stats.latestTopic,
       locale: query.data.locale,
     });
 
-    return NextResponse.json({ ...stats, choiceInsight, summary, feedback });
+    return NextResponse.json({ ...stats, summary, feedback });
   } catch (err) {
     console.error('health-stats failed:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

@@ -16,7 +16,7 @@ const ROUTE_LIMITS: Array<[string, number]> = [
   // Each call spends Gemini free-tier quota. Must stay above the '/api/admin'
   // entry below it — first match wins.
   ['/api/admin/insight-templates/draft', 5],
-  // Admin routes touch HCP clinical profiles — conservative limit to
+  // Admin analytics routes can process many player rows — conservative limit to
   // bound bulk-scraping of pseudonymous behavioral data.
   ['/api/admin', 20],
 ];

@@ -83,8 +83,6 @@ function SignInForm() {
           body: JSON.stringify({
             consent_purposes: {
               platform_account: true,
-              analytics_profiling: true,
-              hcp_vectors_acknowledged: true,
             },
           }),
         }),

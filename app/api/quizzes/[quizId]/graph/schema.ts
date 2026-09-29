@@ -1,9 +1,4 @@
 import { z } from 'zod';
-import {
-  ALLOWED_USAGE_OPTIONS,
-  HCP_VECTOR_KEYS,
-  REVIEW_STATUS_OPTIONS,
-} from '@/lib/analytics/hcp';
 
 const ALLOWED_MEDIA_ORIGINS = new Set([
   'storage.googleapis.com',
@@ -35,12 +30,7 @@ export const ChoiceSchema = z.object({
   // editor round-trips them back verbatim.
   explanation: z.string().max(2000).nullable().optional(),
   behavior_meaning: z.string().max(2000).nullable().optional(),
-  vector_deltas: z.record(z.enum(HCP_VECTOR_KEYS), z.number().finite()).optional(),
   clinical_tags: z.array(z.string().max(120)).max(20).optional(),
-  confidence_weight: z.number().finite().min(0).max(3).optional(),
-  allowed_usage: z.enum(ALLOWED_USAGE_OPTIONS).optional(),
-  requires_hcp_version: z.boolean().optional(),
-  review_status: z.enum(REVIEW_STATUS_OPTIONS).optional(),
 });
 
 export const QuestionSchema = z.object({
