@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
+import { headers } from "next/headers";
 import { Inter, Lexend, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/hooks/useAuth";
@@ -38,6 +39,7 @@ export default async function RootLayout({
   // pages (sign-in, privacy, terms) are statically prerendered with no nonce and
   // 'strict-dynamic' blocks all scripts.
   await connection();
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
     <html
       lang="en"
@@ -45,6 +47,13 @@ export default async function RootLayout({
       data-scroll-behavior="smooth"
       suppressHydrationWarning
     >
+      <head>
+        {/* Apply the saved palette before paint, using the request's CSP nonce. */}
+        <script
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: `(function(){var t='light';try{var s=localStorage.getItem('novarquiz-theme');if(s==='dark'||s==='light')t=s;}catch(e){}document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t;})();` }}
+        />
+      </head>
       <body className="min-h-full flex flex-col font-sans antialiased">
         <MediaPreconnect />
         <div

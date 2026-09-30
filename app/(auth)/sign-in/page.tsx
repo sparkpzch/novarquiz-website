@@ -12,7 +12,6 @@ import Input from '@/components/ui/Input';
 import TermsModal from '@/components/ui/TermsModal';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
-import { motion } from 'motion/react';
 
 function SignInForm() {
   const { t } = useTranslation();
@@ -138,6 +137,7 @@ function SignInForm() {
           label={t('auth.email')}
           type="email"
           placeholder="Example@gmail.com"
+          autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -147,6 +147,7 @@ function SignInForm() {
           label={t('auth.password')}
           type="password"
           placeholder="••••••••"
+          autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -154,47 +155,40 @@ function SignInForm() {
 
         {/* Remember me + Forgot password row */}
         <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <div
-              onClick={() => setRememberMe(!rememberMe)}
-              className="flex-shrink-0 flex items-center justify-center cursor-pointer"
-              style={{
-                width: '18px',
-                height: '18px',
-                borderRadius: '50%',
-                border: `2px solid ${rememberMe ? '#3b5fd4' : '#d1d5db'}`,
-                background: rememberMe ? '#3b5fd4' : 'transparent',
-                transition: 'all 0.2s',
-              }}
-            >
+          <label className="nq-auth-muted flex items-center gap-2 cursor-pointer select-none">
+            <span className="relative flex shrink-0 items-center justify-center">
+              <input
+                type="checkbox"
+                className="nq-auth-remember"
+                checked={rememberMe}
+                onChange={(event) => setRememberMe(event.target.checked)}
+              />
               {rememberMe && (
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <svg className="nq-auth-check absolute pointer-events-none" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                  <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
-            </div>
-            <span className="text-sm text-gray-600">Remember me</span>
+            </span>
+            <span className="text-sm">Remember me</span>
           </label>
           <Link
             href="/forgot-password"
-            className="text-sm font-medium transition-colors"
-            style={{ color: '#3b5fd4' }}
+            className="nq-auth-link text-sm font-medium"
           >
             Forgot password ?
           </Link>
         </div>
 
         {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-lg bg-red-50 border border-red-200 p-3"
+          <div
+            role="alert"
+            className="nq-auth-error rounded-lg border p-3"
           >
-            <p className="text-sm text-red-500">{error}</p>
-          </motion.div>
+            <p className="text-sm">{error}</p>
+          </div>
         )}
 
-        <Button type="submit" loading={loading} className="w-full" style={{ marginTop: '4px' }}>
+        <Button type="submit" loading={loading} className="nq-auth-submit w-full" style={{ marginTop: '4px', background: 'var(--nq-auth-primary)' }}>
           Login
         </Button>
       </form>
@@ -202,10 +196,10 @@ function SignInForm() {
       {/* Or divider — all screens */}
       <div className="relative my-4">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-200" />
+          <div className="nq-auth-divider w-full border-t" />
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="nq-auth-divider-bg px-4 text-gray-400">Or</span>
+          <span className="nq-auth-divider-bg nq-auth-muted px-4">Or</span>
         </div>
       </div>
 
@@ -214,7 +208,7 @@ function SignInForm() {
         type="button"
         onClick={handleGoogleSignIn}
         disabled={loading}
-        className="nq-auth-google-btn w-full flex items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 transition-all py-2.5 text-sm font-medium text-gray-700 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+        className="nq-auth-google-btn w-full flex items-center justify-center gap-3 rounded-xl border py-2.5 text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
         style={{ minHeight: '44px' }}
       >
         <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
@@ -238,9 +232,9 @@ function SignInForm() {
 
 
       {/* Desktop: sign-up link */}
-      <p className="hidden md:block text-center text-sm text-gray-500 mt-6">
+      <p className="nq-auth-muted hidden md:block text-center text-sm mt-6">
         {t('auth.no_account')}{' '}
-        <Link href="/sign-up" className="font-medium transition-colors" style={{ color: '#3b5fd4' }}>
+        <Link href="/sign-up" className="nq-auth-link font-medium">
           {t('auth.sign_up')}
         </Link>
       </p>

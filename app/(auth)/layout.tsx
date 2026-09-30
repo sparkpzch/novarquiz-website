@@ -1,10 +1,9 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { motion } from 'motion/react';
+import { LayoutGroup, MotionConfig, motion } from 'motion/react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { useTheme } from '@/lib/hooks/useTheme';
 
 const AUTH_TABS = [
   { label: 'Login', href: '/sign-in' },
@@ -13,250 +12,56 @@ const AUTH_TABS = [
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
   const isTabPage = pathname === '/sign-in' || pathname === '/sign-up';
 
-  const headerGradient = isDark
-    ? 'linear-gradient(135deg, #223870 0%, #182a5e 40%, #0e1e48 100%)'
-    : 'linear-gradient(135deg, #6ba3f5 0%, #4f82e8 40%, #3b5fd4 100%)';
-  const cardShadow = isDark
-    ? '0 -6px 32px rgba(0,0,0,0.5)'
-    : '0 -6px 32px rgba(0,0,0,0.13)';
-  const tabsBg = isDark ? '#1a2740' : '#f0f0f0';
-  const tabPillBg = isDark ? '#2a3f6a' : '#ffffff';
-  const activeTabColor = isDark ? '#d4e3f5' : '#111';
-  const inactiveTabColor = isDark ? '#7a9abf' : '#6b7280';
-
   return (
-    <>
-      {/* ─── MOBILE LAYOUT ─── */}
-      <div className="md:hidden min-h-screen flex flex-col overflow-hidden nq-sky">
-        {/* Blue gradient header */}
-        <div
-          className="relative flex-shrink-0 overflow-hidden"
-          style={{
-            minHeight: '180px',
-            height: '30vh',
-            background: headerGradient,
-          }}
-        >
-          {/* Dot grid pattern */}
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.45) 1.5px, transparent 1.5px)',
-              backgroundSize: '26px 26px',
-            }}
-          />
-          {/* Soft light flare top-right */}
-          <div
-            className="absolute"
-            style={{
-              top: '-40px',
-              right: '-40px',
-              width: '220px',
-              height: '220px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(255,255,255,0.22) 0%, transparent 70%)',
-            }}
-          />
-          {/* Welcome text */}
-          <motion.div
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: 'easeOut' }}
-            className="absolute left-6 right-6"
-            style={{ bottom: '30px' }}
-          >
-            <p className="text-white font-semibold" style={{ fontSize: '20px', lineHeight: 1.15, marginBottom: '2px' }}>
-              Welcome back
-            </p>
+    <MotionConfig reducedMotion="user">
+      {/* One responsive tree keeps form state and layout measurements stable. */}
+      <div className="nq-auth-shell flex min-h-dvh flex-col">
+        <header className="nq-auth-header relative shrink-0 overflow-hidden">
+          <div className="nq-auth-welcome relative z-10 mx-auto w-full max-w-md">
+            <p className="font-semibold">Welcome back</p>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-white/75 font-normal" style={{ fontSize: '14px' }}>To</span>
-              <span className="text-white font-extrabold tracking-tight" style={{ fontSize: '28px' }}>NovarQuiz</span>
+              <span className="nq-auth-welcome-to font-normal">To</span>
+              <span className="nq-auth-brand font-extrabold tracking-tight">NovarQuiz</span>
             </div>
-          </motion.div>
-        </div>
+          </div>
+        </header>
 
-        {/* White card */}
-        <motion.div
-          initial={{ y: 50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.45, ease: 'easeOut', delay: 0.1 }}
-          className="relative z-10 flex-1 nq-auth-card overflow-y-auto"
-          style={{
-            marginTop: '-28px',
-            borderRadius: '28px 28px 0 0',
-            boxShadow: cardShadow,
-          }}
-        >
-          <div style={{ padding: '24px 22px 32px' }}>
-            {/* ── Tab switcher (only for login/signup pages) ── */}
+        <main className="nq-auth-card relative z-10 flex-1">
+          <div className="nq-auth-content mx-auto w-full max-w-md">
             {isTabPage && (
-              <div
-                className="flex mb-5 relative"
-                style={{
-                  background: tabsBg,
-                  borderRadius: '12px',
-                  padding: '4px',
-                }}
-              >
-                {AUTH_TABS.map((tab) => {
-                  const isActive = pathname === tab.href;
-                  return (
-                    <Link
-                      key={tab.href}
-                      href={tab.href}
-                      className="relative flex-1 text-center z-10"
-                      style={{
-                        borderRadius: '9px',
-                        padding: '8px 0',
-                        fontSize: '14px',
-                        fontWeight: isActive ? 700 : 500,
-                        color: isActive ? activeTabColor : inactiveTabColor,
-                        textDecoration: 'none',
-                      }}
-                    >
-                      {/* Sliding pill — only rendered for the active tab */}
-                      {isActive && (
-                        <motion.div
-                          layoutId="auth-tab-pill"
-                          className="absolute inset-0"
-                          style={{
-                            background: tabPillBg,
-                            borderRadius: '9px',
-                            boxShadow: isDark ? '0 1px 4px rgba(0,0,0,0.3)' : '0 1px 4px rgba(0,0,0,0.10)',
-                            zIndex: -1,
-                          }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 38 }}
-                        />
-                      )}
-                      {tab.label}
-                    </Link>
-                  );
-                })}
-              </div>
+              <LayoutGroup id="auth-tabs">
+                <nav className="nq-auth-tabs relative mb-5 flex" aria-label="Account access">
+                  {AUTH_TABS.map((tab) => {
+                    const isActive = pathname === tab.href;
+                    return (
+                      <Link
+                        key={tab.href}
+                        href={tab.href}
+                        aria-current={isActive ? 'page' : undefined}
+                        className="nq-auth-tab relative flex-1 text-center"
+                      >
+                        {isActive && (
+                          <motion.span
+                            layoutId="auth-tab-pill"
+                            className="nq-auth-tab-pill absolute inset-0"
+                            aria-hidden="true"
+                            transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                          />
+                        )}
+                        <span className="relative z-10">{tab.label}</span>
+                      </Link>
+                    );
+                  })}
+                </nav>
+              </LayoutGroup>
             )}
 
             {children}
           </div>
-        </motion.div>
+        </main>
       </div>
-
-      {/* ─── DESKTOP LAYOUT ─── */}
-      <div
-        className="hidden md:flex min-h-screen flex-col overflow-hidden nq-sky"
-      >
-        {/* Blue gradient header */}
-        <div
-          className="relative flex-shrink-0 overflow-hidden flex items-end"
-          style={{
-            minHeight: '220px',
-            height: '32vh',
-            background: headerGradient,
-          }}
-        >
-          {/* Dot grid pattern */}
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.45) 1.5px, transparent 1.5px)',
-              backgroundSize: '26px 26px',
-            }}
-          />
-          {/* Soft light flare top-right */}
-          <div
-            className="absolute"
-            style={{
-              top: '-40px',
-              right: '-40px',
-              width: '300px',
-              height: '300px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%)',
-            }}
-          />
-          {/* Welcome text */}
-          <motion.div
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: 'easeOut' }}
-            className="relative z-10 w-full max-w-md mx-auto px-8 pb-8"
-          >
-            <p className="text-white font-semibold" style={{ fontSize: '22px', lineHeight: 1.15, marginBottom: '2px' }}>
-              Welcome back
-            </p>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-white/75 font-normal" style={{ fontSize: '15px' }}>To</span>
-              <span className="text-white font-extrabold tracking-tight" style={{ fontSize: '32px' }}>NovarQuiz</span>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* White card */}
-        <motion.div
-          initial={{ y: 50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.45, ease: 'easeOut', delay: 0.1 }}
-          className="relative z-10 flex-1 nq-auth-card overflow-y-auto"
-          style={{
-            marginTop: '-28px',
-            borderRadius: '28px 28px 0 0',
-            boxShadow: cardShadow,
-          }}
-        >
-          <div className="w-full max-w-md mx-auto" style={{ padding: '24px 22px 40px' }}>
-            {/* ── Tab switcher (only for login/signup pages) ── */}
-            {isTabPage && (
-              <div
-                className="flex mb-6 relative"
-                style={{
-                  background: tabsBg,
-                  borderRadius: '12px',
-                  padding: '4px',
-                }}
-              >
-                {AUTH_TABS.map((tab) => {
-                  const isActive = pathname === tab.href;
-                  return (
-                    <Link
-                      key={tab.href}
-                      href={tab.href}
-                      className="relative flex-1 text-center z-10"
-                      style={{
-                        borderRadius: '9px',
-                        padding: '9px 0',
-                        fontSize: '15px',
-                        fontWeight: isActive ? 700 : 500,
-                        color: isActive ? activeTabColor : inactiveTabColor,
-                        textDecoration: 'none',
-                      }}
-                    >
-                      {isActive && (
-                        <motion.div
-                          layoutId="auth-tab-pill-desktop"
-                          className="absolute inset-0"
-                          style={{
-                            background: tabPillBg,
-                            borderRadius: '9px',
-                            boxShadow: isDark ? '0 1px 4px rgba(0,0,0,0.3)' : '0 1px 4px rgba(0,0,0,0.10)',
-                            zIndex: -1,
-                          }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 38 }}
-                        />
-                      )}
-                      {tab.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-
-            {children}
-          </div>
-        </motion.div>
-      </div>
-    </>
+    </MotionConfig>
   );
 }

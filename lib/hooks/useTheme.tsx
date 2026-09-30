@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 
 type Theme = 'light' | 'dark';
 
@@ -18,21 +18,26 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('light');
+  const themeRef = useRef<Theme>('light');
 
   useEffect(() => {
-    const stored = localStorage.getItem('novarquiz-theme') as Theme | null;
-    if (stored === 'dark' || stored === 'light') {
-      setThemeState(stored);
+    // The bootstrap script has already applied this before the first paint.
+    // Do not persist the initial light state over a saved dark preference.
+    const current = document.documentElement.dataset.theme;
+    if (current === 'dark' || current === 'light') {
+      themeRef.current = current;
+      setThemeState(current);
     }
   }, []);
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('novarquiz-theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => setThemeState((t) => (t === 'light' ? 'dark' : 'light'));
-  const setTheme = (t: Theme) => setThemeState(t);
+  const setTheme = (next: Theme) => {
+    themeRef.current = next;
+    setThemeState(next);
+    document.documentElement.dataset.theme = next;
+    document.documentElement.style.colorScheme = next;
+    try { localStorage.setItem('novarquiz-theme', next); } catch {}
+  };
+  const toggleTheme = () => setTheme(themeRef.current === 'light' ? 'dark' : 'light');
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
