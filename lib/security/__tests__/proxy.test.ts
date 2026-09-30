@@ -39,11 +39,11 @@ test('verified player sessions cannot open admin pages, and admins land in Quiz 
         headers: { cookie: `session=${token}` },
       }));
       assert.equal(adminResponse.status, isAdmin ? 200 : 307);
-      if (!isAdmin) assert.equal(adminResponse.headers.get('location'), 'https://quiz.example/quizzes');
+      if (!isAdmin) assert.equal(adminResponse.headers.get('location'), 'https://quiz.example/');
       const loginResponse = await proxy(new NextRequest('https://quiz.example/sign-in', {
         headers: { cookie: `session=${token}` },
       }));
-      assert.equal(loginResponse.headers.get('location'), `https://quiz.example${isAdmin ? '/admin' : '/quizzes'}`);
+      assert.equal(loginResponse.headers.get('location'), `https://quiz.example${isAdmin ? '/admin' : '/'}`);
     }
   } finally {
     if (originalSecret === undefined) delete process.env.SESSION_SECRET;

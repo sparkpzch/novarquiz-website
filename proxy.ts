@@ -89,7 +89,7 @@ export async function proxy(request: NextRequest) {
       try {
         const user = await verifySessionToken(session);
         if (!['/terms', '/privacy'].includes(pathname)) {
-          return NextResponse.redirect(new URL(user.isAdmin ? '/admin' : '/quizzes', request.url));
+          return NextResponse.redirect(new URL(user.isAdmin ? '/admin' : '/', request.url));
         }
       } catch {
         // Expired / invalid — let through to sign-in
@@ -108,7 +108,7 @@ export async function proxy(request: NextRequest) {
   try {
     const user = await verifySessionToken(session);
     if ((pathname === '/admin' || pathname.startsWith('/admin/')) && !user.isAdmin) {
-      return NextResponse.redirect(new URL('/quizzes', request.url));
+      return NextResponse.redirect(new URL('/', request.url));
     }
     return withCsp(request, nonce);
   } catch {
