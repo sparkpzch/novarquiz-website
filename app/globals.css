@@ -62,7 +62,7 @@
 }
 
 [data-theme="light"] .text-gray-500 {
-  color: #9ca3af !important;
+  color: #456786 !important;
 }
 
 [data-theme="light"] .hover\:text-white:hover {
@@ -1500,4 +1500,56 @@ body {
 
 .nq-dashboard-shell .nq-full-report [class~="hover:text-white"]:hover {
   color: #ffffff !important;
+}
+
+/* Opaque ink keeps small labels readable on light dashboard surfaces. */
+.nq-dashboard-shell.nq-theme-light [class~="text-[#4D6F93]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#5D7EA1]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#475E79]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#8AA4C0]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#8a97c1]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#7886af]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#65739f]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#8391bc]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#9aa8d1]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#7987b3]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#7886b2]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#7784ae]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#7180ad]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#62709d]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#5f6e9c]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#53618f]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#9aabda]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#aab6da]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#8FA3BD]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#A7B3C3]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#B3BFCE]"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#5D7EA1]/50"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#5D7EA1]/70"]:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light .text-gray-300:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light .text-gray-400:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light .text-gray-500:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light .text-gray-600:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light .nq-text-muted:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light .nq-content:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light .nq-details:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light .nq-sidebar-muted:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light .nq-insight-eyebrow:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light .nq-insight-note:not(.nq-always-dark *):not(.nq-report-dark-panel *),
+.nq-dashboard-shell.nq-theme-light .nq-insight-question-label:not(.nq-always-dark *):not(.nq-report-dark-panel *) {
+  color: #45617e !important;
+}
+
+.nq-dashboard-shell.nq-theme-light [class~="text-[#7898ff]"]:not(.nq-always-dark *),
+.nq-dashboard-shell.nq-theme-light [class~="text-[#91a7ff]"]:not(.nq-always-dark *) {
+  color: #2457b2 !important;
+}
+
+.nq-dashboard-shell.nq-theme-light [class~="text-[#8f83ff]"]:not(.nq-always-dark *) {
+  color: #6240b5 !important;
+}
+
+.nq-dashboard-shell.nq-theme-light input::placeholder,
+.nq-dashboard-shell.nq-theme-light textarea::placeholder {
+  color: #526b85 !important;
 }
