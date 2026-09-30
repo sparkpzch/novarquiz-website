@@ -428,6 +428,7 @@ export default function DashboardPage() {
 }
 
 function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUid: string | null; healthStatsLocale: string }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
   const [initialCache] = useState(() => healthStatsUid
@@ -559,7 +560,7 @@ function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUi
 
       <div id="topic-understanding" className="scroll-mt-24">
         {healthStatsLoading ? (
-          <section aria-label="Loading topic understanding" className="nq-dashboard-panel min-h-[205px] animate-pulse rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
+          <section aria-label={t('topic_breakdown.loading')} className="nq-dashboard-panel min-h-[205px] animate-pulse rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
             <div className="h-4 w-52 rounded bg-white/10" />
             <div className="mt-2 h-3 w-72 max-w-full rounded bg-white/[0.06]" />
             <div className="mt-5 grid grid-cols-2 gap-3">
@@ -568,13 +569,13 @@ function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUi
           </section>
         ) : healthStatsError && !healthStats ? (
           <section role="status" className="nq-dashboard-panel flex min-h-[205px] items-center rounded-xl border border-white/8 bg-[#0d173e] p-5 text-xs leading-5 text-[#9aa8d1]">
-            We couldn’t load your topic understanding. Refresh the page to try again.
+            {t('topic_breakdown.load_error')}
           </section>
         ) : (
           <TopicUnderstandingBreakdown
             variant="dashboard"
             items={healthStats?.topicBreakdown ?? []}
-            description="Your utility earned compared with the maximum available across every session you answered."
+            description={t('topic_breakdown.descriptions.home')}
             onRefresh={() => {
               setHealthStatsRefreshing(true);
               setHealthStatsError(false);
@@ -584,10 +585,10 @@ function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUi
             lastFetchedAt={healthStatsFetchedAt}
             refreshError={healthStatsError}
             emptyMessage={user?.isAnonymous
-              ? "Sign in to track topic understanding across your sessions."
+              ? t('topic_breakdown.guest_empty')
               : healthStats?.answered
-                ? `You’ve answered ${healthStats.answered} question${healthStats.answered === 1 ? '' : 's'}, but none has topic tags yet. Add topic tags to quiz choices to build this breakdown.`
-                : "No tagged answers yet. Answer topic-tagged questions to build your breakdown."}
+                ? t('topic_breakdown.untagged', { count: healthStats.answered })
+                : t('topic_breakdown.no_answers')}
           />
         )}
       </div>

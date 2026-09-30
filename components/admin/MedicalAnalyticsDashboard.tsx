@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'next/navigation';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 import type { Session, LeaderboardEntry, Quiz } from '@/lib/types';
@@ -229,6 +230,7 @@ export default function MedicalAnalyticsDashboard({
   allSessions: initialAllSessions,
   onBack,
 }: MedicalAnalyticsDashboardProps = {}) {
+  const { t } = useTranslation();
   const router = useRouter();
 
   // Multi-session Compare Modal State (Matching QuizManage)
@@ -805,7 +807,7 @@ export default function MedicalAnalyticsDashboard({
                   responses: topic.sampleSize,
                   questionCount: 0,
                 }))}
-                description={selectedAggregateSession ? `Utility earned versus maximum available utility for ${selectedAggregateSession.name}.` : 'Utility earned versus maximum available utility, aggregated across all quiz sessions.'}
+                description={selectedAggregateSession ? t('topic_breakdown.descriptions.session', { name: selectedAggregateSession.name }) : t('topic_breakdown.descriptions.aggregate')}
                 selectedTag={selectedTag}
                 onToggleTag={handleTagToggle}
               />
@@ -1494,10 +1496,10 @@ export default function MedicalAnalyticsDashboard({
               };
             })}
             description={selectedPlayer
-              ? `Utility score for ${selectedPlayer.displayName}, based on their recorded responses.`
+              ? t('topic_breakdown.descriptions.player', { name: selectedPlayer.displayName })
               : selectedCompareSession
-                ? `Topic utility compared with ${selectedCompareSession.cohort_label || selectedCompareSession.name}.`
-                : 'Utility earned versus maximum available utility for questions tagged with each topic.'}
+                ? t('topic_breakdown.descriptions.comparison', { name: selectedCompareSession.cohort_label || selectedCompareSession.name })
+                : t('topic_breakdown.descriptions.report')}
             selectedPlayerName={selectedPlayer?.displayName}
             selectedCompareLabel={selectedCompareSession?.cohort_label || selectedCompareSession?.name}
             selectedTag={selectedTag}

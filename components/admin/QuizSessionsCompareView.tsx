@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import '@/lib/i18n';
 import { useRouter } from 'next/navigation';
 import type { Quiz, Session } from '@/lib/types';
 import CompareSessionsModal from './CompareSessionsModal';
@@ -106,6 +108,7 @@ export default function QuizSessionsCompareView({
   allSessions = [],
   onBack,
 }: QuizSessionsCompareViewProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'domains' | 'questions'>('overview');
@@ -179,10 +182,10 @@ export default function QuizSessionsCompareView({
     // Mock/derive realistic domain mastery stats per cohort for each tag
     return tags.map((tag) => {
       const descriptions: Record<string, string> = {
-        '#SGLT2i-Dosage': 'SGLT2 Inhibitor initiation criteria, eGFR dosage titration, & cardiorenal safety thresholds',
-        '#LDL-Targets': 'Very high-risk ASCVD intensive lipid lowering targets (<55 mg/dL) & combination therapy',
-        '#HeartDisease-Symptoms': 'Early recognition of subtle HFpEF decompensation, NT-proBNP cutoff interpretation',
-        '#Nutrition-Guidelines': 'Dietary sodium restriction, potassium management in CKD Stage 3b-4, and MNT',
+        '#SGLT2i-Dosage': t('topic_breakdown.compare.topics.cardiorenal'),
+        '#LDL-Targets': t('topic_breakdown.compare.topics.lipids'),
+        '#HeartDisease-Symptoms': t('topic_breakdown.compare.topics.heart'),
+        '#Nutrition-Guidelines': t('topic_breakdown.compare.topics.nutrition'),
       };
 
       const cohortScores = cohorts.map((cohort, idx) => {
@@ -211,7 +214,7 @@ export default function QuizSessionsCompareView({
 
       return {
         tag,
-        description: descriptions[tag] || 'Clinical decision guidance and guideline adherence evaluation',
+        description: descriptions[tag] || t('topic_breakdown.compare.topics.other'),
         cohortScores,
         delta,
         averageMastery: Math.round(
@@ -219,7 +222,7 @@ export default function QuizSessionsCompareView({
         ),
       };
     });
-  }, [cohorts]);
+  }, [cohorts, t]);
 
   // Aggregated Questions Friction & Distractor Comparison
   const questionsFriction = useMemo(() => {
@@ -440,16 +443,16 @@ export default function QuizSessionsCompareView({
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <h3 className="text-xl font-bold text-[#16324F]">
-                  Topic Understanding Breakdown
+                  {t('topic_breakdown.title')}
                 </h3>
                 <p className="text-xs text-[#5D7EA1]">
-                  Comparative evaluation of guideline adherence across clinical therapeutic topics.
+                  {t('topic_breakdown.compare.description')}
                 </p>
               </div>
               <div className="flex items-center gap-3 text-xs font-semibold text-[#5D7EA1]">
-                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> High (≥75%)</span>
-                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Moderate (50-74%)</span>
-                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> At-Risk (&lt;50%)</span>
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> {t('topic_breakdown.compare.high')} (≥75%)</span>
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> {t('topic_breakdown.compare.moderate')} (50–74%)</span>
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> {t('topic_breakdown.compare.at_risk')} (&lt;50%)</span>
               </div>
             </div>
 
@@ -481,7 +484,7 @@ export default function QuizSessionsCompareView({
                             : 'bg-rose-50 text-rose-700'
                         }`}
                       >
-                        {domain.delta > 0 ? `+${domain.delta}% Shift` : `${domain.delta}% Shift`}
+                        {t('topic_breakdown.compare.shift', { value: domain.delta > 0 ? `+${domain.delta}` : domain.delta })}
                       </span>
                     )}
                   </div>
@@ -498,7 +501,7 @@ export default function QuizSessionsCompareView({
                             />
                             <span className="text-[#16324F]">{score.cohortLabel}: {score.cohortName}</span>
                           </div>
-                          <span style={{ color: score.color.hex }}>{score.masteryPercent}% Mastery</span>
+                          <span style={{ color: score.color.hex }}>{t('topic_breakdown.compare.mastery', { value: score.masteryPercent })}</span>
                         </div>
                         
                         {/* Progress bar */}
@@ -514,9 +517,9 @@ export default function QuizSessionsCompareView({
 
                         {/* Distribution breakdown */}
                         <div className="flex items-center justify-between text-[10px] font-medium text-[#5D7EA1] px-1">
-                          <span>High: {score.distribution.high}%</span>
-                          <span>Mod: {score.distribution.moderate}%</span>
-                          <span>Low: {score.distribution.low}%</span>
+                          <span>{t('topic_breakdown.compare.high')}: {score.distribution.high}%</span>
+                          <span>{t('topic_breakdown.compare.moderate')}: {score.distribution.moderate}%</span>
+                          <span>{t('topic_breakdown.compare.low')}: {score.distribution.low}%</span>
                         </div>
                       </div>
                     ))}
@@ -525,16 +528,16 @@ export default function QuizSessionsCompareView({
                   {/* Clinical Pedagogical Insight Box */}
                   <div className="mt-5 rounded-2xl bg-[#F4F9FF] p-3.5 border border-[#0460A9]/10">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-[#0460A9]">
-                      Recommended Clinical Focus
+                      {t('topic_breakdown.compare.focus')}
                     </p>
                     <p className="mt-1 text-xs text-[#16324F] leading-relaxed">
                       {domain.tag === '#SGLT2i-Dosage'
-                        ? 'Reinforce eGFR monitoring cadences and safety pauses during acute dehydrating illness.'
+                        ? t('topic_breakdown.compare.recommendations.cardiorenal')
                         : domain.tag === '#LDL-Targets'
-                        ? 'Promote earlier non-statin ezetimibe/PCSK9i combination therapy in very-high-risk patients.'
+                        ? t('topic_breakdown.compare.recommendations.lipids')
                         : domain.tag === '#HeartDisease-Symptoms'
-                        ? 'Emphasize biomarker-driven diagnostic pathways for HFpEF detection prior to overt congestion.'
-                        : 'Provide practical dietary guidance on potassium-sparing combinations for chronic kidney disease.'}
+                        ? t('topic_breakdown.compare.recommendations.heart')
+                        : t('topic_breakdown.compare.recommendations.nutrition')}
                     </p>
                   </div>
                 </div>

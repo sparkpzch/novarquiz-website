@@ -21,12 +21,31 @@ const ROUTE_LIMITS: Array<[string, number]> = [
   ['/api/admin', 20],
 ];
 const DEFAULT_LIMIT = 100;
+const STATIC_BUCKETS = new Set([
+  '/api/quizzes', '/api/sessions', '/api/auth/admin', '/api/admin/stats',
+  '/api/admin/insight-templates', '/api/admin/provisional-insights',
+  '/api/admin/sessions/compare',
+]);
 
 function resolveLimit(pathname: string): number {
   for (const [prefix, limit] of ROUTE_LIMITS) {
-    if (pathname.startsWith(prefix)) return limit;
+    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) return limit;
   }
   return DEFAULT_LIMIT;
+}
+
+// IDs must not create new counters. Preserve the operation suffix so normal
+// answer/leaderboard traffic retains separate limits, as it did previously.
+function routeBucket(pathname: string): string {
+  const path = pathname.replace(/\/+$/, '');
+  if (STATIC_BUCKETS.has(path)) return path;
+  const dynamic = /^(\/api\/(?:admin\/)?(?:quizzes|sessions|users|play|team-rooms|join))\/[^/]+(\/(?:analytics|answer|complete|leaderboard|preview|join|duplicate|graph|data|history|health-stats))?$/.exec(path);
+  if (dynamic) return `${dynamic[1]}/:id${dynamic[2] ?? ''}`;
+  for (const [prefix] of ROUTE_LIMITS) {
+    if (path === prefix || path.startsWith(`${prefix}/`)) return prefix;
+  }
+  // Arbitrary unknown namespaces must not allocate unlimited memory either.
+  return '/api/:unknown';
 }
 
 // ── Upstash Redis path ──────────────────────────────────────────────────────
@@ -99,11 +118,11 @@ function fallbackCheck(key: string, limit: number): { allowed: boolean; retryAft
   const now = Date.now();
   if (fallbackStore.size > 10_000) {
     for (const [k, e] of fallbackStore) {
-      if (e.resetAt < now) fallbackStore.delete(k);
+      if (e.resetAt <= now) fallbackStore.delete(k);
     }
   }
   const entry = fallbackStore.get(key);
-  if (!entry || entry.resetAt < now) {
+  if (!entry || entry.resetAt <= now) {
     fallbackStore.set(key, { count: 1, resetAt: now + WINDOW_MS });
     return { allowed: true, retryAfter: 0 };
   }
@@ -125,13 +144,16 @@ function fallbackCheck(key: string, limit: number): { allowed: boolean; retryAft
  *   makes the key meaningful in server logs). L4: parameter named `ip` for
  *   historical reasons — it accepts any stable string key.
  * @param pathname - The route prefix used to look up the per-route limit.
+ * @param scope - Keep ingress and handler counters separate to avoid counting
+ * the same request twice against one budget when both layers check it.
  */
 export async function checkRateLimit(
   ip: string,
   pathname: string,
+  scope: 'handler' | 'ingress' = 'handler',
 ): Promise<{ allowed: boolean; retryAfter: number }> {
   const limit = resolveLimit(pathname);
-  const key = `${ip}:${pathname}`;
+  const key = `${scope}:${ip}:${routeBucket(pathname)}`;
 
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
     if (Date.now() >= redisDownUntil) {

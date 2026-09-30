@@ -54,7 +54,7 @@ export async function proxy(request: NextRequest) {
     // When unset, fall back to a fixed bucket so abuse is globally capped.
     const ip = getRateLimitIp(request);
 
-    const { allowed, retryAfter } = await checkRateLimit(ip, pathname);
+    const { allowed, retryAfter } = await checkRateLimit(ip, pathname, 'ingress');
     if (!allowed) {
       return new NextResponse('Too Many Requests', {
         status: 429,

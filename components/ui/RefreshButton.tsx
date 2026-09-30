@@ -1,5 +1,8 @@
 'use client';
 
+import { useTranslation } from 'react-i18next';
+import '@/lib/i18n';
+
 export interface RefreshButtonProps {
   onRefresh: () => void;
   isRefreshing?: boolean;
@@ -16,9 +19,12 @@ export default function RefreshButton({
   lastFetchedAt = null,
   refreshError = false,
   theme = 'light',
-  label = 'Refresh',
-  resourceLabel = 'analytics data',
+  label,
+  resourceLabel,
 }: RefreshButtonProps) {
+  const { t, i18n } = useTranslation();
+  const buttonLabel = label ?? t('topic_breakdown.refresh');
+  const resource = resourceLabel ?? t('topic_breakdown.resource');
   const dark = theme === 'dark';
   const buttonTheme = dark
     ? 'border-white/12 bg-[#0a1234] text-[#e4eaff] hover:border-[#7898ff]/60 hover:text-white'
@@ -32,16 +38,16 @@ export default function RefreshButton({
         onClick={onRefresh}
         disabled={isRefreshing}
         className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition disabled:cursor-wait disabled:opacity-65 ${buttonTheme}`}
-        aria-label={`${label} ${resourceLabel}`}
+        aria-label={t('topic_breakdown.refresh_aria', { label: buttonLabel, resource })}
       >
         <span className={isRefreshing ? 'animate-spin' : ''} aria-hidden="true">↻</span>
-        {isRefreshing ? 'Refreshing' : label}
+        {isRefreshing ? t('topic_breakdown.refreshing') : buttonLabel}
       </button>
       <span className={`text-[10px] ${statusTheme}`} role="status" aria-live="polite">
-        {refreshError ? 'Refresh failed · ' : ''}
+        {refreshError ? `${t('topic_breakdown.refresh_failed')} · ` : ''}
         {lastFetchedAt
-          ? `Fetched ${new Date(lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
-          : 'Not fetched yet'}
+          ? t('topic_breakdown.fetched', { time: new Date(lastFetchedAt).toLocaleTimeString(i18n.resolvedLanguage, { hour: 'numeric', minute: '2-digit' }) })
+          : t('topic_breakdown.not_fetched')}
       </span>
     </div>
   );

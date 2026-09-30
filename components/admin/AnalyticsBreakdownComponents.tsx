@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import '@/lib/i18n';
 import { useTheme } from '@/lib/hooks/useTheme';
 import RefreshButton from '@/components/ui/RefreshButton';
 
@@ -46,11 +48,11 @@ export interface TopicUnderstandingBreakdownProps {
   refreshError?: boolean;
 }
 
-const TOPIC_META: Record<string, { description: string; icon: string }> = {
-  '#SGLT2i-Dosage': { description: 'Cardio-Renal Protocol & Thresholds', icon: '🫀' },
-  '#LDL-Targets': { description: 'Lipidology Goals & Risk Stratification', icon: '🧪' },
-  '#HeartDisease-Symptoms': { description: 'Heart Failure Signs & Clinical Symptoms', icon: '🩺' },
-  '#Nutrition-Guidelines': { description: 'Preventive Lifestyle & Dietary Management', icon: '🥗' },
+const TOPIC_META: Record<string, { translationKey: string; icon: string }> = {
+  '#SGLT2i-Dosage': { translationKey: 'topic_breakdown.topics.cardiorenal', icon: '🫀' },
+  '#LDL-Targets': { translationKey: 'topic_breakdown.topics.lipids', icon: '🧪' },
+  '#HeartDisease-Symptoms': { translationKey: 'topic_breakdown.topics.heart', icon: '🩺' },
+  '#Nutrition-Guidelines': { translationKey: 'topic_breakdown.topics.nutrition', icon: '🥗' },
 };
 
 export function TopicUnderstandingBreakdown({
@@ -61,12 +63,13 @@ export function TopicUnderstandingBreakdown({
   selectedTag,
   onToggleTag,
   variant = 'report',
-  emptyMessage = 'No topic tags are present in this report.',
+  emptyMessage,
   onRefresh,
   isRefreshing = false,
   lastFetchedAt = null,
   refreshError = false,
 }: TopicUnderstandingBreakdownProps) {
+  const { t } = useTranslation();
   const dashboardVariant = variant === 'dashboard';
   const { theme: activeTheme } = useTheme();
   const dark = activeTheme === 'dark';
@@ -88,7 +91,7 @@ export function TopicUnderstandingBreakdown({
         <div>
           <div className="flex items-center gap-2">
             <span className={`flex h-6 w-6 items-center justify-center rounded-md ${dashboardVariant ? 'bg-[#4f76ff]/15 text-[#91a7ff]' : 'bg-[#0460A9]/10 text-[#0460A9]'}`} aria-hidden="true">▦</span>
-            <h2 className={`text-base font-bold tracking-tight sm:text-lg ${dashboardVariant ? 'text-white' : 'text-[#16324F]'}`}>Topic Understanding Breakdown</h2>
+            <h2 className={`text-base font-bold tracking-tight sm:text-lg ${dashboardVariant ? 'text-white' : 'text-[#16324F]'}`}>{t('topic_breakdown.title')}</h2>
           </div>
           <p className={`mt-0.5 text-xs ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>{description}</p>
         </div>
@@ -103,18 +106,18 @@ export function TopicUnderstandingBreakdown({
             />
           )}
           <label className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>
-            Sort
-            <select aria-label="Sort topics" value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium normal-case tracking-normal focus:outline-none focus:ring-2 ${dashboardVariant ? 'border-white/12 bg-[#0a1234] text-[#e4eaff] focus:ring-[#7898ff]' : 'nq-report-control border-[#0460A9]/20 bg-white text-[#16324F] focus:ring-[#0460A9]'}`}>
-              <option value="lowest">Lowest utility</option>
-              <option value="highest">Highest utility</option>
-              <option value="responses">Most responses</option>
-              <option value="name">Topic name</option>
+            {t('topic_breakdown.sort')}
+            <select aria-label={t('topic_breakdown.sort_aria')} value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium normal-case tracking-normal focus:outline-none focus:ring-2 ${dashboardVariant ? 'border-white/12 bg-[#0a1234] text-[#e4eaff] focus:ring-[#7898ff]' : 'nq-report-control border-[#0460A9]/20 bg-white text-[#16324F] focus:ring-[#0460A9]'}`}>
+              <option value="lowest">{t('topic_breakdown.sort_lowest')}</option>
+              <option value="highest">{t('topic_breakdown.sort_highest')}</option>
+              <option value="responses">{t('topic_breakdown.sort_responses')}</option>
+              <option value="name">{t('topic_breakdown.sort_name')}</option>
             </select>
           </label>
           {selectedTag && onToggleTag && (
             <div className="flex items-center gap-2 rounded-xl border border-[#0460A9]/15 bg-[#F4F8FC] px-3 py-1.5 text-xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5D7EA1]">Filter:</span>
-              <button onClick={() => onToggleTag(selectedTag)} className="inline-flex items-center gap-1 rounded border border-[#0460A9]/20 bg-white px-2 py-0.5 font-mono font-bold text-[#0460A9] hover:text-rose-700" title="Clear topic filter">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5D7EA1]">{t('topic_breakdown.filter')}</span>
+              <button onClick={() => onToggleTag(selectedTag)} className="inline-flex items-center gap-1 rounded border border-[#0460A9]/20 bg-white px-2 py-0.5 font-mono font-bold text-[#0460A9] hover:text-rose-700" title={t('topic_breakdown.clear_filter')}>
                 {selectedTag} <span aria-hidden="true">×</span>
               </button>
             </div>
@@ -123,20 +126,21 @@ export function TopicUnderstandingBreakdown({
       </div>
 
       {items.length === 0 ? (
-        <p className={`rounded-xl p-4 text-xs ${dashboardVariant ? 'border border-white/8 bg-[#0a1234] text-[#9aa8d1]' : 'bg-[#F8FAFC] text-[#5D7EA1]'}`}>{emptyMessage}</p>
+        <p className={`rounded-xl p-4 text-xs ${dashboardVariant ? 'border border-white/8 bg-[#0a1234] text-[#9aa8d1]' : 'bg-[#F8FAFC] text-[#5D7EA1]'}`}>{emptyMessage ?? t('topic_breakdown.empty_report')}</p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {sortedItems.map((item) => {
             const hasData = item.percentage !== null && item.maxUtility > 0;
             const score = item.percentage ?? 0;
-            const meta = TOPIC_META[item.tag] ?? { description: item.tag.replace(/^#/, '').replace(/[-_]/g, ' '), icon: '📊' };
+            const meta = TOPIC_META[item.tag];
+            const topicDescription = meta ? t(meta.translationKey) : item.tag.replace(/^#/, '').replace(/[-_]/g, ' ');
             const selected = selectedTag === item.tag;
             const tier = !hasData ? 'empty' : score < 50 ? 'priority' : score < 75 ? 'developing' : 'strong';
             const theme = {
               border: 'nq-topic-border', badge: 'nq-topic-badge', score: 'nq-topic-score',
               fill: !hasData ? '#737373' : score < 50 ? '#E11D48' : score < 75 ? '#D97706' : '#0284C7',
               track: dark ? '#404040' : '#E5E7EB',
-              status: !hasData ? (item.responses > 0 ? 'No max utility' : 'No responses') : score < 50 ? 'Priority review' : score < 75 ? 'Developing' : 'Strong',
+              status: t(`topic_breakdown.${!hasData ? (item.responses > 0 ? 'no_max' : 'no_responses') : tier}`),
             };
             const radius = 15;
             const circumference = 2 * Math.PI * radius;
@@ -149,26 +153,26 @@ export function TopicUnderstandingBreakdown({
                 disabled={!onToggleTag}
                 aria-pressed={onToggleTag ? selected : undefined}
                 data-tier={tier}
-                title={onToggleTag ? (selected ? `Clear ${item.tag} filter` : `Filter questions by ${item.tag}`) : undefined}
+                title={onToggleTag ? t(selected ? 'topic_breakdown.clear_tag_filter' : 'topic_breakdown.filter_tag', { tag: item.tag }) : undefined}
                 className={`nq-topic-card w-full overflow-hidden rounded-2xl border text-left transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 ${dashboardVariant ? 'bg-[#0a1234]' : 'bg-white'} ${selected ? `ring-2 ring-[#0460A9]/40 shadow-md ${theme.border}` : `${theme.border} hover:shadow-md hover:border-[#0460A9]/30`} ${onToggleTag ? 'cursor-pointer' : 'cursor-default'}`}
               >
                 {selected && <div className="h-1 w-full" style={{ backgroundColor: theme.fill }} />}
                 <div className={`nq-topic-content flex min-h-[112px] flex-col justify-between gap-2.5 p-3 ${dashboardVariant ? 'bg-white/[0.025]' : 'bg-[#F8FAFC]'}`}>
                   <div className="flex items-center justify-between gap-1.5">
                     <div className="flex min-w-0 items-center gap-1.5">
-                      <span className="shrink-0 text-sm">{meta.icon}</span>
+                      <span className="shrink-0 text-sm">{meta?.icon ?? '📊'}</span>
                       <span className={`truncate rounded-md border px-2 py-0.5 font-mono text-[11px] font-bold ${theme.badge}`}>{item.tag}</span>
                     </div>
                     <span className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold ${theme.badge}`}>{theme.status}</span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1 pr-1">
-                      <p className={`nq-topic-description line-clamp-2 text-xs font-semibold leading-tight ${dashboardVariant ? 'text-[#e4eaff]' : 'text-[#16324F]'}`}>{meta.description}</p>
+                      <p className={`nq-topic-description line-clamp-2 text-xs font-semibold leading-tight ${dashboardVariant ? 'text-[#e4eaff]' : 'text-[#16324F]'}`}>{topicDescription}</p>
                       <p className={`nq-topic-meta mt-1 truncate font-mono text-[11px] ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>
-                        {item.earnedUtility}/{item.maxUtility} utility · {item.responses} responses
+                        {t('topic_breakdown.utility_responses', { earned: item.earnedUtility, maximum: item.maxUtility, count: item.responses })}
                       </p>
-                      {selectedPlayerName && <p className={`nq-topic-meta mt-0.5 truncate text-[11px] ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>For {selectedPlayerName}</p>}
-                      {selectedCompareLabel && item.benchmarkPercentage != null && <p className="mt-0.5 text-[9px] text-indigo-700">Compared with {selectedCompareLabel}: {item.benchmarkPercentage}%</p>}
+                      {selectedPlayerName && <p className={`nq-topic-meta mt-0.5 truncate text-[11px] ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>{t('topic_breakdown.for_player', { name: selectedPlayerName })}</p>}
+                      {selectedCompareLabel && item.benchmarkPercentage != null && <p className="mt-0.5 text-[9px] text-indigo-700">{t('topic_breakdown.benchmark', { name: selectedCompareLabel, percentage: item.benchmarkPercentage })}</p>}
                     </div>
                     <div className="relative flex shrink-0 items-center justify-center">
                       <svg width="38" height="38" viewBox="0 0 38 38" className="-rotate-90">
@@ -186,8 +190,8 @@ export function TopicUnderstandingBreakdown({
       )}
 
       <div className={`flex flex-wrap items-center justify-between gap-2 border-t pt-2.5 text-xs ${dashboardVariant ? 'border-white/8 text-[#9aa8d1]' : 'border-[#0460A9]/10 text-[#5D7EA1]'}`}>
-        <div className="flex flex-wrap items-center gap-3 text-[11px]"><span className={`font-bold ${dashboardVariant ? 'text-white' : 'text-[#16324F]'}`}>Tiers:</span><span>🔴 &lt;50% Priority review</span><span>🟠 50–74% Developing</span><span>🔵 ≥75% Strong</span></div>
-        {onToggleTag && <span className="text-[11px] italic">Click a topic card to filter questions · click again to clear.</span>}
+        <div className="flex flex-wrap items-center gap-3 text-[11px]"><span className={`font-bold ${dashboardVariant ? 'text-white' : 'text-[#16324F]'}`}>{t('topic_breakdown.tiers')}</span><span>🔴 &lt;50% {t('topic_breakdown.priority')}</span><span>🟠 50–74% {t('topic_breakdown.developing')}</span><span>🔵 ≥75% {t('topic_breakdown.strong')}</span></div>
+        {onToggleTag && <span className="text-[11px] italic">{t('topic_breakdown.filter_hint')}</span>}
       </div>
     </section>
   );
