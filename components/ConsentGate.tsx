@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/hooks/useAuth';
 import TermsModal, { PRIVACY_VERSION, TOS_VERSION } from '@/components/ui/TermsModal';
 import { useToast } from '@/components/ui/Toast';
@@ -37,7 +36,8 @@ function markAcceptedLocally(uid: string) {
  * Declining signs them out.
  */
 export default function ConsentGate() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const { t } = useTranslation();
   const pathname = usePathname();
   const { showToast } = useToast();
   const [checkedUid, setCheckedUid] = useState<string | null>(null);
@@ -93,9 +93,11 @@ export default function ConsentGate() {
   };
 
   const handleDecline = async () => {
-    await fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
-    await signOut(auth).catch(() => {});
-    window.location.href = '/sign-in';
+    try {
+      await logout();
+    } catch {
+      showToast(t('auth.logout_error'), 'error');
+    }
   };
 
   return <TermsModal onClose={handleDecline} onAccept={handleAccept} />;

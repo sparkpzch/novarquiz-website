@@ -302,7 +302,7 @@ function GeneralRow({
 
 export default function ProfilePage() {
   const { t, i18n } = useTranslation();
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -386,9 +386,11 @@ export default function ProfilePage() {
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth/session", { method: "DELETE" });
-    await signOut(auth);
-    window.location.href = "/sign-in";
+    try {
+      await logout();
+    } catch {
+      showToast(t('auth.logout_error'), 'error');
+    }
   };
 
   const handleDeleteAccount = async () => {

@@ -10,6 +10,11 @@ runConfig:
 
 # Environment variables and secrets.
 env:
+  # Browser-facing origin for CSRF checks; request.url may use Cloud Run's host.
+  - variable: APP_ORIGIN
+    value: "https://novarquiz-website-sg--novartis-decisionlab.asia-southeast1.hosted.app"
+    availability:
+      - RUNTIME
   - variable: TRUST_PROXY
     value: "1"
     availability:

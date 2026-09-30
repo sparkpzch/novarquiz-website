@@ -47,6 +47,11 @@ export async function proxy(request: NextRequest) {
     if (!isTrustedMutation(request)) {
       return NextResponse.json({ error: 'Cross-origin request denied' }, { status: 403 });
     }
+    // Logging out only expires this browser's cookie. A spent login budget
+    // must never prevent it, while the Origin check above still prevents CSRF.
+    if (pathname === '/api/auth/session' && request.method === 'DELETE') {
+      return NextResponse.next();
+    }
     // On Cloud Run / Firebase App Hosting the platform appends the real client
     // IP as the LAST entry in x-forwarded-for. Only honor these headers when
     // TRUST_PROXY=1 is set, since direct ingress (local dev, misrouted Cloud

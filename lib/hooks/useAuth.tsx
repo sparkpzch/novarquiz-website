@@ -1,8 +1,9 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
-import { User, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { User, onAuthStateChanged, signInWithCustomToken, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
+import { endClientSession } from '@/lib/security/logout';
 
 type CachedProfile = { displayName: string | null; photoURL: string | null; email: string | null } | null;
 
@@ -12,6 +13,7 @@ interface AuthContextType {
   isAdmin: boolean;
   cachedProfile: CachedProfile;
   refreshUser: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -20,6 +22,7 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
   cachedProfile: null,
   refreshUser: async () => {},
+  logout: async () => {},
 });
 
 const PROFILE_CACHE_KEY = 'nq_profile';
@@ -50,16 +53,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   // Guards against repeated rehydration attempts on a broken cookie.
   const rehydrateTriedRef = useRef(false);
+  const authVersionRef = useRef(0);
+  const signingOutRef = useRef(false);
+  const recoveryRef = useRef<Promise<unknown> | null>(null);
+
+  const clearLocalSession = useCallback(() => {
+    setIsAdmin(false);
+    setUser(null);
+    setCachedProfile(null);
+    clearProfileCache();
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      const version = ++authVersionRef.current;
+      const isCurrent = () => version === authVersionRef.current && !signingOutRef.current;
+      if (!isCurrent()) return;
       if (firebaseUser) {
-        const tokenResult = await firebaseUser.getIdTokenResult();
-        setIsAdmin(!!tokenResult.claims.admin);
-        setUser(firebaseUser);
-        saveProfileCache(firebaseUser);
-        setCachedProfile({ displayName: firebaseUser.displayName, photoURL: firebaseUser.photoURL, email: firebaseUser.email });
-        setLoading(false);
+        // Recovery is for initial startup only, never a later sign-out event.
+        rehydrateTriedRef.current = true;
+        try {
+          const tokenResult = await firebaseUser.getIdTokenResult();
+          if (!isCurrent()) return;
+          setIsAdmin(tokenResult.claims.admin === true);
+          setUser(firebaseUser);
+          saveProfileCache(firebaseUser);
+          setCachedProfile({ displayName: firebaseUser.displayName, photoURL: firebaseUser.photoURL, email: firebaseUser.email });
+          setLoading(false);
+        } catch {
+          if (isCurrent()) clearLocalSession();
+        }
         return;
       }
 
@@ -72,10 +96,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         rehydrateTriedRef.current = true;
         try {
           const res = await fetch('/api/auth/rehydrate', { method: 'POST' });
+          if (!isCurrent()) return;
           if (res.ok) {
             const { customToken } = await res.json();
+            if (!isCurrent()) return;
             if (customToken) {
-              await signInWithCustomToken(auth, customToken);
+              recoveryRef.current = signInWithCustomToken(auth, customToken);
+              await recoveryRef.current;
               // onAuthStateChanged will fire again with the rehydrated user —
               // let that branch handle setting state.
               return;
@@ -86,15 +113,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      setIsAdmin(false);
-      setUser(null);
-      setCachedProfile(null);
-      clearProfileCache();
-      setLoading(false);
+      if (isCurrent()) clearLocalSession();
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      ++authVersionRef.current;
+      unsubscribe();
+    };
+  }, [clearLocalSession]);
+
+  const logout = useCallback(async () => {
+    if (signingOutRef.current) return;
+    signingOutRef.current = true;
+    rehydrateTriedRef.current = true;
+    ++authVersionRef.current;
+    try {
+      await endClientSession(
+        () => fetch('/api/auth/session', { method: 'DELETE' }),
+        async () => {
+          // A custom-token sign-in already in flight must finish before sign-out.
+          await recoveryRef.current?.catch(() => {});
+          await signOut(auth);
+        },
+      );
+      clearLocalSession();
+      // Start a fresh document so cached authenticated routes cannot survive.
+      window.location.replace('/sign-in');
+    } catch (error) {
+      signingOutRef.current = false;
+      throw error;
+    }
+  }, [clearLocalSession]);
 
   const refreshUser = useCallback(async () => {
     if (!auth.currentUser) return;
@@ -105,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, cachedProfile, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, cachedProfile, refreshUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -27,6 +27,7 @@
     "logout_cancel": "Cancel",
     "logout_confirm": "Log out",
     "logging_out": "Logging out…",
+    "logout_error": "Could not log out. Please try again.",
     "no_account": "Don't have an account?",
     "have_account": "Already have an account?",
     "or_continue": "Or continue with",

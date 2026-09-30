@@ -5,7 +5,7 @@ import { safeRedirectPath } from '@/lib/security/redirect';
 import { useState, Suspense } from 'react';
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -16,7 +16,6 @@ import { motion } from 'motion/react';
 
 function SignInForm() {
   const { t } = useTranslation();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const nextUrl = searchParams.get('next');
   const [email, setEmail] = useState('');
@@ -39,7 +38,8 @@ function SignInForm() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Session creation failed');
     await beforeRedirect?.();
-    router.push(safeNextUrl);
+    // Read the newly issued cookie on a fresh request, without an old route cache.
+    window.location.replace(safeNextUrl);
   };
 
   const handleSignIn = async (e: React.FormEvent) => {

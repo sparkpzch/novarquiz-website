@@ -9,14 +9,13 @@ import {
   useRouter,
   useSearchParams,
 } from 'next/navigation';
-import { signOut } from 'firebase/auth';
 import { AnimatePresence, motion } from 'motion/react';
-import { auth } from '@/lib/firebase/config';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 import { useTheme } from '@/lib/hooks/useTheme';
+import { useToast } from '@/components/ui/Toast';
 
 type NavItem = {
   href: string;
@@ -103,7 +102,8 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { theme } = useTheme();
-  const { user, loading, isAdmin, cachedProfile } = useAuth();
+  const { user, loading, isAdmin, cachedProfile, logout } = useAuth();
+  const { showToast } = useToast();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const avatarName = user?.displayName ?? cachedProfile?.displayName;
@@ -117,7 +117,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    if (!loading && !user) router.push('/sign-in');
+    if (!loading && !user) router.replace('/sign-in');
   }, [loading, router, user]);
 
   useEffect(() => {
@@ -135,9 +135,9 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
     setIsSigningOut(true);
 
     try {
-      await fetch('/api/auth/session', { method: 'DELETE' });
-      await signOut(auth);
-      router.push('/sign-in');
+      await logout();
+    } catch {
+      showToast(t('auth.logout_error'), 'error');
     } finally {
       setIsSigningOut(false);
     }
