@@ -422,75 +422,65 @@ function PersonalFeedbackCard({
 export default function DashboardPage() {
   const { i18n } = useTranslation();
   const { user } = useAuth();
+  const uid = user && !user.isAnonymous ? user.uid : null;
+  const locale = i18n.language?.startsWith("en") ? "en" : "th";
+  return <DashboardContent key={`${uid ?? "anonymous"}:${locale}`} healthStatsUid={uid} healthStatsLocale={locale} />;
+}
+
+function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUid: string | null; healthStatsLocale: string }) {
+  const { user } = useAuth();
   const router = useRouter();
-  const [healthStats, setHealthStats] = useState<DashboardHealthStats | null>(null);
-  const [healthStatsLoading, setHealthStatsLoading] = useState(true);
+  const [initialCache] = useState(() => healthStatsUid
+    ? readDashboardHealthStatsCache(dashboardHealthStatsCacheKey(healthStatsUid, healthStatsLocale))
+    : null);
+  const [initialCacheIsFresh] = useState(() => !!initialCache && Date.now() - initialCache.fetchedAt < HEALTH_STATS_CACHE_TTL_MS);
+  const [healthStats, setHealthStats] = useState<DashboardHealthStats | null>(initialCache?.data ?? null);
+  const [healthStatsLoading, setHealthStatsLoading] = useState(!!healthStatsUid && !initialCache);
   const [healthStatsError, setHealthStatsError] = useState(false);
-  const [healthStatsRefreshing, setHealthStatsRefreshing] = useState(false);
-  const [healthStatsFetchedAt, setHealthStatsFetchedAt] = useState<number | null>(null);
+  const [healthStatsRefreshing, setHealthStatsRefreshing] = useState(!!healthStatsUid && !initialCacheIsFresh);
+  const [healthStatsFetchedAt, setHealthStatsFetchedAt] = useState<number | null>(initialCache?.fetchedAt ?? null);
   const healthStatsRequestId = useRef(0);
   const [sessions, setSessions] = useState<DashboardSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
 
-  const healthStatsUid = user && !user.isAnonymous ? user.uid : null;
-  const healthStatsLocale = i18n.language?.startsWith("en") ? "en" : "th";
-
-  const refreshHealthStats = useCallback(async () => {
+  const refreshHealthStats = useCallback(() => {
     if (!healthStatsUid) return;
     const requestId = ++healthStatsRequestId.current;
-    setHealthStatsRefreshing(true);
-    setHealthStatsError(false);
-    try {
-      const response = await fetch(
-        `/api/users/${healthStatsUid}/health-stats?locale=${healthStatsLocale}`,
-        { cache: "no-store" },
-      );
-      if (!response.ok) throw new Error("Failed to load topic understanding");
-      const stats = await response.json() as DashboardHealthStats;
-      if (requestId !== healthStatsRequestId.current) return;
-      const fetchedAt = Date.now();
-      setHealthStats(stats);
-      setHealthStatsFetchedAt(fetchedAt);
-      setHealthStatsLoading(false);
-      writeDashboardHealthStatsCache(
-        dashboardHealthStatsCacheKey(healthStatsUid, healthStatsLocale),
-        { data: stats, fetchedAt },
-      );
-    } catch {
-      if (requestId === healthStatsRequestId.current) setHealthStatsError(true);
-    } finally {
-      if (requestId === healthStatsRequestId.current) {
-        setHealthStatsRefreshing(false);
+    return fetch(
+      `/api/users/${healthStatsUid}/health-stats?locale=${healthStatsLocale}`,
+      { cache: "no-store" },
+    )
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Failed to load topic understanding");
+        return await response.json() as DashboardHealthStats;
+      })
+      .then((stats) => {
+        if (requestId !== healthStatsRequestId.current) return;
+        const fetchedAt = Date.now();
+        setHealthStats(stats);
+        setHealthStatsFetchedAt(fetchedAt);
         setHealthStatsLoading(false);
-      }
-    }
+        writeDashboardHealthStatsCache(
+          dashboardHealthStatsCacheKey(healthStatsUid, healthStatsLocale),
+          { data: stats, fetchedAt },
+        );
+      })
+      .catch(() => {
+        if (requestId === healthStatsRequestId.current) setHealthStatsError(true);
+      })
+      .finally(() => {
+        if (requestId === healthStatsRequestId.current) {
+          setHealthStatsRefreshing(false);
+          setHealthStatsLoading(false);
+        }
+      });
   }, [healthStatsUid, healthStatsLocale]);
 
   useEffect(() => {
-    if (!healthStatsUid) {
-      healthStatsRequestId.current += 1;
-      setHealthStats(null);
-      setHealthStatsLoading(false);
-      setHealthStatsError(false);
-      setHealthStatsRefreshing(false);
-      setHealthStatsFetchedAt(null);
-      return;
-    }
-    const cacheKey = dashboardHealthStatsCacheKey(healthStatsUid, healthStatsLocale);
-    const cached = readDashboardHealthStatsCache(cacheKey);
-    const cacheIsFresh = !!cached && Date.now() - cached.fetchedAt < HEALTH_STATS_CACHE_TTL_MS;
-    healthStatsRequestId.current += 1;
-    setHealthStats(cached?.data ?? null);
-    setHealthStatsFetchedAt(cached?.fetchedAt ?? null);
-    setHealthStatsLoading(!cached);
-    setHealthStatsError(false);
-    if (cacheIsFresh) {
-      setHealthStatsRefreshing(false);
-      return;
-    }
+    if (!healthStatsUid || initialCacheIsFresh) return;
     void refreshHealthStats();
     return () => { healthStatsRequestId.current += 1; };
-  }, [healthStatsUid, healthStatsLocale, refreshHealthStats]);
+  }, [healthStatsUid, initialCacheIsFresh, refreshHealthStats]);
 
   useEffect(() => {
     fetch("/api/sessions")
@@ -584,7 +574,11 @@ export default function DashboardPage() {
           variant="dashboard"
           items={healthStats?.topicBreakdown ?? []}
           description="Your utility earned compared with the maximum available across every session you answered."
-          onRefresh={refreshHealthStats}
+          onRefresh={() => {
+            setHealthStatsRefreshing(true);
+            setHealthStatsError(false);
+            void refreshHealthStats();
+          }}
           isRefreshing={healthStatsRefreshing}
           lastFetchedAt={healthStatsFetchedAt}
           refreshError={healthStatsError}

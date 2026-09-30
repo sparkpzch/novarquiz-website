@@ -6,8 +6,7 @@ import type { Quiz } from '@/lib/types';
 import type { CompareSessionsModalProps } from '@/components/admin/CompareSessionsModal';
 import QuizOverallAnalyticsView, { type QuizOverallAnalyticsData } from '@/components/admin/QuizOverallAnalyticsView';
 
-function QuizAnalyticsContent({ params }: { params: Promise<{ quizId: string }> }) {
-  const { quizId } = use(params);
+function QuizAnalyticsContent({ quizId }: { quizId: string }) {
   const router = useRouter();
 
   const [data, setData] = useState<QuizOverallAnalyticsData | null>(null);
@@ -17,8 +16,7 @@ function QuizAnalyticsContent({ params }: { params: Promise<{ quizId: string }> 
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
+    let cancelled = false;
 
     Promise.all([
       fetch(`/api/admin/quizzes/${quizId}/analytics`).then(async (res) => {
@@ -29,15 +27,19 @@ function QuizAnalyticsContent({ params }: { params: Promise<{ quizId: string }> 
       fetch('/api/sessions').then((res) => (res.ok ? res.json() : [])).catch(() => []),
     ])
       .then(([analyticsRes, quizzesRes, sessionsRes]) => {
+        if (cancelled) return;
         setData(analyticsRes);
         setAllQuizzes(quizzesRes || []);
         setAllSessions(sessionsRes || []);
       })
       .catch((err: Error) => {
+        if (cancelled) return;
         console.error('Error fetching quiz analytics:', err);
         setError(err.message || 'Failed to load quiz analytics');
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
   }, [quizId]);
 
   if (loading) {
@@ -91,6 +93,11 @@ function QuizAnalyticsContent({ params }: { params: Promise<{ quizId: string }> 
   );
 }
 
+function QuizAnalyticsRoute({ params }: { params: Promise<{ quizId: string }> }) {
+  const { quizId } = use(params);
+  return <QuizAnalyticsContent key={quizId} quizId={quizId} />;
+}
+
 export default function QuizAnalyticsPage({ params }: { params: Promise<{ quizId: string }> }) {
   return (
     <Suspense
@@ -100,7 +107,7 @@ export default function QuizAnalyticsPage({ params }: { params: Promise<{ quizId
         </div>
       }
     >
-      <QuizAnalyticsContent params={params} />
+      <QuizAnalyticsRoute params={params} />
     </Suspense>
   );
 }

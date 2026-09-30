@@ -125,6 +125,9 @@ export interface MedicalAnalyticsDashboardProps {
     avg_time_ms: number;
     node_friction_score?: number;
     error_rate_percent?: number;
+    topic_tag?: string;
+    scenario?: string;
+    clinical_scenario?: string;
     choices?: Array<{ label?: string; text?: string; choice_text?: string; count?: number; score_impact?: number; clinical_tags?: string[]; behavior_meaning?: string | null }>;
     user_responses?: Record<string, { selectedOption: string; isCorrect: boolean; utilityScore: number; timeSeconds: number }>;
   }>;
@@ -313,7 +316,7 @@ export default function MedicalAnalyticsDashboard({
     const selectedBreakdownQuestions = selectedAggregateSessionId
       ? aggregateSessionBreakdowns?.[selectedAggregateSessionId]?.questions
       : undefined;
-    const sourceQuestions = aggregateOnly && selectedBreakdownQuestions
+    const sourceQuestions: MedicalAnalyticsDashboardProps['questions'] = aggregateOnly && selectedBreakdownQuestions
       ? selectedBreakdownQuestions.map((question) => ({
           id: question.id,
           question_text: question.question_text,
@@ -327,20 +330,20 @@ export default function MedicalAnalyticsDashboard({
       : questions;
     if (!sourceQuestions || sourceQuestions.length === 0) return [];
 
-    return sourceQuestions.map((q: any, idx: number) => {
+    return sourceQuestions.map((q, idx) => {
       const totalResponses = q.total_responses ?? 0;
       const rawChoices = Array.isArray(q.choices) ? q.choices : [];
-      const choiceTags = rawChoices.flatMap((choice: any) => Array.isArray(choice.clinical_tags) ? choice.clinical_tags : []);
+      const choiceTags = rawChoices.flatMap((choice) => Array.isArray(choice.clinical_tags) ? choice.clinical_tags : []);
       const tags = Array.from(new Set([
         ...choiceTags,
         ...(typeof q.topic_tag === 'string' ? [q.topic_tag] : []),
       ]));
       const tag = tags[0] || '';
       const correctAnswers = rawChoices
-        .filter((choice: any) => (choice.score_impact ?? 0) > 0)
-        .reduce((sum: number, choice: any) => sum + (Number(choice.count) || 0), 0);
-      const maxScore = Math.max(0, ...rawChoices.map((choice: any) => Number(choice.score_impact) || 0));
-      const hasChoiceCounts = rawChoices.some((choice: any) => Number.isFinite(Number(choice.count)));
+        .filter((choice) => (choice.score_impact ?? 0) > 0)
+        .reduce((sum, choice) => sum + (Number(choice.count) || 0), 0);
+      const maxScore = Math.max(0, ...rawChoices.map((choice) => Number(choice.score_impact) || 0));
+      const hasChoiceCounts = rawChoices.some((choice) => Number.isFinite(Number(choice.count)));
       const computedErrorRate = totalResponses > 0 && hasChoiceCounts
         ? Math.round(100 - (correctAnswers / totalResponses) * 100)
         : undefined;
@@ -349,7 +352,7 @@ export default function MedicalAnalyticsDashboard({
       const understandingLevel: UnderstandingLevel =
         errorRatePercent > 50 ? 'low' : errorRatePercent > 25 ? 'moderate' : 'high';
       const avgTimeSeconds = Math.round((q.avg_time_ms ?? 0) / 1000);
-      const distractors: DistractorItem[] = rawChoices.map((c: any) => {
+      const distractors: DistractorItem[] = rawChoices.map((c) => {
           const pct = totalResponses > 0 ? Math.round(((c.count || 0) / totalResponses) * 100) : 0;
           const isCorrect = (c.score_impact ?? 0) > 0;
           return {
@@ -367,7 +370,9 @@ export default function MedicalAnalyticsDashboard({
       return {
         id: q.id,
         nodeCode: q.node_type ? `NODE-${q.node_type.toUpperCase()}` : `QUESTION-${idx + 1}`,
-        nodeType: (q.node_type as any) || 'DECISION_NODE',
+        nodeType: q.node_type === 'CLINICAL_BRANCH' || q.node_type === 'DIAGNOSTIC_ROOT'
+          ? q.node_type
+          : 'DECISION_NODE',
         branchLabel: `Question ${idx + 1}`,
         tag,
         tags,
