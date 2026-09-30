@@ -1,13 +1,7 @@
-import { jwtVerify } from 'jose';
+import { verifySessionToken } from '@/lib/security/session';
 import { cookies } from 'next/headers';
 
 const COOKIE_NAME = 'session';
-
-function getSecret() {
-  const secret = process.env.SESSION_SECRET;
-  if (!secret) throw new Error('SESSION_SECRET is not set');
-  return new TextEncoder().encode(secret);
-}
 
 export type SessionUser = {
   uid: string;
@@ -20,10 +14,10 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     const token = cookieStore.get(COOKIE_NAME)?.value;
     if (!token) return null;
 
-    const { payload } = await jwtVerify(token, getSecret());
+    const session = await verifySessionToken(token);
     return {
-      uid: payload.uid as string,
-      isAdmin: !!payload.isAdmin,
+      uid: session.uid,
+      isAdmin: session.isAdmin,
     };
   } catch (err) {
     console.error('Session verification failed:', err instanceof Error ? err.message : 'Unknown error');

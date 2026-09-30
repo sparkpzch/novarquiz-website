@@ -3,6 +3,7 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
+  --nq-button-primary: #0460a9;
   --background: #f8f9fc;
   --foreground: #1a1a2e;
   --accent: #0460a9;
@@ -278,8 +279,8 @@ h1, h2, h3, .nq-header, .nq-topic {
 /* ─── Figma "New Design" dashboard + mobile play surfaces ─────────────── */
 .nq-dashboard-shell {
   background:
-    radial-gradient(circle at 78% 4%, rgba(53, 88, 220, 0.12), transparent 26rem),
-    #060b26;
+    radial-gradient(circle at 78% 4%, rgba(70, 70, 70, 0.12), transparent 26rem),
+    #0a0a0a;
 }
 
 [data-theme="light"] .nq-dashboard-shell.text-white,
@@ -293,7 +294,7 @@ h1, h2, h3, .nq-header, .nq-topic {
   background:
     radial-gradient(circle at 88% 8%, rgba(71, 105, 229, 0.24), transparent 24rem),
     radial-gradient(circle at 4% 82%, rgba(41, 69, 170, 0.18), transparent 20rem),
-    linear-gradient(180deg, #080e2b 0%, #060b22 100%);
+    linear-gradient(180deg, #121212 0%, #0a0a0a 100%);
 }
 
 .nq-play-screen::before {
@@ -399,12 +400,12 @@ h1, h2, h3, .nq-header, .nq-topic {
 
 /* React Flow Controls dark theme */
 .react-flow__controls-button {
-  background: #1a1a3a !important;
+  background: #262626 !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 .react-flow__controls-button:hover {
-  background: #25254a !important;
+  background: #333333 !important;
 }
 
 .react-flow__controls-button svg {
@@ -448,29 +449,30 @@ body {
 
 /* ─── Dark mode ────────────────────────────────────────────────── */
 [data-theme="dark"] {
-  --background: #0d1526;
-  --foreground: #d4e3f5;
-  --accent: #5aadff;
-  --accent-hover: #7bc0ff;
+  --nq-button-primary: #404040;
+  --background: #121212;
+  --foreground: #f5f5f5;
+  --accent: #e5e5e5;
+  --accent-hover: #ffffff;
   --surface: rgba(255, 255, 255, 0.05);
   --border: rgba(255, 255, 255, 0.08);
-  --sidebar: #111b30;
+  --sidebar: #171717;
   --sidebar-border: rgba(255, 255, 255, 0.07);
-  --muted: #7a9abf;
+  --muted: #a3a3a3;
 }
 
 html[data-theme="dark"] {
-  background-color: #0a1428;
+  background-color: #0a0a0a;
 }
 
 [data-theme="dark"] .nq-root-bg {
-  background: linear-gradient(180deg, #060e20 0%, #0a1428 50%, #0d1a38 100%);
+  background: linear-gradient(180deg, #0a0a0a 0%, #0a0a0a 50%, #171717 100%);
 }
 
 /* Sky background — dark variant */
 [data-theme="dark"] .nq-sky {
   background:
-    linear-gradient(180deg, rgba(4, 16, 56, 0.98), rgba(8, 20, 52, 0.98) 100%);
+    linear-gradient(180deg, rgba(18, 18, 18, 0.98), rgba(18, 18, 18, 0.98) 100%);
 }
 
 [data-theme="dark"] .nq-sky::before {
@@ -485,18 +487,18 @@ html[data-theme="dark"] {
 }
 
 [data-theme="dark"] .nq-bottom-fade {
-  background: linear-gradient(180deg, rgba(8, 20, 52, 0.24) 0%, rgba(8, 20, 52, 0.72) 100%);
+  background: linear-gradient(180deg, rgba(18, 18, 18, 0.24) 0%, rgba(18, 18, 18, 0.72) 100%);
 }
 
 /* Cards */
 [data-theme="dark"] .nq-card {
-  background: linear-gradient(180deg, rgba(20, 35, 68, 0.96), rgba(12, 22, 50, 0.98));
+  background: linear-gradient(180deg, rgba(32, 32, 32, 0.96), rgba(26, 26, 26, 0.98));
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 [data-theme="dark"] .nq-card-soft {
-  background: linear-gradient(180deg, rgba(18, 30, 60, 0.92), rgba(12, 22, 50, 0.96));
+  background: linear-gradient(180deg, rgba(32, 32, 32, 0.92), rgba(26, 26, 26, 0.96));
   border-color: rgba(255, 255, 255, 0.06);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
 }
@@ -512,13 +514,13 @@ html[data-theme="dark"] {
 [data-theme="dark"] .nq-header,
 [data-theme="dark"] .nq-topic,
 [data-theme="dark"] .nq-subject {
-  color: #d4e3f5;
+  color: #f5f5f5;
 }
 
 [data-theme="dark"] .nq-text-muted,
 [data-theme="dark"] .nq-content,
 [data-theme="dark"] .nq-details {
-  color: #7a9abf;
+  color: #a3a3a3;
 }
 
 [data-theme="dark"] .nq-text-accent {
@@ -526,7 +528,7 @@ html[data-theme="dark"] {
 }
 
 [data-theme="dark"] .nq-text-deep {
-  color: #c2d4ea;
+  color: #e5e5e5;
 }
 
 /* Dashboard hardcoded text colors — primary (dark blue → light) */
@@ -547,12 +549,12 @@ html[data-theme="dark"] {
 [data-theme="dark"] .text-\[\#9BAFC6\],
 [data-theme="dark"] .text-\[\#A7B3C3\],
 [data-theme="dark"] .text-\[\#B3BFCE\] {
-  color: #94a9c5 !important;
+  color: #b3b3b3 !important;
 }
 
-[data-theme="dark"] .text-\[\#4D6F93\] { color: #a8c0d8 !important; }
+[data-theme="dark"] .text-\[\#4D6F93\] { color: #d4d4d4 !important; }
 [data-theme="dark"] .text-\[\#8B8B8B\] { color: #8a96a4 !important; }
-[data-theme="dark"] .text-\[\#294867\] { color: #a8c4e0 !important; }
+[data-theme="dark"] .text-\[\#294867\] { color: #d4d4d4 !important; }
 
 /* Accent blues — brighten for visibility on dark backgrounds */
 [data-theme="dark"] .text-\[\#0460A9\],
@@ -614,11 +616,11 @@ html[data-theme="dark"] {
 /* Edit Profile button — keep white but more opaque so the button reads as a button */
 html[data-theme="dark"] .bg-white { background-color: rgba(255, 255, 255, 0.92) !important; }
 
-/* All translucent-white surfaces become solid dark navy tiles in dark mode,
+/* All translucent-white surfaces become solid charcoal tiles in dark mode,
    matching the profile card's tile look. Using attribute selector so it
    beats Tailwind v4's utility cascade regardless of opacity variant. */
 html[data-theme="dark"] [class*="bg-white/"] {
-  background-color: #1f2f55 !important;
+  background-color: #262626 !important;
   box-shadow: none !important;
 }
 
@@ -633,7 +635,7 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
 /* Darker variant of the blue profile card */
 [data-theme="dark"] .nq-card-blue {
   background:
-    linear-gradient(135deg, #1a3370, #0d1d4a),
+    linear-gradient(135deg, #303030, #171717),
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
   border-color: rgba(255, 255, 255, 0.1);
   box-shadow: 0 24px 56px rgba(0, 0, 0, 0.55);
@@ -679,9 +681,9 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
 
 /* Admin panel — use dark glass styles in dark mode */
 [data-theme="dark"] .nq-admin-panel {
-  --nq-admin-title: #d4e3f5;
-  --nq-admin-body: #a8c4e0;
-  --nq-admin-muted: #7a9abf;
+  --nq-admin-title: #f5f5f5;
+  --nq-admin-body: #d4d4d4;
+  --nq-admin-muted: #a3a3a3;
   --nq-admin-soft: #5a86a8;
   --nq-admin-border: rgba(255, 255, 255, 0.08);
   --nq-admin-surface: rgba(255, 255, 255, 0.05);
@@ -730,14 +732,14 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
 [data-theme="dark"] .nq-auth-card input {
   background-color: #162040 !important;
   border-color: rgba(255, 255, 255, 0.12) !important;
-  color: #d4e3f5 !important;
+  color: #f5f5f5 !important;
 }
 [data-theme="dark"] .nq-auth-card input::placeholder {
   color: rgba(255, 255, 255, 0.32) !important;
 }
-[data-theme="dark"] .nq-auth-card .text-gray-700 { color: #94a9c5 !important; }
-[data-theme="dark"] .nq-auth-card .text-gray-600 { color: #94a9c5 !important; }
-[data-theme="dark"] .nq-auth-card .text-gray-500 { color: #7a9abf !important; }
+[data-theme="dark"] .nq-auth-card .text-gray-700 { color: #b3b3b3 !important; }
+[data-theme="dark"] .nq-auth-card .text-gray-600 { color: #b3b3b3 !important; }
+[data-theme="dark"] .nq-auth-card .text-gray-500 { color: #a3a3a3 !important; }
 [data-theme="dark"] .nq-auth-card .text-gray-400 { color: #6a8dab !important; }
 [data-theme="dark"] .nq-auth-card .border-gray-200 { border-color: rgba(255, 255, 255, 0.1) !important; }
 [data-theme="dark"] .nq-auth-card .bg-red-50 { background-color: rgba(220, 38, 38, 0.12) !important; }
@@ -757,7 +759,7 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
 }
 
 /* ─── Insight summary card (/stats) ─────────────────────────────
-   The card sits on .nq-card, which flips to a dark navy gradient in dark
+   The card sits on .nq-card, which flips to a charcoal gradient in dark
    mode. These are semantic so the colours flip with it — the page used to
    hardcode #16324F ink, which is invisible on that gradient. */
 .nq-insight-eyebrow { color: #8aa4c0; }
@@ -801,7 +803,7 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
 
 [data-theme="dark"] .nq-insight-question {
   border-color: rgba(156, 173, 255, 0.14);
-  background: rgba(7, 14, 42, 0.72);
+  background: rgba(18, 18, 18, 0.72);
 }
 
 [data-theme="dark"] .nq-insight-question-label { color: #8fa9ca; }
@@ -836,18 +838,18 @@ body {
   border-color: rgba(156, 173, 255, 0.12) !important;
   background:
     radial-gradient(circle at 90% 0%, rgba(73, 101, 217, 0.12), transparent 16rem),
-    linear-gradient(150deg, rgba(18, 29, 73, 0.98), rgba(10, 18, 49, 0.98)) !important;
+    linear-gradient(150deg, rgba(32, 32, 32, 0.98), rgba(26, 26, 26, 0.98)) !important;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22) !important;
 }
 
 .nq-dashboard-shell .nq-admin-panel {
-  --nq-admin-title: #f4f7ff;
-  --nq-admin-body: #c3cdec;
-  --nq-admin-muted: #9aa8d1;
-  --nq-admin-soft: #8494c0;
+  --nq-admin-title: #f5f5f5;
+  --nq-admin-body: #d4d4d4;
+  --nq-admin-muted: #b3b3b3;
+  --nq-admin-soft: #a3a3a3;
   --nq-admin-border: rgba(156, 173, 255, 0.12);
-  --nq-admin-surface: rgba(19, 31, 76, 0.74);
-  --nq-admin-surface-strong: rgba(31, 46, 100, 0.88);
+  --nq-admin-surface: rgba(32, 32, 32, 0.74);
+  --nq-admin-surface-strong: rgba(48, 48, 48, 0.88);
 }
 
 .nq-dashboard-shell .nq-admin-panel .bg-white\/5,
@@ -856,34 +858,34 @@ body {
 .nq-dashboard-shell [class~="bg-white/60"],
 .nq-dashboard-shell [class~="bg-white/70"],
 .nq-dashboard-shell [class~="bg-white/50"] {
-  background-color: rgba(20, 33, 79, 0.78) !important;
+  background-color: rgba(32, 32, 32, 0.78) !important;
 }
 
 .nq-dashboard-shell [class~="bg-white"],
 .nq-dashboard-shell [class~="bg-[#F8FAFC]"],
 .nq-dashboard-shell [class~="bg-[#F4F9FF]"] {
-  background-color: #111d48 !important;
+  background-color: #202020 !important;
 }
 
 .nq-dashboard-shell [class~="text-[#16324F]"],
 .nq-dashboard-shell [class~="text-[#202832]"],
 .nq-dashboard-shell [class~="text-[#294867]"] {
-  color: #f4f7ff !important;
+  color: #f5f5f5 !important;
 }
 
 .nq-dashboard-shell [class~="text-[#4D6F93]"],
 .nq-dashboard-shell [class~="text-[#5D7EA1]"],
 .nq-dashboard-shell [class~="text-[#475E79]"],
 .nq-dashboard-shell [class~="text-[#8AA4C0]"] {
-  color: #aebbe0 !important;
+  color: #b3b3b3 !important;
 }
 
 .nq-dashboard-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .nq-dashboard-shell select,
 .nq-dashboard-shell textarea {
   border-color: rgba(156, 173, 255, 0.16) !important;
-  background-color: rgba(7, 14, 42, 0.78) !important;
-  color: #f4f7ff !important;
+  background-color: rgba(18, 18, 18, 0.78) !important;
+  color: #f5f5f5 !important;
 }
 
 .nq-dashboard-shell input::placeholder,
@@ -900,7 +902,7 @@ body {
 .nq-dashboard-shell .hover\:bg-white:hover,
 .nq-dashboard-shell .hover\:bg-white\/60:hover,
 .nq-dashboard-shell .hover\:bg-white\/70:hover {
-  background-color: rgba(42, 59, 121, 0.82) !important;
+  background-color: rgba(48, 48, 48, 0.82) !important;
 }
 
 /* Light mode keeps the original airy NovarQuiz surfaces. The redesigned
@@ -1029,7 +1031,7 @@ body {
 }
 
 /* The mobile player follows the same preference: pale sky in light mode,
-   navy glass in dark mode. */
+   charcoal in dark mode. */
 [data-theme="light"] .nq-play-screen {
   color-scheme: light;
   background:
@@ -1179,8 +1181,8 @@ body {
   color-scheme: dark;
   border-color: rgba(98, 126, 226, 0.22);
   background:
-    radial-gradient(circle at 20% 102%, rgba(35, 80, 198, 0.2), transparent 22rem),
-    linear-gradient(180deg, #080d2b 0%, #050924 100%);
+    radial-gradient(circle at 20% 102%, rgba(80, 80, 80, 0.2), transparent 22rem),
+    linear-gradient(180deg, #121212 0%, #0a0a0a 100%);
   box-shadow: 10px 0 32px rgba(0, 0, 0, 0.16);
 }
 
@@ -1203,27 +1205,27 @@ body {
 }
 
 .nq-sidebar-profile { border-color: rgba(255, 255, 255, 0.1); }
-.nq-sidebar-label { color: #f0f3ff; }
-.nq-sidebar-name { color: #f7f8ff !important; }
-.nq-sidebar-muted { color: #8d97bd !important; }
+.nq-sidebar-label { color: #f5f5f5; }
+.nq-sidebar-name { color: #f5f5f5 !important; }
+.nq-sidebar-muted { color: #a3a3a3 !important; }
 
 .nq-sidebar-link:hover { background: rgba(255, 255, 255, 0.045); }
 
 .nq-sidebar-link-active {
-  background: linear-gradient(90deg, rgba(57, 66, 115, 0.72), rgba(43, 49, 91, 0.58));
+  background: linear-gradient(90deg, rgba(60, 60, 60, 0.72), rgba(48, 48, 48, 0.58));
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
 }
 
 .nq-sidebar-icon {
   color: #6685ed;
-  background: rgba(31, 58, 139, 0.32);
+  background: rgba(60, 60, 60, 0.32);
   box-shadow: inset 0 0 0 1px rgba(112, 142, 255, 0.08);
 }
 
 .nq-sidebar-link-active .nq-sidebar-icon {
   color: #ffffff;
   background: linear-gradient(135deg, #3078f2, #5458e9);
-  box-shadow: 0 5px 14px rgba(50, 91, 232, 0.38);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.38);
 }
 
 .nq-sidebar-footer { padding-inline: 0.25rem; }
@@ -1321,13 +1323,13 @@ body {
 /* Full report has its own surface hierarchy. Keep its small labels, tables,
    status chips and the dark comparison panels legible in both themes. */
 .nq-dashboard-shell .nq-full-report {
-  --report-page: #0b1630;
-  --report-card: #172744;
-  --report-subtle: #203452;
-  --report-tint: #203c60;
-  --report-ink: #f2f7ff;
-  --report-muted: #bed0e7;
-  --report-accent: #8acbff;
+  --report-page: #121212;
+  --report-card: #202020;
+  --report-subtle: #292929;
+  --report-tint: #303030;
+  --report-ink: #f5f5f5;
+  --report-muted: #b3b3b3;
+  --report-accent: #e5e5e5;
   --report-border: rgba(177, 205, 239, 0.24);
   color-scheme: dark;
   color: var(--report-ink) !important;
@@ -1552,4 +1554,124 @@ body {
 .nq-dashboard-shell.nq-theme-light input::placeholder,
 .nq-dashboard-shell.nq-theme-light textarea::placeholder {
   color: #526b85 !important;
+}
+
+/* Shared report controls and topic cards use explicit ink/surface pairs. */
+.nq-topic-breakdown {
+  --topic-ink: #16324f;
+  --topic-muted: #49647e;
+  --topic-surface: #f8fafc;
+  --topic-border: #cbd5e1;
+}
+[data-theme="dark"] .nq-topic-breakdown {
+  --topic-ink: #f5f5f5;
+  --topic-muted: #b3b3b3;
+  --topic-surface: #262626;
+  --topic-border: #525252;
+}
+.nq-dashboard-shell .nq-topic-breakdown .nq-topic-card {
+  background: var(--topic-surface) !important;
+  border-color: var(--topic-border) !important;
+  color: var(--topic-ink) !important;
+}
+.nq-dashboard-shell .nq-topic-card > .nq-topic-content { background: transparent !important; }
+.nq-dashboard-shell .nq-topic-card .nq-topic-description { color: var(--topic-ink) !important; }
+.nq-dashboard-shell .nq-topic-card .nq-topic-meta { color: var(--topic-muted) !important; }
+.nq-dashboard-shell .nq-topic-card .nq-topic-badge,
+.nq-dashboard-shell .nq-topic-card .nq-topic-score {
+  color: var(--tier-ink) !important;
+}
+.nq-dashboard-shell .nq-topic-card .nq-topic-badge {
+  background: var(--tier-surface) !important;
+  border-color: var(--tier-border) !important;
+}
+.nq-topic-card[data-tier="empty"] { --tier-ink: #404040; --tier-surface: #f3f4f6; --tier-border: #9ca3af; }
+.nq-topic-card[data-tier="priority"] { --tier-ink: #9f1239; --tier-surface: #fff1f2; --tier-border: #fda4af; }
+.nq-topic-card[data-tier="developing"] { --tier-ink: #92400e; --tier-surface: #fffbeb; --tier-border: #fcd34d; }
+.nq-topic-card[data-tier="strong"] { --tier-ink: #075985; --tier-surface: #f0f9ff; --tier-border: #7dd3fc; }
+[data-theme="dark"] .nq-topic-card[data-tier="empty"] { --tier-ink: #e5e5e5; --tier-surface: #333333; --tier-border: #737373; }
+[data-theme="dark"] .nq-topic-card[data-tier="priority"] { --tier-ink: #fda4af; --tier-surface: #3b2028; --tier-border: #9f4560; }
+[data-theme="dark"] .nq-topic-card[data-tier="developing"] { --tier-ink: #fcd34d; --tier-surface: #362c20; --tier-border: #987227; }
+[data-theme="dark"] .nq-topic-card[data-tier="strong"] { --tier-ink: #7dd3fc; --tier-surface: #203039; --tier-border: #3b809b; }
+.nq-topic-card[aria-pressed="true"] {
+  outline: 2px solid var(--topic-ink);
+  outline-offset: 2px;
+}
+.nq-topic-card:not(:disabled):hover { transform: translateY(-2px); }
+.nq-dashboard-shell :is(button, a, select, input):focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 3px;
+}
+.nq-dashboard-shell .nq-report-cta {
+  background: #0460a9 !important;
+  border-color: #0460a9 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
+}
+.nq-dashboard-shell .group:hover .nq-report-cta { background: #03508c !important; }
+.nq-dashboard-shell .nq-full-report button { min-height: 36px; }
+.nq-dashboard-shell .nq-full-report button.nq-topic-card { min-height: 112px; }
+.nq-dashboard-shell .nq-full-report button[class~="hover:bg-[#0460A9]"]:hover {
+  background-color: #0460a9 !important;
+  color: #ffffff !important;
+}
+/* Descendants of topic buttons must keep their status and metadata colors. */
+.nq-dashboard-shell.nq-theme-light .nq-topic-breakdown h2,
+.nq-dashboard-shell.nq-theme-light .nq-topic-breakdown .text-white,
+.nq-dashboard-shell.nq-theme-light .nq-topic-breakdown [class~="text-[#e4eaff]"] {
+  color: #16324f !important;
+}
+
+/* Black and charcoal surfaces throughout dark mode, including legacy tiles. */
+[data-theme="dark"] :is(.nq-dashboard-shell, .nq-root-bg, .nq-sky, .nq-play-screen) {
+  background: #101010 !important;
+}
+[data-theme="dark"] :is(.nq-dashboard-sidebar, .nq-dashboard-mobile-header, .nq-dashboard-mobile-nav) {
+  background: #171717 !important;
+  border-color: #333333 !important;
+}
+[data-theme="dark"] :is(.nq-card-blue, .nq-card-dark, .nq-report-dark-panel) {
+  background: linear-gradient(135deg, #333333, #171717) !important;
+  border-color: #525252 !important;
+}
+[data-theme="dark"] .nq-sidebar-icon { background: #303030; color: #d4d4d4; }
+[data-theme="dark"] .nq-sidebar-link-active .nq-sidebar-icon { background: #525252; box-shadow: none; }
+[data-theme="dark"] .nq-dashboard-shell [class~="bg-[#17275f]"],
+[data-theme="dark"] .nq-dashboard-shell [class~="bg-[#18255d]"],
+[data-theme="dark"] .nq-dashboard-shell [class~="bg-[#070d2b]"],
+[data-theme="dark"] .nq-dashboard-shell [class~="bg-[#0a1234]"],
+[data-theme="dark"] .nq-dashboard-shell [class~="bg-[#0d173e]"],
+[data-theme="dark"] .nq-dashboard-shell [class~="bg-[#101b49]"],
+[data-theme="dark"] .nq-dashboard-shell [class~="bg-[#111d48]"],
+[data-theme="dark"] .nq-dashboard-shell [class~="bg-[#142153]"] {
+  background-color: #262626 !important;
+}
+[data-theme="dark"] .nq-dashboard-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+[data-theme="dark"] .nq-dashboard-shell select,
+[data-theme="dark"] .nq-dashboard-shell textarea {
+  background: #202020 !important;
+  border-color: #525252 !important;
+  color: #f5f5f5 !important;
+}
+[data-theme="dark"] .nq-dashboard-shell :is(input, textarea)::placeholder { color: #a3a3a3 !important; }
+[data-theme="dark"] .nq-dashboard-shell .nq-report-cta {
+  background: #e5e5e5 !important;
+  border-color: #e5e5e5 !important;
+  color: #171717 !important;
+}
+[data-theme="dark"] .nq-dashboard-shell .group:hover .nq-report-cta { background: #ffffff !important; }
+[data-theme="dark"] .nq-dashboard-shell :is(button, a)[class~="bg-[#0460A9]"],
+[data-theme="dark"] .nq-dashboard-shell button[class~="hover:bg-[#0460A9]"]:hover {
+  background-color: #404040 !important;
+  color: #ffffff !important;
+}
+[data-theme="dark"] .nq-dashboard-shell .nq-always-dark[class*="bg-[linear-gradient("] {
+  background-image: linear-gradient(135deg, #171717, #525252) !important;
+}
+[data-theme="dark"] .nq-button { box-shadow: none; }
+[data-theme="dark"] .nq-play-screen::after { background: none; }
+[data-theme="dark"] .nq-play-screen::before { background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px); }
+@media (prefers-reduced-motion: reduce) {
+  .nq-topic-card { transition: none; }
+  .nq-topic-card:not(:disabled):hover { transform: none; }
 }

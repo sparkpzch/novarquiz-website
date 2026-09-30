@@ -7,7 +7,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { jwtVerify, SignJWT } from 'jose';
+import { SignJWT } from 'jose';
+import { verifySessionToken } from '@/lib/security/session';
 import { adminAuth } from '@/lib/firebase/admin';
 import { checkRateLimit } from '@/lib/ratelimit';
 import { getRateLimitIp } from '@/lib/security/request-ip';
@@ -42,19 +43,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No session' }, { status: 401 });
     }
 
-    const { payload } = await jwtVerify(session, getSecret());
-    const uid = payload.uid as string | undefined;
-    if (!uid) {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
-    }
-
+    const verified = await verifySessionToken(session);
+    const uid = verified.uid;
     // Re-check live Firebase claims so a revoked admin loses access within one rehydrate cycle
     const firebaseUser = await adminAuth.getUser(uid);
-    const currentIsAdmin = !!(firebaseUser.customClaims as Record<string, unknown> | undefined)?.admin;
-    const tokenIsAdmin = !!payload.isAdmin;
+    if (firebaseUser.disabled) {
+      cookieStore.delete(COOKIE_NAME);
+      return NextResponse.json({ error: 'Account disabled' }, { status: 401 });
+    }
+    const currentIsAdmin = firebaseUser.customClaims?.admin === true;
+    const tokenIsAdmin = verified.isAdmin;
 
     if (currentIsAdmin !== tokenIsAdmin) {
-      const remaining = (payload.exp ?? 0) - Math.floor(Date.now() / 1000);
+      const remaining = verified.expiresAt - Math.floor(Date.now() / 1000);
       const maxAge = currentIsAdmin ? Math.min(remaining, ADMIN_MAX_AGE) : remaining;
 
       if (maxAge <= 0) {

@@ -1,5 +1,7 @@
 'use client';
 
+import { safeRedirectPath } from '@/lib/security/redirect';
+
 import { useState, Suspense } from 'react';
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
@@ -26,7 +28,7 @@ function SignInForm() {
   const [consentPending, setConsentPending] = useState<string | null>(null);
 
   const safeNextUrl =
-    nextUrl && /^\/(?!\/)/.test(nextUrl) ? nextUrl : '/';
+    safeRedirectPath(nextUrl);
 
   const createSession = async (idToken: string, beforeRedirect?: () => Promise<unknown>) => {
     const res = await fetch('/api/auth/session', {

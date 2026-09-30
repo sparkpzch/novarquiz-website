@@ -499,7 +499,7 @@ export default function QuizzesManager({
                           >
                             <div className="flex items-center justify-between mb-3">
                               <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#5D7EA1]">Analytics Preview</span>
-                              <span className="text-[11px] font-bold text-[#0460A9] group-hover:text-[#03508C] group-hover:underline flex items-center gap-1">
+                              <span className="nq-report-cta flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold">
                                 Full Report
                                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />

@@ -34,17 +34,20 @@ export async function POST(request: NextRequest) {
     }
 
     const { idToken, rememberMe } = await request.json();
-    if (!idToken) {
+    if (typeof idToken !== 'string' || !idToken || (rememberMe !== undefined && typeof rememberMe !== 'boolean')) {
       return NextResponse.json({ error: 'Missing idToken' }, { status: 400 });
     }
 
-    const decoded = await adminAuth.verifyIdToken(idToken);
+    const decoded = await adminAuth.verifyIdToken(idToken, true);
 
     // Password sign-ups must verify their email before we issue a session
     // cookie. OAuth providers deliver verified emails by construction, so
     // only the password provider is gated. Without this, anyone can
     // pre-create an account on an email they don't own.
     const provider = decoded.firebase?.sign_in_provider;
+    if (provider === 'anonymous') {
+      return NextResponse.json({ error: 'Guest accounts cannot create application sessions' }, { status: 403 });
+    }
     if (provider === 'password' && !decoded.email_verified) {
       return NextResponse.json(
         { error: 'Email not verified', code: 'email-not-verified' },
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
     // Sync profile to Postgres
     await syncUserProfile(decoded.uid, decoded.name || null, decoded.picture || null);
 
-    const isAdmin = !!decoded.admin;
+    const isAdmin = decoded.admin === true;
     const maxAge = isAdmin ? ADMIN_MAX_AGE : (rememberMe ? REMEMBER_MAX_AGE : DEFAULT_MAX_AGE);
 
     const token = await new SignJWT({ uid: decoded.uid, isAdmin })

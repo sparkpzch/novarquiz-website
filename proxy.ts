@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
 import { checkRateLimit } from '@/lib/ratelimit';
+import { getRateLimitIp } from '@/lib/security/request-ip';
+import { isTrustedMutation } from '@/lib/security/request-origin';
+import { verifySessionToken } from '@/lib/security/session';
 
 const COOKIE_NAME = 'session';
-const PUBLIC_PATHS = ['/sign-in', '/sign-up', '/forgot-password'];
+const PUBLIC_PATHS = ['/sign-in', '/sign-up', '/forgot-password', '/new-password', '/terms', '/privacy'];
 const GUEST_PLAY_PATHS = ['/join/', '/play/'];
-
-function getSecret() {
-  const secret = process.env.SESSION_SECRET;
-  if (!secret) throw new Error('SESSION_SECRET is not set');
-  return new TextEncoder().encode(secret);
-}
 
 function buildCsp(nonce: string): string {
   const isDev = process.env.NODE_ENV === 'development';
@@ -26,6 +22,7 @@ function buildCsp(nonce: string): string {
     "frame-ancestors 'self'",
     "base-uri 'self'",
     "object-src 'none'",
+    "form-action 'self'",
   ].join('; ');
 }
 
@@ -46,21 +43,16 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Rate-limit all API routes
-  if (pathname.startsWith('/api')) {
+  if (pathname === '/api' || pathname.startsWith('/api/')) {
+    if (!isTrustedMutation(request)) {
+      return NextResponse.json({ error: 'Cross-origin request denied' }, { status: 403 });
+    }
     // On Cloud Run / Firebase App Hosting the platform appends the real client
     // IP as the LAST entry in x-forwarded-for. Only honor these headers when
     // TRUST_PROXY=1 is set, since direct ingress (local dev, misrouted Cloud
     // Run revisions) lets an attacker forge them to rotate rate-limit buckets.
     // When unset, fall back to a fixed bucket so abuse is globally capped.
-    const trustProxy = process.env.TRUST_PROXY === '1';
-    let ip = 'untrusted';
-    if (trustProxy) {
-      const xff = request.headers.get('x-forwarded-for');
-      ip =
-        request.headers.get('x-real-ip') ??
-        (xff ? xff.split(',').at(-1)!.trim() : null) ??
-        '127.0.0.1';
-    }
+    const ip = getRateLimitIp(request);
 
     const { allowed, retryAfter } = await checkRateLimit(ip, pathname);
     if (!allowed) {
@@ -72,20 +64,16 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Pass through static assets. The previous `pathname.includes('.')` check
-  // skipped the auth gate for ANY path containing a dot (e.g.
-  // /admin/sessions/foo.bar/analytics), which let unauthenticated traffic
-  // reach protected dynamic routes. Limit the bypass to file paths that end
-  // in a known static-asset extension.
-  const STATIC_FILE_RE = /\.(?:svg|png|jpe?g|gif|webp|avif|ico|css|js|mjs|map|woff2?|ttf|otf|eot|json|txt|xml|webmanifest)$/i;
-  if (pathname.startsWith('/_next') || pathname.startsWith('/favicon') || STATIC_FILE_RE.test(pathname)) {
+  // Only known asset namespaces bypass authentication. An arbitrary dynamic
+  // route ending in .json/.png is still a protected page.
+  if (pathname.startsWith('/_next/') || pathname.startsWith('/image/') || pathname === '/favicon.ico') {
     return NextResponse.next();
   }
 
   // Per-request nonce for nonce-based CSP (applied to all page responses below).
   const nonce = btoa(crypto.randomUUID());
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  const isPublic = PUBLIC_PATHS.includes(pathname);
   const session = request.cookies.get(COOKIE_NAME)?.value;
 
   // Guest pages render a client shell. Their APIs verify the Firebase
@@ -99,8 +87,10 @@ export async function proxy(request: NextRequest) {
   if (isPublic) {
     if (session) {
       try {
-        const { payload } = await jwtVerify(session, getSecret());
-        return NextResponse.redirect(new URL(payload.isAdmin ? '/admin' : '/', request.url));
+        const user = await verifySessionToken(session);
+        if (!['/terms', '/privacy'].includes(pathname)) {
+          return NextResponse.redirect(new URL(user.isAdmin ? '/admin' : '/quizzes', request.url));
+        }
       } catch {
         // Expired / invalid — let through to sign-in
       }
@@ -116,9 +106,9 @@ export async function proxy(request: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(session, getSecret());
-    if (pathname.startsWith('/admin') && !payload.isAdmin) {
-      return NextResponse.redirect(new URL('/', request.url));
+    const user = await verifySessionToken(session);
+    if ((pathname === '/admin' || pathname.startsWith('/admin/')) && !user.isAdmin) {
+      return NextResponse.redirect(new URL('/quizzes', request.url));
     }
     return withCsp(request, nonce);
   } catch {

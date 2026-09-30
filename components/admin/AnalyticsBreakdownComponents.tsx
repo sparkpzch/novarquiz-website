@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTheme } from '@/lib/hooks/useTheme';
 import RefreshButton from '@/components/ui/RefreshButton';
 
 export interface TopicBreakdownItem {
@@ -67,6 +68,8 @@ export function TopicUnderstandingBreakdown({
   refreshError = false,
 }: TopicUnderstandingBreakdownProps) {
   const dashboardVariant = variant === 'dashboard';
+  const { theme: activeTheme } = useTheme();
+  const dark = activeTheme === 'dark';
   const [sortBy, setSortBy] = useState<'lowest' | 'highest' | 'responses' | 'name'>('lowest');
   const sortedItems = [...items].sort((a, b) => {
     if (sortBy === 'name') return a.tag.localeCompare(b.tag);
@@ -80,7 +83,7 @@ export function TopicUnderstandingBreakdown({
   });
 
   return (
-    <section className={`space-y-4 ${dashboardVariant ? 'nq-dashboard-panel rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5' : 'rounded-3xl border border-[#0460A9]/15 bg-white p-4 shadow-[0_4px_24px_rgba(4,96,169,0.04)] sm:p-5'}`}>
+    <section className={`nq-topic-breakdown space-y-4 ${dashboardVariant ? 'nq-dashboard-panel rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5' : 'rounded-3xl border border-[#0460A9]/15 bg-white p-4 shadow-[0_4px_24px_rgba(4,96,169,0.04)] sm:p-5'}`}>
       <div className={`flex flex-col gap-3 pb-3.5 sm:flex-row sm:items-center sm:justify-between ${dashboardVariant ? 'border-b border-white/8' : 'border-b border-[#0460A9]/10'}`}>
         <div>
           <div className="flex items-center gap-2">
@@ -96,7 +99,7 @@ export function TopicUnderstandingBreakdown({
               isRefreshing={isRefreshing}
               lastFetchedAt={lastFetchedAt}
               refreshError={refreshError}
-              theme="dark"
+              theme={activeTheme}
             />
           )}
           <label className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>
@@ -128,21 +131,13 @@ export function TopicUnderstandingBreakdown({
             const score = item.percentage ?? 0;
             const meta = TOPIC_META[item.tag] ?? { description: item.tag.replace(/^#/, '').replace(/[-_]/g, ' '), icon: '📊' };
             const selected = selectedTag === item.tag;
-            const theme = !hasData
-                ? dashboardVariant
-                ? { border: 'border-white/12', badge: 'bg-white/8 text-[#b8c4e8] border-white/12', score: 'text-[#b8c4e8]', fill: '#9CA3AF', track: '#344365', status: item.responses > 0 ? 'No max utility' : 'No responses' }
-                : { border: 'border-gray-200', badge: 'bg-gray-100/90 text-gray-700 border-gray-300', score: 'text-gray-500', fill: '#9CA3AF', track: '#E5E7EB', status: item.responses > 0 ? 'No max utility' : 'No responses' }
-              : score < 50
-                ? dashboardVariant
-                  ? { border: 'border-rose-400/40', badge: 'bg-rose-400/15 text-rose-200 border-rose-400/30', score: 'text-rose-200', fill: '#FB7185', track: '#4c2942', status: 'Priority review' }
-                  : { border: 'border-rose-200', badge: 'bg-rose-100/90 text-rose-800 border-rose-300', score: 'text-rose-700', fill: '#E11D48', track: '#FFE4E6', status: 'Priority review' }
-                : score < 75
-                  ? dashboardVariant
-                    ? { border: 'border-amber-400/40', badge: 'bg-amber-400/15 text-amber-200 border-amber-400/30', score: 'text-amber-200', fill: '#FBBF24', track: '#4a3c2c', status: 'Developing' }
-                    : { border: 'border-amber-200', badge: 'bg-amber-100/90 text-amber-800 border-amber-300', score: 'text-amber-700', fill: '#D97706', track: '#FEF3C7', status: 'Developing' }
-                  : dashboardVariant
-                    ? { border: 'border-sky-400/40', badge: 'bg-sky-400/15 text-sky-200 border-sky-400/30', score: 'text-sky-200', fill: '#38BDF8', track: '#29445d', status: 'Strong' }
-                    : { border: 'border-sky-200', badge: 'bg-sky-100/90 text-sky-800 border-sky-300', score: 'text-sky-700', fill: '#0284C7', track: '#E0F2FE', status: 'Strong' };
+            const tier = !hasData ? 'empty' : score < 50 ? 'priority' : score < 75 ? 'developing' : 'strong';
+            const theme = {
+              border: 'nq-topic-border', badge: 'nq-topic-badge', score: 'nq-topic-score',
+              fill: !hasData ? '#737373' : score < 50 ? '#E11D48' : score < 75 ? '#D97706' : '#0284C7',
+              track: dark ? '#404040' : '#E5E7EB',
+              status: !hasData ? (item.responses > 0 ? 'No max utility' : 'No responses') : score < 50 ? 'Priority review' : score < 75 ? 'Developing' : 'Strong',
+            };
             const radius = 15;
             const circumference = 2 * Math.PI * radius;
 
@@ -152,11 +147,13 @@ export function TopicUnderstandingBreakdown({
                 type="button"
                 onClick={() => onToggleTag?.(item.tag)}
                 disabled={!onToggleTag}
+                aria-pressed={onToggleTag ? selected : undefined}
+                data-tier={tier}
                 title={onToggleTag ? (selected ? `Clear ${item.tag} filter` : `Filter questions by ${item.tag}`) : undefined}
-                className={`w-full overflow-hidden rounded-2xl border text-left transition-all duration-200 focus:outline-none ${dashboardVariant ? 'bg-[#0a1234]' : 'bg-white'} ${selected ? `ring-2 ring-[#0460A9]/40 shadow-md ${theme.border}` : `${theme.border} hover:shadow-md hover:border-[#0460A9]/30`} ${onToggleTag ? 'cursor-pointer' : 'cursor-default'}`}
+                className={`nq-topic-card w-full overflow-hidden rounded-2xl border text-left transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 ${dashboardVariant ? 'bg-[#0a1234]' : 'bg-white'} ${selected ? `ring-2 ring-[#0460A9]/40 shadow-md ${theme.border}` : `${theme.border} hover:shadow-md hover:border-[#0460A9]/30`} ${onToggleTag ? 'cursor-pointer' : 'cursor-default'}`}
               >
                 {selected && <div className="h-1 w-full" style={{ backgroundColor: theme.fill }} />}
-                <div className={`flex min-h-[112px] flex-col justify-between gap-2.5 p-3 ${dashboardVariant ? 'bg-white/[0.025]' : 'bg-[#F8FAFC]'}`}>
+                <div className={`nq-topic-content flex min-h-[112px] flex-col justify-between gap-2.5 p-3 ${dashboardVariant ? 'bg-white/[0.025]' : 'bg-[#F8FAFC]'}`}>
                   <div className="flex items-center justify-between gap-1.5">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <span className="shrink-0 text-sm">{meta.icon}</span>
@@ -166,11 +163,11 @@ export function TopicUnderstandingBreakdown({
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1 pr-1">
-                      <p className={`line-clamp-2 text-[11px] font-semibold leading-tight ${dashboardVariant ? 'text-[#e4eaff]' : 'text-[#16324F]'}`}>{meta.description}</p>
-                      <p className={`mt-1 truncate font-mono text-[9px] ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>
+                      <p className={`nq-topic-description line-clamp-2 text-xs font-semibold leading-tight ${dashboardVariant ? 'text-[#e4eaff]' : 'text-[#16324F]'}`}>{meta.description}</p>
+                      <p className={`nq-topic-meta mt-1 truncate font-mono text-[11px] ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>
                         {item.earnedUtility}/{item.maxUtility} utility · {item.responses} responses
                       </p>
-                      {selectedPlayerName && <p className={`mt-0.5 truncate text-[9px] ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>For {selectedPlayerName}</p>}
+                      {selectedPlayerName && <p className={`nq-topic-meta mt-0.5 truncate text-[11px] ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>For {selectedPlayerName}</p>}
                       {selectedCompareLabel && item.benchmarkPercentage != null && <p className="mt-0.5 text-[9px] text-indigo-700">Compared with {selectedCompareLabel}: {item.benchmarkPercentage}%</p>}
                     </div>
                     <div className="relative flex shrink-0 items-center justify-center">

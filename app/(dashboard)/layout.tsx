@@ -33,17 +33,6 @@ const profileNavItem: NavItem = {
 
 const primaryNavItems: NavItem[] = [
   {
-    href: '/',
-    label: 'nav.home',
-    icon: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
-    exact: true,
-  },
-  {
-    href: '/stats',
-    label: 'nav.stats',
-    icon: 'M3 3v18h18M9 17V9m4 8v-4m4 4V5',
-  },
-  {
     href: '/quizzes',
     label: 'nav.quizzes',
     icon: 'M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25',
@@ -58,12 +47,8 @@ const primaryNavItems: NavItem[] = [
 
 const desktopAdminItems: NavItem[] = [
   {
-    href: '/admin?tab=dashboard',
-    label: 'Dashboard',
-    icon: 'M5 12h5V5H5v7Zm0 7h5v-5H5v5Zm7 0h7V12h-7v7Zm0-14v5h7V5h-7Z',
-  },
-  {
-    href: '/admin?tab=quizzes-manager',
+    href: '/admin',
+    exact: true,
     label: 'Quizzes Manager',
     icon: 'M3.75 3h16.5M3.75 7.5h16.5M3.75 12h16.5M3.75 16.5h16.5M3.75 21h16.5',
   },
@@ -167,7 +152,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
       <div className="flex min-h-dvh">
         <aside className="nq-dashboard-sidebar sticky top-0 hidden h-dvh w-[264px] shrink-0 overflow-hidden border-r px-4 py-5 lg:flex">
           <div className="nq-sidebar-scroll flex min-h-0 w-full flex-col overflow-y-auto pr-1">
-            <Link href="/" className="flex h-10 items-center px-1">
+            <Link href={isAdmin ? '/admin' : '/quizzes'} className="flex h-10 items-center px-1">
               <Image
                 src="/image/icon/novartis-logo-transparent.png"
                 alt="Novartis"
@@ -291,7 +276,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
 
         <div className="min-w-0 flex-1">
           <header className="nq-dashboard-mobile-header sticky top-0 z-30 flex h-[68px] items-center justify-between border-b border-white/8 bg-[#080e2d]/92 px-4 backdrop-blur-xl lg:hidden">
-            <Link href="/" className="flex items-center">
+            <Link href={isAdmin ? '/admin' : '/quizzes'} className="flex items-center">
               <Image
                 src="/image/icon/novartis-logo-transparent.png"
                 alt="Novartis"
