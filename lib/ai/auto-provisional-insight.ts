@@ -9,6 +9,7 @@ import { generatePersonalInsight, geminiLiteModel, isGeminiConfigured } from './
 export type AutoProvisionalInsight = {
   summary: InsightSummary;
   status: 'provisional' | 'approved';
+  context?: AnswerReviewContext | null;
 };
 
 /** Sends recorded selections and authored explanations, but never a UID or
@@ -22,6 +23,8 @@ type ProvisionalInput = {
   context?: AnswerReviewContext;
   readingStyle?: 'everyday';
   allowGeneration?: boolean;
+  /** Admin reports inspect saved wording without spending quota or changing it. */
+  readOnly?: boolean;
 };
 
 export type PreparedInsight = {
@@ -72,19 +75,23 @@ export async function prepareProvisionalInsight(input: ProvisionalInput, depende
     const summary = { headline: reusable.headline, body: reusable.body, suggestion: reusable.suggestion };
     if (validateInsightLanguage(summary, input.locale) && (input.readingStyle !== 'everyday' || (isEverydayInsight(summary) && hasSpecificInsightHeadline(summary)))) {
       const status = reusable.status === 'approved' ? 'approved' : 'provisional';
-      return { state: status === 'approved' ? 'approved' : 'pending', insight: { summary, status } };
+      return { state: status === 'approved' ? 'approved' : 'pending', insight: { summary, status, context: reusable.answer_context } };
     }
-    if (reusable.status === 'provisional') await invalidateProvisionalLanguage(reusable.id);
+    if (!input.readOnly && reusable.status === 'provisional') await invalidateProvisionalLanguage(reusable.id);
   }
 
   const existing = await getProvisionalInsight(input.quizId, input.audience, input.locale, answerSignature);
   if (existing) {
     const summary = { headline: existing.headline, body: existing.body, suggestion: existing.suggestion };
     if (validateInsightLanguage(summary, input.locale) && (input.readingStyle !== 'everyday' || (isEverydayInsight(summary) && hasSpecificInsightHeadline(summary)))) {
-      return { state: existing.status === 'approved' ? 'approved' : 'pending', insight: { summary, status: existing.status as 'provisional' | 'approved' } };
+      return { state: existing.status === 'approved' ? 'approved' : 'pending', insight: { summary, status: existing.status as 'provisional' | 'approved', context: existing.answer_context } };
     }
-    if (existing.status === 'approved') return { state: 'unavailable' };
+    if (existing.status === 'approved' || input.readOnly) return { state: 'unavailable' };
     await invalidateProvisionalLanguage(existing.id);
+  }
+  if (input.readOnly) {
+    const status = await getInsightGenerationState(input.quizId, input.audience, input.locale, answerSignature);
+    return { state: status === 'generating' ? 'generating' : status === 'rejected' ? 'rejected' : 'unavailable' };
   }
   if (input.allowGeneration === false) return { state: 'consent-required' };
   if (!isGeminiConfigured()) return { state: 'unavailable' };

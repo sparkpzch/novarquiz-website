@@ -124,7 +124,7 @@ export default function CompareSessionsModal({
 
   return typeof document !== 'undefined'
     ? createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0d2238]/60 p-4 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="nq-report-compare-modal fixed inset-0 z-[9999] flex items-center justify-center bg-[#0d2238]/60 p-4 backdrop-blur-md animate-in fade-in duration-200">
           <div
             className="relative flex max-h-[90vh] w-full max-w-3xl flex-col rounded-[32px] border border-white/20 bg-white shadow-[0_25px_60px_-15px_rgba(4,96,169,0.3)] overflow-hidden"
             onClick={(e) => e.stopPropagation()}

@@ -1470,6 +1470,26 @@ body {
   color-scheme: light;
 }
 
+/* Let the dashboard background continue behind reports instead of painting
+   a large rectangular page surface. Cards retain their own contrast. */
+.nq-dashboard-shell .nq-full-report.nq-report-canvas {
+  background: transparent !important;
+}
+
+/* Global solid-blue button rules also matched pale bg-[#0460A9]/10 controls.
+   Give the report's outline/tinted actions their intended dark blue ink. */
+.nq-dashboard-shell.nq-theme-light .nq-full-report button[class~="text-[#0460A9]"] {
+  color: var(--report-accent) !important;
+}
+.nq-dashboard-shell.nq-theme-light .nq-full-report button[class~="text-[#0460A9]"][class~="hover:text-white"]:hover {
+  color: #fff !important;
+}
+.nq-dashboard-shell .nq-full-report .nq-report-solid,
+.nq-dashboard-shell .nq-full-report .nq-report-solid [class~="text-white"],
+.nq-report-compare-modal [class~="text-white"] {
+  color: #fff !important;
+}
+
 .nq-dashboard-shell .nq-full-report [class~="bg-white"] {
   background-color: var(--report-card) !important;
 }

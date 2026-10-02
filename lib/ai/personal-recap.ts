@@ -8,13 +8,14 @@ import { prepareProvisionalInsight, type InsightDependencies, type PreparedInsig
  * Personal identity and health profile never enter the model input. */
 export async function preparePersonalRecap(
   uid: string, session: UserHistoryRow, answers: HistoryAnswer[], locale: 'en' | 'th', dependencies?: InsightDependencies,
+  options: { readOnly?: boolean } = {},
 ): Promise<PreparedInsight> {
   if (!session.quiz_id || !answers.length) return { state: 'unavailable' };
-  const [quiz, consent] = await Promise.all([getQuizById(session.quiz_id), getUserConsent(uid)]);
+  const [quiz, consent] = await Promise.all([getQuizById(session.quiz_id), options.readOnly ? Promise.resolve(null) : getUserConsent(uid)]);
   const coaching = historyCoaching({ session, answers, topics: [], feedback: null }, locale);
   return prepareProvisionalInsight({
     userId: uid, quizId: session.quiz_id, audience: quiz?.intended_audience === 'hcp' ? 'hcp' : 'public',
-    locale, readingStyle: 'everyday', allowGeneration: consent?.privacy_version === PRIVACY_VERSION,
+    locale, readingStyle: 'everyday', allowGeneration: consent?.privacy_version === PRIVACY_VERSION, readOnly: options.readOnly,
     context: {
       quizName: quiz?.name ?? session.session_name, quizDescription: quiz?.description ?? session.session_description,
       answers: answers.map(({ question, selected, selectedExplanation, selectedAligned, alignedChoices }) => ({ question, selected, selectedExplanation, selectedAligned, alignedChoices })),

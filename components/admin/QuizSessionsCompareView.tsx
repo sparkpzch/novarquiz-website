@@ -274,7 +274,7 @@ export default function QuizSessionsCompareView({
   }, [cohorts]);
 
   return (
-    <div className="min-h-screen bg-[#F4F9FF] p-4 md:p-8">
+    <div className="nq-full-report nq-report-canvas p-4 md:p-8">
       {/* Top Header & Navigation */}
       <div className="mx-auto max-w-[1700px] space-y-6">
         {/* Navigation Bar */}
@@ -316,7 +316,7 @@ export default function QuizSessionsCompareView({
 
             <button
               onClick={() => window.print()}
-              className="flex items-center gap-2 rounded-[20px] bg-[#16324F] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-[#0d2238]"
+              className="nq-report-solid flex items-center gap-2 rounded-[20px] bg-[#16324F] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-[#0d2238]"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -336,7 +336,7 @@ export default function QuizSessionsCompareView({
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span
-                    className={`rounded-lg px-2.5 py-1 text-[11px] font-extrabold text-white shadow-sm`}
+                    className="nq-report-solid rounded-lg px-2.5 py-1 text-[11px] font-extrabold text-white shadow-sm"
                     style={{ backgroundColor: cohort.color.hex }}
                   >
                     {cohort.cohortLabel}
@@ -369,7 +369,7 @@ export default function QuizSessionsCompareView({
         </div>
 
         {/* Executive Macro KPI Banner */}
-        <div className="relative overflow-hidden rounded-[32px] border border-[#0460A9]/20 bg-gradient-to-br from-[#16324F] via-[#0460A9] to-[#03508C] p-6 md:p-8 text-white shadow-xl">
+        <div className="nq-report-dark-panel relative overflow-hidden rounded-[32px] border border-[#0460A9]/20 bg-gradient-to-br from-[#16324F] via-[#0460A9] to-[#03508C] p-6 md:p-8 text-white shadow-xl">
           <div className="absolute right-0 top-0 -mr-16 -mt-16 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
           <div className="relative z-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
             <div>

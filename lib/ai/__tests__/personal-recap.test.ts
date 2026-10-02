@@ -37,6 +37,33 @@ function fixture() {
   return { dependencies, setStatus: (value: ProvisionalStatus) => { status = value; }, get calls() { return calls; }, get saves() { return saves; }, get failures() { return failures; } };
 }
 
+test('admin reports read pending and approved evidence without claims, writes, or Gemini calls', async () => {
+  const f = fixture();
+  const forbidden = async () => { throw new Error('Read-only report attempted a mutation'); };
+  f.dependencies.claimProvisionalInsight = forbidden;
+  f.dependencies.invalidateProvisionalLanguage = forbidden;
+  f.dependencies.generateText = forbidden;
+  const read = () => prepareProvisionalInsight({ ...input, readOnly: true }, f.dependencies);
+  assert.equal((await read()).state, 'unavailable');
+  f.setStatus('generating'); assert.equal((await read()).state, 'generating');
+  f.setStatus('provisional');
+  const pending = await read();
+  assert.equal(pending.state, 'pending'); assert.equal(pending.generate, undefined);
+  assert.deepEqual(pending.insight?.context, food); assert.deepEqual(pending.insight?.summary, summary);
+  f.setStatus('approved'); assert.equal((await read()).state, 'approved');
+  f.setStatus('rejected'); assert.deepEqual(await read(), { state: 'rejected' });
+  assert.equal(f.calls, 0); assert.equal(f.saves, 0);
+});
+
+test('admin reports do not invalidate unsuitable saved text during a read', async () => {
+  const f = fixture(); f.setStatus('provisional');
+  const reusable = f.dependencies.getSimilarReusableInsight;
+  f.dependencies.getSimilarReusableInsight = async (...args) => { const row = await reusable(...args); return row ? { ...row, headline: 'You’re doing well' } : null; };
+  f.dependencies.getProvisionalInsight = async () => null;
+  f.dependencies.invalidateProvisionalLanguage = async () => { throw new Error('Must not invalidate'); };
+  assert.equal((await prepareProvisionalInsight({ ...input, readOnly: true }, f.dependencies)).state, 'unavailable');
+});
+
 test('completion prepares analysis without blocking; identical simultaneous reads share one generation lease', async () => {
   const f = fixture();
   const prepared = await prepareProvisionalInsight(input, f.dependencies);

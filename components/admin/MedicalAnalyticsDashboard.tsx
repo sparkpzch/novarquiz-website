@@ -7,6 +7,7 @@ import ProfileAvatar from '@/components/ui/ProfileAvatar';
 import type { Session, LeaderboardEntry, Quiz } from '@/lib/types';
 import CompareSessionsModal, { type CompareSessionsModalProps } from './CompareSessionsModal';
 import { FilteredQuestionAnalysisTable, TopicUnderstandingBreakdown } from './AnalyticsBreakdownComponents';
+import PlayerInsightPanel from './PlayerInsightPanel';
 
 type CompareSessionItem = CompareSessionsModalProps['allSessions'][number];
 
@@ -230,7 +231,7 @@ export default function MedicalAnalyticsDashboard({
   allSessions: initialAllSessions,
   onBack,
 }: MedicalAnalyticsDashboardProps = {}) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
 
   // Multi-session Compare Modal State (Matching QuizManage)
@@ -748,7 +749,7 @@ export default function MedicalAnalyticsDashboard({
       return matchesSearch && matchesFilter;
     });
     return (
-      <div className="nq-full-report w-full min-h-screen bg-[#F4F8FC] p-3 font-sans text-[#16324F] antialiased sm:p-5 md:p-6 lg:p-8">
+      <div className="nq-full-report nq-report-canvas w-full p-3 font-sans text-[#16324F] antialiased sm:p-5 md:p-6 lg:p-8">
         <div className="mx-auto max-w-[1700px] space-y-5">
           <header className="space-y-5 rounded-3xl border border-[#0460A9]/15 bg-white p-5 shadow-[0_4px_24px_rgba(4,96,169,0.05)] sm:p-6">
             <div className="flex flex-col gap-4 border-b border-[#0460A9]/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
@@ -826,7 +827,7 @@ export default function MedicalAnalyticsDashboard({
   }
 
   return (
-    <div className="nq-full-report w-full min-h-screen bg-[#F4F8FC] text-[#16324F] font-sans antialiased p-3 sm:p-5 md:p-6 lg:p-8 space-y-6">
+    <div className="nq-full-report nq-report-canvas w-full text-[#16324F] font-sans antialiased p-3 sm:p-5 md:p-6 lg:p-8 space-y-6">
 
       {/* =============================================================
           1. TOP: SESSION OVERVIEW COMPONENT (Merged Single-View Header)
@@ -1412,7 +1413,12 @@ export default function MedicalAnalyticsDashboard({
                 return (
                   <div
                     key={player.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isSelected}
+                    aria-label={`${player.displayName} · ${i18n.language?.startsWith('th') ? 'ดูสรุปจาก AI' : 'View AI summary'}`}
                     onClick={() => handlePlayerToggle(player)}
+                    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handlePlayerToggle(player); } }}
                     className={`w-full text-left rounded-xl border p-2 transition-all cursor-pointer relative group ${isSelected
                       ? 'bg-[#EBF3FA] border-[#0460A9] ring-2 ring-[#0460A9]/30 shadow-xs'
                       : 'bg-white border-[#0460A9]/10 hover:border-[#0460A9]/30 hover:bg-[#F8FAFC]'
@@ -1465,6 +1471,8 @@ export default function MedicalAnalyticsDashboard({
             3. RIGHT COMPONENT: CLINICAL HEATMAP & QUESTION TABLE (EXPANDED)
         -------------------------------------------------------------- */}
         <main className="lg:col-span-9 xl:col-span-9 space-y-6">
+
+          {session?.id && <PlayerInsightPanel sessionId={session.id} player={selectedPlayer} th={i18n.language?.startsWith('th') ?? false} />}
 
           <TopicUnderstandingBreakdown
             items={availableTags.map((tag) => {

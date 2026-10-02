@@ -125,6 +125,11 @@ test('insight drafts and review lifecycle preserve scope, share pending text, an
     assert.ok(queued); assert.equal(queued.status, 'provisional');
     const pendingRecap = await preparePersonalRecap(historyUid, session, completedAnswers, 'en', dependencies);
     assert.equal(pendingRecap.state, 'pending'); assert.equal(modelCalls, 1);
+    const adminRead = await preparePersonalRecap(historyUid, session, completedAnswers, 'en', dependencies, { readOnly: true });
+    assert.equal(adminRead.state, 'pending'); assert.equal(adminRead.generate, undefined);
+    assert.deepEqual(adminRead.insight?.context?.answers, completedAnswers.map(({ question, selected, selectedExplanation, selectedAligned, alignedChoices }) => ({ question, selected, selectedExplanation, selectedAligned, alignedChoices })));
+    assert.equal((await preparePersonalRecap(historyUid, session, completedAnswers, 'th', dependencies, { readOnly: true })).state, 'unavailable');
+    assert.equal(modelCalls, 1, 'Admin language changes must not generate new drafts');
     await db.reviewProvisionalInsight(queued.id, 'approved', 'qa', { expectedRevision: queued.revision });
     const reviewedRecap = await preparePersonalRecap(historyUid, session, completedAnswers, 'en', dependencies);
     assert.equal(reviewedRecap.state, 'approved'); assert.equal(modelCalls, 1);
