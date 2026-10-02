@@ -105,7 +105,7 @@ export default function SessionAnalyticsPage({ params }: { params: Promise<{ ses
   const peerSessions = data.peer_sessions ?? [];
 
   return (
-    <div className="mx-auto max-w-[1700px]">
+    <div className="mx-auto max-w-[1600px]">
       <MedicalAnalyticsDashboard
         session={session}
         leaderboard={leaderboard}

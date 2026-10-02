@@ -751,16 +751,16 @@ export default function MedicalAnalyticsDashboard({
       return matchesSearch && matchesFilter;
     });
     return (
-      <div className="nq-full-report nq-report-canvas w-full p-3 font-sans text-[#16324F] antialiased sm:p-5 md:p-6 lg:p-8">
-        <div className="mx-auto max-w-[1700px] space-y-5">
+      <div className="nq-full-report nq-report-canvas mx-auto w-full max-w-[1600px] text-[#16324F] antialiased">
+        <div className="space-y-6">
           <header className="space-y-5 rounded-3xl border border-[#0460A9]/15 bg-white p-5 shadow-[0_4px_24px_rgba(4,96,169,0.05)] sm:p-6">
             <div className="flex flex-col gap-4 border-b border-[#0460A9]/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
                 {onBack && <button onClick={onBack} className="mt-1 rounded-xl border border-[#0460A9]/15 bg-[#F8FAFC] px-3 py-1.5 text-xs font-semibold text-[#5D7EA1] hover:bg-[#EBF3FA] hover:text-[#0460A9]">← Back</button>}
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#0460A9]/20 bg-[#EBF3FA] px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wide text-[#0460A9]"><span className="h-2 w-2 rounded-full bg-[#0D8C6D]" />{selectedAggregateSession ? 'SESSION FILTER' : 'QUIZ ANALYTICS'}</span>
-                    <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-800">All session results</span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#0460A9]/20 bg-[#EBF3FA] px-2.5 py-1 text-xs font-mono font-bold uppercase tracking-wide text-[#0460A9]"><span className="h-2 w-2 rounded-full bg-[#0D8C6D]" />{selectedAggregateSession ? 'SESSION FILTER' : 'QUIZ ANALYTICS'}</span>
+                    <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800">All session results</span>
                   </div>
                   <h1 className="mt-2 text-xl font-bold tracking-tight text-[#16324F] sm:text-2xl">{sessionTitle}</h1>
                   <p className="mt-0.5 text-xs text-[#5D7EA1] sm:text-sm">{selectedAggregateSession ? `Filtered to ${selectedAggregateSession.name}. Individual participant details are not shown.` : `Quiz results across ${metrics.totalSessions} sessions. Individual participant details are not shown.`}</p>
@@ -776,13 +776,13 @@ export default function MedicalAnalyticsDashboard({
                 { label: 'Participants', value: displayMetrics.totalParticipants, detail: selectedAggregateSession ? 'In selected run' : 'Combined count' },
                 { label: 'Average accuracy', value: displayMetrics.totalParticipants > 0 ? `${displayMetrics.avgAccuracy}%` : '—', detail: displayMetrics.totalParticipants > 0 ? (selectedAggregateSession ? 'Selected session' : `Session spread: ${displayMetrics.accuracySpread}%`) : 'No participant responses' },
                 { label: 'Average score', value: displayMetrics.totalParticipants > 0 ? displayMetrics.avgScore : '—', detail: displayMetrics.totalParticipants > 0 ? `Response time: ${displayMetrics.avgTimeSeconds}s average` : 'No participant responses' },
-              ].map((item) => <div key={item.label} className="rounded-2xl border border-[#0460A9]/10 bg-[#F8FAFC] p-3.5"><p className="text-[10px] font-bold uppercase tracking-wide text-[#5D7EA1]">{item.label}</p><p className="mt-1 text-2xl font-extrabold text-[#16324F]">{item.value}</p><p className="text-[10px] text-[#5D7EA1]">{item.detail}</p></div>)}
+              ].map((item) => <div key={item.label} className="rounded-2xl border border-[#0460A9]/10 bg-[#F8FAFC] p-3.5"><p className="text-xs font-bold uppercase tracking-wide text-[#5D7EA1]">{item.label}</p><p className="mt-1 text-2xl font-extrabold text-[#16324F]">{item.value}</p><p className="text-xs text-[#5D7EA1]">{item.detail}</p></div>)}
             </div>
           </header>
 
           <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
             <aside className="space-y-3 rounded-3xl border border-[#0460A9]/15 bg-white p-4 shadow-[0_4px_24px_rgba(4,96,169,0.04)] lg:col-span-3">
-              <div className="border-b border-[#0460A9]/10 pb-3"><h2 className="text-sm font-bold text-[#16324F]">Session overview</h2><p className="mt-0.5 text-[11px] text-[#5D7EA1]">Search sessions or filter them by accuracy.</p></div>
+              <div className="border-b border-[#0460A9]/10 pb-3"><h2 className="text-sm font-bold text-[#16324F]">Session overview</h2><p className="mt-0.5 text-xs text-[#5D7EA1]">Search sessions or filter them by accuracy.</p></div>
               {selectedAggregateSession && <button onClick={() => setSelectedAggregateSessionId(null)} className="w-full rounded-lg border border-[#0460A9]/20 bg-[#0460A9]/10 px-3 py-2 text-xs font-semibold text-[#0460A9] hover:bg-[#0460A9]/20">Clear session filter · Show all sessions</button>}
               {aggregateSessions.length > 0 && <div className="space-y-2">
                 <input type="search" value={aggregateSessionSearch} onChange={(event) => setAggregateSessionSearch(event.target.value)} placeholder="Search sessions..." aria-label="Search sessions" className="nq-report-control w-full rounded-xl border border-[#0460A9]/20 bg-white px-3 py-2 text-xs text-[#16324F] placeholder-[#5D7EA1] focus:outline-none focus:ring-2 focus:ring-[#0460A9]" />
@@ -792,9 +792,9 @@ export default function MedicalAnalyticsDashboard({
               </div>}
               {aggregateSessions.length === 0 ? <p className="py-3 text-xs text-[#5D7EA1]">No sessions recorded yet.</p> : visibleAggregateSessions.length === 0 ? <p className="py-3 text-xs text-[#5D7EA1]">No sessions match your search and accuracy filter.</p> : visibleAggregateSessions.map((item, index) => (
                 <button key={item.id} type="button" aria-pressed={selectedAggregateSessionId === item.id} onClick={() => setSelectedAggregateSessionId((current) => current === item.id ? null : item.id)} className={`w-full rounded-2xl border p-3 text-left transition hover:border-[#0460A9]/40 hover:shadow-sm ${selectedAggregateSessionId === item.id ? 'border-[#0460A9] bg-[#EBF3FA] ring-2 ring-[#0460A9]/20' : 'border-[#0460A9]/10 bg-[#F8FAFC]'}`}>
-                  <p className="text-[9px] font-bold uppercase tracking-wide text-[#5D7EA1]">Session {index + 1}</p><h3 className="truncate text-xs font-bold text-[#16324F]">{item.name}</h3>
-                  <p className="mt-1 text-[10px] text-[#5D7EA1]">{new Date(item.started_at).toLocaleDateString()} · {item.participantCount} participants</p>
-                  <div className="mt-2 grid grid-cols-2 gap-2"><div className="rounded-lg bg-white p-2"><p className="text-[9px] uppercase text-[#5D7EA1]">Accuracy</p><p className={`text-sm font-bold ${item.avgAccuracy >= 75 ? 'text-emerald-700' : item.avgAccuracy >= 50 ? 'text-amber-700' : 'text-rose-700'}`}>{item.avgAccuracy}%</p></div><div className="rounded-lg bg-white p-2"><p className="text-[9px] uppercase text-[#5D7EA1]">Avg score</p><p className="text-sm font-bold text-[#16324F]">{item.avgScore}</p></div></div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-[#5D7EA1]">Session {index + 1}</p><h3 className="truncate text-xs font-bold text-[#16324F]">{item.name}</h3>
+                  <p className="mt-1 text-xs text-[#5D7EA1]">{new Date(item.started_at).toLocaleDateString()} · {item.participantCount} participants</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2"><div className="rounded-lg bg-white p-2"><p className="text-xs uppercase text-[#5D7EA1]">Accuracy</p><p className={`text-sm font-bold ${item.avgAccuracy >= 75 ? 'text-emerald-700' : item.avgAccuracy >= 50 ? 'text-amber-700' : 'text-rose-700'}`}>{item.avgAccuracy}%</p></div><div className="rounded-lg bg-white p-2"><p className="text-xs uppercase text-[#5D7EA1]">Avg score</p><p className="text-sm font-bold text-[#16324F]">{item.avgScore}</p></div></div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"><div className={`h-full rounded-full ${item.avgAccuracy >= 75 ? 'bg-emerald-500' : item.avgAccuracy >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${Math.min(100, Math.max(0, item.avgAccuracy))}%` }} /></div>
                 </button>
               ))}
@@ -830,7 +830,7 @@ export default function MedicalAnalyticsDashboard({
   }
 
   return (
-    <div className="nq-full-report nq-report-canvas w-full text-[#16324F] font-sans antialiased p-3 sm:p-5 md:p-6 lg:p-8 space-y-6">
+    <div className="nq-full-report nq-report-canvas mx-auto w-full max-w-[1600px] text-[#16324F] antialiased space-y-6">
 
       {/* =============================================================
           1. TOP: SESSION OVERVIEW COMPONENT (Merged Single-View Header)
@@ -851,11 +851,11 @@ export default function MedicalAnalyticsDashboard({
 
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <span className="text-[11px] font-mono text-[#5D7EA1] tracking-wider uppercase">
+                <span className="text-xs font-mono text-[#5D7EA1] tracking-wider uppercase">
                   {session?.id ? `SESSION: ${session.id}` : 'SESSION: —'}
                 </span>
                 {selectedCompareSession && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-md animate-fadeIn">
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-md animate-fadeIn">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
                     Comparing vs {selectedCompareSession.cohort_label || selectedCompareSession.name}
                   </span>
@@ -907,10 +907,10 @@ export default function MedicalAnalyticsDashboard({
                 </span>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-indigo-300">
+                    <span className="text-xs font-mono uppercase tracking-wider font-bold text-indigo-300">
                       SESSION BENCHMARK COMPARISON (SAME QUIZ)
                     </span>
-                    <span className="px-2 py-0.2 rounded-full text-[9px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                    <span className="px-2 py-0.2 rounded-full text-xs font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
                       Session comparison
                     </span>
                   </div>
@@ -949,14 +949,14 @@ export default function MedicalAnalyticsDashboard({
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Delta 1: Audience Size */}
               <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-                <div className="text-[10px] uppercase tracking-wider text-indigo-200 font-semibold">
+                <div className="text-xs uppercase tracking-wider text-indigo-200 font-semibold">
                   Participants
                 </div>
                 <div className="mt-1 flex items-baseline justify-between">
                   <div className="text-base sm:text-lg font-bold font-mono text-white">
                     {benchmarkComparisonMetrics.currentParticipants} <span className="text-xs text-gray-400 font-normal">vs {benchmarkComparisonMetrics.compareParticipants}</span>
                   </div>
-                  <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ${benchmarkComparisonMetrics.participantDelta >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                  <span className={`text-xs font-bold font-mono px-1.5 py-0.5 rounded ${benchmarkComparisonMetrics.participantDelta >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
                     }`}>
                     {benchmarkComparisonMetrics.participantDelta >= 0 ? `+${benchmarkComparisonMetrics.participantDelta}` : benchmarkComparisonMetrics.participantDelta} attendees
                   </span>
@@ -965,14 +965,14 @@ export default function MedicalAnalyticsDashboard({
 
               {/* Delta 2: Guideline Accuracy */}
               <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-                <div className="text-[10px] uppercase tracking-wider text-indigo-200 font-semibold">
+                <div className="text-xs uppercase tracking-wider text-indigo-200 font-semibold">
                   Difference in correct answers
                 </div>
                 <div className="mt-1 flex items-baseline justify-between">
                   <div className="text-base sm:text-lg font-bold font-mono text-white">
                     {benchmarkComparisonMetrics.currentAccuracy}% <span className="text-xs text-gray-400 font-normal">vs {benchmarkComparisonMetrics.compareAccuracy}%</span>
                   </div>
-                  <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ${benchmarkComparisonMetrics.accuracyDelta >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                  <span className={`text-xs font-bold font-mono px-1.5 py-0.5 rounded ${benchmarkComparisonMetrics.accuracyDelta >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
                     }`}>
                     {benchmarkComparisonMetrics.accuracyDelta >= 0 ? `+${benchmarkComparisonMetrics.accuracyDelta}% ↗` : `${benchmarkComparisonMetrics.accuracyDelta}% ↘`}
                   </span>
@@ -981,14 +981,14 @@ export default function MedicalAnalyticsDashboard({
 
               {/* Delta 3: Mean Response time */}
               <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-                <div className="text-[10px] uppercase tracking-wider text-indigo-200 font-semibold">
+                <div className="text-xs uppercase tracking-wider text-indigo-200 font-semibold">
                   Response time
                 </div>
                 <div className="mt-1 flex items-baseline justify-between">
                   <div className="text-base sm:text-lg font-bold font-mono text-white">
                     {benchmarkComparisonMetrics.currentTime}s <span className="text-xs text-gray-400 font-normal">vs {benchmarkComparisonMetrics.compareTime}s</span>
                   </div>
-                  <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ${benchmarkComparisonMetrics.timeDelta <= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                  <span className={`text-xs font-bold font-mono px-1.5 py-0.5 rounded ${benchmarkComparisonMetrics.timeDelta <= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
                     }`}>
                     {benchmarkComparisonMetrics.timeDelta <= 0 ? `${Math.abs(benchmarkComparisonMetrics.timeDelta)}s faster` : `+${benchmarkComparisonMetrics.timeDelta}s slower`}
                   </span>
@@ -1012,7 +1012,7 @@ export default function MedicalAnalyticsDashboard({
         {/* Row 4: Active Filter Chips Bar (With Click-to-Unfilter indicators) */}
         <div className="rounded-2xl bg-[#EBF3FA] border border-[#0460A9]/20 p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-bold text-[#16324F] text-[11px] uppercase tracking-wider">
+            <span className="font-bold text-[#16324F] text-xs uppercase tracking-wider">
               Active Filters:
             </span>
 
@@ -1027,7 +1027,7 @@ export default function MedicalAnalyticsDashboard({
                 <span className="text-gray-400 group-hover:text-rose-700 font-mono">✕</span>
               </button>
             ) : (
-              <span className="px-2.5 py-1 rounded-lg bg-white/70 border border-[#0460A9]/10 text-[#5D7EA1] font-mono text-[11px]">
+              <span className="px-2.5 py-1 rounded-lg bg-white/70 border border-[#0460A9]/10 text-[#5D7EA1] font-mono text-xs">
                 All Players View
               </span>
             )}
@@ -1043,7 +1043,7 @@ export default function MedicalAnalyticsDashboard({
                 <span className="text-gray-400 group-hover:text-rose-700 font-mono">✕</span>
               </button>
             ) : (
-              <span className="px-2.5 py-1 rounded-lg bg-white/70 border border-[#0460A9]/10 text-[#5D7EA1] font-mono text-[11px]">
+              <span className="px-2.5 py-1 rounded-lg bg-white/70 border border-[#0460A9]/10 text-[#5D7EA1] font-mono text-xs">
                 All Topics
               </span>
             )}
@@ -1051,14 +1051,14 @@ export default function MedicalAnalyticsDashboard({
 
           {/* Quick Clear All & Hint */}
           <div className="flex items-center gap-2">
-            <span className="text-[#5D7EA1] text-[11px] hidden sm:inline italic">
+            <span className="text-[#5D7EA1] text-xs hidden sm:inline italic">
               Click any selected filter item again to unfilter.
             </span>
 
             {(selectedPlayer || selectedTag) && (
               <button
                 onClick={handleClearAllFilters}
-                className="px-2.5 py-1 rounded-lg bg-white border border-[#0460A9]/30 text-[#0460A9] font-bold text-[11px] hover:bg-[#0460A9] hover:text-white transition shadow-2xs"
+                className="px-2.5 py-1 rounded-lg bg-white border border-[#0460A9]/30 text-[#0460A9] font-bold text-xs hover:bg-[#0460A9] hover:text-white transition shadow-2xs"
               >
                 Reset All Filters
               </button>
@@ -1095,7 +1095,7 @@ export default function MedicalAnalyticsDashboard({
               </div>
             </div>
 
-            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[#EBF3FA] text-[#0460A9] border border-[#0460A9]/15">
+            <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded-md bg-[#EBF3FA] text-[#0460A9] border border-[#0460A9]/15">
               {filteredPlayers.length} Active
             </span>
           </div>
@@ -1105,7 +1105,7 @@ export default function MedicalAnalyticsDashboard({
             <div className="flex items-center gap-1.5 p-1 rounded-xl bg-indigo-50 border border-indigo-200 text-xs">
               <button
                 onClick={() => { setActiveLeaderboardCohort('current'); setSelectedPlayer(null); }}
-                className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition flex items-center justify-center gap-1 ${activeLeaderboardCohort === 'current'
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1 ${activeLeaderboardCohort === 'current'
                   ? 'bg-[#0460A9] text-white shadow-xs'
                   : 'text-indigo-900 hover:bg-indigo-100/60'
                   }`}
@@ -1115,7 +1115,7 @@ export default function MedicalAnalyticsDashboard({
               </button>
               <button
                 onClick={() => { setActiveLeaderboardCohort('compare'); setSelectedPlayer(null); }}
-                className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition flex items-center justify-center gap-1 ${activeLeaderboardCohort === 'compare'
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1 ${activeLeaderboardCohort === 'compare'
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-indigo-900 hover:bg-indigo-100/60'
                   }`}
@@ -1149,7 +1149,7 @@ export default function MedicalAnalyticsDashboard({
           </div>
 
           {/* Quick Filter Tabs */}
-          <div className="flex items-center gap-1 p-0.5 rounded-xl bg-[#F8FAFC] border border-[#0460A9]/10 text-[10px]">
+          <div className="flex items-center gap-1 p-0.5 rounded-xl bg-[#F8FAFC] border border-[#0460A9]/10 text-xs">
             <button
               onClick={() => setLeaderboardFilterTab('all')}
               className={`flex-1 py-0.5 px-1 font-semibold rounded-lg transition ${leaderboardFilterTab === 'all'
@@ -1182,7 +1182,7 @@ export default function MedicalAnalyticsDashboard({
           {/* "View All Players" Toggle Button */}
           <button
             onClick={() => setSelectedPlayer(null)}
-            className={`w-full py-1.5 px-2.5 rounded-xl border text-[11px] font-semibold flex items-center justify-between transition-all ${selectedPlayer === null
+            className={`w-full py-1.5 px-2.5 rounded-xl border text-xs font-semibold flex items-center justify-between transition-all ${selectedPlayer === null
               ? 'bg-[#0460A9] text-white border-[#0460A9] shadow-xs'
               : 'bg-white text-[#5D7EA1] border-[#0460A9]/15 hover:bg-[#F8FAFC] hover:text-[#0460A9]'
               }`}
@@ -1191,7 +1191,7 @@ export default function MedicalAnalyticsDashboard({
               <span className={`w-1.5 h-1.5 rounded-full ${selectedPlayer === null ? 'bg-white animate-pulse' : 'bg-gray-400'}`} />
               All Players
             </span>
-            <span className="font-mono text-[9px] bg-black/10 px-1 py-0.2 rounded">
+            <span className="font-mono text-xs bg-black/10 px-1 py-0.2 rounded">
               Unfiltered
             </span>
           </button>
@@ -1199,7 +1199,7 @@ export default function MedicalAnalyticsDashboard({
           {/* Scrollable Player Cards List */}
           <div className="space-y-1.5 max-h-[520px] overflow-y-auto pr-1">
             {filteredPlayers.length === 0 ? (
-              <div className="py-6 text-center text-[11px] text-[#5D7EA1]">
+              <div className="py-6 text-center text-xs text-[#5D7EA1]">
                 No players match.
               </div>
             ) : (
@@ -1223,7 +1223,7 @@ export default function MedicalAnalyticsDashboard({
                     <div className="flex items-center justify-between gap-1.5">
                       <div className="flex items-center gap-2 min-w-0">
                         {/* Rank Badge */}
-                        <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold ${player.rank === 1
+                        <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded font-mono text-xs font-bold ${player.rank === 1
                           ? 'bg-amber-100 text-amber-900 border border-amber-300'
                           : player.rank <= 3
                             ? 'bg-sky-100 text-sky-900 border border-sky-300'
@@ -1235,7 +1235,7 @@ export default function MedicalAnalyticsDashboard({
                         <ProfileAvatar displayName={player.displayName} photoURL={player.photoUrl} size={24} />
 
                         <div className="min-w-0">
-                          <div className="font-bold text-[11px] text-[#16324F] truncate group-hover:text-[#0460A9] transition-colors">
+                          <div className="font-bold text-xs text-[#16324F] truncate group-hover:text-[#0460A9] transition-colors">
                             {player.displayName}
                           </div>
                         </div>
@@ -1243,10 +1243,10 @@ export default function MedicalAnalyticsDashboard({
 
                       {/* Score & Accuracy */}
                       <div className="text-right shrink-0">
-                        <div className="font-mono font-bold text-[11px] text-[#0460A9]">
+                        <div className="font-mono font-bold text-xs text-[#0460A9]">
                           {player.score} pts
                         </div>
-                        <span className={`inline-block px-1 py-0.2 rounded font-mono text-[9px] font-bold ${player.accuracy >= 75
+                        <span className={`inline-block px-1 py-0.2 rounded font-mono text-xs font-bold ${player.accuracy >= 75
                           ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                           : player.accuracy >= 50
                             ? 'bg-amber-50 text-amber-800 border border-amber-200'
