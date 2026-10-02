@@ -1,457 +1,276 @@
 "use client";
 
-// Authoring and review desk for the summaries players read on /stats.
-//
-// Manually drafted templates remain private until approval. Automatically
-// generated summaries have their own review queue and a visible provisional
-// label on player pages while awaiting a decision.
-
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/hooks/useAuth";
-import {
-  BODY_MAX,
-  HEADLINE_MAX,
-  INSIGHT_LOCALES,
-  SUGGESTION_MAX,
-  type InsightLocale,
-  type InsightReviewStatus,
-  type InsightTemplate,
-} from "@/lib/analytics/insights";
-import type { Quiz } from "@/lib/types";
+import { BODY_MAX, HEADLINE_MAX, SUGGESTION_MAX, type InsightLocale, type InsightTemplate } from "@/lib/analytics/insights";
 import type { ProvisionalInsight } from "@/lib/db/provisional-insights";
+import type { Quiz } from "@/lib/types";
+import "./insights.css";
 
-const STATUS_THEME: Record<InsightReviewStatus, string> = {
-  draft: "bg-[#FFB020]/20 text-[#8A5A00]",
-  reviewed: "bg-[#0460A9]/12 text-[#0460A9]",
-  approved: "bg-[#0D8C6D]/15 text-[#0D6B54]",
-};
+type Tab = "provisional" | "approved" | "rejected" | "templates";
+type Editor = { headline: string; body: string; suggestion: string };
+type Notice = { error: boolean; text: string };
+const EMPTY: Editor = { headline: "", body: "", suggestion: "" };
 
-type Editor = {
-  headline: string;
-  body: string;
-  suggestion: string;
-};
-
-const EMPTY_EDITOR: Editor = { headline: "", body: "", suggestion: "" };
-
-const COPY = {
-  th: {
-    title: "สรุปผลแบบทดสอบ", intro: "ข้อความที่อนุมัติแล้วจะถูกใช้ก่อน หากแบบทดสอบที่เผยแพร่ยังไม่มีสรุป Gemini อาจสร้างสรุปตามชุดคำตอบและทำเครื่องหมายว่ารอตรวจทาน",
-    quiz: "แบบทดสอบ", global: "ใช้กับทุกแบบทดสอบ", clinicalTag: "แท็กหัวข้อ (เว้นว่าง = ทุกหัวข้อ)", clinicalPlaceholder: "เช่น screening", language: "ภาษา", publicAudience: "ทั่วไป", hcpAudience: "บุคลากรสุขภาพ",
-    headline: "หัวข้อ", body: "เนื้อหา", suggestion: "คำแนะนำ", draft: "✨ ร่างด้วย Gemini", drafting: "กำลังร่าง…", save: "บันทึกเป็นฉบับร่าง", saving: "กำลังบันทึก…", pickQuiz: "เลือกแบบทดสอบก่อนสร้างร่าง",
-    draftReady: "สร้างร่างแล้ว กรุณาตรวจและอนุมัติ", saved: "บันทึกฉบับร่างแล้ว", approvedMessage: "อนุมัติสรุป AI แล้ว", rejectedMessage: "ปฏิเสธสรุป AI แล้ว", reviewError: "บันทึกผลตรวจไม่ได้ โปรดลองอีกครั้ง",
-    automatic: "สรุป AI อัตโนมัติ", automaticIntro: "เมื่อไม่มีข้อความที่อนุมัติแล้ว ผู้เล่นจะเห็นสรุปที่ยังไม่ผ่านการตรวจทานพร้อมป้าย AI อนุมัติเพื่อนำป้ายออก หรือปฏิเสธเพื่อซ่อนสรุปของชุดคำตอบนั้น", noneAutomatic: "ยังไม่มีสรุปอัตโนมัติ",
-    pattern: "ชุดคำตอบ", reviewAnswers: "ดูคำตอบและเฉลยที่ใช้สร้างสรุป", selected: "เลือก", aligned: "ตรงเป้าหมาย", offTarget: "ไม่ตรงเป้าหมาย", explanation: "คำอธิบาย", alignedAnswer: "เฉลยที่ตรงเป้าหมาย", approve: "อนุมัติ", reject: "ปฏิเสธ", unapprove: "ถอนการอนุมัติ", load: "นำเข้าแบบฟอร์ม", remove: "ลบ",
-    all: "สรุปที่เขียนไว้", noneTemplates: "ยังไม่มีสรุป ลองร่างหรือเขียนจากแบบฟอร์มด้านบน", quizScoped: "เฉพาะแบบทดสอบ", status: { draft: "ฉบับร่าง", reviewed: "ตรวจแล้ว", approved: "อนุมัติแล้ว", provisional: "รอตรวจทาน", rejected: "ปฏิเสธแล้ว" },
-  },
-  en: {
-    title: "Insight Summaries", intro: "Approved templates take priority. When a published quiz has no approved summary, Gemini may summarize each distinct answer pattern with an awaiting-review label.",
-    quiz: "Quiz", global: "Global (any quiz)", clinicalTag: "Clinical tag (blank = any)", clinicalPlaceholder: "e.g. screening", language: "Language", publicAudience: "public", hcpAudience: "HCP",
-    headline: "Headline", body: "Body", suggestion: "Suggestion", draft: "✨ Draft with Gemini", drafting: "Drafting…", save: "Save as draft", saving: "Saving…", pickQuiz: "Pick a quiz to draft from its authored text",
-    draftReady: "Draft written — review it, then approve.", saved: "Saved as draft.", approvedMessage: "AI summary approved.", rejectedMessage: "AI summary rejected.", reviewError: "Could not save the review. Please try again.",
-    automatic: "Automatic AI summaries", automaticIntro: "When no approved template matches, provisional text is visible with an AI label. Approve it to remove the label, or reject it to hide it for that answer pattern.", noneAutomatic: "No automatic summaries yet.",
-    pattern: "pattern", reviewAnswers: "Review recorded answers and answer key", selected: "Selected", aligned: "aligned", offTarget: "off target", explanation: "Explanation", alignedAnswer: "Aligned answer", approve: "Approve", reject: "Reject", unapprove: "Unapprove", load: "Load into editor", remove: "Delete",
-    all: "All summaries", noneTemplates: "Nothing yet. Draft or write one above.", quizScoped: "quiz-scoped", status: { draft: "draft", reviewed: "reviewed", approved: "approved", provisional: "provisional", rejected: "rejected" },
-  },
-} as const;
+function Icon({ name }: { name: "spark" | "check" | "clock" | "search" | "arrow" | "plus" | "book" }) {
+  const paths = { spark: "m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z", check: "m5 12 4 4L19 6", clock: "M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0", search: "m21 21-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0", arrow: "M5 12h14m-5-5 5 5-5 5", plus: "M12 5v14M5 12h14", book: "M3 5h6a4 4 0 0 1 3 2 4 4 0 0 1 3-2h6v15h-6a4 4 0 0 0-3 2 4 4 0 0 0-3-2H3V5Zm9 2v15" };
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]} /></svg>;
+}
 
 export default function InsightsAdminPage() {
   const router = useRouter();
   const { i18n } = useTranslation();
-  const language = i18n.language?.startsWith("th") ? "th" : "en";
-  const copy = COPY[language];
+  const th = i18n.language?.startsWith("th");
+  const text = (en: string, thai: string) => th ? thai : en;
   const { isAdmin, loading: authLoading } = useAuth();
-
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [templates, setTemplates] = useState<InsightTemplate[]>([]);
-  const [provisional, setProvisional] = useState<ProvisionalInsight[]>([]);
-  const [reviewingId, setReviewingId] = useState<string | null>(null);
-  const [quizId, setQuizId] = useState<string>("");
-  const [clinicalTag, setClinicalTag] = useState("");
-  const [locale, setLocale] = useState<InsightLocale>(language);
-  const [editor, setEditor] = useState<Editor>(EMPTY_EDITOR);
-  const [busy, setBusy] = useState<"" | "save" | "draft">("");
-  const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
-  const [reviewMessage, setReviewMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
+  const [summaries, setSummaries] = useState<ProvisionalInsight[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [tab, setTab] = useState<Tab>("provisional");
+  const [locale, setLocale] = useState<InsightLocale | "all">("all");
+  const [quizFilter, setQuizFilter] = useState("");
+  const [search, setSearch] = useState("");
+  const [selection, setSelection] = useState<string | null>(null);
+  const [edits, setEdits] = useState<Record<string, Editor>>({});
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [newEditor, setNewEditor] = useState<Editor>(EMPTY);
+  const [newQuiz, setNewQuiz] = useState("");
+  const [newLocale, setNewLocale] = useState<InsightLocale>(th ? "th" : "en");
+  const [newAudience, setNewAudience] = useState<"public" | "hcp">("public");
+  const [newTag, setNewTag] = useState("");
+  const [rejectTarget, setRejectTarget] = useState<ProvisionalInsight | null>(null);
+  const [deleteTemplateTarget, setDeleteTemplateTarget] = useState<InsightTemplate | null>(null);
+  const rejectDialog = useRef<HTMLDialogElement>(null);
 
-  useEffect(() => {
-    if (!authLoading && !isAdmin) router.push("/");
-  }, [authLoading, isAdmin, router]);
+  useEffect(() => { if (!authLoading && !isAdmin) router.replace("/"); }, [authLoading, isAdmin, router]);
 
-  useEffect(() => {
-    const onLanguageChanged = (next: string) => setLocale(next.startsWith("th") ? "th" : "en");
-    i18n.on("languageChanged", onLanguageChanged);
-    return () => i18n.off("languageChanged", onLanguageChanged);
-  }, [i18n]);
+  const load = useCallback(async () => {
+    const read = async (url: string) => {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`Load failed (${response.status})`);
+      return response.json();
+    };
+    const [nextSummaries, nextTemplates, nextQuizzes] = await Promise.all([
+      read("/api/admin/provisional-insights"), read("/api/admin/insight-templates"), read("/api/quizzes?all=true"),
+    ]);
+    setSummaries(nextSummaries); setTemplates(nextTemplates); setQuizzes(nextQuizzes); setLoadError(false);
+  }, []);
 
-  const fetchTemplates = useCallback(
-    (): Promise<InsightTemplate[]> =>
-      fetch("/api/admin/insight-templates")
-        .then((r) => (r.ok ? r.json() : []))
-        .catch(() => []),
-    [],
-  );
-
-  const fetchProvisional = useCallback(
-    (): Promise<ProvisionalInsight[]> =>
-      fetch("/api/admin/provisional-insights")
-        .then((r) => (r.ok ? r.json() : []))
-        .catch(() => []),
-    [],
-  );
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try { await load(); } catch { setLoadError(true); } finally { setLoading(false); }
+  }, [load]);
 
   useEffect(() => {
     if (!isAdmin) return;
-    void fetchTemplates().then(setTemplates);
-    void fetchProvisional().then(setProvisional);
-    void fetch("/api/quizzes?all=true")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((rows: Quiz[]) => setQuizzes(Array.isArray(rows) ? rows : []))
-      .catch(() => setQuizzes([]));
-  }, [isAdmin, fetchTemplates, fetchProvisional]);
+    let active = true;
+    void Promise.resolve().then(load).catch(() => { if (active) setLoadError(true); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [isAdmin, load]);
 
-  const reviewAutoSummary = async (id: string, status: "approved" | "rejected") => {
-    setReviewingId(id);
-    setReviewMessage(null);
-    try {
-      const response = await fetch("/api/admin/provisional-insights", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status }),
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        setReviewMessage({ kind: "error", text: data.error ?? `Review failed (${response.status})` });
-        return;
-      }
-      setProvisional(await fetchProvisional());
-      setReviewMessage({ kind: "ok", text: status === "approved" ? copy.approvedMessage : copy.rejectedMessage });
-    } catch {
-      setReviewMessage({ kind: "error", text: copy.reviewError });
-    } finally {
-      setReviewingId(null);
+  const filtered = useMemo(() => summaries.filter((item) =>
+    (locale === "all" || item.locale === locale) && (!quizFilter || item.quiz_id === quizFilter) &&
+    `${item.quiz_name} ${item.headline} ${item.body}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
+  ), [summaries, locale, quizFilter, search]);
+  const visibleTemplates = templates.filter((item) =>
+    (locale === "all" || item.locale === locale) && (!quizFilter || item.quiz_id === quizFilter) &&
+    `${item.headline} ${item.body} ${quizzes.find((quiz) => quiz.id === item.quiz_id)?.name ?? ""}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
+  );
+  const queue = filtered.filter((item) => item.status === tab);
+  const selectedAI = tab === "templates" ? null : queue.find((item) => item.id === selection) ?? queue[0] ?? null;
+  const selectedTemplate = tab === "templates" ? visibleTemplates.find((item) => item.id === selection) ?? visibleTemplates[0] ?? null : null;
+  const selected = selectedAI ?? selectedTemplate;
+  const editor: Editor = selected && edits[selected.id] ? edits[selected.id] : selected ? { headline: selected.headline, body: selected.body, suggestion: selected.suggestion ?? "" } : EMPTY;
+  const valid = (value: Editor) => !!value.headline.trim() && !!value.body.trim();
+  const dirty = selected && (editor.headline !== selected.headline || editor.body !== selected.body || editor.suggestion !== (selected.suggestion ?? ""));
+  const statusName = (status: string) => ({ provisional: text("Awaiting review", "รอตรวจสอบ"), approved: text("Approved", "อนุมัติแล้ว"), rejected: text("Not approved", "ไม่อนุมัติ"), draft: text("Private draft", "ฉบับร่างส่วนตัว"), reviewed: text("Reviewed", "ตรวจแล้ว") })[status] ?? status;
+  const status = selectedAI?.status ?? selectedTemplate?.review_status ?? "draft";
+
+  const request = async (url: string, method: string, body: unknown) => {
+    const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const errors: Record<number, string> = {
+        400: text("Enter a headline and summary within the character limits.", "กรอกหัวข้อและข้อความสรุปให้ครบ โดยไม่เกินจำนวนตัวอักษรที่กำหนด"),
+        403: text("Your admin session is unavailable. Sign in again to save.", "ไม่พบสิทธิ์ผู้ดูแล กรุณาเข้าสู่ระบบอีกครั้งก่อนบันทึก"),
+        409: text("Another review changed this summary. Refresh, check your edits, and try again.", "สรุปนี้ถูกแก้ไขหรือตรวจสอบแล้ว กรุณาโหลดข้อมูลใหม่ ตรวจข้อความ แล้วลองอีกครั้ง"),
+        422: text("Keep the summary educational. Remove personal diagnoses or treatment instructions before saving.", "กรุณาใช้ข้อความเพื่อการเรียนรู้ และนำการวินิจฉัยบุคคลหรือคำสั่งรักษาออกก่อนบันทึก"),
+        429: text("Too many requests. Wait a moment and save again; your edits are preserved.", "ดำเนินการถี่เกินไป กรุณารอสักครู่แล้วบันทึกใหม่ ข้อความที่แก้ไขยังอยู่"),
+        500: text("Could not save. Please try again; your edits are preserved.", "บันทึกไม่ได้ โปรดลองอีกครั้ง ข้อความที่แก้ไขยังอยู่"),
+      };
+      throw new Error(errors[response.status] ?? data.error ?? text(`Request failed (${response.status}). Please try again.`, `ดำเนินการไม่สำเร็จ (${response.status}) โปรดลองอีกครั้ง`));
     }
+    return data;
   };
 
-  const run = async (kind: "save" | "draft", request: () => Promise<Response>) => {
-    setBusy(kind);
-    setMessage(null);
+  const perform = async (action: () => Promise<unknown>, success: string) => {
+    setBusy(true); setNotice(null);
     try {
-      const r = await request();
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        setMessage({ kind: "error", text: data.error ?? `Request failed (${r.status})` });
-        return;
-      }
-      if (kind === "draft" && data.headline) {
-        setEditor({
-          headline: data.headline,
-          body: data.body,
-          suggestion: data.suggestion ?? "",
-        });
-      }
-      setMessage({
-        kind: "ok",
-        text: kind === "draft" ? copy.draftReady : copy.saved,
+      await action();
+      setNotice({ error: false, text: success });
+    } catch (error) {
+      setNotice({ error: true, text: error instanceof Error ? error.message : text("Could not save. Please try again.", "บันทึกไม่ได้ โปรดลองอีกครั้ง") });
+    } finally { setBusy(false); }
+  };
+
+  const saveSelected = () => {
+    if (!selected) return;
+    void perform(async () => {
+      const result = await request(selectedAI ? "/api/admin/provisional-insights" : "/api/admin/insight-templates", "POST", selectedAI ? {
+        id: selectedAI.id, expectedRevision: selectedAI.revision, ...editor, suggestion: editor.suggestion.trim() || null,
+      } : {
+        id: selectedTemplate!.id, quizId: selectedTemplate!.quiz_id, clinicalTag: selectedTemplate!.clinical_tag,
+        audience: selectedTemplate!.audience, locale: selectedTemplate!.locale, ...editor, suggestion: editor.suggestion.trim() || null,
       });
-      setTemplates(await fetchTemplates());
-    } finally {
-      setBusy("");
-    }
+      if (selectedAI) setSummaries((rows) => rows.map((row) => row.id === result.id ? result : row));
+      else setTemplates((rows) => rows.map((row) => row.id === result.id ? result : row));
+      setEdits((drafts) => { const next = { ...drafts }; delete next[selected.id]; return next; });
+    }, text("Draft saved. Review it when you’re ready.", "บันทึกฉบับร่างแล้ว พร้อมให้ตรวจสอบต่อ"));
   };
 
-  const save = () =>
-    run("save", () =>
-      fetch("/api/admin/insight-templates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          quizId: quizId || null,
-          clinicalTag,
-          audience: "public",
-          locale,
-          headline: editor.headline,
-          body: editor.body,
-          suggestion: editor.suggestion || null,
-        }),
-      }),
-    );
-
-  const draft = () =>
-    run("draft", () =>
-      fetch("/api/admin/insight-templates/draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quizId, clinicalTag, locale }),
-      }),
-    );
-
-  const review = async (id: string, reviewStatus: InsightReviewStatus) => {
-    await fetch("/api/admin/insight-templates", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, reviewStatus }),
-    });
-    setTemplates(await fetchTemplates());
+  const approve = () => {
+    if (!selected) return;
+    void perform(async () => {
+      const result = await request(selectedAI ? "/api/admin/provisional-insights" : "/api/admin/insight-templates", "PATCH", selectedAI ? {
+        id: selectedAI.id, status: "approved", expectedRevision: selectedAI.revision,
+        summary: { ...editor, suggestion: editor.suggestion.trim() || null },
+      } : { id: selectedTemplate!.id, reviewStatus: "approved" });
+      if (selectedAI) setSummaries((rows) => rows.map((row) => row.id === result.id ? result : row));
+      else setTemplates((rows) => rows.map((row) => row.id === result.id ? result : row));
+      setEdits((drafts) => { const next = { ...drafts }; delete next[selected.id]; return next; });
+    }, text("Approved. This wording can now be reused for matching answers.", "อนุมัติแล้ว สามารถนำข้อความนี้ไปใช้กับคำตอบที่ตรงกันได้"));
   };
 
-  const remove = async (id: string) => {
-    await fetch("/api/admin/insight-templates", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    setTemplates(await fetchTemplates());
+  const reject = (disposition: "keep" | "delete") => {
+    if (!rejectTarget) return;
+    void perform(async () => {
+      const result = await request("/api/admin/provisional-insights", "PATCH", {
+        id: rejectTarget.id, status: "rejected", disposition, expectedRevision: rejectTarget.revision,
+      });
+      setSummaries((rows) => disposition === "delete" ? rows.filter((row) => row.id !== result.id) : rows.map((row) => row.id === result.id ? result : row));
+      rejectDialog.current?.close(); setRejectTarget(null);
+      setEdits((drafts) => { const next = { ...drafts }; delete next[rejectTarget.id]; return next; });
+    }, disposition === "delete" ? text("Summary deleted and hidden from users.", "ลบข้อความสรุปแล้ว และไม่แสดงให้ผู้ใช้เห็น") : text("Kept for reconsideration. Hidden from users.", "เก็บไว้พิจารณาแล้ว โดยไม่แสดงให้ผู้ใช้เห็น"));
   };
 
-  const visibleProvisional = provisional.filter((item) => item.locale === locale);
-  const visibleTemplates = templates.filter((item) => item.locale === locale);
+  const selectTab = (next: Tab) => { setTab(next); setSelection(null); setNotice(null); setCreating(false); };
+  const openReject = () => { if (selectedAI) { setRejectTarget(selectedAI); rejectDialog.current?.showModal(); } };
 
   if (authLoading || !isAdmin) return null;
 
-  return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <header>
-        <h1 className="text-[22px] font-bold text-[#16324F] lg:text-4xl">{copy.title}</h1>
-        <p className="mt-1 text-sm text-[#5D7EA1]">{copy.intro}</p>
-      </header>
+  return <div className="insights-desk">
+    <header className="insights-header">
+      <div><p className="insights-eyebrow"><Icon name="spark" /> {text("ANSWER INSIGHTS", "สรุปจากคำตอบ")}</p>
+        <h1>{text("Insight Summaries", "สรุปผลแบบทดสอบ")}</h1>
+        <p>{text("Review what AI learned from quiz answers, and shape the feedback people receive.", "ตรวจสรุปที่ AI วิเคราะห์จากคำตอบ แล้วส่งต่อข้อความที่เหมาะสมให้ผู้ใช้")}</p></div>
+      <button className="insights-button secondary" disabled={busy} onClick={() => { selectTab("templates"); setCreating(true); }}><Icon name="plus" />{text("Write a summary", "เขียนสรุปเอง")}</button>
+    </header>
 
-      <section className="nq-card space-y-4 rounded-[24px] p-5 md:rounded-[28px] md:p-7">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label={copy.quiz}>
-            <select
-              value={quizId}
-              onChange={(e) => setQuizId(e.target.value)}
-              className="nq-input w-full rounded-xl border border-[#0460A9]/20 px-3 py-2 text-sm"
-            >
-              <option value="">{copy.global}</option>
-              {quizzes.map((quiz) => (
-                <option key={quiz.id} value={quiz.id}>
-                  {quiz.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label={copy.clinicalTag}>
-            <input
-              value={clinicalTag}
-              onChange={(e) => setClinicalTag(e.target.value)}
-              placeholder={copy.clinicalPlaceholder}
-              className="nq-input w-full rounded-xl border border-[#0460A9]/20 px-3 py-2 text-sm"
-            />
-          </Field>
-          <Field label={copy.language}>
-            <select
-              value={locale}
-              onChange={(e) => {
-                setLocale(e.target.value as InsightLocale);
-                setEditor(EMPTY_EDITOR);
-                setMessage(null);
-              }}
-              className="nq-input w-full rounded-xl border border-[#0460A9]/20 px-3 py-2 text-sm"
-            >
-              {INSIGHT_LOCALES.map((code) => (
-                <option key={code} value={code}>
-                  {code === "th" ? "ไทย (TH)" : "English (EN)"}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-
-        <Field label={`${copy.headline} (${editor.headline.length}/${HEADLINE_MAX})`}>
-          <input
-            value={editor.headline}
-            maxLength={HEADLINE_MAX}
-            onChange={(e) => setEditor({ ...editor, headline: e.target.value })}
-            className="nq-input w-full rounded-xl border border-[#0460A9]/20 px-3 py-2 text-sm"
-          />
-        </Field>
-        <Field label={`${copy.body} (${editor.body.length}/${BODY_MAX})`}>
-          <textarea
-            value={editor.body}
-            maxLength={BODY_MAX}
-            rows={3}
-            onChange={(e) => setEditor({ ...editor, body: e.target.value })}
-            className="nq-input w-full rounded-xl border border-[#0460A9]/20 px-3 py-2 text-sm"
-          />
-        </Field>
-        <Field label={`${copy.suggestion} (${editor.suggestion.length}/${SUGGESTION_MAX})`}>
-          <input
-            value={editor.suggestion}
-            maxLength={SUGGESTION_MAX}
-            onChange={(e) => setEditor({ ...editor, suggestion: e.target.value })}
-            className="nq-input w-full rounded-xl border border-[#0460A9]/20 px-3 py-2 text-sm"
-          />
-        </Field>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={draft}
-            disabled={!quizId || busy !== ""}
-            title={quizId ? "" : copy.pickQuiz}
-            className="rounded-full border border-[#0460A9]/25 px-4 py-2 text-sm font-semibold text-[#0460A9] disabled:opacity-40"
-          >
-            {busy === "draft" ? copy.drafting : copy.draft}
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={!editor.headline || !editor.body || busy !== ""}
-            className="rounded-full bg-gradient-to-r from-[#0460A9] to-[#2F7FD0] px-5 py-2 text-sm font-semibold text-white disabled:opacity-40"
-          >
-            {busy === "save" ? copy.saving : copy.save}
-          </button>
-          {message && (
-            <span
-              className={`text-sm font-medium ${message.kind === "error" ? "text-[#D63A3D]" : "text-[#0D6B54]"}`}
-            >
-              {message.text}
-            </span>
-          )}
-        </div>
-      </section>
-
-      <section className="nq-card space-y-3 rounded-[24px] p-5 md:rounded-[28px] md:p-7">
-        <h2 className="text-[17px] font-bold text-[#16324F]">{copy.automatic} ({visibleProvisional.length})</h2>
-        <p className="text-sm text-[#5D7EA1]">{copy.automaticIntro}</p>
-        {reviewMessage && (
-          <p role="status" className={`text-sm font-medium ${reviewMessage.kind === "error" ? "text-[#D63A3D]" : "text-[#0D6B54]"}`}>
-            {reviewMessage.text}
-          </p>
-        )}
-        {visibleProvisional.length === 0 && <p className="text-sm text-[#5D7EA1]">{copy.noneAutomatic}</p>}
-        {visibleProvisional.map((item) => (
-          <div key={item.id} className="space-y-2 rounded-[18px] border border-[#0460A9]/12 p-4">
-            <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[#5D7EA1]">
-              <span className={`rounded-full px-2 py-0.5 font-semibold ${item.status === "approved" ? STATUS_THEME.approved : item.status === "rejected" ? "bg-[#D63A3D]/10 text-[#D63A3D]" : STATUS_THEME.draft}`}>
-                {copy.status[item.status as keyof typeof copy.status] ?? item.status}
-              </span>
-              <span>{item.quiz_name}</span>
-              <span>· {item.locale.toUpperCase()}</span>
-              <span>· {item.audience === "hcp" ? copy.hcpAudience : copy.publicAudience}</span>
-              <span>· {copy.pattern} {item.answer_signature.slice(0, 8)}</span>
-              {item.model && <span>· 🤖 {item.model}</span>}
-            </div>
-            <p className="text-sm font-bold text-[#16324F]">{item.headline}</p>
-            <p className="text-sm text-[#5D7EA1]">{item.body}</p>
-            {item.suggestion && <p className="text-sm text-[#0D6B54]">👉 {item.suggestion}</p>}
-            {item.answer_context?.answers?.length ? (
-              <details className="rounded-xl bg-[#F4F8FC] p-3 text-xs text-[#45627E]">
-                <summary className="cursor-pointer font-semibold">{copy.reviewAnswers} ({item.answer_context.answers.length})</summary>
-                <ol className="mt-3 list-decimal space-y-3 pl-5">
-                  {item.answer_context.answers.map((answer, index) => (
-                    <li key={`${index}-${answer.question}`}>
-                      <p className="font-semibold">{answer.question}</p>
-                      <p>{copy.selected}: {answer.selected} · {answer.selectedAligned ? copy.aligned : copy.offTarget}</p>
-                      {answer.selectedExplanation && <p>{copy.explanation}: {answer.selectedExplanation}</p>}
-                      {answer.alignedChoices.map((choice, choiceIndex) => (
-                        <p key={choiceIndex}>{copy.alignedAnswer}: {choice.text}{choice.explanation ? ` — ${choice.explanation}` : ""}</p>
-                      ))}
-                    </li>
-                  ))}
-                </ol>
-              </details>
-            ) : null}
-            <div className="flex gap-2 pt-1">
-              {item.status !== "approved" && (
-                <button type="button" disabled={reviewingId !== null} onClick={() => reviewAutoSummary(item.id, "approved")}
-                  className="rounded-full bg-[#0D8C6D] px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">
-                  {copy.approve}
-                </button>
-              )}
-              {item.status !== "rejected" && (
-                <button type="button" disabled={reviewingId !== null} onClick={() => reviewAutoSummary(item.id, "rejected")}
-                  className="rounded-full border border-[#D63A3D]/30 px-3 py-1 text-xs font-semibold text-[#D63A3D] disabled:opacity-40">
-                  {copy.reject}
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </section>
-
-      <section className="nq-card space-y-3 rounded-[24px] p-5 md:rounded-[28px] md:p-7">
-        <h2 className="text-[17px] font-bold text-[#16324F]">{copy.all} ({visibleTemplates.length})</h2>
-        {visibleTemplates.length === 0 && (
-          <p className="text-sm text-[#5D7EA1]">{copy.noneTemplates}</p>
-        )}
-        {visibleTemplates.map((template) => (
-          <motion.div
-            key={template.id}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-2 rounded-[18px] border border-[#0460A9]/12 p-4"
-          >
-            <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[#5D7EA1]">
-              <span className={`rounded-full px-2 py-0.5 font-semibold ${STATUS_THEME[template.review_status]}`}>
-                {copy.status[template.review_status]}
-              </span>
-              <span>· {template.locale.toUpperCase()}</span>
-              <span>· {template.audience === "hcp" ? copy.hcpAudience : copy.publicAudience}</span>
-              {template.clinical_tag && <span>· #{template.clinical_tag}</span>}
-              <span>· {template.quiz_id ? copy.quizScoped : copy.global}</span>
-              {template.source === "llm_draft" && <span>· 🤖 {template.model}</span>}
-            </div>
-            <p className="text-sm font-bold text-[#16324F]">{template.headline}</p>
-            <p className="text-sm text-[#5D7EA1]">{template.body}</p>
-            {template.suggestion && <p className="text-sm text-[#0D6B54]">👉 {template.suggestion}</p>}
-            <div className="flex flex-wrap gap-2 pt-1">
-              {template.review_status !== "approved" && (
-                <button
-                  type="button"
-                  onClick={() => review(template.id, "approved")}
-                  className="rounded-full bg-[#0D8C6D] px-3 py-1 text-xs font-semibold text-white"
-                >
-                  {copy.approve}
-                </button>
-              )}
-              {template.review_status === "approved" && (
-                <button
-                  type="button"
-                  onClick={() => review(template.id, "draft")}
-                  className="rounded-full border border-[#0460A9]/25 px-3 py-1 text-xs font-semibold text-[#0460A9]"
-                >
-                  {copy.unapprove}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() =>
-                  setEditor({
-                    headline: template.headline,
-                    body: template.body,
-                    suggestion: template.suggestion ?? "",
-                  })
-                }
-                className="rounded-full border border-[#0460A9]/25 px-3 py-1 text-xs font-semibold text-[#0460A9]"
-              >
-                {copy.load}
-              </button>
-              <button
-                type="button"
-                onClick={() => remove(template.id)}
-                className="rounded-full border border-[#D63A3D]/30 px-3 py-1 text-xs font-semibold text-[#D63A3D]"
-              >
-                {copy.remove}
-              </button>
-            </div>
-          </motion.div>
-        ))}
-      </section>
+    <div className="insights-metrics">
+      {([ ["provisional", "clock", text("Ready for your review", "รอให้คุณตรวจสอบ"), text("Visible with an AI review label", "แสดงพร้อมป้ายว่ายังไม่ผ่านการตรวจสอบ")], ["approved", "check", text("Approved insights", "สรุปที่อนุมัติแล้ว"), text("Reusable for matching answers", "ใช้ซ้ำกับคำตอบที่ตรงกันได้")], ["rejected", "book", text("Kept for reconsideration", "เก็บไว้พิจารณา"), text("Hidden from every user", "ซ่อนไม่ให้ผู้ใช้เห็น")]] as const).map(([key, icon, label, note]) =>
+        <button className={`insights-metric ${key}`} key={key} disabled={busy} onClick={() => selectTab(key)}><span className="metric-icon"><Icon name={icon} /></span><span><strong>{filtered.filter((item) => item.status === key).length}</strong><span className="metric-label">{label}</span><small>{note}</small></span><Icon name="arrow" /></button>)}
     </div>
-  );
+
+    <div className="insights-workflow"><span className="workflow-title"><Icon name="spark" />{text("How it works", "ขั้นตอนการทำงาน")}</span><span>1. {text("AI reads actual quiz answers", "AI วิเคราะห์คำตอบจริง")}</span><Icon name="arrow" /><span>2. {text("You review the wording", "คุณตรวจสอบข้อความ")}</span><Icon name="arrow" /><span>3. {text("Approved insights can be reused", "นำสรุปที่อนุมัติไปใช้ซ้ำ")}</span></div>
+
+    {notice && <div className={`insights-notice ${notice.error ? "error" : "success"}`} role={notice.error ? "alert" : "status"}>{notice.text}<button aria-label={text("Dismiss message", "ปิดข้อความ")} onClick={() => setNotice(null)}>×</button></div>}
+    {loadError && <div className="insights-notice error" role="alert">{text("Couldn’t load the latest summaries. Your typed changes are still here.", "โหลดข้อมูลล่าสุดไม่ได้ ข้อความที่คุณแก้ไขยังอยู่")}
+      <button className="insights-button secondary" disabled={busy || loading} onClick={() => void refresh()}>{text("Try again", "ลองอีกครั้ง")}</button></div>}
+
+    <section className="insights-workspace" aria-label={text("Summary review desk", "พื้นที่ตรวจสอบสรุป")}>
+      <div className="insights-toolbar">
+        <div className="insights-tabs" role="tablist" aria-label={text("Summary status", "สถานะสรุป")}>
+          {(["provisional", "approved", "rejected", "templates"] as Tab[]).map((key) => <button key={key} id={`insights-tab-${key}`} role="tab" aria-selected={tab === key} aria-controls="insights-panel" tabIndex={tab === key ? 0 : -1} disabled={busy} onKeyDown={(event) => {
+            const tabs: Tab[] = ["provisional", "approved", "rejected", "templates"];
+            if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+              event.preventDefault();
+              const next = event.key === "Home" ? tabs[0] : event.key === "End" ? tabs[3] : tabs[(tabs.indexOf(key) + (event.key === "ArrowRight" ? 1 : 3)) % 4];
+              selectTab(next); document.getElementById(`insights-tab-${next}`)?.focus();
+            }
+          }} onClick={() => selectTab(key)}>{key === "templates" ? text("Written summaries", "สรุปที่เขียนเอง") : statusName(key)}<span>{key === "templates" ? visibleTemplates.length : filtered.filter((item) => item.status === key).length}</span></button>)}
+        </div>
+        <div className="insights-filters">
+          <label className="insights-search"><Icon name="search" /><input aria-label={text("Search summaries", "ค้นหาสรุป")} placeholder={text("Search quiz or summary…", "ค้นหาแบบทดสอบหรือสรุป…")} value={search} disabled={busy} onChange={(e) => { setSearch(e.target.value); setSelection(null); }} /></label>
+          <select aria-label={text("Filter by quiz", "กรองตามแบบทดสอบ")} value={quizFilter} disabled={busy} onChange={(e) => { setQuizFilter(e.target.value); setSelection(null); }}><option value="">{text("All quizzes", "ทุกแบบทดสอบ")}</option>{quizzes.map((quiz) => <option key={quiz.id} value={quiz.id}>{quiz.name}</option>)}</select>
+          <select aria-label={text("Filter by language", "กรองตามภาษา")} value={locale} disabled={busy} onChange={(e) => { setLocale(e.target.value as InsightLocale | "all"); setSelection(null); }}><option value="all">{text("All languages", "ทุกภาษา")}</option><option value="th">ไทย</option><option value="en">English</option></select>
+          <button className="insights-refresh" disabled={busy || loading} onClick={() => void refresh()} aria-label={text("Refresh summaries", "โหลดสรุปใหม่")} title={text("Refresh summaries", "โหลดสรุปใหม่")}>↻</button>
+        </div>
+      </div>
+
+      <div role="tabpanel" id="insights-panel" aria-labelledby={`insights-tab-${tab}`} aria-busy={loading || busy}>
+      {creating ? <div className="insights-create">
+        <div><p className="insights-eyebrow">{text("MANUAL SUMMARY", "เขียนสรุปเอง")}</p><h2>{text("Start with your own words", "เริ่มจากข้อความของคุณ")}</h2><p className="insights-muted">{text("Manual drafts stay private until approved. AI summaries from user answers appear in the review queue automatically.", "ฉบับร่างที่เขียนเองจะไม่แสดงจนกว่าจะอนุมัติ ส่วนสรุป AI จากคำตอบผู้ใช้จะเข้าคิวตรวจสอบอัตโนมัติ")}</p></div>
+        <form onSubmit={(event) => { event.preventDefault(); void perform(async () => {
+          const result = await request("/api/admin/insight-templates", "POST", { quizId: newQuiz || null, clinicalTag: newTag, audience: newAudience, locale: newLocale, ...newEditor, suggestion: newEditor.suggestion.trim() || null });
+          setTemplates((rows) => [result, ...rows.filter((row) => row.id !== result.id)]); setSelection(result.id); setNewEditor(EMPTY);  setCreating(false); setQuizFilter(""); setLocale("all"); setSearch("");
+        }, text("Draft saved. It’s private until you approve it.", "บันทึกฉบับร่างแล้ว ข้อความจะไม่แสดงจนกว่าคุณจะอนุมัติ")); }}>
+          <fieldset disabled={busy} className="insights-fields">
+            <div className="insights-scope"><Field label={text("Quiz", "แบบทดสอบ")}><select value={newQuiz} onChange={(e) => setNewQuiz(e.target.value)}><option value="">{text("All quizzes", "ทุกแบบทดสอบ")}</option>{quizzes.map((quiz) => <option key={quiz.id} value={quiz.id}>{quiz.name}</option>)}</select></Field><Field label={text("Language", "ภาษา")}><select value={newLocale} onChange={(e) => setNewLocale(e.target.value as InsightLocale)}><option value="th">ไทย</option><option value="en">English</option></select></Field><Field label={text("Audience", "กลุ่มผู้อ่าน")}><select value={newAudience} onChange={(e) => setNewAudience(e.target.value as "public" | "hcp")}><option value="public">{text("General public", "บุคคลทั่วไป")}</option><option value="hcp">{text("Healthcare professionals", "บุคลากรสุขภาพ")}</option></select></Field></div>
+            <EditorFields value={newEditor} onChange={setNewEditor} th={!!th} />
+            <details><summary>{text("Optional topic scope", "กำหนดหัวข้อเพิ่มเติม (ไม่บังคับ)")}</summary><Field label={text("Topic tag — leave blank for all topics", "แท็กหัวข้อ — เว้นว่างเพื่อใช้กับทุกหัวข้อ")}><input value={newTag} maxLength={80} onChange={(e) => setNewTag(e.target.value)} /></Field></details>
+          </fieldset>
+          <div className="insights-actions"><button type="submit" className="insights-button primary" disabled={busy || !valid(newEditor)}>{busy ? text("Saving…", "กำลังบันทึก…") : text("Save draft", "บันทึกฉบับร่าง")}</button><button type="button" className="insights-button secondary" disabled={busy} onClick={() => setCreating(false)}>{text("Back to summaries", "กลับไปดูสรุป")}</button></div>
+        </form>
+      </div> : loading ? <div className="insights-empty" role="status"><span className="insights-loader" /><h2>{text("Loading your review desk…", "กำลังโหลดรายการสรุป…")}</h2></div> : !selected ? <div className="insights-empty"><span className="empty-icon"><Icon name={tab === "provisional" ? "check" : "book"} /></span><h2>{search || quizFilter || locale !== "all" ? text("No matching summaries", "ไม่พบสรุปที่ตรงกับตัวกรอง") : tab === "provisional" ? text("You’re all caught up", "ตรวจครบแล้วในตอนนี้") : text("No summaries here yet", "ยังไม่มีสรุปในรายการนี้")}</h2><p>{search || quizFilter || locale !== "all" ? text("Try another search or clear the filters.", "ลองค้นหาใหม่หรือล้างตัวกรอง") : text("When users view feedback after a published quiz, AI summaries based on their answers will appear here for review.", "เมื่อผู้ใช้เปิดดูผลหลังทำแบบทดสอบที่เผยแพร่แล้ว สรุป AI จากคำตอบจะเข้าคิวให้คุณตรวจสอบที่นี่")}</p>{(search || quizFilter || locale !== "all") && <button className="insights-button secondary" onClick={() => { setSearch(""); setQuizFilter(""); setLocale("all"); }}>{text("Clear filters", "ล้างตัวกรอง")}</button>}</div> : <div className="insights-review-layout">
+        <aside className="insights-list" aria-label={text("Summaries", "รายการสรุป")}>
+          <p className="insights-list-heading">{text("SELECT A SUMMARY", "เลือกสรุปเพื่อตรวจสอบ")}</p>
+          {(tab === "templates" ? visibleTemplates : queue).map((item) => <button className={`insights-list-item ${selected.id === item.id ? "active" : ""}`} key={item.id} disabled={busy} aria-pressed={selected.id === item.id} onClick={() => { setSelection(item.id);  setNotice(null); }}>
+            <span className="insights-list-meta"><span className={`insights-badge ${"status" in item ? item.status : item.review_status}`}>{statusName("status" in item ? item.status : item.review_status)}</span><small>{item.locale === "th" ? "TH" : "EN"}</small></span>
+            <strong>{item.headline}</strong><span className="insights-list-quiz">{"quiz_name" in item ? item.quiz_name : quizzes.find((quiz) => quiz.id === item.quiz_id)?.name ?? text("All quizzes", "ทุกแบบทดสอบ")}</span><p>{item.body}</p>
+          </button>)}
+        </aside>
+        <article className="insights-detail" key={selected.id}>
+          <div className="insights-detail-header"><div><p className="insights-eyebrow">{selectedAI ? text("ANSWER-BASED SUMMARY", "สรุปจากคำตอบจริง") : text("WRITTEN SUMMARY", "สรุปที่เขียนไว้")}</p><h2>{selectedAI?.quiz_name ?? quizzes.find((quiz) => quiz.id === selectedTemplate?.quiz_id)?.name ?? text("All quizzes", "ทุกแบบทดสอบ")}</h2><p className="insights-muted">{selected.locale === "th" ? "ไทย" : "English"} · {selected.audience === "hcp" ? text("Healthcare professionals", "บุคลากรสุขภาพ") : text("General public", "บุคคลทั่วไป")}{selectedAI?.answer_context ? ` · ${selectedAI.answer_context.answers.length} ${text("answers", "คำตอบ")}` : ""}</p></div><span className={`insights-badge ${status}`}>{statusName(status)}</span></div>
+          <div className={`insights-visibility ${status}`}><Icon name={status === "approved" ? "check" : "clock"} /><p>{status === "approved" ? text("Users see reviewed feedback. Answer-based summaries can be reused when the recorded selections match.", "ผู้ใช้เห็นสรุปที่ตรวจแล้ว สรุปจากคำตอบสามารถใช้ซ้ำได้เมื่อคำตอบต้นทางตรงกัน") : status === "rejected" ? text("Hidden from users. Kept here so you can reconsider, edit, or delete it.", "ไม่แสดงให้ผู้ใช้เห็น เก็บไว้ให้พิจารณา แก้ไข หรือลบภายหลัง") : selectedAI ? text("Users can see this with an “AI · awaiting admin or doctor review” label.", "ผู้ใช้เห็นข้อความนี้พร้อมป้าย “AI · ยังไม่ผ่านการตรวจสอบจากผู้ดูแลหรือแพทย์”") : text("This draft is private. Users will only see it after approval.", "ฉบับร่างนี้ยังเป็นส่วนตัว ผู้ใช้จะเห็นได้หลังจากอนุมัติเท่านั้น")}</p></div>
+          <form onSubmit={(event) => { event.preventDefault(); saveSelected(); }}>
+            <fieldset disabled={busy} className="insights-fields"><EditorFields value={editor} onChange={(value) => setEdits((drafts) => ({ ...drafts, [selected.id]: value }))} th={!!th} /></fieldset>
+            <section className="insights-preview" aria-label={text("User preview", "ตัวอย่างที่ผู้ใช้จะเห็น")}><p className="insights-eyebrow"><Icon name="spark" />{text("USER PREVIEW", "ตัวอย่างสำหรับผู้ใช้")}</p>{selectedAI && status === "provisional" && <span className="insights-badge provisional">{text("AI · awaiting admin or doctor review", "AI · ยังไม่ผ่านการตรวจสอบจากผู้ดูแลหรือแพทย์")}</span>}<h3>{editor.headline || text("Your headline", "หัวข้อสรุป")}</h3><p>{editor.body || text("Your summary will appear here.", "ข้อความสรุปจะแสดงที่นี่")}</p>{editor.suggestion && <div className="insights-next-step"><Icon name="arrow" /><span>{editor.suggestion}</span></div>}<small>{text("A recap of learning, not medical advice.", "สรุปสิ่งที่เรียนรู้ ไม่ใช่คำแนะนำทางการแพทย์")}{status === "rejected" && ` · ${text("Preview only — hidden from users", "ตัวอย่างเท่านั้น — ไม่แสดงให้ผู้ใช้เห็น")}`}</small></section>
+            {selectedAI?.answer_context?.answers.length ? <section className="insights-evidence"><div><Icon name="book" /><h3>{text("The answers behind this insight", "คำตอบที่ AI ใช้สร้างสรุป")}</h3><span>{selectedAI.answer_context.answers.length}</span></div><p className="insights-muted">{text("Compare the wording with the recorded selections and authored explanations before approving.", "เปรียบเทียบข้อความกับคำตอบที่เลือกและคำอธิบายต้นฉบับก่อนอนุมัติ")}</p><ol>{selectedAI.answer_context.answers.map((answer, index) => <li key={index}><details open={selectedAI.answer_context!.answers.length === 1}><summary><span className="answer-number">{index + 1}</span><span>{answer.question}</span><span className={`answer-result ${answer.selectedAligned ? "aligned" : "review"}`}>{answer.selectedAligned ? text("Correct", "ถูกต้อง") : text("To revisit", "ควรทบทวน")}</span></summary><div className="answer-source"><p><strong>{text("Selected answer", "คำตอบที่เลือก")}</strong>{answer.selected}</p>{answer.selectedExplanation && <p><strong>{text("Author’s explanation", "คำอธิบายจากผู้เขียน")}</strong>{answer.selectedExplanation}</p>}{answer.alignedChoices.map((choice, i) => <p className="answer-key" key={i}><strong>{text("Answer key", "เฉลย")}</strong>{choice.text}{choice.explanation && <span>{choice.explanation}</span>}</p>)}</div></details></li>)}</ol></section> : selectedAI ? <p className="insights-muted">{text("Source answers are unavailable for this older summary. Review carefully before approving.", "สรุปเก่านี้ไม่มีข้อมูลคำตอบต้นทาง กรุณาตรวจข้อความก่อนอนุมัติ")}</p> : null}
+            <div className="insights-detail-footer"><p>{dirty ? text("Unsaved changes", "มีการแก้ไขที่ยังไม่บันทึก") : text("All changes saved", "บันทึกการเปลี่ยนแปลงแล้ว")}{selected.reviewed_at && ` · ${text("Reviewed", "ตรวจเมื่อ")} ${new Date(selected.reviewed_at).toLocaleDateString(th ? "th-TH" : "en-GB", { timeZone: "Asia/Bangkok" })}`}</p><div className="insights-actions">
+              <button type="submit" className="insights-button secondary" disabled={busy || !valid(editor)}>{busy ? text("Saving…", "กำลังบันทึก…") : text("Save draft", "บันทึกฉบับร่าง")}</button>
+              {(status !== "approved" || dirty) && <button type="button" className="insights-button primary" disabled={busy || !valid(editor) || (!!selectedTemplate && !!dirty)} onClick={approve}><Icon name="check" />{text("Approve summary", "อนุมัติสรุป")}</button>}
+              {selectedAI && <button type="button" className="insights-button danger" disabled={busy} onClick={openReject}>{status === "rejected" ? text("Delete or keep", "ลบหรือเก็บไว้") : text("Not approved", "ไม่อนุมัติ")}</button>}
+              {selectedTemplate && status === "approved" && <button type="button" className="insights-button danger" disabled={busy} onClick={() => void perform(async () => {
+                const result = await request("/api/admin/insight-templates", "PATCH", { id: selectedTemplate.id, reviewStatus: "draft" });
+                setTemplates((rows) => rows.map((row) => row.id === result.id ? result : row));
+              }, text("Approval withdrawn. The draft is private.", "ถอนการอนุมัติแล้ว ฉบับร่างไม่แสดงให้ผู้ใช้เห็น"))}>{text("Withdraw approval", "ถอนการอนุมัติ")}</button>}
+              {selectedTemplate && <button type="button" className="insights-button danger" disabled={busy} onClick={() => { setDeleteTemplateTarget(selectedTemplate); rejectDialog.current?.showModal(); }}>{text("Delete", "ลบ")}</button>}
+            </div>{selectedTemplate && dirty && <small>{text("Save your changes before approving.", "บันทึกการแก้ไขก่อนอนุมัติ")}</small>}</div>
+          </form>
+        </article>
+      </div>}
+      </div>
+    </section>
+    <p className="insights-bottom-note"><Icon name="book" />{text("Reuse requires all source selections to match and cover at least 80% of the new answers. Changed answers or explanations need a new summary.", "ใช้ซ้ำได้เมื่อคำตอบต้นทางทั้งหมดตรงกัน และครอบคลุมอย่างน้อย 80% ของคำตอบใหม่ หากคำตอบหรือคำอธิบายเปลี่ยน ต้องสร้างสรุปใหม่")}</p>
+
+    <dialog ref={rejectDialog} className="insights-dialog" aria-labelledby="insights-reject-title" aria-describedby="insights-reject-description" onCancel={(event) => { if (busy) event.preventDefault(); else { setRejectTarget(null); setDeleteTemplateTarget(null); } }} onClose={() => { setRejectTarget(null); setDeleteTemplateTarget(null); }}>
+      <p className="insights-eyebrow">{text("REVIEW DECISION", "ผลการตรวจสอบ")}</p><h2 id="insights-reject-title">{deleteTemplateTarget ? text("Delete this written summary?", "ต้องการลบสรุปที่เขียนไว้นี้?") : text("What should happen to this summary?", "ต้องการจัดการสรุปนี้อย่างไร?")}</h2><p id="insights-reject-description">{deleteTemplateTarget ? text("The summary will be removed permanently. Cancel to keep it.", "ข้อความสรุปจะถูกลบถาวร กดยกเลิกหากต้องการเก็บไว้") : text("Both choices hide it from users. Keep it if you want to reconsider later, or delete its wording permanently.", "ทั้งสองตัวเลือกจะซ่อนข้อความจากผู้ใช้ คุณสามารถเก็บไว้พิจารณาภายหลัง หรือลบข้อความออกถาวร")}</p><blockquote>{deleteTemplateTarget?.headline ?? rejectTarget?.headline}</blockquote>
+      {!deleteTemplateTarget && <button className="insights-decision" disabled={busy} onClick={() => reject("keep")}><Icon name="book" /><span><strong>{text("Keep for reconsideration", "เก็บไว้พิจารณา")}</strong><small>{text("Move to Not approved. You can edit and approve it later.", "ย้ายไปที่ไม่อนุมัติ สามารถแก้ไขและอนุมัติภายหลังได้")}</small></span><Icon name="arrow" /></button>}
+      <button className="insights-decision danger" disabled={busy} onClick={() => {
+        if (!deleteTemplateTarget) { reject("delete"); return; }
+        void perform(async () => {
+          await request("/api/admin/insight-templates", "DELETE", { id: deleteTemplateTarget.id });
+          setTemplates((rows) => rows.filter((row) => row.id !== deleteTemplateTarget.id));
+          setEdits((drafts) => { const next = { ...drafts }; delete next[deleteTemplateTarget.id]; return next; });
+          rejectDialog.current?.close();
+        }, text("Written summary deleted.", "ลบสรุปที่เขียนไว้แล้ว"));
+      }}><span className="decision-x" aria-hidden="true">×</span><span><strong>{text("Delete summary", "ลบข้อความสรุป")}</strong><small>{deleteTemplateTarget ? text("Remove this written summary permanently.", "ลบสรุปที่เขียนไว้นี้ถาวร") : text("Remove the text and prevent regeneration for this answer pattern.", "ลบข้อความ และป้องกันการสร้างใหม่อัตโนมัติสำหรับชุดคำตอบนี้")}</small></span><Icon name="arrow" /></button>
+      <button className="insights-button secondary" disabled={busy} onClick={() => rejectDialog.current?.close()}>{text("Cancel", "ยกเลิก")}</button>
+    </dialog>
+  </div>;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block space-y-1">
-      <span className="text-xs font-semibold text-[#5D7EA1]">{label}</span>
-      {children}
-    </label>
-  );
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="insights-field"><span>{label}</span>{children}</label>; }
+function EditorFields({ value, onChange, th }: { value: Editor; onChange: (value: Editor) => void; th: boolean }) {
+  return <>{([
+    ["headline", th ? "หัวข้อสรุป" : "Headline", HEADLINE_MAX, th ? "ประเด็นสำคัญจากคำตอบ" : "The key takeaway"],
+    ["body", th ? "ข้อความสรุป" : "Summary", BODY_MAX, th ? "สรุปสิ่งที่ผู้ใช้เรียนรู้จากคำตอบ" : "What their answers show about their learning"],
+    ["suggestion", th ? "คำแนะนำเพื่อเรียนรู้ต่อ (ไม่บังคับ)" : "Next learning step (optional)", SUGGESTION_MAX, th ? "สิ่งที่ควรทบทวนหรือเรียนรู้ต่อ" : "One helpful next step"],
+  ] as const).map(([key, label, max, placeholder]) => <label className="insights-field" key={key}><span>{label}<small>{value[key].length}/{max}</small></span>{key === "body" ? <textarea required value={value[key]} rows={4} maxLength={max} placeholder={placeholder} onChange={(e) => onChange({ ...value, [key]: e.target.value })} /> : <input required={key === "headline"} value={value[key]} maxLength={max} placeholder={placeholder} onChange={(e) => onChange({ ...value, [key]: e.target.value })} />}</label>)}</>;
 }

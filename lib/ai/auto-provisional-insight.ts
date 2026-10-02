@@ -7,6 +7,8 @@ import {
   failProvisionalInsight,
   finishProvisionalInsight,
   getProvisionalInsight,
+  getSimilarApprovedInsight,
+  isAnswerPatternRejected,
   getUserAnswerReviewContext,
   invalidateProvisionalLanguage,
   type AnswerReviewContext,
@@ -28,6 +30,7 @@ export async function getOrGenerateProvisionalInsight(input: {
   /** Session-scoped answers supplied by an authenticated caller. */
   context?: AnswerReviewContext;
   readingStyle?: 'everyday';
+  allowGeneration?: boolean;
 }): Promise<AutoProvisionalInsight | null> {
   const context = input.context ?? await getUserAnswerReviewContext(input.userId, input.quizId);
   if (!context || context.answers.length === 0) return null;
@@ -39,6 +42,18 @@ export async function getOrGenerateProvisionalInsight(input: {
     ...(input.readingStyle ? { readingStyle: input.readingStyle } : {}),
   });
 
+  if (await isAnswerPatternRejected(input.quizId, input.audience, input.locale, answerSignature)) return null;
+
+  // Reuse approved wording before an unreviewed cache entry, without sending
+  // the player's answers to the model again.
+  const approved = await getSimilarApprovedInsight(input.quizId, input.audience, input.locale, context);
+  if (approved) {
+    const summary = { headline: approved.headline, body: approved.body, suggestion: approved.suggestion };
+    if (validateInsightLanguage(summary, input.locale) && (input.readingStyle !== 'everyday' || isEverydayInsight(summary))) {
+      return { summary, status: 'approved' };
+    }
+  }
+
   const existing = await getProvisionalInsight(input.quizId, input.audience, input.locale, answerSignature);
   if (existing) {
     const summary = { headline: existing.headline, body: existing.body, suggestion: existing.suggestion };
@@ -48,7 +63,7 @@ export async function getOrGenerateProvisionalInsight(input: {
     if (existing.status === 'approved') return null;
     await invalidateProvisionalLanguage(existing.id);
   }
-  if (!isGeminiConfigured()) return null;
+  if (input.allowGeneration === false || !isGeminiConfigured()) return null;
 
   const claim = await claimProvisionalInsight(input.quizId, input.audience, input.locale, answerSignature, context);
   if (!claim) return null;

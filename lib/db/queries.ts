@@ -1795,6 +1795,7 @@ export async function getInsightSummaryDistribution(
  * to the slot it sits in.
  */
 export async function upsertInsightTemplate(data: {
+  id?: string;
   quizId: string | null;
   clinicalTag: string;
   audience: IntendedAudience;
@@ -1806,6 +1807,18 @@ export async function upsertInsightTemplate(data: {
   model: string | null;
   createdBy: string;
 }): Promise<InsightTemplate> {
+  if (data.id) {
+    // Editing an existing draft keeps its quiz, audience and language. Looking
+    // up only by the form's default scope used to save a different template.
+    const result = await queryWithRetry<InsightTemplate>(
+      `UPDATE insight_templates SET headline = $2, body = $3, suggestion = $4,
+       review_status = 'draft', reviewed_by = NULL, reviewed_at = NULL, updated_at = now()
+       WHERE id = $1 RETURNING *`,
+      [data.id, data.headline, data.body, data.suggestion], { allowWriteRetry: true },
+    );
+    if (!result.rows[0]) throw new Error('Insight template not found');
+    return result.rows[0];
+  }
   const conflictTarget =
     data.quizId === null
       ? '(archetype_id, clinical_tag, audience, locale) WHERE quiz_id IS NULL'

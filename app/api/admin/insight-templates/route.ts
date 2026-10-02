@@ -34,13 +34,14 @@ const Query = z.object({
 });
 
 const UpsertBody = z.object({
+  id: UUID.optional(),
   quizId: UUID.nullable(),
-  clinicalTag: z.string().max(80).default(''),
+  clinicalTag: z.string().trim().max(80).default(''),
   audience: z.enum(['public', 'hcp']),
   locale: z.enum(INSIGHT_LOCALES),
-  headline: z.string().min(1).max(HEADLINE_MAX),
-  body: z.string().min(1).max(BODY_MAX),
-  suggestion: z.string().max(SUGGESTION_MAX).nullable().default(null),
+  headline: z.string().trim().min(1).max(HEADLINE_MAX),
+  body: z.string().trim().min(1).max(BODY_MAX),
+  suggestion: z.string().trim().max(SUGGESTION_MAX).nullable().default(null),
 });
 
 const ReviewBody = z.object({
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
   if (gate.error) return gate.error;
 
   const parsed = UpsertBody.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: 'Enter a headline and body within the character limits.' }, { status: 400 });
 
   // The same content rules a drafted summary has to clear apply to hand-written
   // text — the forbidden-claim check is about what a player reads, not about

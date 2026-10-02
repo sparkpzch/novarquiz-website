@@ -1,5 +1,6 @@
 import pool, { queryWithRetry } from './postgres';
 import type { InsightLocale, InsightSummary } from '../analytics/insights';
+import { approvedAnswerCoverage } from '../analytics/provisional-insights';
 
 export type AnswerReviewItem = {
   question: string;
@@ -29,6 +30,7 @@ export type ProvisionalInsight = InsightSummary & {
   reviewed_by: string | null;
   reviewed_at: string | null;
   updated_at: string;
+  revision: string;
 };
 
 let schemaPromise: Promise<boolean> | null = null;
@@ -47,6 +49,37 @@ async function hasSchema(): Promise<boolean> {
 }
 
 type InsightRow = Omit<ProvisionalInsight, 'quiz_name'>;
+
+export async function getSimilarApprovedInsight(
+  quizId: string, audience: 'public' | 'hcp', locale: InsightLocale,
+  context: AnswerReviewContext,
+): Promise<InsightRow | null> {
+  if (!(await hasSchema())) return null;
+  const result = await queryWithRetry<InsightRow>(
+    `SELECT p.*, p.claim_token AS revision FROM provisional_insight_summaries p
+     JOIN quizzes q ON q.id = p.quiz_id AND q.is_published = TRUE
+     WHERE p.quiz_id = $1 AND p.audience = $2 AND p.locale = $3
+       AND p.status = 'approved' AND p.answer_context IS NOT NULL
+       AND p.headline IS NOT NULL AND p.body IS NOT NULL
+     ORDER BY p.reviewed_at DESC`, [quizId, audience, locale],
+  );
+  return result.rows.map((row) => ({ row, coverage: approvedAnswerCoverage(row.answer_context!, context) }))
+    .filter(({ coverage }) => coverage > 0)
+    .sort((a, b) => b.coverage - a.coverage)[0]?.row ?? null;
+}
+
+export async function isAnswerPatternRejected(
+  quizId: string, audience: 'public' | 'hcp', locale: InsightLocale, signature: string,
+): Promise<boolean> {
+  if (!(await hasSchema())) return false;
+  const result = await queryWithRetry<{ rejected: boolean }>(
+    `SELECT EXISTS (SELECT 1 FROM provisional_insight_summaries
+     WHERE quiz_id = $1 AND audience = $2 AND locale = $3
+       AND answer_signature = $4 AND status = 'rejected') AS rejected`,
+    [quizId, audience, locale, signature],
+  );
+  return result.rows[0]?.rejected ?? false;
+}
 
 /** Authenticated caller supplies the user ID; only authored choice text and
  * explanations leave this function. The ID never enters the model prompt. */
@@ -82,7 +115,7 @@ export async function getUserAnswerReviewContext(userId: string, quizId: string)
      JOIN quizzes quiz ON quiz.id = q.session_id AND quiz.is_published = TRUE
      JOIN choices chosen ON chosen.question_id = q.id AND chosen.label = latest.chosen_label
      ORDER BY q.question_order, q.id
-     LIMIT 20`,
+     `,
     [userId, quizId],
   );
   if (result.rows.length === 0) return null;
@@ -109,7 +142,7 @@ export async function getProvisionalInsight(
   const result = await queryWithRetry<InsightRow>(
     `SELECT p.id, p.quiz_id, p.audience, p.locale, p.answer_signature, p.answer_context, p.status,
             p.headline, p.body, p.suggestion, p.model,
-            p.reviewed_by, p.reviewed_at, p.updated_at
+            p.reviewed_by, p.reviewed_at, p.updated_at, p.claim_token AS revision
      FROM provisional_insight_summaries p
      JOIN quizzes q ON q.id = p.quiz_id
      WHERE p.quiz_id = $1 AND p.audience = $2 AND p.locale = $3 AND p.answer_signature = $4
@@ -192,33 +225,61 @@ export async function listProvisionalInsights(): Promise<ProvisionalInsight[]> {
     `SELECT p.id, p.quiz_id, q.name AS quiz_name, p.audience, p.locale,
             p.answer_signature, p.answer_context,
             p.status, p.headline, p.body, p.suggestion, p.model,
-            p.reviewed_by, p.reviewed_at, p.updated_at
+            p.reviewed_by, p.reviewed_at, p.updated_at, p.claim_token AS revision
      FROM provisional_insight_summaries p
      JOIN quizzes q ON q.id = p.quiz_id
      WHERE p.status IN ('provisional', 'approved', 'rejected')
+       AND p.headline IS NOT NULL AND p.body IS NOT NULL
      ORDER BY CASE p.status WHEN 'provisional' THEN 0 ELSE 1 END,
               p.updated_at DESC`,
   );
   return result.rows;
 }
 
+/** Deleted wording retains its rejected cache key to block regeneration. */
 export async function reviewProvisionalInsight(
   id: string,
   status: 'approved' | 'rejected',
   reviewerUid: string,
+  options: { disposition?: 'keep' | 'delete'; expectedRevision: string; summary?: InsightSummary },
 ): Promise<ProvisionalInsight | null> {
   if (!(await hasSchema())) return null;
   const result = await queryWithRetry<ProvisionalInsight>(
     `UPDATE provisional_insight_summaries p
-     SET status = $2, reviewed_by = $3, reviewed_at = now(), updated_at = now()
+     SET status = $2, reviewed_by = $3, reviewed_at = now(), updated_at = now(), claim_token = uuid_generate_v4(),
+         headline = CASE WHEN $5 THEN NULL ELSE COALESCE($6, p.headline) END,
+         body = CASE WHEN $5 THEN NULL ELSE COALESCE($7, p.body) END,
+         suggestion = CASE WHEN $5 THEN NULL WHEN $9 THEN $8 ELSE p.suggestion END
      FROM quizzes q
      WHERE p.id = $1 AND q.id = p.quiz_id
        AND p.status IN ('provisional', 'approved', 'rejected')
+       AND p.claim_token = $4::uuid
+       AND p.headline IS NOT NULL AND p.body IS NOT NULL
      RETURNING p.id, p.quiz_id, q.name AS quiz_name, p.audience, p.locale,
                p.answer_signature, p.answer_context,
                p.status, p.headline, p.body, p.suggestion, p.model,
-               p.reviewed_by, p.reviewed_at, p.updated_at`,
-    [id, status, reviewerUid],
+               p.reviewed_by, p.reviewed_at, p.updated_at, p.claim_token AS revision`,
+    [id, status, reviewerUid, options.expectedRevision, status === 'rejected' && options.disposition === 'delete',
+      options.summary?.headline ?? null, options.summary?.body ?? null, options.summary?.suggestion ?? null, !!options.summary],
+    { allowWriteRetry: true },
+  );
+  return result.rows[0] ?? null;
+}
+
+/** Editing retained text keeps it hidden until explicitly approved. */
+export async function saveProvisionalDraft(id: string, summary: InsightSummary, expectedRevision: string): Promise<ProvisionalInsight | null> {
+  if (!(await hasSchema())) return null;
+  const result = await queryWithRetry<ProvisionalInsight>(
+    `UPDATE provisional_insight_summaries p
+     SET headline = $2, body = $3, suggestion = $4,
+         status = CASE WHEN p.status = 'rejected' THEN 'rejected' ELSE 'provisional' END,
+         reviewed_by = NULL, reviewed_at = NULL, updated_at = now(), claim_token = uuid_generate_v4()
+     FROM quizzes q WHERE p.id = $1 AND q.id = p.quiz_id
+       AND p.status IN ('provisional', 'approved', 'rejected')
+       AND p.headline IS NOT NULL AND p.body IS NOT NULL
+       AND p.claim_token = $5::uuid
+     RETURNING p.*, p.claim_token AS revision, q.name AS quiz_name`,
+    [id, summary.headline, summary.body, summary.suggestion, expectedRevision],
     { allowWriteRetry: true },
   );
   return result.rows[0] ?? null;

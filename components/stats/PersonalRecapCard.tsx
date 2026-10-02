@@ -27,6 +27,7 @@ export default function PersonalRecapCard({ report, locale, compact = false, det
     <div className="history-recap-art" aria-hidden="true"><div className="history-bloom bloom-one" /><div className="history-bloom bloom-two" /><div className="history-bloom bloom-three" /><div className="history-art-center"><RecapIcon name="book" /></div><RecapIcon name="spark" className="history-art-spark" /></div>
     <div className="history-recap-copy">
       <p className="history-section-label"><RecapIcon name="spark" />{copy('Your personal recap', 'สรุปสำหรับคุณ')}</p>
+      {everydayFeedback?.reviewStatus === 'provisional' && <span className="personal-recap-review-badge">{copy('AI · awaiting admin or doctor review', 'AI · ยังไม่ผ่านการตรวจสอบจากผู้ดูแลหรือแพทย์')}</span>}
       <h2 id={headingId}>{everydayFeedback?.headline ?? coaching.headline}</h2>
       {!compact && <>
         <p className="history-recap-body">{everydayFeedback?.body ?? coaching.body}</p>

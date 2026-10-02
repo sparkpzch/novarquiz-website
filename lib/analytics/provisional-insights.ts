@@ -17,7 +17,40 @@ export function answerPatternSignature(input: AnswerReviewContext & {
   locale: InsightLocale;
   readingStyle?: 'everyday';
 }): string {
-  return createHash('sha256').update(JSON.stringify(input)).digest('hex');
+  return createHash('sha256').update(JSON.stringify({
+    quizId: input.quizId,
+    audience: input.audience,
+    locale: input.locale,
+    readingStyle: input.readingStyle,
+    quizName: input.quizName,
+    quizDescription: input.quizDescription,
+    answers: canonicalAnswers(input.answers),
+  })).digest('hex');
+}
+
+function canonicalAnswers(answers: AnswerReviewContext['answers']) {
+  return answers.map((answer) => ({
+    question: answer.question,
+    selected: answer.selected,
+    selectedExplanation: answer.selectedExplanation,
+    selectedAligned: answer.selectedAligned,
+    alignedChoices: [...answer.alignedChoices].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+  })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+}
+
+/** Reuse only when every recorded selection behind the approved wording also
+ * exists in the new answers. Up to 20% additional answers are allowed, but a
+ * changed selection or explanation is never treated as a match. */
+export function approvedAnswerCoverage(source: AnswerReviewContext, target: AnswerReviewContext): number {
+  if (source.quizName !== target.quizName || source.quizDescription !== target.quizDescription || !source.answers.length || !target.answers.length) return 0;
+  const available = canonicalAnswers(target.answers).map((answer) => JSON.stringify(answer));
+  for (const answer of canonicalAnswers(source.answers)) {
+    const index = available.indexOf(JSON.stringify(answer));
+    if (index === -1) return 0;
+    available.splice(index, 1);
+  }
+  const coverage = source.answers.length / target.answers.length;
+  return coverage >= 0.8 ? coverage : 0;
 }
 
 export function buildProvisionalInsightPrompt(context: AnswerReviewContext & {

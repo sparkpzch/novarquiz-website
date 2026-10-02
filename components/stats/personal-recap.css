@@ -60,6 +60,7 @@
 .nq-personal-recap .personal-recap-details:hover { background: var(--history-purple-soft); }
 .nq-personal-recap .personal-recap-details:focus-visible { outline: 3px solid var(--history-purple); outline-offset: 4px; }
 .nq-personal-recap .personal-recap-note { margin: 12px 0 0; font-size: 12px; line-height: 1.6; color: var(--history-muted); }
+.nq-personal-recap .personal-recap-review-badge { display: inline-block; margin: 0 0 12px; padding: 5px 10px; border-radius: 8px; background: var(--history-peach-soft); color: var(--history-peach); font-size: 11px; line-height: 1.7; }
 .nq-personal-recap.personal-recap-compact { display: block; margin-bottom: 0; padding: 20px; height: 100%; border-radius: 16px; }
 .nq-personal-recap.personal-recap-compact .history-recap-art { position: absolute; right: 12px; top: 8px; width: 64px; height: 64px; }
 .nq-personal-recap.personal-recap-compact .history-bloom { inset: 8px; }

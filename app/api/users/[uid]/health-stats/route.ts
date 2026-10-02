@@ -49,13 +49,8 @@ export async function GET(
       return NextResponse.json({ ...stats, summary: null, feedback: null });
     }
 
-    // Approved CMS copy always wins. Only when absent do we use a separately
-    // marked AI draft based on the player's recorded selections, the answer
-    // key, and authored explanations. The UID is used only for DB lookup;
-    // answer patterns, rather than user IDs, key the shared cache.
-    //
-    // Anchored on the quiz answered most recently, not the weakest one: the
-    // player has just finished something and expects to read about that.
+    // Recorded-answer summaries take priority over general CMS copy. Consent
+    // gates new model calls; approved cached wording needs no external call.
     const summary = stats.latestTopic
       ? await getApprovedInsightSummary({
           quizId: stats.latestTopic.quiz_id,
@@ -65,27 +60,31 @@ export async function GET(
         })
       : null;
 
-    const maySendAnswersToGemini = !summary && stats.latestTopic
-      ? (await getUserConsent(uid))?.privacy_version === PRIVACY_VERSION
-      : false;
-
-    const provisional = maySendAnswersToGemini && stats.latestTopic
-      ? await getOrGenerateProvisionalInsight({
+    let provisional = null;
+    if (stats.latestTopic) {
+      try {
+        provisional = await getOrGenerateProvisionalInsight({
           userId: uid,
           quizId: stats.latestTopic.quiz_id,
           audience: stats.latestTopic.audience === 'hcp' ? 'hcp' : 'public',
           locale: query.data.locale,
-        })
-      : null;
+          readingStyle: 'everyday',
+          allowGeneration: (await getUserConsent(uid))?.privacy_version === PRIVACY_VERSION,
+        });
+      } catch (error) {
+        console.error('health summary failed:', error instanceof Error ? error.message : 'unknown error');
+      }
+    }
+    const resolvedSummary = provisional?.summary ?? summary;
 
     const feedback = composePersonalFeedback({
-      summary: summary ?? provisional?.summary ?? null,
+      summary: resolvedSummary,
       summaryStatus: provisional?.status ?? (summary ? 'approved' : null),
       latestTopic: stats.latestTopic,
       locale: query.data.locale,
     });
 
-    return NextResponse.json({ ...stats, summary, feedback });
+    return NextResponse.json({ ...stats, summary: resolvedSummary, summaryStatus: provisional?.status ?? (summary ? 'approved' : null), feedback });
   } catch (err) {
     console.error('health-stats failed:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

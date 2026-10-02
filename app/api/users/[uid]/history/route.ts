@@ -50,19 +50,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         const audience = topic?.audience === 'hcp' ? 'hcp' : 'public';
         const reviewed = await getApprovedInsightSummary({ quizId: session.quiz_id, tags: gapTags, audience, locale });
         summary = reviewed && isEverydayInsight(reviewed) ? reviewed : null;
-        if (!summary && (await getUserConsent(uid))?.privacy_version === PRIVACY_VERSION) {
-          provisional = await getOrGenerateProvisionalInsight({
-            userId: uid, quizId: session.quiz_id, audience, locale, readingStyle: 'everyday',
-            context: { quizName: topic?.quiz_name ?? session.session_name, quizDescription: session.session_description, answers: answers.slice(0, 20).map(({ question, selected, selectedExplanation, selectedAligned, alignedChoices }) => ({ question, selected, selectedExplanation, selectedAligned, alignedChoices })) },
-          });
-        }
+        provisional = await getOrGenerateProvisionalInsight({
+          userId: uid, quizId: session.quiz_id, audience, locale, readingStyle: 'everyday',
+          allowGeneration: (await getUserConsent(uid))?.privacy_version === PRIVACY_VERSION,
+          context: { quizName: topic?.quiz_name ?? session.session_name, quizDescription: session.session_description, answers: answers.map(({ question, selected, selectedExplanation, selectedAligned, alignedChoices }) => ({ question, selected, selectedExplanation, selectedAligned, alignedChoices })) },
+        });
       } catch (error) {
         console.error('history summary failed:', error instanceof Error ? error.message : 'unknown error');
       }
     }
     const feedback = composePersonalFeedback({
-      summary: summary ?? provisional?.summary ?? null,
-      summaryStatus: summary ? 'approved' : provisional?.status,
+      summary: provisional?.summary ?? summary ?? null,
+      summaryStatus: provisional?.status ?? (summary ? 'approved' : null),
       latestTopic: answers.length ? { name: session.session_name, score: Math.round(answers.filter((a) => a.selectedAligned).length / answers.length * 100) } : null,
       locale,
     });

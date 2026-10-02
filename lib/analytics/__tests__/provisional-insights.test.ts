@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { answerPatternSignature, buildProvisionalInsightPrompt, parseProvisionalInsight } from '../provisional-insights';
+import { answerPatternSignature, approvedAnswerCoverage, buildProvisionalInsightPrompt, parseProvisionalInsight } from '../provisional-insights';
 
 const context = {
   quizName: 'Food labels',
@@ -68,4 +68,38 @@ test('everyday coaching changes the cache and prompt without altering profession
   const specialist = JSON.stringify({ headline: 'Screening and adherence', body: 'Review the clinical guideline.', suggestion: 'Review risk_factors.' });
   assert.equal(parseProvisionalInsight(specialist, 'en').ok, true);
   assert.equal(parseProvisionalInsight(specialist, 'en', 'everyday').ok, false);
+});
+
+test('shuffling questions or answer keys preserves the answer cache signature', () => {
+  const second = { ...context.answers[0], question: 'Which table?', selected: 'Nutrition table' };
+  const input = { ...context, quizId: 'quiz-1', answers: [context.answers[0], second] };
+  assert.equal(answerPatternSignature(input), answerPatternSignature({ ...input, answers: [...input.answers].reverse() }));
+});
+
+test('approved wording is reusable only when all source answers match at 80% coverage or more', () => {
+  const answers = Array.from({ length: 5 }, (_, index) => ({ ...context.answers[0], question: `Question ${index}` }));
+  const target = { ...context, answers };
+  assert.equal(approvedAnswerCoverage(target, target), 1);
+  assert.equal(approvedAnswerCoverage({ ...target, answers: answers.slice(0, 4) }, target), 0.8);
+  assert.equal(approvedAnswerCoverage({ ...target, answers: answers.slice(0, 3) }, target), 0);
+  assert.equal(approvedAnswerCoverage(target, { ...target, answers: [...answers].reverse() }), 1);
+  assert.equal(approvedAnswerCoverage(target, { ...target, quizName: 'Updated quiz' }), 0);
+  assert.equal(approvedAnswerCoverage(target, { ...target, answers: answers.slice(0, 4) }), 0);
+  assert.equal(approvedAnswerCoverage({ ...target, answers: [] }, target), 0);
+});
+
+test('similar scores do not permit reuse of wording about different selections or explanations', () => {
+  for (const changed of [
+    { selected: 'The serving size' },
+    { selectedExplanation: 'A revised explanation' },
+    { selectedAligned: true },
+    { alignedChoices: [{ text: 'New key', explanation: null }] },
+  ]) {
+    assert.equal(approvedAnswerCoverage(context, { ...context, answers: [{ ...context.answers[0], ...changed }] }), 0);
+  }
+});
+
+test('duplicate target answers cannot be used to manufacture source coverage', () => {
+  const source = { ...context, answers: [context.answers[0], context.answers[0]] };
+  assert.equal(approvedAnswerCoverage(source, context), 0);
 });
