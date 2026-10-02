@@ -9,11 +9,13 @@ import {
   type InsightSummary,
 } from './insights';
 import type { AnswerReviewContext } from '../db/provisional-insights';
+import { isEverydayInsight } from './history-coaching';
 
 export function answerPatternSignature(input: AnswerReviewContext & {
   quizId: string;
   audience: 'public' | 'hcp';
   locale: InsightLocale;
+  readingStyle?: 'everyday';
 }): string {
   return createHash('sha256').update(JSON.stringify(input)).digest('hex');
 }
@@ -21,9 +23,10 @@ export function answerPatternSignature(input: AnswerReviewContext & {
 export function buildProvisionalInsightPrompt(context: AnswerReviewContext & {
   audience: 'public' | 'hcp';
   locale: InsightLocale;
+  readingStyle?: 'everyday';
 }): string {
   const language = context.locale === 'th' ? 'Thai' : 'English';
-  const reader = context.audience === 'hcp' ? 'a healthcare professional' : 'a general reader';
+  const reader = context.readingStyle === 'everyday' ? 'an everyday reader with no medical training' : context.audience === 'hcp' ? 'a healthcare professional' : 'a general reader';
   const answers = context.answers.map((answer, index) => [
     `${index + 1}. Question: ${answer.question}`,
     `Player selected: ${answer.selected}`,
@@ -41,6 +44,14 @@ export function buildProvisionalInsightPrompt(context: AnswerReviewContext & {
     ...answers,
     '',
     'Mention one or two specific selections and explain the learning point using the matching author explanations.',
+    ...(context.readingStyle === 'everyday' ? [
+      'Use everyday words, short sentences, and a warm, helpful tone. This is a health learning website, not a game or a clinician report.',
+      'Do not show internal tags, underscores, hashtags, acronyms, accuracy percentages, points, ranks, timers, or streaks.',
+      'Replace professional terms with ordinary phrases: adherence means following a care plan; risk factors means things that can affect health; screening means check-ups; symptom awareness means noticing warning signs.',
+      'Never use clinical, cohort, utility, aligned, distractor, guideline, or pedagogical in the output.',
+      'Explain what the reader did well and pick one question-based learning step. Name the subject of that question in ordinary language.',
+      'The suggestion must describe one specific question or authored learning point, not generic advice to read explanations, compare aligned answers, and try again.',
+    ] : []),
     'You may say which listed options the player selected. Do not invent any other selection or a numerical score.',
     'A character mentioned in a quiz question is not the player; do not describe that character as the player.',
     'Do not infer medical conditions, clinical competence, knowledge level, or intent from these answers.',
@@ -59,7 +70,7 @@ export function buildProvisionalInsightPrompt(context: AnswerReviewContext & {
 
 /** Personal claims are allowed only for recorded answers; the prompt limits
  * the source and this validator rejects unsupported score/medical claims. */
-export function parseProvisionalInsight(text: string, locale: InsightLocale): { ok: true; value: InsightSummary } | { ok: false; reason: string } {
+export function parseProvisionalInsight(text: string, locale: InsightLocale, readingStyle?: 'everyday'): { ok: true; value: InsightSummary } | { ok: false; reason: string } {
   const parsed = parseDraftResponse(text);
   if (!parsed.ok) return parsed;
   const joined = `${parsed.value.headline}\n${parsed.value.body}\n${parsed.value.suggestion ?? ''}`;
@@ -69,6 +80,9 @@ export function parseProvisionalInsight(text: string, locale: InsightLocale): { 
   }
   if (!validateInsightLanguage(parsed.value, locale)) {
     return { ok: false, reason: `summary is not in ${locale === 'th' ? 'Thai' : 'English'}` };
+  }
+  if (readingStyle === 'everyday' && !isEverydayInsight(parsed.value)) {
+    return { ok: false, reason: 'summary uses specialist or game language' };
   }
   return parsed;
 }

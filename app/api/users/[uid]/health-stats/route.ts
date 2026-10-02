@@ -13,7 +13,10 @@ import { getOrGenerateProvisionalInsight } from '@/lib/ai/auto-provisional-insig
 import { PRIVACY_VERSION } from '@/components/ui/TermsModal';
 
 const Params = z.object({ uid: z.string().min(1).max(128) });
-const Query = z.object({ locale: z.enum(INSIGHT_LOCALES).default('th') });
+const Query = z.object({
+  locale: z.enum(INSIGHT_LOCALES).default('th'),
+  summary: z.enum(['include', 'none']).default('include'),
+});
 
 // Per-topic knowledge summary for the /stats "Health" tab. Only the player's
 // own answers (or any, for admins) — same access rule as /history.
@@ -27,6 +30,7 @@ export async function GET(
 
   const query = Query.safeParse({
     locale: request.nextUrl.searchParams.get('locale') ?? undefined,
+    summary: request.nextUrl.searchParams.get('summary') ?? undefined,
   });
   if (!query.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 
@@ -39,6 +43,11 @@ export async function GET(
   try {
     const input = await getUserHealthStatsInput(uid);
     const stats = summarizeHealthStats(input);
+    // Home gets its recap from completed-session history; this request only
+    // needs the topic breakdown and should not generate a second AI summary.
+    if (query.data.summary === 'none') {
+      return NextResponse.json({ ...stats, summary: null, feedback: null });
+    }
 
     // Approved CMS copy always wins. Only when absent do we use a separately
     // marked AI draft based on the player's recorded selections, the answer

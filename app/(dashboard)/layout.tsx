@@ -47,6 +47,11 @@ const primaryNavItems: NavItem[] = [
     label: 'nav.history',
     icon: 'M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
   },
+  {
+    href: '/stats',
+    label: 'nav.stats',
+    icon: 'M3 3v18h18M7 16v-4m5 4V8m5 8V5',
+  },
   profileNavItem,
 ];
 

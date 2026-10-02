@@ -1,5 +1,6 @@
 import { answerPatternSignature, buildProvisionalInsightPrompt, parseProvisionalInsight } from '../analytics/provisional-insights';
 import type { InsightLocale, InsightSummary } from '../analytics/insights';
+import { isEverydayInsight } from '../analytics/history-coaching';
 import { validateInsightLanguage } from '../analytics/insights';
 import {
   claimProvisionalInsight,
@@ -8,6 +9,7 @@ import {
   getProvisionalInsight,
   getUserAnswerReviewContext,
   invalidateProvisionalLanguage,
+  type AnswerReviewContext,
 } from '../db/provisional-insights';
 import { generateText, geminiModel, isGeminiConfigured } from './gemini';
 
@@ -23,20 +25,24 @@ export async function getOrGenerateProvisionalInsight(input: {
   quizId: string;
   audience: 'public' | 'hcp';
   locale: InsightLocale;
+  /** Session-scoped answers supplied by an authenticated caller. */
+  context?: AnswerReviewContext;
+  readingStyle?: 'everyday';
 }): Promise<AutoProvisionalInsight | null> {
-  const context = await getUserAnswerReviewContext(input.userId, input.quizId);
+  const context = input.context ?? await getUserAnswerReviewContext(input.userId, input.quizId);
   if (!context || context.answers.length === 0) return null;
   const answerSignature = answerPatternSignature({
     ...context,
     quizId: input.quizId,
     audience: input.audience,
     locale: input.locale,
+    ...(input.readingStyle ? { readingStyle: input.readingStyle } : {}),
   });
 
   const existing = await getProvisionalInsight(input.quizId, input.audience, input.locale, answerSignature);
   if (existing) {
     const summary = { headline: existing.headline, body: existing.body, suggestion: existing.suggestion };
-    if (validateInsightLanguage(summary, input.locale)) {
+    if (validateInsightLanguage(summary, input.locale) && (input.readingStyle !== 'everyday' || isEverydayInsight(summary))) {
       return { summary, status: existing.status as 'provisional' | 'approved' };
     }
     if (existing.status === 'approved') return null;
@@ -52,10 +58,11 @@ export async function getOrGenerateProvisionalInsight(input: {
       ...context,
       audience: input.audience,
       locale: input.locale,
+      readingStyle: input.readingStyle,
     });
-    let drafted = parseProvisionalInsight(await generateText(prompt), input.locale);
-    if (!drafted.ok && drafted.reason.startsWith('summary is not in ')) {
-      drafted = parseProvisionalInsight(await generateText(`${prompt}\n\nReturn the JSON again. Every value MUST be in ${input.locale === 'th' ? 'Thai' : 'English'}.`), input.locale);
+    let drafted = parseProvisionalInsight(await generateText(prompt), input.locale, input.readingStyle);
+    if (!drafted.ok && (drafted.reason.startsWith('summary is not in ') || drafted.reason === 'summary uses specialist or game language')) {
+      drafted = parseProvisionalInsight(await generateText(`${prompt}\n\nReturn the JSON again. Every value MUST be in ${input.locale === 'th' ? 'Thai' : 'English'}.${input.readingStyle === 'everyday' ? ' Use only everyday words, without professional terms or game results.' : ''}`), input.locale, input.readingStyle);
     }
     if (!drafted.ok) {
       console.warn(`Provisional insight rejected: ${drafted.reason}`);

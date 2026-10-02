@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { useTheme } from '@/lib/hooks/useTheme';
 import RefreshButton from '@/components/ui/RefreshButton';
+import { learningTopic } from '@/lib/analytics/history-coaching';
 
 export interface TopicBreakdownItem {
   tag: string;
@@ -46,6 +47,7 @@ export interface TopicUnderstandingBreakdownProps {
   isRefreshing?: boolean;
   lastFetchedAt?: number | null;
   refreshError?: boolean;
+  readingStyle?: 'everyday';
 }
 
 const TOPIC_META: Record<string, { translationKey: string; icon: string }> = {
@@ -68,14 +70,20 @@ export function TopicUnderstandingBreakdown({
   isRefreshing = false,
   lastFetchedAt = null,
   refreshError = false,
+  readingStyle,
 }: TopicUnderstandingBreakdownProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const everyday = readingStyle === 'everyday';
+  const locale = i18n.resolvedLanguage?.startsWith('th') ? 'th' : 'en';
+  const topicLabel = (tag: string) => everyday
+    ? learningTopic(tag, locale)?.title ?? (locale === 'th' ? 'เรื่องอื่น ๆ ในแบบทดสอบ' : 'Other quiz topics')
+    : tag;
   const dashboardVariant = variant === 'dashboard';
   const { theme: activeTheme } = useTheme();
   const dark = activeTheme === 'dark';
   const [sortBy, setSortBy] = useState<'lowest' | 'highest' | 'responses' | 'name'>('lowest');
   const sortedItems = [...items].sort((a, b) => {
-    if (sortBy === 'name') return a.tag.localeCompare(b.tag);
+    if (sortBy === 'name') return everyday ? topicLabel(a.tag).localeCompare(topicLabel(b.tag), locale) : a.tag.localeCompare(b.tag);
     if (sortBy === 'responses') return b.responses - a.responses || a.tag.localeCompare(b.tag);
     const aHasScore = a.percentage !== null && a.maxUtility > 0;
     const bHasScore = b.percentage !== null && b.maxUtility > 0;
@@ -108,9 +116,9 @@ export function TopicUnderstandingBreakdown({
           <label className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>
             {t('topic_breakdown.sort')}
             <select aria-label={t('topic_breakdown.sort_aria')} value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium normal-case tracking-normal focus:outline-none focus:ring-2 ${dashboardVariant ? 'border-white/12 bg-[#0a1234] text-[#e4eaff] focus:ring-[#7898ff]' : 'nq-report-control border-[#0460A9]/20 bg-white text-[#16324F] focus:ring-[#0460A9]'}`}>
-              <option value="lowest">{t('topic_breakdown.sort_lowest')}</option>
-              <option value="highest">{t('topic_breakdown.sort_highest')}</option>
-              <option value="responses">{t('topic_breakdown.sort_responses')}</option>
+              <option value="lowest">{t(everyday ? 'topic_breakdown.sort_review_first' : 'topic_breakdown.sort_lowest')}</option>
+              <option value="highest">{t(everyday ? 'topic_breakdown.sort_strongest' : 'topic_breakdown.sort_highest')}</option>
+              <option value="responses">{t(everyday ? 'topic_breakdown.sort_answers' : 'topic_breakdown.sort_responses')}</option>
               <option value="name">{t('topic_breakdown.sort_name')}</option>
             </select>
           </label>
@@ -118,7 +126,7 @@ export function TopicUnderstandingBreakdown({
             <div className="flex items-center gap-2 rounded-xl border border-[#0460A9]/15 bg-[#F4F8FC] px-3 py-1.5 text-xs">
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#5D7EA1]">{t('topic_breakdown.filter')}</span>
               <button onClick={() => onToggleTag(selectedTag)} className="inline-flex items-center gap-1 rounded border border-[#0460A9]/20 bg-white px-2 py-0.5 font-mono font-bold text-[#0460A9] hover:text-rose-700" title={t('topic_breakdown.clear_filter')}>
-                {selectedTag} <span aria-hidden="true">×</span>
+                {topicLabel(selectedTag)} <span aria-hidden="true">×</span>
               </button>
             </div>
           )}
@@ -133,7 +141,9 @@ export function TopicUnderstandingBreakdown({
             const hasData = item.percentage !== null && item.maxUtility > 0;
             const score = item.percentage ?? 0;
             const meta = TOPIC_META[item.tag];
-            const topicDescription = meta ? t(meta.translationKey) : item.tag.replace(/^#/, '').replace(/[-_]/g, ' ');
+            const topicDescription = everyday
+              ? topicLabel(item.tag)
+              : meta ? t(meta.translationKey) : item.tag.replace(/^#/, '').replace(/[-_]/g, ' ');
             const selected = selectedTag === item.tag;
             const tier = !hasData ? 'empty' : score < 50 ? 'priority' : score < 75 ? 'developing' : 'strong';
             const theme = {
@@ -153,7 +163,7 @@ export function TopicUnderstandingBreakdown({
                 disabled={!onToggleTag}
                 aria-pressed={onToggleTag ? selected : undefined}
                 data-tier={tier}
-                title={onToggleTag ? t(selected ? 'topic_breakdown.clear_tag_filter' : 'topic_breakdown.filter_tag', { tag: item.tag }) : undefined}
+                title={onToggleTag ? t(selected ? 'topic_breakdown.clear_tag_filter' : 'topic_breakdown.filter_tag', { tag: topicLabel(item.tag) }) : undefined}
                 className={`nq-topic-card w-full overflow-hidden rounded-2xl border text-left transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 ${dashboardVariant ? 'bg-[#0a1234]' : 'bg-white'} ${selected ? `ring-2 ring-[#0460A9]/40 shadow-md ${theme.border}` : `${theme.border} hover:shadow-md hover:border-[#0460A9]/30`} ${onToggleTag ? 'cursor-pointer' : 'cursor-default'}`}
               >
                 {selected && <div className="h-1 w-full" style={{ backgroundColor: theme.fill }} />}
@@ -161,7 +171,7 @@ export function TopicUnderstandingBreakdown({
                   <div className="flex items-center justify-between gap-1.5">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <span className="shrink-0 text-sm">{meta?.icon ?? '📊'}</span>
-                      <span className={`truncate rounded-md border px-2 py-0.5 font-mono text-[11px] font-bold ${theme.badge}`}>{item.tag}</span>
+                      <span className={`truncate rounded-md border px-2 py-0.5 font-mono text-[11px] font-bold ${theme.badge}`}>{topicLabel(item.tag)}</span>
                     </div>
                     <span className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold ${theme.badge}`}>{theme.status}</span>
                   </div>
@@ -169,7 +179,7 @@ export function TopicUnderstandingBreakdown({
                     <div className="min-w-0 flex-1 pr-1">
                       <p className={`nq-topic-description line-clamp-2 text-xs font-semibold leading-tight ${dashboardVariant ? 'text-[#e4eaff]' : 'text-[#16324F]'}`}>{topicDescription}</p>
                       <p className={`nq-topic-meta mt-1 truncate font-mono text-[11px] ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>
-                        {t('topic_breakdown.utility_responses', { earned: item.earnedUtility, maximum: item.maxUtility, count: item.responses })}
+                        {everyday ? t('topic_breakdown.answers_count', { count: item.responses }) : t('topic_breakdown.utility_responses', { earned: item.earnedUtility, maximum: item.maxUtility, count: item.responses })}
                       </p>
                       {selectedPlayerName && <p className={`nq-topic-meta mt-0.5 truncate text-[11px] ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>{t('topic_breakdown.for_player', { name: selectedPlayerName })}</p>}
                       {selectedCompareLabel && item.benchmarkPercentage != null && <p className="mt-0.5 text-[9px] text-indigo-700">{t('topic_breakdown.benchmark', { name: selectedCompareLabel, percentage: item.benchmarkPercentage })}</p>}

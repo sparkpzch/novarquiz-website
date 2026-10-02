@@ -56,3 +56,16 @@ test('cache signature changes with the selected answer and source explanation', 
     answers: [{ ...input.answers[0], selectedExplanation: 'Updated explanation' }],
   }));
 });
+
+test('everyday coaching changes the cache and prompt without altering professional feedback', () => {
+  const standard = { ...context, quizId: 'quiz-1' };
+  const everyday = { ...standard, readingStyle: 'everyday' as const, audience: 'hcp' as const };
+  assert.notEqual(answerPatternSignature(standard), answerPatternSignature(everyday));
+  const prompt = buildProvisionalInsightPrompt(everyday);
+  assert.match(prompt, /an everyday reader with no medical training/);
+  assert.match(prompt, /not a game or a clinician report/);
+  assert.match(prompt, /one specific question/);
+  const specialist = JSON.stringify({ headline: 'Screening and adherence', body: 'Review the clinical guideline.', suggestion: 'Review risk_factors.' });
+  assert.equal(parseProvisionalInsight(specialist, 'en').ok, true);
+  assert.equal(parseProvisionalInsight(specialist, 'en', 'everyday').ok, false);
+});

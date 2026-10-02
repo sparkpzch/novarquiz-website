@@ -18,7 +18,7 @@ import { canResumeRoom, hasRecentSessionPresence } from "@/lib/session-resume";
 import { ROOM_STATUS } from "@/lib/constants/session";
 import { useToast } from "@/components/ui/Toast";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
-import type { PersonalFeedback } from "@/lib/analytics/personal-feedback";
+import LatestPersonalRecap from "@/components/stats/LatestPersonalRecap";
 import { TopicUnderstandingBreakdown, type TopicBreakdownItem } from "@/components/admin/AnalyticsBreakdownComponents";
 import "@/lib/i18n";
 
@@ -32,7 +32,6 @@ type SessionResumeSnapshot = {
 };
 
 type DashboardHealthStats = {
-  feedback: PersonalFeedback | null;
   topicBreakdown: TopicBreakdownItem[];
   answered: number;
 };
@@ -359,66 +358,6 @@ function QuizCard({ session, onClick, eagerImage = false }: { session: Dashboard
   );
 }
 
-function PersonalFeedbackCard({
-  healthStats,
-  onViewDetails,
-}: {
-  healthStats: DashboardHealthStats | null;
-  onViewDetails: () => void;
-}) {
-  const { t } = useTranslation();
-  const feedback = healthStats?.feedback;
-
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="nq-dashboard-panel relative overflow-hidden rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5"
-    >
-      <div className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-[#705cff]/15 blur-3xl" />
-      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#705cff]/15 text-[#8f83ff]" aria-hidden="true">✦</span>
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#7898ff]">{t("dashboard.feedback_eyebrow")}</p>
-              <h2 className="text-sm font-semibold text-white">{t("dashboard.feedback_title")}</h2>
-            </div>
-          </div>
-          {feedback?.reviewStatus === "provisional" && (
-            <span className="mt-3 inline-flex rounded-full border border-amber-300/35 bg-amber-300/10 px-2.5 py-1 text-[10px] font-semibold text-amber-200">
-              {t("stats.provisional_badge")}
-            </span>
-          )}
-          <h3 className="mt-4 text-base font-semibold leading-snug text-white sm:text-lg">{feedback?.headline ?? t("dashboard.feedback_empty_headline")}</h3>
-          {feedback?.question && (
-            <p className="mt-2 max-w-4xl text-xs leading-5 text-[#9aa8d1] sm:text-sm">
-              {t("stats.insight_question")}: {feedback.question}
-            </p>
-          )}
-          <p className="mt-2 max-w-4xl text-xs leading-5 text-[#9aa8d1] sm:text-sm">{feedback?.body ?? t("dashboard.feedback_empty_body")}</p>
-          {feedback?.context && <p className="mt-2 max-w-4xl text-xs leading-5 text-[#9aa8d1] sm:text-sm">{feedback.context}</p>}
-          {feedback?.suggestion && (
-            <p className="nq-ai-suggestion mt-3 rounded-lg border border-[#2bb39a]/20 bg-[#2bb39a]/10 px-3 py-2 text-xs font-medium leading-5 text-[#65d7b9]">
-              <span aria-hidden="true">→ </span>{feedback.suggestion}
-            </p>
-          )}
-          <p className="mt-3 text-[9px] leading-4 text-[#7180ad]">
-            {t(feedback?.reviewStatus === "provisional" ? "stats.provisional_note" : "stats.disclaimer")}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onViewDetails}
-          className="shrink-0 self-start rounded-lg border border-[#557cff]/35 px-3 py-2 text-[10px] font-semibold text-[#7898ff] transition hover:border-[#557cff]/70 hover:text-white"
-        >
-          {t("dashboard.feedback_view_details")} →
-        </button>
-      </div>
-    </motion.section>
-  );
-}
-
 export default function DashboardPage() {
   const { i18n } = useTranslation();
   const { user } = useAuth();
@@ -427,7 +366,7 @@ export default function DashboardPage() {
   return <DashboardContent key={`${uid ?? "anonymous"}:${locale}`} healthStatsUid={uid} healthStatsLocale={locale} />;
 }
 
-function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUid: string | null; healthStatsLocale: string }) {
+function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUid: string | null; healthStatsLocale: "en" | "th" }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
@@ -448,7 +387,7 @@ function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUi
     if (!healthStatsUid) return;
     const requestId = ++healthStatsRequestId.current;
     return fetch(
-      `/api/users/${healthStatsUid}/health-stats?locale=${healthStatsLocale}`,
+      `/api/users/${healthStatsUid}/health-stats?locale=${healthStatsLocale}&summary=none`,
       { cache: "no-store" },
     )
       .then(async (response) => {
@@ -553,7 +492,7 @@ function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUi
         </motion.div>
 
         <div className="grid gap-4 md:grid-cols-[1.3fr_0.8fr]">
-          <PersonalFeedbackCard healthStats={healthStats} onViewDetails={() => document.getElementById("topic-understanding")?.scrollIntoView({ behavior: "smooth", block: "start" })} />
+          <LatestPersonalRecap uid={healthStatsUid} locale={healthStatsLocale} />
           <JoinByCodeCard />
         </div>
       </section>

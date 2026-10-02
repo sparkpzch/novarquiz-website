@@ -1,347 +1,122 @@
 'use client';
 
-import { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useWindowVirtualizer } from '@tanstack/react-virtual';
+import { Fragment, Suspense, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
-import { motion } from 'motion/react';
-import { Card } from '@/components/ui/Card';
+import { useAuth } from '@/lib/hooks/useAuth';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
-import type { LeaderboardEntry, Session } from '@/lib/types';
+import { TopicUnderstandingBreakdown } from '@/components/admin/AnalyticsBreakdownComponents';
+import { learningTopic, personalLearningAreas } from '@/lib/analytics/history-coaching';
+import type { HistoryAnswer, PersonalHistoryReport, UserHistoryRow } from '@/lib/analytics/history';
+import './history.css';
 
-type UserHistoryRow = {
-  session_id: string;
-  session_name: string;
-  session_description: string | null;
-  total_score: number;
-  correct_count: number;
-  incorrect_count: number;
-  streak: number;
-  total_time_ms: number | null;
-  completed_at: string | null;
-  rank: number;
-  total_players: number;
-};
-
-function formatDuration(ms: number | null) {
-  if (!ms || ms <= 0) return 'No timer';
-  const totalSeconds = Math.round(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes === 0) return `${seconds}s`;
-  return `${minutes}m ${seconds}s`;
-}
-
-function formatDate(dateString: string | null) {
-  if (!dateString) return 'Not finished';
-  return new Date(dateString).toLocaleDateString([], {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function HistoryPageContent() {
-  const { t } = useTranslation();
-  const { user } = useAuth();
+function HistoryContent() {
+  const { user, loading: authLoading } = useAuth();
+  const { i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage?.startsWith('th') ? 'th' : 'en';
+  const copy = (en: string, th: string) => locale === 'th' ? th : en;
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const sessionParam = searchParams.get('session');
+  const params = useSearchParams();
+  const uid = user && !user.isAnonymous ? user.uid : null;
+  const [version, setVersion] = useState(0);
+  const [quizSearch, setQuizSearch] = useState('');
+  const [historyState, setHistoryState] = useState<{ key: string; rows: UserHistoryRow[]; error: boolean } | null>(null);
+  const [reportState, setReportState] = useState<{ key: string; data: PersonalHistoryReport | null; error: boolean } | null>(null);
+  const historyKey = `${uid}:${version}`;
+  const history = historyState?.key === historyKey ? historyState : null;
+  const rows = history?.rows ?? [];
+  const selectedId = params.get('session') ?? rows[0]?.session_id ?? null;
+  const selected = rows.find((row) => row.session_id === selectedId);
+  const reportKey = `${uid}:${selectedId}:${locale}:${version}`;
+  const result = reportState?.key === reportKey ? reportState : null;
+  const report = result?.data;
 
-  const [mine, setMine] = useState<UserHistoryRow[] | null>(null);
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-  const [sessionMeta, setSessionMeta] = useState<Session | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-
-  // Fetch personal history
   useEffect(() => {
-    if (!user) return;
-    fetch(`/api/users/${user.uid}/history`)
-      .then((response) => (response.ok ? response.json() : []))
-      .then(setMine)
-      .catch(() => setMine([]));
-  }, [user]);
+    if (!uid) return;
+    const abort = new AbortController();
+    fetch(`/api/users/${encodeURIComponent(uid)}/history`, { signal: abort.signal })
+      .then(async (response) => { if (!response.ok) throw new Error('History unavailable'); return response.json() as Promise<UserHistoryRow[]>; })
+      .then((data) => setHistoryState({ key: historyKey, rows: data, error: false }))
+      .catch(() => { if (!abort.signal.aborted) setHistoryState({ key: historyKey, rows: [], error: true }); });
+    return () => abort.abort();
+  }, [uid, historyKey]);
 
-  // Fetch detail if session is selected
   useEffect(() => {
-    if (!sessionParam) {
-      setEntries([]);
-      setSessionMeta(null);
-      return;
-    }
+    if (!uid || !selected) return;
+    const abort = new AbortController();
+    fetch(`/api/users/${encodeURIComponent(uid)}/history?session=${encodeURIComponent(selected.session_id)}&locale=${locale}&summary=none`, { signal: abort.signal })
+      .then(async (response) => { if (!response.ok) throw new Error('Report unavailable'); return response.json() as Promise<PersonalHistoryReport>; })
+      .then((data) => setReportState({ key: reportKey, data, error: false }))
+      .catch(() => { if (!abort.signal.aborted) setReportState({ key: reportKey, data: null, error: true }); });
+    return () => abort.abort();
+  }, [uid, selected, locale, reportKey]);
 
-    setLoadingDetail(true);
-    // Fetch leaderboard
-    fetch(`/api/sessions/${sessionParam}/leaderboard`)
-      .then((response) => (response.ok ? response.json() : []))
-      .then((data) => {
-        setEntries([...data].sort((a, b) => b.total_score - a.total_score));
-      })
-      .catch(() => setEntries([]));
+  const date = (value: string | null) => value ? new Date(value).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : copy('Completed quiz', 'แบบทดสอบที่ทำแล้ว');
+  const correct = report?.answers.filter((answer) => answer.selectedAligned).length ?? 0;
+  const total = report?.answers.length ?? 0;
+  const retry = () => setVersion((value) => value + 1);
 
-    // Fetch session meta
-    fetch(`/api/sessions/${sessionParam}`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then(setSessionMeta)
-      .finally(() => setLoadingDetail(false));
-  }, [sessionParam]);
-
-  const totalAttempts = mine?.length ?? 0;
-  const averageScore =
-    mine && mine.length
-      ? Math.round(mine.reduce((sum, row) => sum + row.total_score, 0) / mine.length)
-      : 0;
-  const bestRank =
-    mine && mine.length ? Math.min(...mine.map((row) => row.rank)) : 0;
-
-  const listParentRef = useRef<HTMLDivElement>(null);
-  const scrollMarginRef = useRef(0);
-  useLayoutEffect(() => {
-    scrollMarginRef.current = listParentRef.current?.offsetTop ?? 0;
-  });
-  const historyVirtualizer = useWindowVirtualizer({
-    count: mine?.length ?? 0,
-    estimateSize: () => 232,
-    overscan: 3,
-    scrollMargin: scrollMarginRef.current,
-  });
-
-  // Handle Detail View
-  if (sessionParam) {
-    const sortedEntries = entries;
-    const topThree = sortedEntries.slice(0, 3);
-    const podium =
-      topThree.length === 1
-        ? [{ entry: topThree[0], rank: 1, height: 'h-40', featured: true, surface: 'from-[#055A9E] via-[#0460A9] to-[#92BFFF]' }]
-        : topThree.length === 2
-          ? [
-              { entry: topThree[0], rank: 1, height: 'h-40', featured: true, surface: 'from-[#055A9E] via-[#0460A9] to-[#92BFFF]' },
-              { entry: topThree[1], rank: 2, height: 'h-32', featured: false, surface: 'from-[#7AA7E7] to-[#C9DDF7]' },
-            ]
-          : [
-              { entry: topThree[1], rank: 2, height: 'h-32', featured: false, surface: 'from-[#7AA7E7] to-[#C9DDF7]' },
-              { entry: topThree[0], rank: 1, height: 'h-40', featured: true, surface: 'from-[#055A9E] via-[#0460A9] to-[#92BFFF]' },
-              { entry: topThree[2], rank: 3, height: 'h-28', featured: false, surface: 'from-[#A9C6F4] to-[#DDEAFB]' },
-            ];
-
-    return (
-      <div className="mx-auto max-w-6xl space-y-6">
-        <button
-          onClick={() => router.push('/history')}
-          className="group flex items-center gap-2 text-sm font-bold text-white transition hover:opacity-80"
-        >
-          <svg className="h-4 w-4 transition-transform group-hover:-translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-          Back to History
-        </button>
-
-        {loadingDetail ? (
-          <div className="flex justify-center py-20">
-             <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-          </div>
-        ) : (
-          <>
-            <section className="nq-card rounded-[34px] p-6 md:p-8">
-              <div className="flex flex-col gap-5 border-b border-[#0460A9]/10 pb-6 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <p className="nq-details font-bold text-[#5D7EA1]">Session Detail</p>
-                  <h1 className="mt-2 text-3xl font-bold text-[#16324F] font-display tracking-tight">
-                    {sessionMeta?.name || 'Leaderboard'}
-                  </h1>
-                  <p className="mt-2 max-w-2xl text-sm text-[#5D7EA1] font-medium">
-                    {sessionMeta?.description || 'Review the final rankings and podium for this quiz session.'}
-                  </p>
-                </div>
-                <div className="rounded-[24px] bg-[#EAF5FF] px-5 py-4 text-right border border-[#0460A9]/08">
-                  <p className="nq-details font-bold text-[#5D7EA1]">Final Players</p>
-                  <p className="mt-2 text-2xl font-bold text-[#0460A9] font-display">{entries.length}</p>
-                </div>
-              </div>
-
-              {entries.length > 0 && (
-                <div className="mt-8 flex items-end justify-center gap-4">
-                  {podium.map(({ entry, rank, height, surface, featured }) => (
-                    <div key={entry.user_id} className="flex w-24 flex-col items-center">
-                      <div className="mb-3 rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-[#5D7EA1]">#{rank}</div>
-                      <ProfileAvatar
-                        displayName={entry.user_display_name}
-                        photoURL={entry.user_photo_url}
-                        size={featured ? 68 : 56}
-                        ringClassName="ring-4 ring-[#DDF0FF] shadow-lg shadow-[#113D7A]/14"
-                      />
-                      <p className="mt-3 w-full truncate text-center text-xs font-bold text-[#16324F]">{entry.user_display_name}</p>
-                      <p className="mt-1 text-xs font-bold text-[#0460A9]">{entry.total_score} pts</p>
-                      <div className={`mt-4 flex w-full items-start justify-center rounded-t-[28px] bg-gradient-to-b ${surface} pt-4 text-xl font-bold ${featured ? 'text-white' : 'text-[#16324F]'} ${height}`}>
-                        {rank}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section className="nq-card rounded-[34px] p-4 md:p-6">
-              <h2 className="mb-4 px-2 text-xl font-bold text-[#16324F] font-display">Full Standings</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[#0460A9]/10 text-[#5D7EA1]">
-                      <th className="px-4 py-3 text-left font-bold">Rank</th>
-                      <th className="px-4 py-3 text-left font-bold">Player</th>
-                      <th className="px-4 py-3 text-right font-bold">Score</th>
-                      <th className="hidden px-4 py-3 text-right font-bold sm:table-cell">Accuracy</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedEntries.map((entry, idx) => (
-                      <tr key={entry.user_id} className={`border-b border-[#0460A9]/05 ${entry.is_me ? 'bg-[#0460A9]/05' : 'hover:bg-white/40'}`}>
-                        <td className="px-4 py-3 font-bold text-[#5D7EA1]">#{idx + 1}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <ProfileAvatar displayName={entry.user_display_name} photoURL={entry.user_photo_url} size={32} />
-                            <span className="font-bold text-[#16324F]">{entry.is_me ? 'You' : entry.user_display_name}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-right font-bold text-[#0460A9]">{entry.total_score}</td>
-                        <td className="hidden px-4 py-3 text-right font-medium text-[#5D7EA1] sm:table-cell">
-                          {Math.round((entry.correct_count / (entry.correct_count + entry.incorrect_count || 1)) * 100)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </>
-        )}
-      </div>
-    );
-  }
-
-  // Main History List
-  return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <section className="nq-card relative overflow-hidden rounded-[34px] p-6 md:p-8">
-        <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(146,191,255,0.38),transparent_65%)]" />
-        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-2xl">
-            <p className="nq-details font-bold text-[#5D7EA1]">NovarQuiz archive</p>
-            <h1 className="mt-2 text-3xl font-bold text-[#16324F] md:text-4xl font-display tracking-tight">{t('leaderboard.title')}</h1>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#5D7EA1] font-medium">
-              Track your finished attempts, review scores, placements, and streaks from all your completed quiz sessions.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:w-[440px]">
-            <Card.Tile
-              label="Attempts"
-              value={totalAttempts}
-            />
-            <Card.Tile
-              label="Avg score"
-              value={averageScore}
-            />
-            <Card.Tile
-              label="Best rank"
-              value={bestRank ? `#${bestRank}` : '--'}
-            />
-          </div>
+  return <div className="nq-full-report nq-personal-report">
+    <div className="pr-wrap">
+      <header className="pr-card pr-header">
+        <div className="pr-header-top">
+          <div className="pr-header-title"><Link className="pr-button pr-home" href="/">← {copy('Home', 'หน้าหลัก')}</Link><div><p className="pr-eyebrow">{copy('Your quiz history', 'ประวัติแบบทดสอบของคุณ')}</p><h1>{selected?.session_name ?? copy('History', 'ประวัติ')}</h1><p className="pr-muted">{copy('Explore your topics and understand the answers you chose.', 'ดูเรื่องที่คุณเรียนรู้และทำความเข้าใจคำตอบที่คุณเลือก')}</p></div></div>
+          <div className="pr-header-actions">{selected && <Link className="pr-button" href={`/stats?session=${encodeURIComponent(selected.session_id)}`}>{copy('Your learning recap', 'ดูสรุปการเรียนรู้')}</Link>}<button className="pr-button" onClick={retry} type="button">↻ {copy('Refresh', 'โหลดใหม่')}</button></div>
         </div>
-      </section>
-
-      <div className="space-y-4">
-          {!user ? (
-            <div className="nq-card rounded-[34px] p-10 text-center">
-              <p className="text-lg font-bold text-[#16324F] font-display">Sign in to see your attempts.</p>
-              <p className="mt-2 text-sm text-[#5D7EA1] font-medium">Finished quizzes linked to your account will appear here.</p>
-            </div>
-          ) : mine === null ? (
-            <div className="flex justify-center py-14">
-              <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#0460A9] border-t-transparent" />
-            </div>
-          ) : mine.length === 0 ? (
-            <div className="nq-card rounded-[34px] p-10 text-center">
-              <p className="text-lg font-bold text-[#16324F] font-display">You have not finished any sessions yet.</p>
-              <p className="mt-2 text-sm text-[#5D7EA1] font-medium">Complete a quiz and this page will turn into your personal record board.</p>
-            </div>
-          ) : (
-            <div
-              ref={listParentRef}
-              style={{ position: 'relative', height: `${historyVirtualizer.getTotalSize()}px` }}
-            >
-              {historyVirtualizer.getVirtualItems().map((virtualItem) => {
-                const row = mine![virtualItem.index];
-                return (
-                  <div
-                    key={virtualItem.key}
-                    data-index={virtualItem.index}
-                    ref={historyVirtualizer.measureElement}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      transform: `translateY(${virtualItem.start - historyVirtualizer.options.scrollMargin}px)`,
-                      paddingBottom: '16px',
-                    }}
-                  >
-                    <Card
-                      onClick={() => router.push(`/history?session=${row.session_id}`)}
-                      variant="soft"
-                      className="w-full !p-5"
-                    >
-                      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-[#0460A9]/10 px-3 py-1 nq-details font-bold text-[#0460A9]">
-                              Attempt
-                            </span>
-                            <span className="text-sm font-bold text-[#5D7EA1]">{formatDate(row.completed_at)}</span>
-                          </div>
-                          <h2 className="mt-3 truncate text-xl font-bold text-[#16324F] font-display">{row.session_name}</h2>
-                          <p className="mt-2 text-sm text-[#5D7EA1] font-medium line-clamp-2">
-                            {row.session_description || 'Completed session overview with your score, placement, and streak.'}
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[420px]">
-                          <Card.Tile label="Score" value={row.total_score} />
-                          <Card.Tile
-                            label="Rank"
-                            value={
-                              <span className="font-display">
-                                #{row.rank}
-                                <span className="text-sm font-medium text-[#5D7EA1]">/{row.total_players}</span>
-                              </span>
-                            }
-                          />
-                          <Card.Tile label="Correct" value={row.correct_count} className="[&_p:last-child]:text-[#0D8C6D]" />
-                          <Card.Tile label="Streak" value={row.streak} className="[&_p:last-child]:text-[#E67E22]" />
-                        </div>
-                      </div>
-
-                      <div className="mt-5 flex items-center justify-between border-t border-[#0460A9]/10 pt-4">
-                        <p className="text-sm text-[#5D7EA1] font-medium">Completion time: {formatDuration(row.total_time_ms)}</p>
-                        <span className="text-sm font-bold text-[#0460A9] font-display">View Standings →</span>
-                      </div>
-                    </Card>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-      </div>
+        {report && <div className="pr-overview">
+          <div className="pr-profile"><ProfileAvatar displayName={user?.displayName} photoURL={user?.photoURL} size={42} /><div><strong>{user?.displayName || copy('Your results', 'ผลของคุณ')}</strong><span>{date(selected?.completed_at ?? null)}</span></div></div>
+          <div className="pr-fact"><span>{copy('Questions answered', 'ข้อที่คุณตอบ')}</span><strong>{total}</strong></div>
+          <div className="pr-fact pr-fact-good"><span>{copy('Answers to build on', 'คำตอบให้เรียนรู้ต่อ')}</span><strong>{correct}<small>{copy(`of ${total} questions`, `จาก ${total} ข้อ`)}</small></strong></div>
+          <div className="pr-fact"><span>{copy('Questions to revisit', 'ข้อที่ควรทบทวน')}</span><strong>{total - correct}</strong></div>
+        </div>}
+      </header>
+      {authLoading || (uid && !history) ? <StatePanel message={copy('Loading your quizzes…', 'กำลังโหลดแบบทดสอบของคุณ…')} loading /> : !uid ? <StatePanel message={copy('Sign in to see your quiz history.', 'เข้าสู่ระบบเพื่อดูประวัติแบบทดสอบของคุณ')}><Link className="pr-button" href="/sign-in?next=%2Fhistory">{copy('Sign in', 'เข้าสู่ระบบ')}</Link></StatePanel> : history?.error ? <StatePanel message={copy('Your quizzes couldn’t load. Please try again.', 'ยังโหลดแบบทดสอบไม่ได้ กรุณาลองอีกครั้ง')} error><button className="pr-button" onClick={retry}>{copy('Try again', 'ลองอีกครั้ง')}</button></StatePanel> : !rows.length ? <StatePanel message={copy('Your completed quizzes will appear here.', 'แบบทดสอบที่คุณทำเสร็จแล้วจะแสดงที่นี่')}><Link className="pr-button" href="/quizzes">{copy('Explore health quizzes', 'เลือกแบบทดสอบสุขภาพ')}</Link></StatePanel> : <div className="pr-layout">
+        <aside className="pr-card pr-archive" aria-labelledby="archive-title">
+          <div className="pr-section-heading"><h2 id="archive-title">{copy('Your completed quizzes', 'แบบทดสอบที่คุณทำแล้ว')}</h2><span className="pr-count">{rows.length}</span></div>
+          <input className="pr-input" type="search" aria-label={copy('Search your quizzes', 'ค้นหาแบบทดสอบของคุณ')} placeholder={copy('Search your quizzes…', 'ค้นหาแบบทดสอบ…')} value={quizSearch} onChange={(event) => setQuizSearch(event.target.value)} />
+          <div className="pr-quiz-list">{rows.filter((row) => row.session_name.toLocaleLowerCase().includes(quizSearch.trim().toLocaleLowerCase())).map((row) => <button type="button" key={row.session_id} className={`pr-quiz ${selectedId === row.session_id ? 'pr-quiz-selected' : ''}`} aria-current={selectedId === row.session_id ? 'page' : undefined} onClick={() => router.push(`/history?session=${encodeURIComponent(row.session_id)}`, { scroll: false })}><strong>{row.session_name}</strong><span>{date(row.completed_at)}</span><small>{copy(`${row.correct_count + row.incorrect_count} questions answered`, `ตอบแล้ว ${row.correct_count + row.incorrect_count} ข้อ`)}</small></button>)}</div>
+          {!rows.some((row) => row.session_name.toLocaleLowerCase().includes(quizSearch.trim().toLocaleLowerCase())) && <p className="pr-muted">{copy('No quizzes match your search.', 'ไม่พบแบบทดสอบที่ตรงกับการค้นหา')}</p>}
+        </aside>
+        <main className="pr-report-content">{!selected ? <StatePanel message={copy('Choose one of your completed quizzes from the list.', 'เลือกแบบทดสอบที่คุณทำแล้วจากรายการ')} /> : !result ? <StatePanel message={copy('Loading your answers…', 'กำลังโหลดคำตอบของคุณ…')} loading /> : result.error ? <StatePanel message={copy('Your answers couldn’t load. Please try again.', 'ยังโหลดคำตอบไม่ได้ กรุณาลองอีกครั้ง')} error><button className="pr-button" onClick={retry}>{copy('Try again', 'ลองอีกครั้ง')}</button></StatePanel> : report && <PersonalReport key={reportKey} report={report} locale={locale} />}</main>
+      </div>}
     </div>
-  );
+  </div>;
 }
 
+function PersonalReport({ report, locale }: { report: PersonalHistoryReport; locale: 'en' | 'th' }) {
+  const copy = (en: string, th: string) => locale === 'th' ? th : en;
+  const [topic, setTopic] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [onlyReview, setOnlyReview] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const answerTopics = (answer: HistoryAnswer) => personalLearningAreas([answer], locale);
+  const answers = report.answers.filter((answer) => (!onlyReview || !answer.selectedAligned) && (!topic || answer.tags.includes(topic)) && `${answer.question} ${answer.selected} ${answerTopics(answer).map((area) => area.title).join(' ')}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  return <>
+    <TopicUnderstandingBreakdown
+      items={report.topics}
+      description={copy('Explore how your answers matched what this quiz teaches. Choose a topic to see its questions below.', 'ดูว่าคำตอบของคุณสอดคล้องกับสิ่งที่แบบทดสอบอธิบายมากน้อยแค่ไหน เลือกเรื่องเพื่อดูคำถามด้านล่าง')}
+      readingStyle="everyday"
+      selectedTag={topic}
+      onToggleTag={(tag) => { setTopic((previous) => previous === tag ? null : tag); setExpanded(null); }}
+      emptyMessage={copy('This quiz has no topic labels yet. You can still review your answers below.', 'แบบทดสอบนี้ยังไม่มีป้ายกำกับเรื่อง คุณยังดูคำตอบของคุณด้านล่างได้')}
+    />
+    <section className="pr-card pr-questions" aria-labelledby="questions-title">
+      <div className="pr-section-heading"><div><h2 id="questions-title">{copy('Your answers and explanations', 'คำตอบและคำอธิบายของคุณ')} <span className="pr-count">{answers.length}</span></h2><p className="pr-muted">{(topic ? learningTopic(topic, locale)?.title ?? copy('Other quiz topics', 'เรื่องอื่น ๆ ในแบบทดสอบ') : null) ?? copy('See what you chose and why the quiz accepts an answer.', 'ดูคำตอบที่คุณเลือกและเหตุผลของคำตอบ')}</p></div><input className="pr-input" type="search" aria-label={copy('Search your answers', 'ค้นหาคำตอบของคุณ')} placeholder={copy('Search questions…', 'ค้นหาคำถาม…')} value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <label className="pr-review-filter"><input type="checkbox" checked={onlyReview} onChange={(event) => setOnlyReview(event.target.checked)} />{copy('Only questions to revisit', 'เฉพาะข้อที่ควรทบทวน')}</label>
+      <div className="pr-table-scroll"><table className="pr-table"><thead><tr><th scope="col">{copy('Topic', 'เรื่อง')}</th><th scope="col">{copy('Question', 'คำถาม')}</th><th scope="col">{copy('Your answer', 'คำตอบของคุณ')}</th><th scope="col">{copy('Review', 'ทบทวน')}</th></tr></thead><tbody>
+        {answers.map((answer) => <Fragment key={answer.id}><tr><td className="pr-topic-cell">{answerTopics(answer).map((area) => <span key={area.id}>{area.title}</span>)}</td><td className="pr-question-cell">{answer.question}</td><td><span className={`pr-answer-status ${answer.selectedAligned ? 'pr-answer-good' : ''}`}>{answer.selectedAligned ? copy('Answered correctly', 'ตอบถูก') : copy('Worth another look', 'น่าลองทบทวน')}</span><p>{answer.selected}</p></td><td><button type="button" className="pr-button pr-explain-button" aria-expanded={expanded === answer.id} aria-controls={`answer-${answer.id}`} aria-label={copy(`${expanded === answer.id ? 'Hide' : 'View'} explanation for: ${answer.question}`, `${expanded === answer.id ? 'ซ่อน' : 'ดู'}คำอธิบาย: ${answer.question}`)} onClick={() => setExpanded((previous) => previous === answer.id ? null : answer.id)}>{expanded === answer.id ? copy('Hide explanation', 'ซ่อนคำอธิบาย') : copy('View explanation', 'ดูคำอธิบาย')} {expanded === answer.id ? '−' : '+'}</button></td></tr>
+        <tr hidden={expanded !== answer.id} id={`answer-${answer.id}`} className="pr-detail-row"><td colSpan={4}><div className="pr-answer-detail"><div><h3>{copy('What you chose', 'คำตอบที่คุณเลือก')}</h3><p>{answer.selected}</p>{answer.selectedExplanation && <p className="pr-muted">{answer.selectedExplanation}</p>}</div><div>{answer.alignedChoices.map((choice, index) => <div className="pr-accepted" key={index}><h3>{copy('What the quiz explains', 'สิ่งที่แบบทดสอบอธิบาย')}</h3><p>{choice.text}</p>{choice.explanation && <p className="pr-muted">{choice.explanation}</p>}</div>)}{!answer.selectedExplanation && !answer.alignedChoices.some((choice) => choice.explanation) && <p className="pr-muted">{copy('There isn’t an explanation for this question yet.', 'คำถามนี้ยังไม่มีคำอธิบาย')}</p>}</div></div></td></tr></Fragment>)}
+        {!answers.length && <tr><td colSpan={4} className="pr-no-answers">{copy('No questions match. Try another topic or clear your search.', 'ไม่พบคำถาม ลองเลือกเรื่องอื่นหรือล้างการค้นหา')}</td></tr>}
+      </tbody></table></div>
+    </section>
+  </>;
+}
+
+function StatePanel({ message, loading, error, children }: { message: string; loading?: boolean; error?: boolean; children?: React.ReactNode }) {
+  return <section className="pr-card pr-state" role={loading ? 'status' : error ? 'alert' : undefined}><p>{message}</p>{children}</section>;
+}
 export default function HistoryPage() {
-  return (
-    <Suspense fallback={<div className="min-h-[40vh]" />}>
-      <HistoryPageContent />
-    </Suspense>
-  );
+  return <Suspense fallback={<div className="pr-state" role="status" />}><HistoryContent /></Suspense>;
 }

@@ -1360,6 +1360,7 @@ export async function getUserHistory(userId: string) {
   const result = await queryWithRetry(
     `SELECT
        le.session_id,
+       qs.id AS quiz_id,
        COALESCE(s.name, qs.name)           AS session_name,
        qs.description                      AS session_description,
        le.total_score,
@@ -1379,6 +1380,47 @@ export async function getUserHistory(userId: string) {
      WHERE le.user_id = $1
      ORDER BY le.completed_at DESC`,
     [userId],
+  );
+  return result.rows;
+}
+
+// Personal question review is scoped to both the authenticated user and the
+// selected run. Never return cohort answers through the player history API.
+export async function getUserHistoryAnswers(userId: string, sessionId: string) {
+  const [layered, questionTags] = await Promise.all([
+    hasLayeredAnalyticsSchema(), hasQuestionTopicTagsSchema(),
+  ]);
+  const tags = questionTags
+    ? `(SELECT COALESCE(jsonb_agg(tag ORDER BY tag), '[]'::jsonb)
+        FROM question_topic_tags WHERE question_id = q.id)`
+    : layered
+      ? `(SELECT COALESCE(jsonb_agg(DISTINCT tag), '[]'::jsonb)
+          FROM choices c CROSS JOIN LATERAL jsonb_array_elements_text(c.clinical_tags) tag
+          WHERE c.question_id = q.id)`
+      : `'[]'::jsonb`;
+  const result = await queryWithRetry<{
+    id: string; question: string; selected: string; selectedExplanation: string | null;
+    selectedAligned: boolean; utilityScore: number; maxUtility: number;
+    timeMs: number | null; tags: string[];
+    alignedChoices: Array<{ text: string; explanation: string | null }>;
+  }>(
+    `WITH latest AS (
+       SELECT DISTINCT ON (ua.question_id) ua.*
+       FROM user_answers ua WHERE ua.user_id = $1 AND ua.session_id::text = $2
+       ORDER BY ua.question_id, ua.answered_at DESC, ua.id DESC
+     )
+     SELECT q.id, q.question_text AS question, chosen.choice_text AS selected,
+            chosen.explanation AS "selectedExplanation", (latest.utility_score > 0) AS "selectedAligned",
+            latest.utility_score AS "utilityScore", latest.time_taken_ms AS "timeMs",
+            (SELECT GREATEST(MAX(c.score_impact), 0) FROM choices c WHERE c.question_id = q.id) AS "maxUtility",
+            ${tags} AS tags,
+            COALESCE((SELECT jsonb_agg(jsonb_build_object('text', c.choice_text, 'explanation', c.explanation) ORDER BY c.label)
+              FROM choices c WHERE c.question_id = q.id AND c.score_impact > 0), '[]'::jsonb) AS "alignedChoices"
+     FROM latest JOIN questions q ON q.id = latest.question_id
+     JOIN quizzes quiz ON quiz.id = q.session_id AND quiz.is_published = TRUE
+     JOIN choices chosen ON chosen.question_id = q.id AND chosen.label = latest.chosen_label
+     ORDER BY q.question_order, q.id`,
+    [userId, sessionId],
   );
   return result.rows;
 }
