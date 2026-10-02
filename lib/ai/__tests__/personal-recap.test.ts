@@ -15,27 +15,72 @@ const food: AnswerReviewContext = {
 const summary = { headline: 'Look closer at food labels', body: 'You chose the front label. The serving size helps compare portions.', suggestion: 'Check the serving size on the example label.' };
 const input = { userId: 'private-john-id', quizId: 'quiz', audience: 'public' as const, locale: 'en' as const, readingStyle: 'everyday' as const, context: food, allowGeneration: true };
 
-function fixture() {
+const perfectFood: AnswerReviewContext = {
+  ...food,
+  answers: [{ ...food.answers[0], selected: 'Serving size', selectedExplanation: 'Check serving size before comparing the food labels.', selectedAligned: true }],
+};
+
+test('fully correct answers request topic-specific praise in either language, without remedial hints', () => {
+  for (const locale of ['en', 'th'] as const) {
+    const prompt = buildProvisionalInsightPrompt({ ...perfectFood, locale, audience: 'public', readingStyle: 'everyday' });
+    assert.match(prompt, /every answer is correct/);
+    assert.match(prompt, /Celebrate understanding of this topic: Everyday food choices/);
+    assert.match(prompt, /praising understanding of a specific quiz subject/);
+    assert.match(prompt, /Player selected: Serving size/);
+    assert.match(prompt, new RegExp(`Write every JSON text field .* in ${locale === 'th' ? 'Thai' : 'English'}`));
+    assert.doesNotMatch(prompt, /Focus on the topic with the most missed questions|Use this recorded question for the hint|combining a recorded choice with its useful learning hint/);
+  }
+  const mixed = buildProvisionalInsightPrompt({ ...food, locale: 'en', audience: 'public', readingStyle: 'everyday' });
+  assert.match(mixed, /some recorded answers need another look/);
+  assert.doesNotMatch(mixed, /Outcome across ALL recorded answers: every answer is correct/);
+  const empty = buildProvisionalInsightPrompt({ ...food, answers: [], locale: 'en', audience: 'public' });
+  assert.doesNotMatch(empty, /Outcome across ALL recorded answers: every answer is correct/);
+});
+
+test('fully correct praise is reusable across correct paths but not paths with an additional miss', () => {
+  const source = { ...perfectFood, answers: Array.from({ length: 4 }, (_, i) => ({ ...perfectFood.answers[0], question: `Food example ${i}` })) };
+  const correctTarget = { ...source, answers: [...source.answers, { ...perfectFood.answers[0], question: 'Extra question' }] };
+  const mixedTarget = { ...source, answers: [...source.answers, { ...food.answers[0], question: 'Extra question' }] };
+  assert.equal(approvedAnswerCoverage(source, correctTarget), 0.8);
+  assert.equal(approvedAnswerCoverage(source, mixedTarget), 0);
+  assert.equal(approvedAnswerCoverage(perfectFood, perfectFood), 1);
+});
+
+function fixture(context = food, generatedSummary = summary) {
   let status: ProvisionalStatus | null = null;
   let calls = 0;
   let saves = 0;
   let failures = 0;
-  const row = () => ({ ...summary, id: 'draft', quiz_id: 'quiz', audience: 'public' as const, locale: 'en' as const, answer_signature: 'signature', answer_context: food, status: status!, model: 'test', reviewed_by: null, reviewed_at: null, updated_at: 'now', revision: 'claim' });
+  const row = () => ({ ...generatedSummary, id: 'draft', quiz_id: 'quiz', audience: 'public' as const, locale: 'en' as const, answer_signature: 'signature', answer_context: context, status: status!, model: 'test', reviewed_by: null, reviewed_at: null, updated_at: 'now', revision: 'claim' });
   const dependencies: InsightDependencies = {
     isAnswerPatternRejected: async () => status === 'rejected',
-    getSimilarReusableInsight: async (_quiz, _audience, _locale, context) => (status === 'approved' || status === 'provisional') && approvedAnswerCoverage(food, context) ? row() : null,
+    getSimilarReusableInsight: async (_quiz, _audience, _locale, target) => (status === 'approved' || status === 'provisional') && approvedAnswerCoverage(context, target) ? row() : null,
     getProvisionalInsight: async () => status === 'provisional' || status === 'approved' ? row() : null,
     getInsightGenerationState: async () => status,
     claimProvisionalInsight: async () => { if (status) return null; status = 'generating'; return { id: 'draft', claim_token: 'claim' }; },
     finishProvisionalInsight: async () => { if (status !== 'generating') return false; status = 'provisional'; saves++; return true; },
     failProvisionalInsight: async () => { status = 'failed'; failures++; },
     invalidateProvisionalLanguage: async () => { status = null; },
-    getUserAnswerReviewContext: async () => food,
-    generateText: async (prompt) => { calls++; assert.ok(!prompt.includes(input.userId)); return JSON.stringify(summary); },
+    getUserAnswerReviewContext: async () => context,
+    generateText: async (prompt) => { calls++; assert.ok(!prompt.includes(input.userId)); return JSON.stringify(generatedSummary); },
     geminiModel: () => 'test', isGeminiConfigured: () => true,
   };
   return { dependencies, setStatus: (value: ProvisionalStatus) => { status = value; }, get calls() { return calls; }, get saves() { return saves; }, get failures() { return failures; } };
 }
+
+test('correct-answer praise is saved pending, shared with another person, then marked reviewed without regeneration', async () => {
+  const praise = { headline: 'Understanding food labels', body: 'Great work—choosing serving size showed a strong understanding of comparing food portions.', suggestion: 'Try using serving size when comparing the example food labels.' };
+  const f = fixture(perfectFood, praise);
+  const prepared = await prepareProvisionalInsight({ ...input, context: perfectFood }, f.dependencies);
+  const generated = await prepared.generate!();
+  assert.deepEqual(generated?.summary, praise);
+  assert.equal(generated?.status, 'provisional');
+  const shared = { ...input, context: perfectFood, userId: 'another-person' };
+  assert.equal((await prepareProvisionalInsight(shared, f.dependencies)).state, 'pending');
+  f.setStatus('approved');
+  assert.equal((await prepareProvisionalInsight(shared, f.dependencies)).state, 'approved');
+  assert.equal(f.calls, 1); assert.equal(f.saves, 1);
+});
 
 test('admin reports read pending and approved evidence without claims, writes, or Gemini calls', async () => {
   const f = fixture();
