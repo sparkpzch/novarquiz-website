@@ -235,6 +235,7 @@ export default function MedicalAnalyticsDashboard({
   onBack,
 }: MedicalAnalyticsDashboardProps = {}) {
   const { t, i18n } = useTranslation();
+  const th = i18n.language.startsWith('th');
   const router = useRouter();
 
   // Multi-session Compare Modal State (Matching QuizManage)
@@ -850,28 +851,9 @@ export default function MedicalAnalyticsDashboard({
 
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-[#EBF3FA] text-[#0460A9] border border-[#0460A9]/20">
-                  <span className="w-2 h-2 rounded-full bg-[#0D8C6D] animate-ping" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#0D8C6D] -ml-2.5" />
-                  LIVE TELEMETRY
-                </span>
                 <span className="text-[11px] font-mono text-[#5D7EA1] tracking-wider uppercase">
                   {session?.id ? `SESSION: ${session.id}` : 'SESSION: —'}
                 </span>
-                <span className="text-gray-300">|</span>
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-md">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                  REAL SESSION DATA
-                </span>
-                {session?.session_id && (
-                  <button
-                    onClick={() => router.push(`/admin/quizzes/${session.session_id}/analytics`)}
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0460A9] bg-[#0460A9]/10 hover:bg-[#0460A9]/20 border border-[#0460A9]/25 px-2.5 py-0.5 rounded-md transition"
-                    title="View overall aggregated analytics across all sessions of this quiz template"
-                  >
-                    <span>✦ Quiz results</span>
-                  </button>
-                )}
                 {selectedCompareSession && (
                   <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-md animate-fadeIn">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
@@ -889,7 +871,8 @@ export default function MedicalAnalyticsDashboard({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
+          <div className={`${chartStyles.reportActions} flex flex-wrap items-center gap-2.5 self-start lg:self-auto`}>
+            {session?.session_id && <button type="button" onClick={() => router.push(`/admin/quizzes/${session.session_id}/analytics`)} className={chartStyles.reportPrimaryAction} title={th ? 'ดูผลรวมจากทุกเซสชันของแบบทดสอบนี้' : 'View results across all sessions of this quiz'}>{th ? 'ผลแบบทดสอบทั้งหมด' : 'Quiz results'} <span aria-hidden="true">↗</span></button>}
             {/* Session Compare Button (Matching QuizManage) */}
             <button
               onClick={() => {

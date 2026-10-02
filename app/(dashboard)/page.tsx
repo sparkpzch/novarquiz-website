@@ -19,6 +19,7 @@ import { ROOM_STATUS } from "@/lib/constants/session";
 import { useToast } from "@/components/ui/Toast";
 import WelcomeBackdrop from "@/components/ui/WelcomeBackdrop";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
+import HomeGameStats from "@/components/stats/HomeGameStats";
 import LatestPersonalRecap from "@/components/stats/LatestPersonalRecap";
 import "@/lib/i18n";
 
@@ -366,18 +367,19 @@ function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUi
                 ringClassName="ring-2 ring-white/35 shadow-lg"
               />
               <div className="min-w-0">
-                <p className="text-xs font-medium text-white/70">Home</p>
+                <p className="text-xs font-medium text-white/70">{healthStatsLocale === "th" ? "หน้าหลัก" : "Home"}</p>
                 <h1 className="truncate text-xl font-semibold text-white sm:text-2xl">
                   {user?.displayName || "Player"}
                 </h1>
               </div>
             </div>
+            {healthStatsUid && <HomeGameStats uid={healthStatsUid} locale={healthStatsLocale} />}
             <button
               type="button"
               onClick={() => router.push("/quizzes")}
               className="mt-auto self-start text-xs font-medium text-white/85 transition hover:text-white"
             >
-              All quizzes →
+              {healthStatsLocale === "th" ? "แบบทดสอบทั้งหมด" : "All quizzes"} →
             </button>
           </div>
         </motion.div>

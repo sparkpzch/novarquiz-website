@@ -1,7 +1,7 @@
 "use client";
 import SurveyGate from '@/components/onboarding/SurveyGate';
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useTheme } from "@/lib/hooks/useTheme";
 import { useTranslation } from "react-i18next";
@@ -16,10 +16,7 @@ import { useToast } from "@/components/ui/Toast";
 import { motion } from "motion/react";
 import Link from "next/link";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
-import { Card } from "@/components/ui/Card";
 import WelcomeBackdrop from "@/components/ui/WelcomeBackdrop";
-import { summarizeGameStats } from "@/lib/stats/game";
-import type { UserHistoryRow } from "@/lib/analytics/history";
 
 function ChevronRight() {
   return (
@@ -35,6 +32,25 @@ function ChevronRight() {
   );
 }
 
+
+function QuestionnaireIcon() {
+  return (
+    <svg
+      className="h-5 w-5 text-[#6EA2FF]"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3M9 3h6v4H9V3Zm-1 9h8m-8 4h5"
+      />
+    </svg>
+  );
+}
 
 function LockIcon() {
   return (
@@ -162,24 +178,6 @@ function LogoutIcon() {
   );
 }
 
-function ClearCacheIcon() {
-  return (
-    <svg
-      className="h-5 w-5 text-[#5D7EA1]"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.8}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
-      />
-    </svg>
-  );
-}
-
 function DeleteAccountIcon() {
   return (
     <svg
@@ -301,6 +299,7 @@ function GeneralRow({
 
 export default function ProfilePage() {
   const { t, i18n } = useTranslation();
+  const copy = (en: string, th: string) => i18n.language.startsWith("th") ? th : en;
   const { user, refreshUser, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { showToast } = useToast();
@@ -322,25 +321,6 @@ export default function ProfilePage() {
     if (typeof window === "undefined") return "auto";
     return (window.localStorage.getItem("novarquiz-video-quality") as 'auto' | 'hd' | 'sd') ?? "auto";
   });
-  const [userStats, setUserStats] = useState<{ bestScore: number; bestStreak: number }>({
-    bestScore: 0,
-    bestStreak: 0,
-  });
-
-  useEffect(() => {
-    if (!user || user.isAnonymous) return;
-    const controller = new AbortController();
-    fetch(`/api/users/${user.uid}/history`, { signal: controller.signal })
-      .then((response) => (response.ok ? response.json() : []))
-      .then((history: UserHistoryRow[]) => {
-        if (controller.signal.aborted) return;
-        const stats = summarizeGameStats(Array.isArray(history) ? history : []);
-        setUserStats({ bestScore: stats.bestScore, bestStreak: stats.bestStreak });
-      })
-      .catch(() => {});
-    return () => controller.abort();
-  }, [user]);
-
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -351,9 +331,9 @@ export default function ProfilePage() {
       const url = await getDownloadURL(storageRef);
       await updateProfile(auth.currentUser!, { photoURL: url });
       await refreshUser();
-      showToast("Profile photo updated", "success");
+      showToast(copy("Profile photo updated", "บันทึกรูปโปรไฟล์แล้ว"), "success");
     } catch {
-      showToast("Upload failed", "error");
+      showToast(copy("Upload failed", "อัปโหลดรูปไม่ได้ ลองอีกครั้ง"), "error");
     } finally {
       setUploading(false);
     }
@@ -368,20 +348,13 @@ export default function ProfilePage() {
         await updateProfile(auth.currentUser!, { displayName: trimmed });
         await refreshUser();
       }
-      showToast("Profile updated", "success");
+      showToast(copy("Profile updated", "บันทึกโปรไฟล์แล้ว"), "success");
       setEditModal(false);
     } catch {
-      showToast("Failed to update profile", "error");
+      showToast(copy("Failed to update profile", "บันทึกโปรไฟล์ไม่ได้ ลองอีกครั้ง"), "error");
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleClearCache = () => {
-    const keys = Object.keys(window.localStorage).filter((k) => k.startsWith('novarquiz-'));
-    keys.forEach((k) => window.localStorage.removeItem(k));
-    showToast("Cache cleared", "success");
-    window.location.reload();
   };
 
   const handleLogout = async () => {
@@ -412,10 +385,10 @@ export default function ProfilePage() {
 
       setDeleteModal(false);
       await signOut(auth).catch(() => {});
-      showToast("Account deleted", "success");
+      showToast(copy("Account deleted", "ลบบัญชีแล้ว"), "success");
       window.location.href = "/sign-in";
     } catch {
-      showToast("Failed to delete account", "error");
+      showToast(copy("Failed to delete account", "ลบบัญชีไม่ได้ ลองอีกครั้ง"), "error");
     } finally {
       setDeletingAccount(false);
     }
@@ -454,25 +427,12 @@ export default function ProfilePage() {
             />
             <div className="min-w-0 flex-1">
               <p className="nq-on-dark truncate text-2xl font-bold leading-tight">
-                {user?.displayName || "Player"}
+                {user?.displayName || copy("Player", "ผู้เล่น")}
               </p>
               <p className="nq-on-dark-muted truncate text-sm">
                 {user?.email}
               </p>
             </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-2 gap-3">
-            <Card.Tile
-              label={t("dashboard.best_streak")}
-              value={userStats.bestStreak || 0}
-              className="nq-profile-stat bg-white/14 border-none shadow-none [&_p]:nq-on-dark"
-            />
-            <Card.Tile
-              label={t("profile.best_score")}
-              value={(userStats.bestScore || 0).toLocaleString()}
-              className="nq-profile-stat bg-white/14 border-none shadow-none [&_p]:nq-on-dark"
-            />
           </div>
 
           <button
@@ -503,20 +463,20 @@ export default function ProfilePage() {
       >
         <h2 className="mb-5 text-2xl font-semibold text-[#202A3F]">{t("profile.general")}</h2>
         <div className="space-y-5">
-          <SurveyGate editing renderTrigger={(open, label) => (
-            <GeneralRow
-              icon={<EditIcon />}
-              label={label}
-              onClick={open}
-              trailing={<ChevronRight />}
-            />
-          )} />
           <GeneralRow
             icon={<LockIcon />}
             label={t("profile.change_password")}
             href="/profile/change-password"
             trailing={<ChevronRight />}
           />
+          <SurveyGate editing renderTrigger={(open, label) => (
+            <GeneralRow
+              icon={<QuestionnaireIcon />}
+              label={label}
+              onClick={open}
+              trailing={<ChevronRight />}
+            />
+          )} />
 
           <GeneralRow
             icon={<BellIcon />}
@@ -548,13 +508,13 @@ export default function ProfilePage() {
 
           <GeneralRow
             icon={<VideoQualityIcon />}
-            label="Video Quality"
-            description={videoQuality === 'auto' ? 'Auto (detects Wi-Fi vs cellular)' : videoQuality === 'hd' ? 'Always HD (1080p)' : 'Always SD (720p, saves data)'}
+            label={copy("Video quality", "คุณภาพวิดีโอ")}
+            description={videoQuality === 'auto' ? copy('Adjust to your connection', 'ปรับตามการเชื่อมต่อ') : videoQuality === 'hd' ? copy('HD (1080p)', 'HD (1080p)') : copy('SD (720p), uses less data', 'SD (720p) ใช้ข้อมูลน้อยกว่า')}
             onClick={() => setVideoQualityModal(true)}
             trailing={
               <>
                 <span className="rounded-full bg-[#EEF3FB] px-3 py-1 text-xs font-bold text-[#3A66C1] uppercase tracking-wide">
-                  {videoQuality === 'auto' ? 'Auto' : videoQuality === 'hd' ? 'HD' : 'SD'}
+                  {videoQuality === 'auto' ? copy('Automatic', 'อัตโนมัติ') : videoQuality === 'hd' ? 'HD' : 'SD'}
                 </span>
                 <ChevronRight />
               </>
@@ -577,17 +537,6 @@ export default function ProfilePage() {
         className="nq-card rounded-[30px] p-6"
       >
         <div className="space-y-4">
-          <button
-            type="button"
-            onClick={handleClearCache}
-            className="flex w-full items-center gap-4 py-1 transition hover:opacity-85"
-          >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 shadow-sm">
-              <ClearCacheIcon />
-            </div>
-            <span className="text-[1.05rem] font-medium text-[#E85C5C]">Clear Cache</span>
-          </button>
-
           <button
             type="button"
             onClick={handleLogout}
@@ -619,18 +568,18 @@ export default function ProfilePage() {
       <Modal
         isOpen={videoQualityModal}
         onClose={() => setVideoQualityModal(false)}
-        title="Video Quality"
+        title={copy("Video quality", "คุณภาพวิดีโอ")}
         size="sm"
       >
         <p className="mb-4 text-sm text-[#5D7EA1]">
-          Choose how videos load during a quiz. Lower quality uses less data on cellular.
+          {copy("Choose video quality for quizzes. SD uses less data.", "เลือกคุณภาพวิดีโอในแบบทดสอบ SD ใช้ข้อมูลน้อยกว่า")}
         </p>
         <div className="flex flex-col gap-3">
           {(
             [
-              { value: 'auto', label: 'Auto', sub: 'Uses HD on Wi-Fi, SD on cellular' },
-              { value: 'hd',   label: 'HD — 1080p', sub: 'Always full quality, higher data usage' },
-              { value: 'sd',   label: 'SD — 720p', sub: 'Always lower quality, saves data' },
+              { value: 'auto', label: copy('Automatic', 'อัตโนมัติ'), sub: copy('HD on Wi-Fi, SD on mobile data', 'HD เมื่อใช้ Wi-Fi และ SD เมื่อใช้เน็ตมือถือ') },
+              { value: 'hd',   label: 'HD — 1080p', sub: copy('Sharper video, uses more data', 'ภาพคมชัดกว่า ใช้ข้อมูลมากขึ้น') },
+              { value: 'sd',   label: 'SD — 720p', sub: copy('Uses less data', 'ใช้ข้อมูลน้อยกว่า') },
             ] as const
           ).map(({ value, label, sub }) => (
             <button

@@ -45,6 +45,8 @@ function SessionCard({
   index: number;
   onClick: () => void;
 }) {
+  const { i18n } = useTranslation();
+  const th = i18n.language.startsWith("th");
   return (
     <motion.button
       initial={{ opacity: 0, y: 18 }}
@@ -57,7 +59,7 @@ function SessionCard({
         {session.cover_image_url ? (
           <Image
             src={session.cover_image_url}
-            alt={`${session.name} thumbnail`}
+            alt={session.name ?? (th ? "แบบทดสอบ" : "Quiz")}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             className="object-cover transition duration-300 group-hover:scale-105"
@@ -78,7 +80,7 @@ function SessionCard({
             {session.name}
           </h3>
           <span className="shrink-0 whitespace-nowrap rounded-full bg-[#0460A9]/10 px-3 py-1.5 text-sm font-bold text-[#0460A9]">
-            {session.question_count ?? 0} Q
+            {session.question_count ?? 0} {th ? "ข้อ" : "questions"}
           </span>
         </div>
         {session.description && (
@@ -89,11 +91,11 @@ function SessionCard({
         <div className="mt-auto flex items-end justify-between gap-3 pt-4">
           {session.pin_code && (
             <div className="rounded-full bg-white/75 px-3 py-2 text-xs text-[#5D7EA1]">
-              PIN: {session.pin_code}
+              {th ? "รหัสห้อง" : "Room code"}: {session.pin_code}
             </div>
           )}
           <div className="ml-auto flex items-center gap-2 text-sm font-semibold text-[#0460A9]">
-            <span>Play Now</span>
+            <span>{th ? "เริ่มแบบทดสอบ" : "Start quiz"}</span>
             <svg
               className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
               fill="none"
@@ -206,14 +208,14 @@ function QuizzesContent() {
     });
 
   const sortOptions = [
-    { value: "newest", label: "Newest" },
+    { value: "newest", label: th ? "ล่าสุด" : "Newest" },
   ];
 
   const lengthOptions = [
     { value: "all", label: th ? "ทุกจำนวนข้อ" : "Any number" },
-    { value: "short", label: th ? "น้อยกว่า 5 ข้อ" : "Fewer than 5" },
+    { value: "short", label: th ? "น้อยกว่า 5 ข้อ" : "Fewer than 5 questions" },
     { value: "medium", label: th ? "5–15 ข้อ" : "5–15 questions" },
-    { value: "long", label: th ? "มากกว่า 15 ข้อ" : "More than 15" },
+    { value: "long", label: th ? "มากกว่า 15 ข้อ" : "More than 15 questions" },
   ];
 
   return (
@@ -226,9 +228,9 @@ function QuizzesContent() {
           transition={{ duration: 0.35 }}
         >
           <p className="nq-details font-bold uppercase tracking-[0.28em] text-white/80 drop-shadow-sm">
-            Library
+            {th ? "แบบทดสอบที่เปิดให้ทำ" : "Available quizzes"}
           </p>
-          <h1 className="mt-1 text-3xl font-bold text-white drop-shadow-md font-display tracking-tight">Quizzes</h1>
+          <h1 className="mt-1 text-3xl font-bold text-white drop-shadow-md font-display tracking-tight">{th ? "แบบทดสอบ" : "Quizzes"}</h1>
         </motion.div>
 
         {/* Search + Filters */}
@@ -257,16 +259,16 @@ function QuizzesContent() {
             <input
               id="quizzes-search"
               type="search"
-              aria-label="Search quizzes"
+              aria-label={th ? "ค้นหาแบบทดสอบ" : "Search quizzes"}
               value={inputValue}
               onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Search quizzes by name or description…"
+              placeholder={th ? "ค้นหาชื่อหรือคำอธิบายแบบทดสอบ" : "Search by quiz name or description"}
               className="w-full rounded-[18px] border border-[#0460A9]/14 bg-white/80 py-3 pl-11 pr-4 text-[#16324F] outline-none placeholder:text-[#5D7EA1]/70 focus:border-[#0460A9]/40 focus:ring-2 focus:ring-[#0460A9]/10 transition font-medium"
             />
             {inputValue && (
               <button
                 onClick={() => handleSearch("")}
-                aria-label="Clear search"
+                aria-label={th ? "ล้างคำค้นหา" : "Clear search"}
                 className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-[#5D7EA1] hover:bg-[#0460A9]/08 transition"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -281,7 +283,7 @@ function QuizzesContent() {
             {/* Sort */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <span className="shrink-0 nq-details font-bold uppercase tracking-[0.18em] text-[#5D7EA1] sm:w-24">
-                Sort
+                {th ? "เรียงตาม" : "Sort by"}
               </span>
               <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar sm:pb-0">
                 {sortOptions.map((opt) => (
@@ -317,11 +319,11 @@ function QuizzesContent() {
           {!loading && (
             <p className="text-xs text-[#5D7EA1]">
               {filtered.length === sessions.length
-                ? `${sessions.length} quizzes available`
-                : `${filtered.length} of ${sessions.length} quizzes`}
+                ? (th ? `มี ${sessions.length} แบบทดสอบ` : `${sessions.length} quizzes`)
+                : (th ? `แสดง ${filtered.length} จาก ${sessions.length} แบบทดสอบ` : `${filtered.length} of ${sessions.length} quizzes`)}
               {qParam && (
                 <span>
-                  {" for "}
+                  {th ? " สำหรับ " : " for "}
                   <span className="font-semibold text-[#0460A9]">&ldquo;{qParam}&rdquo;</span>
                 </span>
               )}
@@ -349,9 +351,9 @@ function QuizzesContent() {
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-[28px] bg-gradient-to-br from-[#92BFFF] to-[#0460A9] text-4xl shadow-lg shadow-[#0460A9]/20">
               🔍
             </div>
-            <h2 className="text-xl font-bold text-[#16324F]">No quizzes found</h2>
+            <h2 className="text-xl font-bold text-[#16324F]">{th ? "ไม่พบแบบทดสอบ" : "No quizzes found"}</h2>
             <p className="mt-2 text-sm text-[#5D7EA1]">
-              Try adjusting your search or filters.
+              {th ? "ลองใช้คำค้นหาอื่น หรือล้างตัวกรอง" : "Try a different search or clear the filters."}
             </p>
             <button
               onClick={() => {
@@ -361,7 +363,7 @@ function QuizzesContent() {
               }}
               className="mt-5 rounded-2xl bg-[#0460A9] px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#055A9E]"
             >
-              Clear all filters
+              {th ? "ล้างตัวกรอง" : "Clear filters"}
             </button>
           </motion.div>
         ) : (

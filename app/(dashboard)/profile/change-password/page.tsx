@@ -98,7 +98,8 @@ function PasswordField({
 }
 
 export default function ChangePasswordPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const copy = (en: string, th: string) => i18n.language.startsWith("th") ? th : en;
   const router = useRouter();
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -111,11 +112,11 @@ export default function ChangePasswordPage() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (newPw !== confirmPw) {
-      showToast("Both passwords must match.", "error");
+      showToast(copy("Both passwords must match.", "รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน"), "error");
       return;
     }
     if (newPw.length < 8) {
-      showToast("New password must be at least 8 characters.", "error");
+      showToast(copy("New password must be at least 8 characters.", "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร"), "error");
       return;
     }
     if (!user?.email) return;
@@ -125,10 +126,10 @@ export default function ChangePasswordPage() {
       const cred = EmailAuthProvider.credential(user.email, currentPw);
       await reauthenticateWithCredential(auth.currentUser!, cred);
       await updatePassword(auth.currentUser!, newPw);
-      showToast("Password updated!", "success");
+      showToast(copy("Password changed", "เปลี่ยนรหัสผ่านแล้ว"), "success");
       router.push("/profile");
     } catch {
-      showToast("Failed to update password", "error");
+      showToast(copy("Failed to update password", "เปลี่ยนรหัสผ่านไม่ได้ ตรวจสอบรหัสผ่านปัจจุบันแล้วลองอีกครั้ง"), "error");
     } finally {
       setLoading(false);
     }
@@ -144,29 +145,29 @@ export default function ChangePasswordPage() {
         className="nq-card rounded-[34px] px-6 py-8"
       >
         <h1 className="text-[2.2rem] font-bold leading-tight text-[#111827]">
-          Change password
+          {t("profile.change_password")}
         </h1>
         <p className="mt-4 max-w-md text-[1.05rem] font-medium leading-8 text-[#6A7485]">
-          Enter and confirm your new password.
+          {copy("Enter your current password, then choose a new one.", "กรอกรหัสผ่านปัจจุบัน แล้วตั้งรหัสผ่านใหม่")}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           <PasswordField
-            label="Password"
+            label={t("profile.current_password")}
             value={currentPw}
             onChange={setCurrentPw}
           />
           <PasswordField
-            label="New Password"
+            label={t("profile.new_password")}
             value={newPw}
             onChange={setNewPw}
-            hint="Must be at least 8 characters."
+            hint={copy("At least 8 characters.", "อย่างน้อย 8 ตัวอักษร")}
           />
           <PasswordField
-            label="Confirm New Password"
+            label={t("profile.confirm_new")}
             value={confirmPw}
             onChange={setConfirmPw}
-            hint="Both passwords must match."
+            hint={copy("Enter the new password again.", "กรอกรหัสผ่านใหม่อีกครั้ง")}
           />
 
           <button
@@ -174,7 +175,7 @@ export default function ChangePasswordPage() {
             disabled={loading}
             className="mt-2 w-full rounded-[16px] bg-[#3C5FBA] px-5 py-4 text-xl font-semibold text-white shadow-[0_14px_30px_rgba(17,87,145,0.16)] disabled:opacity-60"
           >
-            {loading ? t("profile.update_password") + "..." : "Change Password"}
+            {loading ? t("profile.update_password") + "..." : t("profile.change_password")}
           </button>
         </form>
       </motion.section>

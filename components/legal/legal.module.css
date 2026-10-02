@@ -1,0 +1,40 @@
+.page,.dialog { --legal-panel: #fff; --legal-inset: #f0f4f8; --legal-border: #dce4ed; --legal-ink: var(--foreground, #1a1a2e); --legal-muted: #52657a; --legal-primary: var(--nq-button-primary, #0460a9); color: var(--legal-ink); }
+:global([data-theme="dark"]) .page,:global([data-theme="dark"]) .dialog { --legal-panel: var(--nq-dark-panel, #262626); --legal-inset: var(--nq-dark-inset, #202020); --legal-border: var(--nq-dark-border, #525252); --legal-muted: #b5b5b5; }
+.page { min-height: 100dvh; background: var(--background); padding: 28px 20px 48px; }
+.pageWrap { max-width: 860px; margin: 0 auto; }
+.pageHeader { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 24px 0; flex-wrap: wrap; }
+.pageHeader h1 { font-size: clamp(24px, 4vw, 32px); font-weight: 700; }
+.back { color: var(--legal-ink); text-decoration: none; font-weight: 600; }
+.pageCard { background: var(--legal-panel); border: 1px solid var(--legal-border); border-radius: 24px; padding: 28px; }
+.languageSwitch { display: inline-flex; padding: 4px; gap: 4px; background: var(--legal-inset); border: 1px solid var(--legal-border); border-radius: 14px; flex-shrink: 0; }
+.languageSwitch button,.tabs button,.tabs a { font: inherit; cursor: pointer; color: var(--legal-ink); background: transparent; border: 0; border-radius: 10px; padding: 10px 14px; min-height: 44px; font-size: 14px; font-weight: 600; text-decoration: none; }
+.languageSwitch button[aria-pressed="true"],.tabs button[aria-pressed="true"],.tabs a[aria-current="page"] { background: var(--legal-primary); color: #fff; }
+.languageSwitch button:focus-visible,.tabs button:focus-visible,.tabs a:focus-visible,.primary:focus-visible,.secondary:focus-visible,.close:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+.tabs a { background: var(--legal-inset); }
+.content { font-size: 14px; line-height: 1.85; overflow-wrap: anywhere; }
+.meta { color: var(--legal-muted); font-size: 12px; margin-bottom: 14px; }
+.intro { color: var(--legal-muted); margin-bottom: 24px; }
+.section { margin: 24px 0; }
+.section h2,.section h3 { color: var(--legal-ink); font-size: 17px; font-weight: 700; margin-bottom: 8px; line-height: 1.5; }
+.section p + p { margin-top: 10px; }
+.section ul { padding-left: 22px; list-style: disc; }
+.section li + li { margin-top: 8px; }
+.dialog { margin: auto; padding: 0; width: min(680px, calc(100% - 32px)); max-width: none; max-height: calc(100dvh - 32px); border: 1px solid var(--legal-border); border-radius: 28px; background: var(--legal-panel); box-shadow: 0 24px 80px #0005; }
+.dialog::backdrop { background: #0008; backdrop-filter: blur(4px); }
+.dialogInner { display: flex; flex-direction: column; max-height: calc(100dvh - 34px); }
+.dialogHeader { padding: 22px 24px 0; flex-shrink: 0; }
+.dialogHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.dialogHeading h2 { font-size: 20px; font-weight: 700; }
+.close { flex-shrink: 0; width: 44px; height: 44px; border: 1px solid var(--legal-border); border-radius: 14px; background: var(--legal-inset); color: var(--legal-ink); font-size: 24px; cursor: pointer; }
+.dialogToolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.dialogToolbar .tabs { margin: 0; }
+.scroll { overflow-y: auto; overscroll-behavior: contain; padding: 22px 24px 8px; }
+.footer { border-top: 1px solid var(--legal-border); padding: 16px 24px 24px; flex-shrink: 0; }
+.footer p { color: var(--legal-muted); font-size: 12px; line-height: 1.7; margin-bottom: 14px; }
+.actions { display: flex; gap: 12px; }
+.primary,.secondary { min-height: 44px; padding: 12px 18px; border-radius: 14px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; flex: 1; }
+.primary { background: var(--legal-primary); color: white; border: 1px solid var(--legal-primary); }
+.secondary { color: var(--legal-ink); background: var(--legal-inset); border: 1px solid var(--legal-border); }
+.primary:disabled,.secondary:disabled { opacity: .6; cursor: wait; }
+@media(max-width:640px) { .page { padding: 20px 16px 32px; } .pageCard { padding: 20px; } .dialog { width: calc(100% - 24px); max-height: calc(100dvh - 24px); border-radius: 24px; } .dialogInner { max-height: calc(100dvh - 26px); } .dialogHeader,.scroll,.footer { padding-left: 18px; padding-right: 18px; } .dialogHeading h2 { font-size: 18px; } .dialogToolbar .tabs { width: 100%; } .dialogToolbar .tabs button { flex: 1; } }

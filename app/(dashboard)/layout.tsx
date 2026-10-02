@@ -107,7 +107,7 @@ function matchesNavItem(
 }
 
 function DashboardLayoutContent({ children }: { children: ReactNode }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -192,10 +192,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
               />
               <div className="min-w-0">
                 <p className="nq-sidebar-name truncate text-xs font-semibold text-white">
-                  {user.displayName || 'Player'}
-                </p>
-                <p className="nq-sidebar-muted mt-1 truncate text-[9px]" title={user.email ?? undefined}>
-                  {user.email}
+                  {user.displayName || (i18n.language.startsWith('th') ? 'ผู้เล่น' : 'Player')}
                 </p>
               </div>
             </Link>
