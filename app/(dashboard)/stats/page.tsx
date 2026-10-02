@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
+import { usePersonalRecapReport } from '@/lib/hooks/usePersonalRecapReport';
 import { useAuth } from '@/lib/hooks/useAuth';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 import PersonalRecapCard from '@/components/stats/PersonalRecapCard';
@@ -41,7 +42,6 @@ function StatsPageContent() {
   const uid = user && !user.isAnonymous ? user.uid : null;
   const [version, setVersion] = useState(0);
   const [historyState, setHistoryState] = useState<{ key: string; rows: UserHistoryRow[]; error: boolean } | null>(null);
-  const [reportState, setReportState] = useState<{ key: string; data: PersonalHistoryReport | null; error: boolean } | null>(null);
   const [focus, setFocus] = useState<{ key: string; id: string; version: number } | null>(null);
   const historyKey = `${uid}:${version}`;
   const history = historyState?.key === historyKey ? historyState : null;
@@ -49,28 +49,18 @@ function StatsPageContent() {
   const selectedId = params.get('session') ?? rows[0]?.session_id ?? null;
   const selected = rows.find((row) => row.session_id === selectedId);
   const reportKey = `${uid}:${selectedId}:${locale}:${version}`;
-  const reportResult = reportState?.key === reportKey ? reportState : null;
+  const reportResult = usePersonalRecapReport(uid, selected?.session_id ?? null, locale, version);
   const report = reportResult?.data;
 
   useEffect(() => {
     if (!uid) return;
     const abort = new AbortController();
-    fetch(`/api/users/${encodeURIComponent(uid)}/history`, { signal: abort.signal })
+    fetch(`/api/users/${encodeURIComponent(uid)}/history`, { signal: abort.signal, cache: 'no-store' })
       .then(async (res) => { if (!res.ok) throw new Error('History unavailable'); return res.json() as Promise<UserHistoryRow[]>; })
       .then((data) => setHistoryState({ key: historyKey, rows: data, error: false }))
       .catch(() => { if (!abort.signal.aborted) setHistoryState({ key: historyKey, rows: [], error: true }); });
     return () => abort.abort();
   }, [uid, historyKey]);
-
-  useEffect(() => {
-    if (!uid || !selected) return;
-    const abort = new AbortController();
-    fetch(`/api/users/${encodeURIComponent(uid)}/history?session=${encodeURIComponent(selected.session_id)}&locale=${locale}`, { signal: abort.signal })
-      .then(async (res) => { if (!res.ok) throw new Error('Report unavailable'); return res.json() as Promise<PersonalHistoryReport>; })
-      .then((data) => setReportState({ key: reportKey, data, error: false }))
-      .catch(() => { if (!abort.signal.aborted) setReportState({ key: reportKey, data: null, error: true }); });
-    return () => abort.abort();
-  }, [uid, selected, locale, reportKey]);
 
   const date = (value: string | null) => value ? new Date(value).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : copy('Completed quiz', 'แบบทดสอบที่ทำเสร็จแล้ว');
   const firstName = user?.displayName?.trim().split(/\s+/)[0];

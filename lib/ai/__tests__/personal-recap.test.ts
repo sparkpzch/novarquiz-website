@@ -1,0 +1,171 @@
+import test from 'node:test';
+import { geminiLiteModel } from '../gemini';
+import assert from 'node:assert/strict';
+import { prepareProvisionalInsight, type InsightDependencies } from '../auto-provisional-insight';
+import { approvedAnswerCoverage, buildProvisionalInsightPrompt, personalDraftSignature, parseProvisionalInsight, sameAnswerPattern } from '../../analytics/provisional-insights';
+import type { AnswerReviewContext, ProvisionalStatus } from '../../db/provisional-insights';
+import { historyCoaching } from '../../analytics/history-coaching';
+import type { HistoryAnswer, PersonalHistoryReport } from '../../analytics/history';
+
+const food: AnswerReviewContext = {
+  quizName: 'Everyday choices', quizDescription: null,
+  learningFocus: { topic: 'Everyday food choices', question: 'Which part of the label helps compare portions?' },
+  answers: [{ question: 'Which part of the label helps compare portions?', selected: 'Only the front label', selectedExplanation: 'The front label omits portion details.', selectedAligned: false, alignedChoices: [{ text: 'Serving size', explanation: 'Check serving size before comparing the food labels.' }] }],
+};
+const summary = { headline: 'Look closer at food labels', body: 'You chose the front label. The serving size helps compare portions.', suggestion: 'Check the serving size on the example label.' };
+const input = { userId: 'private-john-id', quizId: 'quiz', audience: 'public' as const, locale: 'en' as const, readingStyle: 'everyday' as const, context: food, allowGeneration: true };
+
+function fixture() {
+  let status: ProvisionalStatus | null = null;
+  let calls = 0;
+  let saves = 0;
+  let failures = 0;
+  const row = () => ({ ...summary, id: 'draft', quiz_id: 'quiz', audience: 'public' as const, locale: 'en' as const, answer_signature: 'signature', answer_context: food, status: status!, model: 'test', reviewed_by: null, reviewed_at: null, updated_at: 'now', revision: 'claim' });
+  const dependencies: InsightDependencies = {
+    isAnswerPatternRejected: async () => status === 'rejected',
+    getSimilarApprovedInsight: async () => status === 'approved' ? row() : null,
+    getProvisionalInsight: async () => status === 'provisional' || status === 'approved' ? row() : null,
+    getInsightGenerationState: async () => status,
+    claimProvisionalInsight: async () => { if (status) return null; status = 'generating'; return { id: 'draft', claim_token: 'claim' }; },
+    finishProvisionalInsight: async () => { if (status !== 'generating') return false; status = 'provisional'; saves++; return true; },
+    failProvisionalInsight: async () => { status = 'failed'; failures++; },
+    invalidateProvisionalLanguage: async () => { status = null; },
+    getUserAnswerReviewContext: async () => food,
+    generateText: async (prompt) => { calls++; assert.ok(!prompt.includes(input.userId)); return JSON.stringify(summary); },
+    geminiModel: () => 'test', isGeminiConfigured: () => true,
+  };
+  return { dependencies, setStatus: (value: ProvisionalStatus) => { status = value; }, get calls() { return calls; }, get saves() { return saves; }, get failures() { return failures; } };
+}
+
+test('completion prepares analysis without blocking; identical simultaneous reads share one generation lease', async () => {
+  const f = fixture();
+  const prepared = await prepareProvisionalInsight(input, f.dependencies);
+  assert.equal(prepared.state, 'generating');
+  assert.equal(f.calls, 0, 'Preparation must not call the model before the response');
+  assert.ok(prepared.generate);
+  const other = await prepareProvisionalInsight(input, f.dependencies);
+  assert.equal(other.state, 'generating'); assert.equal(other.generate, undefined);
+  const generated = await prepared.generate();
+  assert.equal(generated?.status, 'provisional'); assert.equal(f.calls, 1); assert.equal(f.saves, 1);
+  const waiting = await prepareProvisionalInsight(input, f.dependencies);
+  assert.equal(waiting.state, 'pending'); assert.deepEqual(waiting.insight?.summary, summary); assert.equal(waiting.generate, undefined);
+  f.setStatus('approved');
+  const approved = await prepareProvisionalInsight({ ...input, userId: 'a-similar-person' }, f.dependencies);
+  assert.equal(approved.state, 'approved'); assert.equal(f.calls, 1);
+  f.setStatus('rejected');
+  const rejected = await prepareProvisionalInsight(input, f.dependencies);
+  assert.deepEqual(rejected, { state: 'rejected' }); assert.equal(f.calls, 1);
+});
+
+test('no consent or missing provider never queues a model call', async () => {
+  const f = fixture();
+  assert.deepEqual(await prepareProvisionalInsight({ ...input, allowGeneration: false }, f.dependencies), { state: 'consent-required' });
+  f.dependencies.isGeminiConfigured = () => false;
+  assert.deepEqual(await prepareProvisionalInsight(input, f.dependencies), { state: 'unavailable' });
+  assert.equal(f.calls, 0);
+});
+
+test('invalid model output retries once and is never stored as a pending summary', async () => {
+  const f = fixture();
+  let calls = 0;
+  f.dependencies.generateText = async () => { calls++; return JSON.stringify({ ...summary, headline: 'You’re doing well. Keep building on it.' }); };
+  const prepared = await prepareProvisionalInsight(input, f.dependencies);
+  assert.equal(await prepared.generate!(), null);
+  assert.equal(calls, 2); assert.equal(f.saves, 0); assert.equal(f.failures, 1);
+  assert.equal((await prepareProvisionalInsight(input, f.dependencies)).state, 'unavailable');
+});
+
+test('late generation cannot restore an insight rejected while the model was running', async () => {
+  const f = fixture();
+  const prepared = await prepareProvisionalInsight(input, f.dependencies);
+  f.setStatus('rejected');
+  assert.equal(await prepared.generate!(), null);
+  assert.equal(f.saves, 0);
+  assert.equal((await prepareProvisionalInsight(input, f.dependencies)).state, 'rejected');
+});
+
+test('a draft finishing during claim is returned as pending, not an unavailable summary', async () => {
+  const f = fixture();
+  f.dependencies.claimProvisionalInsight = async () => { f.setStatus('provisional'); return null; };
+  const result = await prepareProvisionalInsight(input, f.dependencies);
+  assert.equal(result.state, 'pending'); assert.deepEqual(result.insight?.summary, summary); assert.equal(f.calls, 0);
+});
+
+test('food hints and movement hints follow each person’s missed answers, not the total score', () => {
+  const answer = (id: string, tags: string[], selectedAligned: boolean): HistoryAnswer => ({ ...food.answers[0], id, tags, selectedAligned, utilityScore: selectedAligned ? 1 : 0, maxUtility: 1, timeMs: null });
+  const report = (answers: HistoryAnswer[]): PersonalHistoryReport => ({ session: {
+    session_id: 'run', quiz_id: 'quiz', session_name: 'Everyday choices', session_description: null,
+    total_score: 2, correct_count: 1, incorrect_count: 2, streak: 1, total_time_ms: null,
+    completed_at: '2026-10-02T07:00:00Z', rank: 1, total_players: 1,
+  }, answers, topics: [], feedback: null });
+  const john = historyCoaching(report([answer('food1', ['nutrition'], false), answer('food2', ['nutrition'], false), answer('move', ['exercise'], true)]), 'en');
+  const jane = historyCoaching(report([answer('food1', ['nutrition'], true), answer('move1', ['exercise'], false), answer('move2', ['exercise'], false)]), 'en');
+  assert.equal(john.correct, jane.correct);
+  assert.match(john.headline, /food/i); assert.match(jane.headline, /active/i);
+  assert.notEqual(john.nextAnswer?.id, jane.nextAnswer?.id);
+  const prompt = buildProvisionalInsightPrompt({ ...food, locale: 'en', audience: 'public', readingStyle: 'everyday' });
+  assert.match(prompt, /Prioritise this learning topic: Everyday food choices/);
+  assert.match(prompt, /Serving size/); assert.match(prompt, /only factual source/);
+  assert.equal(parseProvisionalInsight(JSON.stringify(summary), 'en', 'everyday').ok, true);
+});
+
+test('approved reuse fails when added answers change the priority topic even with similar answer coverage', () => {
+  assert.equal(approvedAnswerCoverage(food, { ...food, learningFocus: { topic: 'Staying active', question: 'Which movement?' } }), 0);
+  assert.equal(approvedAnswerCoverage(food, food), 1);
+});
+
+
+test('unreviewed draft keys belong to each person while rejection matching ignores account and question order', () => {
+  assert.notEqual(personalDraftSignature('pattern', 'john'), personalDraftSignature('pattern', 'jane'));
+  assert.equal(personalDraftSignature('pattern', 'john'), personalDraftSignature('pattern', 'john'));
+  assert.equal(sameAnswerPattern(food, { ...food, learningFocus: undefined }), true);
+  assert.equal(sameAnswerPattern(food, { ...food, answers: [{ ...food.answers[0], selected: 'Serving size' }] }), false);
+});
+
+
+test('personal summaries always use Flash Lite, including when CMS overrides use a larger model', () => {
+  const previous = process.env.GEMINI_MODEL;
+  try {
+    process.env.GEMINI_MODEL = 'gemini-large-pro';
+    assert.equal(geminiLiteModel(), 'gemini-flash-lite-latest');
+    process.env.GEMINI_MODEL = 'gemini-3.1-flash-lite';
+    assert.equal(geminiLiteModel(), 'gemini-3.1-flash-lite');
+  } finally { if (previous === undefined) delete process.env.GEMINI_MODEL; else process.env.GEMINI_MODEL = previous; }
+});
+
+test('large quizzes keep the highest-priority missed question and cap model source examples', () => {
+  const many = Array.from({ length: 40 }, (_, i) => ({ ...food.answers[0], question: `Food example ${i}?` }));
+  const prompt = buildProvisionalInsightPrompt({ ...food, answers: many, learningFocus: { topic: 'Everyday food choices', question: 'Food example 39?' }, locale: 'en', audience: 'public', readingStyle: 'everyday' });
+  assert.match(prompt, /Question: Food example 39/);
+  assert.ok((prompt.match(/Player selected:/g) ?? []).length <= 8);
+  assert.doesNotMatch(prompt, /Question: Food example 20/);
+});
+
+
+test('approved wording covers a nearby path with an extra answer and requires no model call', async () => {
+  const f = fixture();
+  const source = { ...food, answers: [food.answers[0], ...Array.from({ length: 3 }, (_, i) => ({ ...food.answers[0], question: `Food label example ${i}` }))] };
+  const target = { ...source, answers: [...source.answers, { ...food.answers[0], question: 'Another part of the quiz', selectedAligned: true }] };
+  assert.equal(approvedAnswerCoverage(source, target), 0.8);
+  f.setStatus('approved');
+  const approved = await f.dependencies.getSimilarApprovedInsight('quiz', 'public', 'en', source);
+  f.dependencies.getSimilarApprovedInsight = async (_quiz, _audience, _locale, context) => approvedAnswerCoverage(source, context) ? approved : null;
+  const reused = await prepareProvisionalInsight({ ...input, userId: 'jane', context: target }, f.dependencies);
+  assert.equal(reused.state, 'approved'); assert.equal(reused.generate, undefined); assert.equal(f.calls, 0);
+  assert.deepEqual(reused.insight?.summary, summary);
+  assert.equal(approvedAnswerCoverage(source, { ...target, answers: [{ ...source.answers[0], selected: 'A different choice' }, ...target.answers.slice(1)] }), 0);
+});
+
+
+test('older approved summaries remain reusable for an identical answer pattern', () => {
+  assert.equal(approvedAnswerCoverage({ ...food, learningFocus: undefined }, food), 1);
+  const extra = { ...food, answers: [...food.answers, { ...food.answers[0], question: 'An extra question' }] };
+  assert.equal(approvedAnswerCoverage({ ...food, learningFocus: undefined }, extra), 0);
+});
+
+test('oversized metadata cannot cause an unbounded paid model request', async () => {
+  const f = fixture();
+  const prepared = await prepareProvisionalInsight({ ...input, context: { ...food, quizDescription: 'X'.repeat(25_000) } }, f.dependencies);
+  assert.equal(await prepared.generate!(), null);
+  assert.equal(f.calls, 0); assert.equal(f.failures, 1);
+});

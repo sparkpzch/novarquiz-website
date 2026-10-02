@@ -1,6 +1,6 @@
 import pool, { queryWithRetry } from './postgres';
 import type { InsightLocale, InsightSummary } from '../analytics/insights';
-import { approvedAnswerCoverage } from '../analytics/provisional-insights';
+import { approvedAnswerCoverage, sameAnswerPattern } from '../analytics/provisional-insights';
 
 export type AnswerReviewItem = {
   question: string;
@@ -14,6 +14,7 @@ export type AnswerReviewContext = {
   quizName: string;
   quizDescription: string | null;
   answers: AnswerReviewItem[];
+  learningFocus?: { topic: string; question: string };
 };
 
 export type ProvisionalStatus = 'generating' | 'provisional' | 'approved' | 'rejected' | 'failed';
@@ -70,15 +71,19 @@ export async function getSimilarApprovedInsight(
 
 export async function isAnswerPatternRejected(
   quizId: string, audience: 'public' | 'hcp', locale: InsightLocale, signature: string,
+  context?: AnswerReviewContext,
 ): Promise<boolean> {
   if (!(await hasSchema())) return false;
-  const result = await queryWithRetry<{ rejected: boolean }>(
-    `SELECT EXISTS (SELECT 1 FROM provisional_insight_summaries
-     WHERE quiz_id = $1 AND audience = $2 AND locale = $3
-       AND answer_signature = $4 AND status = 'rejected') AS rejected`,
-    [quizId, audience, locale, signature],
+  // Deleted text retains the source context as a tombstone. A new account
+  // must not regenerate the same rejected wording under its private key.
+  const result = await queryWithRetry<{ answer_signature: string; answer_context: AnswerReviewContext | null }>(
+    `SELECT answer_signature, answer_context FROM provisional_insight_summaries
+     WHERE quiz_id = $1 AND audience = $2 AND locale = $3 AND status = 'rejected'
+       AND (answer_signature = $4 OR ($5::boolean AND answer_context IS NOT NULL))`,
+    [quizId, audience, locale, signature, !!context],
   );
-  return result.rows[0]?.rejected ?? false;
+  return result.rows.some((row) => row.answer_signature === signature ||
+    (context && row.answer_context && sameAnswerPattern(row.answer_context, context)));
 }
 
 /** Authenticated caller supplies the user ID; only authored choice text and
@@ -152,6 +157,20 @@ export async function getProvisionalInsight(
     [quizId, audience, locale, answerSignature],
   );
   return result.rows[0] ?? null;
+}
+
+/** Public state only; never expose rejected text or model internals. */
+export async function getInsightGenerationState(
+  quizId: string, audience: 'public' | 'hcp', locale: InsightLocale, signature: string,
+): Promise<ProvisionalStatus | null> {
+  if (!(await hasSchema())) return null;
+  const result = await queryWithRetry<{ status: ProvisionalStatus }>(
+    `SELECT p.status FROM provisional_insight_summaries p
+     JOIN quizzes q ON q.id = p.quiz_id AND q.is_published = TRUE
+     WHERE p.quiz_id = $1 AND p.audience = $2 AND p.locale = $3 AND p.answer_signature = $4`,
+    [quizId, audience, locale, signature],
+  );
+  return result.rows[0]?.status ?? null;
 }
 
 /** A model can ignore the requested language. Reclaim only unreviewed text. */

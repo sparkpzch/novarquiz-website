@@ -459,6 +459,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
             user_display_name: user.displayName,
             user_photo_url: user.photoURL,
             is_guest: user.isAnonymous,
+            locale: th ? 'th' : 'en',
             final_question_id: completionRef.current?.questionId,
             final_question_token: completionRef.current?.questionToken,
             final_choice_label: completionRef.current?.choiceLabel,
@@ -491,7 +492,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       setCompletionSaving(false);
       await refreshLeaderboard();
     })();
-  }, [copy, finished, refreshLeaderboard, score, sessionId, user]);
+  }, [copy, finished, refreshLeaderboard, score, sessionId, th, user]);
 
   if (finished) {
     return <FinishedQuiz score={score} elapsed={elapsed} quizName={sessionMeta?.quiz_name || sessionMeta?.name} leaderboard={leaderboard} error={leaderboardError} saving={completionSaving} guest={!!user?.isAnonymous} th={th}

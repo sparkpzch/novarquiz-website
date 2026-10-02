@@ -23,20 +23,32 @@ export default function PersonalRecapCard({ report, locale, compact = false, det
   const coaching = historyCoaching(report, locale);
   const feedback = report.feedback;
   const everydayFeedback = feedback && feedback.reviewStatus !== 'metrics' && isEverydayInsight(feedback) ? feedback : null;
+  const generating = report.insightState === 'generating';
+  const hint = everydayFeedback?.suggestion ?? coaching.nextAnswer?.alignedChoices.find((choice) => choice.explanation)?.explanation ?? null;
+  const stateText = generating
+    ? copy('AI is analysing your quiz answers…', 'AI กำลังวิเคราะห์คำตอบของคุณ…')
+    : report.insightState === 'rejected'
+      ? copy('The AI recap was removed after review. Your recorded quiz answers are still available.', 'สรุปจาก AI ถูกนำออกหลังการตรวจทาน คุณยังดูคำตอบในแบบทดสอบของคุณได้')
+      : report.insightState === 'consent-required'
+        ? copy('Accept the current privacy notice to enable AI analysis. This recap uses your recorded answers.', 'ยอมรับประกาศความเป็นส่วนตัวฉบับปัจจุบันเพื่อใช้ AI วิเคราะห์ สรุปนี้อ้างอิงจากคำตอบของคุณ')
+        : !everydayFeedback ? copy('AI recap is unavailable. Here is a recap from your recorded answers.', 'ยังไม่มีสรุปจาก AI นี่คือสรุปจากคำตอบที่คุณเลือก') : null;
   return <section className={`nq-personal-recap history-card history-recap${compact ? ' personal-recap-compact' : ''}`} aria-labelledby={headingId}>
     <div className="history-recap-art" aria-hidden="true"><div className="history-bloom bloom-one" /><div className="history-bloom bloom-two" /><div className="history-bloom bloom-three" /><div className="history-art-center"><RecapIcon name="book" /></div><RecapIcon name="spark" className="history-art-spark" /></div>
     <div className="history-recap-copy">
       <p className="history-section-label"><RecapIcon name="spark" />{copy('Your personal recap', 'สรุปสำหรับคุณ')}</p>
+      {everydayFeedback?.reviewStatus === 'approved' && <span className="personal-recap-review-badge personal-recap-approved">{copy('AI · admin reviewed', 'AI · ผ่านการตรวจสอบจากผู้ดูแลแล้ว')}</span>}
       {everydayFeedback?.reviewStatus === 'provisional' && <span className="personal-recap-review-badge">{copy('AI · awaiting admin or doctor review', 'AI · ยังไม่ผ่านการตรวจสอบจากผู้ดูแลหรือแพทย์')}</span>}
       <h2 id={headingId}>{everydayFeedback?.headline ?? coaching.headline}</h2>
+      {stateText && <p className="personal-recap-status" role="status">{stateText}</p>}
+      <p className="history-recap-body">{everydayFeedback?.body ?? coaching.body}</p>
+      {hint && <div className="personal-recap-hint"><strong>{copy('One hint to try', 'คำแนะนำให้ลองทบทวน')}</strong><p>{hint}</p></div>}
       {!compact && <>
-        <p className="history-recap-body">{everydayFeedback?.body ?? coaching.body}</p>
       {coaching.total > 0 && <div className="history-recap-facts">
           <span><RecapIcon name="check" />{copy(`${coaching.correct} ${coaching.correct === 1 ? 'answer' : 'answers'} to build on`, `มี ${coaching.correct} คำตอบให้เรียนรู้ต่อ`)}</span>
           {coaching.review.length > 0 && <span className="history-fact-review"><RecapIcon name="book" />{copy(`${coaching.review.length} to revisit`, `อีก ${coaching.review.length} ข้อที่ควรทบทวน`)}</span>}
         </div>}
-        <p className="history-recap-source">{copy('From your quiz', 'จากแบบทดสอบของคุณ')}: {report.session.session_name}</p>
       </>}
+      <p className="history-recap-source">{copy('Based on your answers to', 'อ้างอิงจากคำตอบของคุณใน')}: {report.session.session_name}</p>
       {detailsHref && <>
         <Link className="personal-recap-details" href={detailsHref}>{copy('View full feedback', 'ดูคำแนะนำทั้งหมด')} <span aria-hidden="true">→</span></Link>
         <p className="personal-recap-note">{everydayFeedback?.reviewStatus === 'provisional' ? copy('AI helped write this recap. It hasn’t been reviewed yet.', 'AI ช่วยเขียนสรุปนี้ โดยยังไม่ได้รับการตรวจทาน') : null} {copy('A recap of your learning, not medical advice.', 'สรุปสิ่งที่คุณเรียนรู้ ไม่ใช่คำแนะนำทางการแพทย์')}</p>

@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '@/lib/hooks/useTheme';
 
-export const TOS_VERSION = '2026-09-17';
-export const PRIVACY_VERSION = '2026-09-30';
+import { TOS_VERSION, PRIVACY_VERSION } from '@/lib/privacy/versions';
+export { TOS_VERSION, PRIVACY_VERSION } from '@/lib/privacy/versions';
 
 type Tab = 'terms' | 'privacy';
 
@@ -365,7 +365,8 @@ function PrivacyContent({ c }: { c: Palette }) {
           the answer key, and authored explanations may be sent to Google Gemini to draft
           feedback marked as awaiting review. Your name, email, account ID, and scores are
           not included in that request. The answer pattern and draft
-          are stored without an account ID for review and reuse.
+          are stored under a hashed draft key for review. Approved summaries can be
+          reused for people with closely matching answers.
         </p>
       </Section>
 

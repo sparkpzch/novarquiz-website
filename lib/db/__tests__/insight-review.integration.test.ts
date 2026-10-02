@@ -35,6 +35,7 @@ test('insight drafts and review lifecycle preserve scope, gate reuse, and block 
     const signature = randomUUID();
     const claim = await db.claimProvisionalInsight(quiz.id, 'public', 'en', signature, context); assert.ok(claim);
     assert.equal(await db.finishProvisionalInsight(claim.id, claim.claim_token, { headline: 'Read the serving size', body: 'You checked the serving size on the label.', suggestion: 'Review the package table.' }, 'qa-mock'), true);
+    assert.equal(await db.getInsightGenerationState(quiz.id, 'public', 'en', signature), 'provisional');
     const row = (await db.listProvisionalInsights()).find(r => r.id === claim.id)!; assert.ok(row.revision);
     const saved = await db.saveProvisionalDraft(row.id, { headline: 'A helpful label check', body: 'You chose to check the serving size.', suggestion: null }, row.revision); assert.ok(saved); assert.notEqual(saved.revision, row.revision);
     assert.equal(await db.reviewProvisionalInsight(row.id, 'approved', 'qa', { expectedRevision: row.revision }), null, 'Stale approvals must fail');
@@ -50,5 +51,47 @@ test('insight drafts and review lifecycle preserve scope, gate reuse, and block 
     assert.equal((await db.listProvisionalInsights()).some(r => r.id === row.id), false);
     assert.equal(await db.isAnswerPatternRejected(quiz.id, 'public', 'en', signature), true);
     assert.equal(await db.claimProvisionalInsight(quiz.id, 'public', 'en', signature, context), null);
+    assert.equal(await db.getInsightGenerationState(quiz.id, 'public', 'en', signature), 'rejected');
+    assert.equal(await db.isAnswerPatternRejected(quiz.id, 'public', 'en', 'another-account-key', context), true, 'Deleted rejected patterns must stay blocked for other accounts');
+
+    // A interrupted post-response job is recoverable, while its old owner can
+    // never overwrite the newer generation or an admin decision.
+    const recoverySignature = randomUUID();
+    const firstJob = await db.claimProvisionalInsight(quiz.id, 'public', 'en', recoverySignature, context); assert.ok(firstJob);
+    assert.equal(await db.getInsightGenerationState(quiz.id, 'public', 'en', recoverySignature), 'generating');
+    assert.equal(await db.claimProvisionalInsight(quiz.id, 'public', 'en', recoverySignature, context), null);
+    await client.query("UPDATE provisional_insight_summaries SET updated_at = now() - interval '90 seconds' WHERE id = $1", [firstJob.id]);
+    const recovered = await db.claimProvisionalInsight(quiz.id, 'public', 'en', recoverySignature, context); assert.ok(recovered);
+    assert.notEqual(recovered.claim_token, firstJob.claim_token);
+    assert.equal(await db.finishProvisionalInsight(firstJob.id, firstJob.claim_token, { headline: 'Stale draft', body: 'Must never overwrite the newer job.', suggestion: null }, 'qa-mock'), false);
+    assert.equal(await db.finishProvisionalInsight(recovered.id, recovered.claim_token, { headline: 'Read the serving size', body: 'Compare serving sizes on the food labels.', suggestion: null }, 'qa-mock'), true);
+
+    // Even an answer one microsecond after completion belongs to a later
+    // attempt and cannot change the completed recap used by Home and Stats.
+    const source = (await client.query(`SELECT q.id, q.session_id AS quiz_id, c.label
+      FROM questions q JOIN quizzes quiz ON quiz.id = q.session_id AND quiz.is_published = TRUE
+      JOIN choices c ON c.question_id = q.id WHERE c.score_impact > 0 AND c.label IN ('A', 'B', 'C', 'D') LIMIT 1`)).rows[0];
+    assert.ok(source, 'Need a published question with an answer key');
+    const historyUid = `qa-history-${randomUUID()}`;
+    const cutoff = '2026-10-02T10:00:00.123456Z';
+    const run = (await client.query('INSERT INTO sessions (session_id, user_id) VALUES ($1, $2) RETURNING id', [source.quiz_id, historyUid])).rows[0];
+    await client.query(`INSERT INTO user_answers (session_id, user_id, question_id, chosen_label, utility_score, answered_at)
+      VALUES ($1, $2, $3, $4, 1, $5::timestamptz), ($1, $2, $3, $4, 0, $5::timestamptz + interval '1 microsecond')`, [run.id, historyUid, source.id, source.label, cutoff]);
+    await client.query('INSERT INTO leaderboard_entries (session_id, user_id, completed_at, correct_count) VALUES ($1, $2, $3, 1)', [run.id, historyUid, cutoff]);
+    const oldBranch = (await client.query(`SELECT q.id, c.label FROM questions q
+      JOIN choices c ON c.question_id = q.id WHERE q.session_id = $1 AND q.id <> $2
+      AND c.label IN ('A', 'B', 'C', 'D') LIMIT 1`, [source.quiz_id, source.id])).rows[0];
+    if (oldBranch) {
+      await client.query(`INSERT INTO user_answers (session_id, user_id, question_id, chosen_label, utility_score, answered_at)
+        VALUES ($1, $2, $3, $4, 0, $5::timestamptz - interval '1 day')`, [run.id, historyUid, oldBranch.id, oldBranch.label, cutoff]);
+    }
+    const history = await templates.getUserHistory(historyUid);
+    assert.equal(history[0].completed_at, cutoff);
+    const completedAnswers = await templates.getUserHistoryAnswers(historyUid, run.id, history[0].completed_at);
+    assert.equal(completedAnswers.length, 1); assert.equal(completedAnswers[0].selectedAligned, true);
+    assert.equal((await templates.getUserHistoryAnswers(historyUid, run.id))[0].selectedAligned, false);
+    assert.equal((await templates.getUserHistoryAnswers(`other-${historyUid}`, run.id, cutoff)).length, 0);
+
+
   } finally { await client.query('ROLLBACK'); client.release(); await pool.end(); }
 });

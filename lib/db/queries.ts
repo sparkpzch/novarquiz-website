@@ -1368,7 +1368,7 @@ export async function getUserHistory(userId: string) {
        le.incorrect_count,
        le.streak,
        le.total_time_ms,
-       le.completed_at,
+       to_char(le.completed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS completed_at,
        (
          SELECT COUNT(*) FROM leaderboard_entries
          WHERE session_id = le.session_id AND total_score > le.total_score
@@ -1377,7 +1377,7 @@ export async function getUserHistory(userId: string) {
      FROM leaderboard_entries le
      LEFT JOIN sessions s ON le.session_id::text = s.id::text
      LEFT JOIN quizzes qs ON (s.session_id::text = qs.id::text OR le.session_id::text = qs.id::text)
-     WHERE le.user_id = $1
+     WHERE le.user_id = $1 AND le.completed_at IS NOT NULL
      ORDER BY le.completed_at DESC`,
     [userId],
   );
@@ -1386,7 +1386,7 @@ export async function getUserHistory(userId: string) {
 
 // Personal question review is scoped to both the authenticated user and the
 // selected run. Never return cohort answers through the player history API.
-export async function getUserHistoryAnswers(userId: string, sessionId: string) {
+export async function getUserHistoryAnswers(userId: string, sessionId: string, completedAt?: string | null) {
   const [layered, questionTags] = await Promise.all([
     hasLayeredAnalyticsSchema(), hasQuestionTopicTagsSchema(),
   ]);
@@ -1407,7 +1407,14 @@ export async function getUserHistoryAnswers(userId: string, sessionId: string) {
     `WITH latest AS (
        SELECT DISTINCT ON (ua.question_id) ua.*
        FROM user_answers ua WHERE ua.user_id = $1 AND ua.session_id::text = $2
+         AND ($3::timestamptz IS NULL OR ua.answered_at <= $3::timestamptz)
        ORDER BY ua.question_id, ua.answered_at DESC, ua.id DESC
+     ), completed_answers AS (
+       SELECT * FROM latest ORDER BY answered_at DESC, id DESC
+       LIMIT CASE WHEN $3::timestamptz IS NULL THEN 2147483647 ELSE COALESCE(
+         (SELECT correct_count + incorrect_count FROM leaderboard_entries
+          WHERE user_id = $1 AND session_id::text = $2 AND completed_at = $3::timestamptz), 0
+       ) END
      )
      SELECT q.id, q.question_text AS question, chosen.choice_text AS selected,
             chosen.explanation AS "selectedExplanation", (latest.utility_score > 0) AS "selectedAligned",
@@ -1416,11 +1423,11 @@ export async function getUserHistoryAnswers(userId: string, sessionId: string) {
             ${tags} AS tags,
             COALESCE((SELECT jsonb_agg(jsonb_build_object('text', c.choice_text, 'explanation', c.explanation) ORDER BY c.label)
               FROM choices c WHERE c.question_id = q.id AND c.score_impact > 0), '[]'::jsonb) AS "alignedChoices"
-     FROM latest JOIN questions q ON q.id = latest.question_id
+     FROM completed_answers latest JOIN questions q ON q.id = latest.question_id
      JOIN quizzes quiz ON quiz.id = q.session_id AND quiz.is_published = TRUE
      JOIN choices chosen ON chosen.question_id = q.id AND chosen.label = latest.chosen_label
      ORDER BY q.question_order, q.id`,
-    [userId, sessionId],
+    [userId, sessionId, completedAt ?? null],
   );
   return result.rows;
 }

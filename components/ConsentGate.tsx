@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/hooks/useAuth';
-import TermsModal, { PRIVACY_VERSION, TOS_VERSION } from '@/components/ui/TermsModal';
+import TermsModal from '@/components/ui/TermsModal';
+import { PRIVACY_VERSION, TOS_VERSION } from '@/lib/privacy/versions';
 import { useToast } from '@/components/ui/Toast';
 import type { UserConsentProfile } from '@/lib/types';
 

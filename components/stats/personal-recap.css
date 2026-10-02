@@ -91,3 +91,11 @@
   .nq-personal-recap .history-recap-facts { gap: 7px; }
   .nq-personal-recap .history-recap-facts span { font-size: 12px; padding: 7px 10px; }
 }
+
+.nq-personal-recap .personal-recap-hint { margin-top: 18px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--history-line); background: var(--history-purple-soft); font-size: 15px; line-height: 1.65; }
+.nq-personal-recap .personal-recap-hint strong { color: var(--history-purple); font-size: 13px; }
+.nq-personal-recap .personal-recap-hint p { margin: 6px 0 0; color: var(--history-ink); }
+.nq-personal-recap .personal-recap-status { margin: 12px 0 0; color: var(--history-muted); font-size: 13px; line-height: 1.6; }
+.nq-personal-recap .personal-recap-approved { background: var(--history-green-soft); color: var(--history-green); }
+.nq-personal-recap.personal-recap-compact .history-recap-body { font-size: 15px; margin-top: 12px; }
+.nq-personal-recap.personal-recap-compact .personal-recap-hint { font-size: 14px; padding: 12px; }

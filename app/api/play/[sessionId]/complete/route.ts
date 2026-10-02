@@ -1,12 +1,18 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { completeSession, getAttemptBoundary, getExistingAnswer, getNextQuestion, getQuestionById, getQuizForQuestion, resolveSessionToQuizId, withPlayerAnswerLock } from '@/lib/db/queries';
+import { completeSession, getAttemptBoundary, getExistingAnswer, getUserHistory, getUserHistoryAnswers, getNextQuestion, getQuestionById, getQuizForQuestion, resolveSessionToQuizId, withPlayerAnswerLock } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
 import { verifyQuestionToken } from '@/lib/security/question-token';
 
+import { preparePersonalRecap } from '@/lib/ai/personal-recap';
+import type { UserHistoryRow } from '@/lib/analytics/history';
+
+export const maxDuration = 60;
+
 const CompletionBody = z.object({
   is_guest: z.boolean().optional(),
+  locale: z.enum(['en', 'th']).default('en'),
   final_question_id: z.string().uuid(),
   final_question_token: z.string(),
   final_choice_label: z.string().min(1).max(10).optional(),
@@ -82,6 +88,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       currentQuestionId: null,
       updatedAt: Date.now(),
     }).catch(() => {});
+
+    // Start analysis only after a verified, persisted completion. The DB lease
+    // deduplicates Home/Stats reads; abandoned leases can be recovered there.
+    after(async () => {
+      try {
+        const rows = await getUserHistory(user.uid) as UserHistoryRow[];
+        const session = rows.find((row) => row.session_id === sessionId);
+        if (!session) return;
+        const answers = await getUserHistoryAnswers(user.uid, sessionId, session.completed_at);
+        const prepared = await preparePersonalRecap(user.uid, session, answers, body.data.locale);
+        if (prepared.generate) await prepared.generate();
+      } catch (error) {
+        console.error('completion recap failed:', error instanceof Error ? error.message : 'unknown error');
+      }
+    });
 
     // Return only the score summary required by the player client.
     return NextResponse.json({

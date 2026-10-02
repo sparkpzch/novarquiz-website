@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getSessionUser } from '@/lib/auth';
 import { getUserConsent, upsertUserConsent } from '@/lib/db/queries';
 import { checkRateLimit } from '@/lib/ratelimit';
-import { PRIVACY_VERSION, TOS_VERSION } from '@/components/ui/TermsModal';
+import { PRIVACY_VERSION, TOS_VERSION } from '@/lib/privacy/versions';
 import { DEFAULT_CONSENT_PURPOSES } from '@/lib/analytics/quiz-metadata';
 
 // ---------------------------------------------------------------------------

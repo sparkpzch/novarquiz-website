@@ -102,9 +102,7 @@ export function historyCoaching(report: PersonalHistoryReport, locale: InsightLo
     ? (locale === 'th' ? 'ยังไม่มีคำตอบให้ทบทวน' : 'Your quiz recap will appear here')
     : review.length === 0
       ? (locale === 'th' ? 'ตอบถูกครบทุกข้อ เยี่ยมเลย' : 'You got every question right. Nice work.')
-      : correct / answers.length >= 0.75
-        ? (locale === 'th' ? 'ทำได้ดีแล้ว อีกนิดก็เข้าใจมากขึ้น' : 'You’re doing well. Keep building on it.')
-        : (locale === 'th' ? 'ค่อย ๆ เรียนรู้ไปทีละเรื่อง' : 'A little practice goes a long way.');
+      : (locale === 'th' ? `ลองทบทวน: ${nextArea?.title ?? 'คำถามที่คุณตอบพลาด'}` : `Worth another look: ${nextArea?.title ?? 'the questions you missed'}`);
   const body = !answers.length
     ? (locale === 'th' ? 'เลือกแบบทดสอบที่ทำเสร็จแล้วเพื่อดูคำแนะนำของคุณ' : 'Choose a completed quiz to see what you learned.')
     : locale === 'th'

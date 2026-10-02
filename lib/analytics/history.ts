@@ -25,11 +25,14 @@ export type HistoryAnswer = AnswerReviewItem & {
   tags: string[];
 };
 
+export type PersonalInsightState = 'generating' | 'pending' | 'approved' | 'rejected' | 'unavailable' | 'consent-required';
+
 export type PersonalHistoryReport = {
   session: UserHistoryRow;
   answers: HistoryAnswer[];
   topics: TopicUnderstanding[];
   feedback: PersonalFeedback | null;
+  insightState?: PersonalInsightState;
 };
 
 export function summarizeHistoryTopics(answers: HistoryAnswer[]): TopicUnderstanding[] {

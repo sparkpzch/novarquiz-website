@@ -25,6 +25,17 @@ export function isGeminiConfigured() {
   return Boolean(process.env.GEMINI_API_KEY);
 }
 
+/** Personal summaries stay on Flash Lite even if CMS drafts use another
+ * explicitly configured model. There is no escalation to a larger model. */
+export function geminiLiteModel() {
+  const configured = geminiModel();
+  return /(?:^|-)flash-lite(?:-|$)/.test(configured) ? configured : DEFAULT_MODEL;
+}
+
+export function generatePersonalInsight(prompt: string): Promise<string> {
+  return generateText(prompt, geminiLiteModel());
+}
+
 type GenerateResponse = {
   candidates?: Array<{
     content?: { parts?: Array<{ text?: string }> };
@@ -34,7 +45,7 @@ type GenerateResponse = {
 };
 
 /** Returns the model's raw text. Callers validate it before storing anything. */
-export async function generateText(prompt: string): Promise<string> {
+export async function generateText(prompt: string, model = geminiModel()): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new GeminiError('GEMINI_API_KEY is not set');
 
@@ -43,7 +54,7 @@ export async function generateText(prompt: string): Promise<string> {
 
   let response: Response;
   try {
-    response = await fetch(`${ENDPOINT}/${geminiModel()}:generateContent`, {
+    response = await fetch(`${ENDPOINT}/${model}:generateContent`, {
       method: 'POST',
       // Header rather than ?key= so the secret stays out of URLs and logs.
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
