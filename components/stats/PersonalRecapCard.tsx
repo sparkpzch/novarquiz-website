@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { historyCoaching, isEverydayInsight } from '@/lib/analytics/history-coaching';
 import type { PersonalHistoryReport } from '@/lib/analytics/history';
+import { firstInsightSentence } from '@/lib/analytics/insight-preview';
 import './personal-recap.css';
 
 function RecapIcon({ name, className = '' }: { name: 'book' | 'spark' | 'check'; className?: string }) {
@@ -39,7 +40,7 @@ export default function PersonalRecapCard({ report, locale, compact = false, det
       {everydayFeedback?.reviewStatus === 'provisional' && <span className="personal-recap-review-badge">{copy('AI · awaiting admin or doctor review', 'AI · ยังไม่ผ่านการตรวจสอบจากผู้ดูแลหรือแพทย์')}</span>}
       <h2 id={headingId}>{everydayFeedback?.headline ?? coaching.headline}</h2>
       {stateText && <p className="personal-recap-status" role="status">{stateText}</p>}
-      {everydayFeedback && <p className="history-recap-body">{everydayFeedback.body}</p>}
+      {everydayFeedback && <p className="history-recap-body">{firstInsightSentence(everydayFeedback.body, locale)}</p>}
       {!compact && <>
       {coaching.total > 0 && <div className="history-recap-facts">
           <span><RecapIcon name="check" />{copy(`${coaching.correct} ${coaching.correct === 1 ? 'answer' : 'answers'} to build on`, `มี ${coaching.correct} คำตอบให้เรียนรู้ต่อ`)}</span>
@@ -48,7 +49,7 @@ export default function PersonalRecapCard({ report, locale, compact = false, det
       </>}
       {detailsHref && <>
         <Link className="personal-recap-details" href={detailsHref}>{copy('View full feedback', 'ดูคำแนะนำทั้งหมด')} <span aria-hidden="true">→</span></Link>
-        <p className="personal-recap-note">{everydayFeedback?.reviewStatus === 'provisional' ? copy('AI helped write this recap. It hasn’t been reviewed yet.', 'AI ช่วยเขียนสรุปนี้ โดยยังไม่ได้รับการตรวจทาน') : null} {copy('A recap of your learning, not medical advice.', 'สรุปสิ่งที่คุณเรียนรู้ ไม่ใช่คำแนะนำทางการแพทย์')}</p>
+        <p className="personal-recap-note">{copy('A recap of your learning, not medical advice.', 'สรุปสิ่งที่คุณเรียนรู้ ไม่ใช่คำแนะนำทางการแพทย์')}</p>
       </>}
     </div>
   </section>;

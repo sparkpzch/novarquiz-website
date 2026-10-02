@@ -122,6 +122,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const [completionSaving, setCompletionSaving] = useState(true);
   const [showExplanationModal, setShowExplanationModal] = useState(false);
   const completedRef = useRef(false);
+  const guestAttemptRef = useRef<string | null>(null);
   const completionRef = useRef<{ questionId: string; questionToken: string; choiceLabel?: string } | null>(null);
   const userRef = useRef(user);
   const sessionStartRef = useRef<number>(0);
@@ -134,6 +135,10 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const videoQualityRef = useRef(videoQuality);
 
   const playRequest = useCallback(async (url: string, init?: RequestInit) => {
+    if (user?.isAnonymous && url.includes('/answer?')) {
+      guestAttemptRef.current ??= crypto.randomUUID();
+      url += `&attempt=${encodeURIComponent(guestAttemptRef.current)}`;
+    }
     const headers = new Headers(init?.headers);
     if (user?.isAnonymous) headers.set('Authorization', `Bearer ${await user.getIdToken()}`);
     return fetch(url, { ...init, headers });
@@ -495,7 +500,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   }, [copy, finished, refreshLeaderboard, score, sessionId, th, user]);
 
   if (finished) {
-    return <FinishedQuiz score={score} elapsed={elapsed} quizName={sessionMeta?.quiz_name || sessionMeta?.name} leaderboard={leaderboard} error={leaderboardError} saving={completionSaving} guest={!!user?.isAnonymous} th={th}
+    return <FinishedQuiz uid={user?.uid ?? null} sessionId={sessionId} score={score} elapsed={elapsed} quizName={sessionMeta?.quiz_name || sessionMeta?.name} leaderboard={leaderboard} error={leaderboardError} saving={completionSaving} guest={!!user?.isAnonymous} th={th}
       onRetry={() => void refreshLeaderboard()} onHome={() => router.push(user?.isAnonymous ? '/sign-in' : '/')}
       onLeaderboard={() => router.push(`/leaderboard?session=${encodeURIComponent(sessionId)}`)}
       onSummary={() => router.push(user?.isAnonymous ? '/sign-in' : `/stats?session=${encodeURIComponent(sessionId)}`)} />;

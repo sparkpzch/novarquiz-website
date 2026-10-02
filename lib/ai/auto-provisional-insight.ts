@@ -1,4 +1,4 @@
-import { answerPatternSignature, buildProvisionalInsightPrompt, hasSpecificInsightHeadline, personalDraftSignature, parseProvisionalInsight } from '../analytics/provisional-insights';
+import { answerPatternSignature, buildProvisionalInsightPrompt, hasSpecificInsightHeadline, parseProvisionalInsight } from '../analytics/provisional-insights';
 import type { InsightLocale, InsightSummary } from '../analytics/insights';
 import { isEverydayInsight } from '../analytics/history-coaching';
 import { validateInsightLanguage } from '../analytics/insights';
@@ -12,7 +12,7 @@ export type AutoProvisionalInsight = {
 };
 
 /** Sends recorded selections and authored explanations, but never a UID or
- * clinical profile. Each account caches its own unreviewed draft. */
+ * clinical profile. Matching answers share one draft and generation lease. */
 type ProvisionalInput = {
   userId: string;
   quizId: string;
@@ -33,12 +33,12 @@ export type PreparedInsight = {
 async function defaultDependencies() {
   const {
     claimProvisionalInsight, failProvisionalInsight, finishProvisionalInsight,
-    getProvisionalInsight, getInsightGenerationState, getSimilarApprovedInsight,
+    getProvisionalInsight, getInsightGenerationState, getSimilarReusableInsight,
     isAnswerPatternRejected, getUserAnswerReviewContext, invalidateProvisionalLanguage,
   } = await import('../db/provisional-insights');
   return {
     claimProvisionalInsight, failProvisionalInsight, finishProvisionalInsight,
-    getProvisionalInsight, getInsightGenerationState, getSimilarApprovedInsight,
+    getProvisionalInsight, getInsightGenerationState, getSimilarReusableInsight,
     isAnswerPatternRejected, getUserAnswerReviewContext, invalidateProvisionalLanguage,
     generateText: generatePersonalInsight, geminiModel: geminiLiteModel, isGeminiConfigured,
   };
@@ -48,7 +48,7 @@ export type InsightDependencies = Awaited<ReturnType<typeof defaultDependencies>
 export async function prepareProvisionalInsight(input: ProvisionalInput, dependencies?: InsightDependencies): Promise<PreparedInsight> {
   const {
     claimProvisionalInsight, failProvisionalInsight, finishProvisionalInsight,
-    getProvisionalInsight, getInsightGenerationState, getSimilarApprovedInsight,
+    getProvisionalInsight, getInsightGenerationState, getSimilarReusableInsight,
     isAnswerPatternRejected, getUserAnswerReviewContext, invalidateProvisionalLanguage,
     generateText, geminiModel, isGeminiConfigured,
   } = dependencies ?? await defaultDependencies();
@@ -62,17 +62,19 @@ export async function prepareProvisionalInsight(input: ProvisionalInput, depende
     ...(input.readingStyle ? { readingStyle: input.readingStyle } : {}),
   });
 
-  const answerSignature = personalDraftSignature(patternSignature, input.userId);
+  const answerSignature = patternSignature;
   if (await isAnswerPatternRejected(input.quizId, input.audience, input.locale, patternSignature, context)) return { state: 'rejected' };
 
-  // Reuse approved wording before an unreviewed cache entry, without sending
-  // the player's answers to the model again.
-  const approved = await getSimilarApprovedInsight(input.quizId, input.audience, input.locale, context);
-  if (approved) {
-    const summary = { headline: approved.headline, body: approved.body, suggestion: approved.suggestion };
+  // Review verifies wording; it does not gate reuse. Prefer reviewed wording,
+  // then a compatible pending draft, including drafts stored under older keys.
+  const reusable = await getSimilarReusableInsight(input.quizId, input.audience, input.locale, context);
+  if (reusable) {
+    const summary = { headline: reusable.headline, body: reusable.body, suggestion: reusable.suggestion };
     if (validateInsightLanguage(summary, input.locale) && (input.readingStyle !== 'everyday' || (isEverydayInsight(summary) && hasSpecificInsightHeadline(summary)))) {
-      return { state: 'approved', insight: { summary, status: 'approved' } };
+      const status = reusable.status === 'approved' ? 'approved' : 'provisional';
+      return { state: status === 'approved' ? 'approved' : 'pending', insight: { summary, status } };
     }
+    if (reusable.status === 'provisional') await invalidateProvisionalLanguage(reusable.id);
   }
 
   const existing = await getProvisionalInsight(input.quizId, input.audience, input.locale, answerSignature);

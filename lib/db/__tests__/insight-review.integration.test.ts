@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 
 const databaseUrl = process.env.INSIGHTS_TEST_DATABASE_URL;
 
-test('insight drafts and review lifecycle preserve scope, gate reuse, and block deleted patterns', { skip: !databaseUrl }, async () => {
+test('insight drafts and review lifecycle preserve scope, share pending text, and block deleted patterns', { skip: !databaseUrl }, async () => {
   process.env.DATABASE_URL = databaseUrl!;
   process.env.DB_PROVIDER = databaseUrl!.includes('neon.tech') ? 'neon' : 'docker';
   const pool = new Pool({ connectionString: databaseUrl, ssl: databaseUrl!.includes('neon.tech') ? { rejectUnauthorized: true } : false });
@@ -33,15 +33,21 @@ test('insight drafts and review lifecycle preserve scope, gate reuse, and block 
     assert.equal(edited.id, draft.id); assert.equal(edited.quiz_id, quiz.id); assert.equal(edited.audience, 'hcp'); assert.equal(edited.locale, 'en'); assert.equal(edited.review_status, 'draft'); assert.equal(edited.reviewed_by, null);
     const context = { quizName: quiz.name, quizDescription: quiz.description, answers: [{ question: 'QA serving size?', selected: 'The serving size', selectedExplanation: 'Read the package table.', selectedAligned: true, alignedChoices: [{ text: 'The serving size', explanation: 'Read the package table.' }] }] };
     const signature = randomUUID();
-    const claim = await db.claimProvisionalInsight(quiz.id, 'public', 'en', signature, context); assert.ok(claim);
+    const claims = await Promise.all(Array.from({ length: 8 }, () => db.claimProvisionalInsight(quiz.id, 'public', 'en', signature, context)));
+    assert.equal(claims.filter(Boolean).length, 1, 'Concurrent submissions must share one database generation lease');
+    const claim = claims.find(Boolean)!; assert.ok(claim);
     assert.equal(await db.finishProvisionalInsight(claim.id, claim.claim_token, { headline: 'Read the serving size', body: 'You checked the serving size on the label.', suggestion: 'Review the package table.' }, 'qa-mock'), true);
     assert.equal(await db.getInsightGenerationState(quiz.id, 'public', 'en', signature), 'provisional');
     const row = (await db.listProvisionalInsights()).find(r => r.id === claim.id)!; assert.ok(row.revision);
+    const pending = await db.getSimilarReusableInsight(quiz.id, 'public', 'en', context);
+    assert.equal(pending?.id, claim.id); assert.equal(pending?.status, 'provisional', 'Pending wording is reusable before review');
+    assert.equal(await db.getSimilarReusableInsight(quiz.id, 'hcp', 'en', context), null);
+    assert.equal(await db.getSimilarReusableInsight(quiz.id, 'public', 'en', { ...context, answers: [{ ...context.answers[0], selected: 'Different answer' }] }), null);
     const saved = await db.saveProvisionalDraft(row.id, { headline: 'A helpful label check', body: 'You chose to check the serving size.', suggestion: null }, row.revision); assert.ok(saved); assert.notEqual(saved.revision, row.revision);
     assert.equal(await db.reviewProvisionalInsight(row.id, 'approved', 'qa', { expectedRevision: row.revision }), null, 'Stale approvals must fail');
     const approved = await db.reviewProvisionalInsight(row.id, 'approved', 'qa', { expectedRevision: saved.revision }); assert.ok(approved); assert.equal(approved.status, 'approved');
-    const reused = await db.getSimilarApprovedInsight(quiz.id, 'public', 'en', context); assert.equal(reused?.id, row.id);
-    assert.equal(await db.getSimilarApprovedInsight(quiz.id, 'public', 'th', context), null);
+    const reused = await db.getSimilarReusableInsight(quiz.id, 'public', 'en', context); assert.equal(reused?.id, row.id);
+    assert.equal(await db.getSimilarReusableInsight(quiz.id, 'public', 'th', context), null);
     const rejected = await db.reviewProvisionalInsight(row.id, 'rejected', 'qa', { expectedRevision: approved.revision, disposition: 'keep' }); assert.ok(rejected); assert.equal(rejected.headline, saved.headline);
     assert.equal(await db.getProvisionalInsight(quiz.id, 'public', 'en', signature), null);
     const reconsidered = await db.saveProvisionalDraft(row.id, { headline: 'Reconsider this label recap', body: 'Check the label before comparing.', suggestion: null }, rejected.revision);

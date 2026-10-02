@@ -24,14 +24,9 @@ export function answerPatternSignature(input: AnswerReviewContext & {
     readingStyle: input.readingStyle,
     quizName: input.quizName,
     quizDescription: input.quizDescription,
+    learningFocus: input.learningFocus,
     answers: canonicalAnswers(input.answers),
   })).digest('hex');
-}
-
-/** Pending drafts belong to one account; only reviewed wording is shared.
- * The stored digest and model prompt contain no plaintext account ID. */
-export function personalDraftSignature(pattern: string, userId: string): string {
-  return createHash('sha256').update(JSON.stringify(['personal-draft', pattern, userId])).digest('hex');
 }
 
 export function sameAnswerPattern(source: AnswerReviewContext, target: AnswerReviewContext): boolean {
@@ -49,7 +44,7 @@ function canonicalAnswers(answers: AnswerReviewContext['answers']) {
   })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
 }
 
-/** Reuse only when every recorded selection behind the approved wording also
+/** Reuse only when every recorded selection behind the cached wording also
  * exists in the new answers. Up to 20% additional answers are allowed, but a
  * changed selection or explanation is never treated as a match. */
 export function approvedAnswerCoverage(source: AnswerReviewContext, target: AnswerReviewContext): number {
@@ -124,7 +119,7 @@ export function buildProvisionalInsightPrompt(context: AnswerReviewContext & {
       ? 'สำคัญ: เขียน headline, body และ suggestion เป็นภาษาไทยทั้งหมด แม้ข้อมูลต้นทางจะเป็นภาษาอังกฤษ'
       : 'Important: write headline, body, and suggestion in English even if the source material is Thai.',
     `headline: at most ${HEADLINE_MAX} characters.`,
-    `body: 1-2 short sentences, aim for under 160 characters, at most ${BODY_MAX} characters.`,
+    `body: exactly one short sentence combining a recorded choice with its useful learning hint, aim for under 160 characters, at most ${BODY_MAX} characters.`,
     `suggestion: one educational next step, at most ${SUGGESTION_MAX} characters.`,
     'Reply with JSON only: {"headline":"...","body":"...","suggestion":"..."}',
   ].filter(Boolean).join('\n');

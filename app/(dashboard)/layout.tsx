@@ -98,7 +98,7 @@ function matchesNavItem(
     );
   }
 
-  return pathname === href || (!exact && href !== '/' && pathname.startsWith(href));
+  return pathname === href || (!exact && href !== '/' && pathname.startsWith(`${href}/`));
 }
 
 function DashboardLayoutContent({ children }: { children: ReactNode }) {
@@ -227,7 +227,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
                 </p>
                 <div className="mt-2 space-y-1.5">
                   {desktopAdminItems.map((item) => {
-                    const active = isActive(item.href);
+                    const active = isActive(item.href, item.exact);
                     return (
                       <Link
                         key={item.href}

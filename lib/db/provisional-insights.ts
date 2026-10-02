@@ -51,7 +51,7 @@ async function hasSchema(): Promise<boolean> {
 
 type InsightRow = Omit<ProvisionalInsight, 'quiz_name'>;
 
-export async function getSimilarApprovedInsight(
+export async function getSimilarReusableInsight(
   quizId: string, audience: 'public' | 'hcp', locale: InsightLocale,
   context: AnswerReviewContext,
 ): Promise<InsightRow | null> {
@@ -60,13 +60,13 @@ export async function getSimilarApprovedInsight(
     `SELECT p.*, p.claim_token AS revision FROM provisional_insight_summaries p
      JOIN quizzes q ON q.id = p.quiz_id AND q.is_published = TRUE
      WHERE p.quiz_id = $1 AND p.audience = $2 AND p.locale = $3
-       AND p.status = 'approved' AND p.answer_context IS NOT NULL
+       AND p.status IN ('approved', 'provisional') AND p.answer_context IS NOT NULL
        AND p.headline IS NOT NULL AND p.body IS NOT NULL
-     ORDER BY p.reviewed_at DESC`, [quizId, audience, locale],
+     ORDER BY (p.status = 'approved') DESC, p.reviewed_at DESC NULLS LAST, p.updated_at DESC`, [quizId, audience, locale],
   );
   return result.rows.map((row) => ({ row, coverage: approvedAnswerCoverage(row.answer_context!, context) }))
     .filter(({ coverage }) => coverage > 0)
-    .sort((a, b) => b.coverage - a.coverage)[0]?.row ?? null;
+    .sort((a, b) => Number(b.row.status === 'approved') - Number(a.row.status === 'approved') || b.coverage - a.coverage)[0]?.row ?? null;
 }
 
 export async function isAnswerPatternRejected(
@@ -75,7 +75,7 @@ export async function isAnswerPatternRejected(
 ): Promise<boolean> {
   if (!(await hasSchema())) return false;
   // Deleted text retains the source context as a tombstone. A new account
-  // must not regenerate the same rejected wording under its private key.
+  // must not regenerate the same rejected wording under another cache key.
   const result = await queryWithRetry<{ answer_signature: string; answer_context: AnswerReviewContext | null }>(
     `SELECT answer_signature, answer_context FROM provisional_insight_summaries
      WHERE quiz_id = $1 AND audience = $2 AND locale = $3 AND status = 'rejected'

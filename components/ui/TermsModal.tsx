@@ -361,12 +361,13 @@ function PrivacyContent({ c }: { c: Palette }) {
           </li>
         </ul>
         <p className="mt-1">
-          When a published quiz has no approved feedback summary, your selected answers,
+          When a published quiz has no matching cached feedback summary, your selected answers,
           the answer key, and authored explanations may be sent to Google Gemini to draft
           feedback marked as awaiting review. Your name, email, account ID, and scores are
           not included in that request. The answer pattern and draft
-          are stored under a hashed draft key for review. Approved summaries can be
-          reused for people with closely matching answers.
+          are stored under a hashed draft key for review. Pending and approved summaries can be
+          reused for people with closely matching answers. Pending summaries carry an
+          unreviewed label; approval updates that label.
         </p>
       </Section>
 

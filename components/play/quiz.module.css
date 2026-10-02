@@ -83,20 +83,11 @@
 .feedbackDialog h3 { font-size: 14px; margin: 0 0 8px; }
 .explanation { color: var(--quiz-muted); font-size: 14px; line-height: 1.9; margin: 0 0 24px; white-space: pre-line; overflow-wrap: anywhere; }
 .feedbackDialog > .primaryButton { width: 100%; }
-.finishedHero { text-align: center; padding: 36px 28px 28px; }
-.trophy { display: grid; place-items: center; width: 76px; height: 76px; margin: 0 auto 20px; border-radius: 24px; background: var(--amber-soft); color: var(--amber); }
-.trophy svg { width: 52px; height: 52px; }
-.finishedHero h1 { font-size: clamp(26px, 4vw, 34px); line-height: 1.5; margin: 6px 0; }
-.heroDescription { color: var(--quiz-muted); font-size: 14px; line-height: 1.8; margin: 8px 0 24px; }
 .resultStats { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--soft); border: 1px solid var(--line); border-radius: 16px; padding: 20px 0; }
 .resultStat + .resultStat { border-left: 1px solid var(--line); }
 .resultStat strong { display: block; font-size: clamp(22px, 4vw, 30px); color: var(--blue); line-height: 1.4; font-variant-numeric: tabular-nums; }
 .resultStat small { display: block; margin-top: 4px; color: var(--quiz-muted); font-size: 11px; }
-.summaryCallout { display: flex; align-items: flex-start; gap: 12px; text-align: left; border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin-top: 20px; background: var(--blue-soft); }
-.summaryIcon { color: var(--blue); font-size: 22px; flex-shrink: 0; }
-.summaryCallout strong { display: block; font-size: 14px; }
-.summaryCallout p { color: var(--quiz-muted); margin: 5px 0 12px; font-size: 12px; line-height: 1.8; }
-.summaryCallout .primaryButton { min-height: 42px; font-size: 12px; padding: 9px 16px; }
+.summaryIcon { color: var(--blue); font-size: 24px; flex-shrink: 0; }
 .standingsTitle { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
 .standingsTitle h2 { font-size: 20px; margin: 0; }
 .standingsTitle > span { font-size: 11px; color: var(--quiz-muted); }
@@ -161,10 +152,8 @@
   .media { margin-bottom: 20px; }
   .feedbackDialog { padding: 22px 20px; }
   .feedbackDialog h2 { font-size: 21px; }
-  .finishedHero { padding: 28px 16px 20px; }
   .resultStats { padding: 16px 0; }
   .resultStat strong { font-size: 24px; }
-  .summaryCallout { padding: 14px; }
   .podium { gap: 10px; }
   .podiumPlayer > p { font-size: 12px; }
   .podiumScore { font-size: 18px; }
@@ -176,3 +165,73 @@
   .sessionControl { width: 100%; max-width: none; min-width: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .choice, .primaryButton, .secondaryButton { transition: none; } }
+
+.mobileRankingToggle { display: none; }
+
+/* The score and recap share the left half; completed standings fill the right. */
+.resultScreen { display: flex; align-items: center; min-height: 100dvh; padding-block: 24px; }
+.resultContainer, .resultsDashboard { max-width: 1080px; }
+.resultsDashboard { gap: 16px; }
+.resultsDashboard > .surface { padding: 16px 24px; }
+.resultsGrid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); grid-template-areas: "score standings" "insight standings"; gap: 16px; align-items: stretch; }
+.resultsGrid > .surface { min-width: 0; padding: 24px; border-radius: 20px; }
+.scorePanel { grid-area: score; }
+.scorePanel .resultStats { text-align: center; }
+.insightPanel { grid-area: insight; display: flex; flex-direction: column; }
+.standingsPanel { grid-area: standings; display: flex; flex-direction: column; }
+.resultHeading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.resultHeading :is(h1,h2) { font-size: clamp(22px, 3vw, 28px); line-height: 1.4; margin: 5px 0 0; }
+.trophy { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 16px; background: var(--amber-soft); color: var(--amber); flex-shrink: 0; }
+.trophy svg { width: 40px; height: 40px; }
+.insightHeading { display: flex; align-items: center; gap: 9px; }
+.insightHeading h2 { margin: 0; font-size: 17px; }
+.insightPanel h3 { font-size: 18px; line-height: 1.5; margin: 14px 0 6px; overflow-wrap: anywhere; }
+.insightSentence { font-size: 14px; line-height: 1.8; color: var(--quiz-muted); margin: 0; overflow-wrap: anywhere; }
+.reviewBadge { display: inline-block; vertical-align: middle; border: 1px solid var(--amber); color: var(--ink); background: var(--amber-soft); border-radius: 999px; font-size: 10px; line-height: 1.5; padding: 3px 8px; }
+.reviewed { border-color: var(--green); background: var(--green-soft); }
+.resultStatus { display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 1.8; margin: 14px 0 0; color: var(--quiz-muted); }
+.insightActions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 14px; }
+.textButton { background: none; color: var(--blue); padding: 6px 0; border: none; cursor: pointer; font-size: 13px; font-weight: 600; min-height: 36px; text-align: left; }
+.textButton:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; border-radius: 4px; }
+.textButton:disabled { opacity: .5; cursor: wait; }
+.standingsPanel > .actions { margin-top: auto; padding-top: 18px; }
+.compactStandings .standingsTitle { margin-bottom: 16px; }
+.compactStandings .rankingRow { padding: 12px; gap: 9px; }
+.compactStandings .rankingHeading { padding: 10px 12px; }
+.compactStandings .rankingTable ol { max-height: 280px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.compactStandings .rankingNote { margin-top: 12px; }
+.topRank { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--amber-soft); color: var(--amber); font-weight: 700; }
+.compactStandings .rankingTable + .secondaryButton { margin-top: 12px; min-height: 40px; }
+.resultsDashboard .pageHeading h1 { font-size: 24px; margin: 4px 0; }
+.resultsDashboard .pageHeading p { margin: 0; }
+.resultsDashboard .boardSession { margin-bottom: 16px; padding-bottom: 12px; }
+.resultsDashboard .boardSession p { display: none; }
+@media (max-width: 800px) {
+  .resultsGrid { grid-template-columns: minmax(0,1fr); grid-template-areas: "score" "insight" "standings"; gap: 12px; }
+  .resultScreen { align-items: flex-start; padding: 16px 12px 24px; }
+  .resultContainer { max-width: 540px; gap: 12px; }
+  .resultsGrid > .surface { padding: 16px; border-radius: 18px; }
+  .resultHeading { margin-bottom: 12px; }
+  .resultHeading :is(h1,h2) { font-size: 22px; }
+  .scorePanel .resultStats { padding: 12px 0; }
+  .insightPanel h3 { margin-top: 10px; font-size: 16px; }
+  .insightSentence { font-size: 13px; }
+  .insightActions { padding-top: 8px; }
+  .compactStandings .standingsTitle { margin-bottom: 10px; }
+  .compactStandings .rankingRow { padding: 9px 10px; }
+  .compactStandings .rankingNote { margin-top: 8px; }
+  .standingsPanel > .actions { padding-top: 12px; }
+  .resultsDashboard .pageHeading { gap: 10px; }
+}
+
+@media (max-width: 800px) {
+  .mobileRankingToggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; margin: 0 0 8px; padding: 8px 12px; color: var(--blue); background: var(--blue-soft); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: 600; }
+  .previewStandings .rankingTable ol:not(.expandedRankings) { display: none; }
+  .previewStandings:not(:has(.expandedRankings)) .rankingGap { display: none; }
+}
+
+.mobileOwnRow { display: none; }
+@media (max-width: 800px) {
+  .mobileOwnRow { display: grid; }
+  .previewStandings:has(.expandedRankings) .mobileOwnRow { display: none; }
+}

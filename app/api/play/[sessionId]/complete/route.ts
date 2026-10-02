@@ -7,6 +7,7 @@ import { verifyQuestionToken } from '@/lib/security/question-token';
 
 import { preparePersonalRecap } from '@/lib/ai/personal-recap';
 import type { UserHistoryRow } from '@/lib/analytics/history';
+import type { PreparedInsight } from '@/lib/ai/auto-provisional-insight';
 
 export const maxDuration = 60;
 
@@ -54,6 +55,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    let prepared: PreparedInsight = { state: 'unavailable' };
     const result = await withPlayerAnswerLock(sessionId, user.uid, async () => {
       const boundary = await getAttemptBoundary(sessionId, user.uid);
       if (!verifyQuestionToken(body.data.final_question_token, sessionId, user.uid, body.data.final_question_id, boundary)) return null;
@@ -74,12 +76,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
         if (await getNextQuestion(question.id, label)) return null;
       }
 
-      return completeSession({
+      const completed = await completeSession({
         session_id: sessionId,
         user_id: user.uid,
         user_display_name: sanitizeDisplayName(body.data.user_display_name),
         user_photo_url: sanitizePhotoUrl(body.data.user_photo_url),
       });
+      // Persist the shared generation claim before returning completion. Capture
+      // the exact finished attempt while the player's answer lock is still held.
+      try {
+        const rows = await getUserHistory(user.uid) as UserHistoryRow[];
+        const session = rows.find((row) => row.session_id === sessionId);
+        if (session) {
+          const answers = await getUserHistoryAnswers(user.uid, sessionId, session.completed_at);
+          prepared = await preparePersonalRecap(user.uid, session, answers, body.data.locale);
+        }
+      } catch (error) {
+        console.error('completion recap preparation failed:', error instanceof Error ? error.message : 'unknown error');
+      }
+      return completed;
     });
     if (!result) return NextResponse.json({ error: 'Quiz is not complete' }, { status: 403 });
 
@@ -89,26 +104,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       updatedAt: Date.now(),
     }).catch(() => {});
 
-    // Start analysis only after a verified, persisted completion. The DB lease
-    // deduplicates Home/Stats reads; abandoned leases can be recovered there.
-    after(async () => {
-      try {
-        const rows = await getUserHistory(user.uid) as UserHistoryRow[];
-        const session = rows.find((row) => row.session_id === sessionId);
-        if (!session) return;
-        const answers = await getUserHistoryAnswers(user.uid, sessionId, session.completed_at);
-        const prepared = await preparePersonalRecap(user.uid, session, answers, body.data.locale);
-        if (prepared.generate) await prepared.generate();
-      } catch (error) {
-        console.error('completion recap failed:', error instanceof Error ? error.message : 'unknown error');
-      }
-    });
+    // Gemini runs after the response; matching players reuse this persisted
+    // lease. Its completed text appears in Insight Summaries without a click.
+    const generate = prepared.generate;
+    if (generate) after(async () => { await generate(); });
 
     // Return only the score summary required by the player client.
     return NextResponse.json({
       total_score: result.total_score,
       streak: result.streak,
       total_time_ms: result.total_time_ms,
+      insight_state: prepared.state,
     });
   } catch (err) {
     console.error('complete failed:', err);

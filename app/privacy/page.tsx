@@ -23,7 +23,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold text-white mb-2">2. How We Use Your Data</h2>
           <p>We use your data to: (a) authenticate your identity; (b) calculate scores and leaderboards; (c) provide quiz history and statistics; (d) improve the Service through analytics; (e) comply with PDPA obligations.</p>
-          <p className="mt-1">When a published quiz has no approved feedback summary, your selected answers, the answer key, and authored explanations may be sent to Google Gemini to draft feedback marked as awaiting review. Your name, email, account ID, and scores are not included in that request. The answer pattern and draft are stored under a hashed draft key for review. Approved summaries can be reused for people with closely matching answers.</p>
+          <p className="mt-1">When a published quiz has no matching cached feedback summary, your selected answers, the answer key, and authored explanations may be sent to Google Gemini to draft feedback marked as awaiting review. Your name, email, account ID, and scores are not included in that request. The answer pattern and draft are stored under a hashed draft key for review. Pending and approved summaries can be reused for people with closely matching answers. Pending summaries carry an unreviewed label; approval updates that label.</p>
         </section>
         <section>
           <h2 className="text-lg font-semibold text-white mb-2">Who Can See Your Data</h2>

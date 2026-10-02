@@ -7,6 +7,8 @@ import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import type { LeaderboardEntry, Session } from '@/lib/types';
 import LeaderboardStandings from '@/components/play/LeaderboardStandings';
+import { ResultInsightCard, ResultScoreCard } from '@/components/play/QuizResultCards';
+import { rankLeaderboard } from '@/lib/analytics/leaderboard';
 import styles from '@/components/play/quiz.module.css';
 
 function LeaderboardPageContent() {
@@ -58,7 +60,10 @@ function LeaderboardPageContent() {
   const selectedSessionMeta = sessions.find((session) => session.id === selectedSession);
   const current = result?.sessionId === selectedSession ? result : null;
   const loading = selectedSession && !current;
-  return <div className={styles.dashboard}>
+  const board = rankLeaderboard(current?.entries ?? []);
+  const myIndex = board.findIndex(entry => entry.is_me);
+  const me = board[myIndex];
+  return <div className={`${styles.dashboard} ${styles.resultsDashboard}`}>
     <section className={styles.surface}>
       <div className={styles.pageHeading}><div><span className={styles.eyebrow}>NOVARQUIZ · LEADERBOARD</span><h1>{copy('Leaderboard', 'อันดับผู้เล่น')}</h1><p>{copy('Explore completed quiz results. Scores refresh as more players finish.', 'ดูผลแบบทดสอบที่ทำเสร็จแล้ว อันดับจะอัปเดตเมื่อมีผู้เล่นทำเสร็จเพิ่ม')}</p></div>
         <div className={styles.sessionControl}><label htmlFor="leaderboard-session">{copy('Quiz session', 'เลือกแบบทดสอบ')}</label><select id="leaderboard-session" className={styles.sessionSelect} value={selectedSession} onChange={(event) => router.replace(event.target.value ? `/leaderboard?session=${encodeURIComponent(event.target.value)}` : '/leaderboard')}>
@@ -69,14 +74,18 @@ function LeaderboardPageContent() {
       </div>
       {sessionsError && <div className={styles.error} role="alert">{copy('Could not load the session list.', 'โหลดรายการแบบทดสอบไม่สำเร็จ')} <button type="button" className={styles.secondaryButton} onClick={() => setRetry((value) => value + 1)}>{copy('Try again', 'ลองอีกครั้ง')}</button></div>}
     </section>
-    <section className={styles.surface} aria-busy={!!loading}>
+    <div className={me ? styles.resultsGrid : undefined}>
+    {me && <><ResultScoreCard score={me.total_score} elapsedMs={me.total_time_ms} rank={myIndex + 1} th={th} headingLevel={2} />
+      <ResultInsightCard key={selectedSession} uid={user?.uid ?? null} sessionId={selectedSession} th={th} onSummary={() => router.push(`/stats?session=${encodeURIComponent(selectedSession)}`)} /></>}
+    <section className={`${styles.surface} ${me ? styles.standingsPanel : ''}`} aria-busy={!!loading}>
       {!selectedSession ? <div className={styles.empty}><h3>{copy('Choose a quiz to see the rankings', 'เลือกแบบทดสอบเพื่อดูอันดับ')}</h3><p>{copy('Your result will be highlighted alongside other completed scores.', 'ผลของคุณจะมีป้ายกำกับเพื่อให้หาได้ง่าย')}</p></div> : loading ? <div className={styles.loading} role="status"><span className={styles.spinner} /><span>{copy('Loading completed results…', 'กำลังโหลดผลและอันดับ…')}</span></div> : <>
-        {selectedSessionMeta && <div className={styles.boardSession}><h2>{selectedSessionMeta.name}</h2>{selectedSessionMeta.description && <p>{selectedSessionMeta.description}</p>}</div>}
+        {selectedSessionMeta && !me && <div className={styles.boardSession}><h2>{selectedSessionMeta.name}</h2>{selectedSessionMeta.description && <p>{selectedSessionMeta.description}</p>}</div>}
         {current?.error && <div className={styles.error} role="alert">{copy('Could not refresh the rankings. Please try again.', 'อัปเดตอันดับไม่สำเร็จ กรุณาลองอีกครั้ง')} <button type="button" className={styles.secondaryButton} onClick={() => setRetry((value) => value + 1)}>{copy('Try again', 'ลองอีกครั้ง')}</button></div>}
-        {current && (!current.error || current.entries.length > 0) && <LeaderboardStandings key={selectedSession} entries={current.entries} th={th} />}
-        <div className={styles.actions}>{current?.entries.some((entry) => entry.is_me) && <button type="button" className={styles.secondaryButton} onClick={() => router.push(`/stats?session=${encodeURIComponent(selectedSession)}`)}>{copy('View my answer summary', 'ดูสรุปจากคำตอบของฉัน')}</button>}<button type="button" className={styles.secondaryButton} onClick={() => router.push('/')}>{copy('Back to home', 'กลับหน้าหลัก')}</button></div>
+        {current && (!current.error || current.entries.length > 0) && <LeaderboardStandings key={selectedSession} entries={current.entries} th={th} compact />}
+        <div className={styles.actions}><button type="button" className={styles.primaryButton} onClick={() => router.push('/')}>{copy('Back to home', 'กลับหน้าหลัก')}</button></div>
       </>}
     </section>
+    </div>
   </div>;
 }
 

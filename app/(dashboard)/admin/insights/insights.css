@@ -28,9 +28,6 @@
 .insights-metric .metric-label { display: block; font-size: 13px; font-weight: 600; }
 .insights-metric small { display: block; font-size: 11px; color: var(--desk-muted); margin-top: 5px; line-height: 1.6; }
 .insights-metric > svg { width: 15px; color: var(--desk-muted); margin-top: 6px; }
-.insights-workflow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 18px; background: var(--desk-purple-soft); border-radius: 12px; color: var(--desk-muted); font-size: 12px; margin-bottom: 26px; }
-.insights-workflow .workflow-title { display: flex; align-items: center; gap: 7px; font-weight: 600; color: var(--desk-purple); margin-right: auto; }
-.insights-workflow > svg { width: 13px; height: 13px; }
 .insights-workspace { border: 1px solid var(--desk-line); border-radius: 20px; background: var(--desk-card); overflow: hidden; }
 .insights-toolbar { padding: 0 22px 18px; border-bottom: 1px solid var(--desk-line); }
 .insights-tabs { display: flex; align-items: center; gap: 24px; overflow-x: auto; margin-bottom: 18px; }
@@ -133,11 +130,10 @@
 .insights-decision small { display: block; color: var(--desk-muted); font-size: 11px; line-height: 1.8; margin-top: 4px; }
 .insights-decision.danger strong { color: var(--desk-red); }
 .insights-decision .decision-x { flex: 0 0 20px; font-size: 26px; text-align: center; color: var(--desk-red); }
-@media (max-width: 1100px) { .insights-review-layout { grid-template-columns: 250px minmax(0, 1fr); } .insights-detail { padding: 24px; } .insights-metric { padding: 16px; gap: 10px; } .insights-workflow > svg { display: none; } }
+@media (max-width: 1100px) { .insights-review-layout { grid-template-columns: 250px minmax(0, 1fr); } .insights-detail { padding: 24px; } .insights-metric { padding: 16px; gap: 10px; } }
 @media (max-width: 760px) {
   .insights-desk { padding-top: 4px; } .insights-header { align-items: flex-start; flex-direction: column; gap: 16px; margin-bottom: 22px; } .insights-header > div > p:last-child { font-size: 13px; }
   .insights-metrics { gap: 8px; } .insights-metric { flex-direction: column; padding: 12px; border-radius: 13px; gap: 9px; } .insights-metric .metric-icon { width: 32px; height: 32px; border-radius: 9px; } .insights-metric .metric-icon svg { width: 17px; } .insights-metric strong { font-size: 26px; } .insights-metric .metric-label { font-size: 11px; line-height: 1.6; } .insights-metric small, .insights-metric > svg { display: none; }
-  .insights-workflow { gap: 6px 14px; font-size: 11px; padding: 12px; } .insights-workflow .workflow-title { width: 100%; }
   .insights-toolbar { padding: 0 16px 16px; } .insights-tabs { gap: 18px; } .insights-tabs button { font-size: 12px; } .insights-filters { flex-wrap: wrap; gap: 8px; } .insights-search { flex-basis: 100%; } .insights-filters select { flex: 1; width: 0; min-width: 80px; max-width: none; }
   .insights-review-layout { grid-template-columns: 1fr; } .insights-list { display: flex; gap: 10px; overflow-x: auto; overflow-y: hidden; max-height: none; border-right: 0; border-bottom: 1px solid var(--desk-line); padding: 14px; } .insights-list-heading { display: none; } .insights-list-item { flex: 0 0 240px; margin: 0; padding: 12px; } .insights-list-item > p { -webkit-line-clamp: 1; }
   .insights-detail { padding: 22px 18px; } .insights-detail-header { flex-direction: column; gap: 8px; } .insights-detail h2 { font-size: 20px; } .insights-preview { padding: 18px; } .insights-actions .insights-button { flex: 1; padding: 10px; font-size: 12px; white-space: nowrap; }
