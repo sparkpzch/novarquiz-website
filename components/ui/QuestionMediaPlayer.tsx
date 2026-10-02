@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import AutoPlayVideo from './AutoPlayVideo';
 
 function showPreparedVideo(video: HTMLVideoElement, container: HTMLDivElement, onError?: () => void) {
-  video.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+  video.style.cssText = 'width:100%;height:100%;object-fit:contain;';
   video.controls = true;
   video.loop = true;
   video.onloadeddata = null;
@@ -47,6 +47,7 @@ export default function QuestionMediaPlayer({
       {preparedVideo ? <div ref={preparedContainer} className="h-full w-full" /> : <AutoPlayVideo
         key={src}
         src={src}
+        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
         controls
         autoPlay
         loop

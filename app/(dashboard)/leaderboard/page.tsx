@@ -1,260 +1,85 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
-import { motion } from 'motion/react';
 import type { LeaderboardEntry, Session } from '@/lib/types';
-import ProfileAvatar from '@/components/ui/ProfileAvatar';
-import { watchScores, type PlayerScore } from '@/lib/firebase/rtdb';
+import LeaderboardStandings from '@/components/play/LeaderboardStandings';
+import styles from '@/components/play/quiz.module.css';
 
 function LeaderboardPageContent() {
-  const { t } = useTranslation();
-  const { user } = useAuth();
+  const { i18n } = useTranslation();
+  const th = i18n.language.startsWith('th');
+  const copy = (en: string, thai: string) => th ? thai : en;
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const selectedSession = searchParams.get('session') || '';
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [selectedSession, setSelectedSession] = useState(searchParams.get('session') || '');
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(Boolean(searchParams.get('session')));
-  const [liveScores, setLiveScores] = useState<Record<string, PlayerScore>>({});
+  const [sessionsError, setSessionsError] = useState(false);
+  const [result, setResult] = useState<{ sessionId: string; entries: LeaderboardEntry[]; error: boolean } | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
-    fetch('/api/sessions')
-      .then((response) => (response.ok ? response.json() : []))
-      .then(setSessions)
-      .catch(() => {});
-  }, []);
+    if (authLoading || !user) return;
+    const controller = new AbortController();
+    fetch('/api/sessions', { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Sessions unavailable');
+        return response.json();
+      })
+      .then((data: Session[]) => { setSessions(data); setSessionsError(false); })
+      .catch(() => { if (!controller.signal.aborted) setSessionsError(true); });
+    return () => controller.abort();
+  }, [authLoading, retry, user]);
 
   useEffect(() => {
-    if (!selectedSession) return;
-    fetch(`/api/play/${selectedSession}/leaderboard`)
-      .then((response) => (response.ok ? response.json() : []))
-      .then(setEntries)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [selectedSession]);
+    if (!selectedSession || authLoading || !user) return;
+    const controller = new AbortController();
+    const load = async () => {
+      try {
+        const response = await fetch(`/api/play/${encodeURIComponent(selectedSession)}/leaderboard`, { signal: controller.signal, cache: 'no-store' });
+        if (!response.ok) throw new Error('Leaderboard unavailable');
+        const entries: LeaderboardEntry[] = await response.json();
+        if (!controller.signal.aborted) setResult({ sessionId: selectedSession, entries, error: false });
+      } catch {
+        if (!controller.signal.aborted) setResult((previous) => ({ sessionId: selectedSession, entries: previous?.sessionId === selectedSession ? previous.entries : [], error: true }));
+      }
+    };
+    void load();
+    // Completed database results contain public IDs. Keep them authoritative;
+    // raw live scores also include unfinished players and cannot be merged here.
+    const interval = window.setInterval(() => { if (document.visibilityState === 'visible') void load(); }, 10_000);
+    return () => { controller.abort(); window.clearInterval(interval); };
+  }, [authLoading, retry, selectedSession, user]);
 
-  useEffect(() => {
-    if (!selectedSession) {
-      setLiveScores({});
-      return;
-    }
-    return watchScores(selectedSession, setLiveScores);
-  }, [selectedSession]);
-
-  const dbUserIds = new Set(entries.map((e) => e.user_id));
-  const mergedEntries: LeaderboardEntry[] = [
-    ...entries.map((entry) => {
-      const live = liveScores[entry.user_id];
-      return live ? { ...entry, total_score: live.score } : entry;
-    }),
-    ...Object.entries(liveScores)
-      // Finished players are already in the DB rows, under an anonymized id.
-      .filter(([uid, live]) => !dbUserIds.has(uid) && !live.finished)
-      .map(([uid, live]): LeaderboardEntry => ({
-        id: uid,
-        session_id: selectedSession,
-        user_id: uid,
-        user_display_name: live.displayName,
-        user_photo_url: live.photoURL ?? null,
-        is_me: uid === user?.uid,
-        total_score: live.score,
-        correct_count: 0,
-        incorrect_count: 0,
-        unanswered_count: 0,
-        streak: 0,
-        total_time_ms: 0,
-        completed_at: '',
-      })),
-  ];
-
-  const sortedEntries = [...mergedEntries].sort((a, b) => {
-    if (b.total_score !== a.total_score) return b.total_score - a.total_score;
-    if (a.total_time_ms !== b.total_time_ms) return a.total_time_ms - b.total_time_ms;
-    return a.user_display_name.localeCompare(b.user_display_name);
-  });
-  const myEntry = sortedEntries.find((entry) => entry.is_me);
-  const myRank = sortedEntries.findIndex((entry) => entry.is_me) + 1;
-  const topThree = sortedEntries.slice(0, 3);
   const selectedSessionMeta = sessions.find((session) => session.id === selectedSession);
-  const podium =
-    topThree.length === 1
-      ? [{ entry: topThree[0], rank: 1, height: 'h-36', featured: true }]
-      : topThree.length === 2
-        ? [
-            { entry: topThree[0], rank: 1, height: 'h-36', featured: true },
-            { entry: topThree[1], rank: 2, height: 'h-28', featured: false },
-          ]
-        : [
-            { entry: topThree[1], rank: 2, height: 'h-28', featured: false },
-            { entry: topThree[0], rank: 1, height: 'h-36', featured: true },
-            { entry: topThree[2], rank: 3, height: 'h-24', featured: false },
-          ];
-
-  const entriesBelow3 = sortedEntries.slice(3);
-  const entriesParentRef = useRef<HTMLDivElement>(null);
-  const entriesVirtualizer = useVirtualizer({
-    count: entriesBelow3.length,
-    getScrollElement: () => entriesParentRef.current,
-    estimateSize: () => 68,
-    overscan: 5,
-    gap: 12,
-  });
-
-  return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <section className="nq-card rounded-[34px] p-6 md:p-7">
-        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#5D7EA1]">Leaderboard</p>
-            <h1 className="mt-2 text-3xl font-bold text-[#16324F]">{t('leaderboard.title')}</h1>
-            <p className="mt-2 text-sm text-[#5D7EA1]">Browse any finished session and compare scores across all players.</p>
-          </div>
-
-          <div className="w-full md:max-w-sm">
-                <label className="mb-2 block text-sm font-semibold text-[#16324F]">{t('leaderboard.select_session')}</label>
-            <select
-              value={selectedSession}
-              onChange={(event) => {
-                const nextSession = event.target.value;
-                setLoading(Boolean(nextSession));
-                setSelectedSession(nextSession);
-                router.replace(nextSession ? `/leaderboard?session=${nextSession}` : '/leaderboard');
-              }}
-              className="w-full rounded-[24px] border border-[#0460A9]/12 bg-white px-4 py-3 text-[#16324F] outline-none"
-            >
-              <option value="">{t('leaderboard.select_session')}</option>
-              {sessions.map((session) => (
-                <option key={session.id} value={session.id}>
-                  {session.name} ({new Date(session.started_at).toLocaleDateString()})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </section>
-
-      {!selectedSession ? (
-        <div className="nq-card rounded-[34px] p-10 text-center">
-          <p className="text-lg font-semibold text-[#16324F]">Select a quiz session to view the leaderboard.</p>
-        </div>
-      ) : loading ? (
-        <div className="flex justify-center py-14">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#0460A9] border-t-transparent" />
-        </div>
-      ) : mergedEntries.length === 0 ? (
-        <div className="nq-card rounded-[34px] p-10 text-center">
-          <p className="text-lg font-semibold text-[#16324F]">No entries yet for this session.</p>
-        </div>
-      ) : (
-        <>
-          <section className="nq-card rounded-[34px] p-6 md:p-8">
-            {selectedSessionMeta && (
-              <div className="mb-6 border-b border-[#0460A9]/10 pb-4">
-                <h2 className="text-2xl font-bold text-[#16324F]">{selectedSessionMeta.name}</h2>
-                <p className="mt-2 text-sm text-[#5D7EA1]">
-                  {selectedSessionMeta.description || 'Browse the finished standings for this session.'}
-                </p>
-              </div>
-            )}
-            <div className="flex items-end justify-center gap-4">
-              {podium.map(({ entry, rank, height, featured }, index) => {
-                return (
-                  <motion.div
-                    key={entry.user_id}
-                    initial={{ opacity: 0, y: 18 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.08 }}
-                    className="flex w-24 flex-col items-center"
-                  >
-                    <ProfileAvatar
-                      displayName={entry.user_display_name}
-                      photoURL={entry.user_photo_url}
-                      size={featured ? 72 : 60}
-                      ringClassName="ring-4 ring-[#DDF0FF] shadow-[0_16px_28px_rgba(17,87,145,0.14)]"
-                    />
-                    <div className="mt-3 w-full text-center">
-                      <p className="truncate text-sm font-bold text-[#16324F]">{entry.user_display_name}</p>
-                      <p className="text-lg text-[#0460A9]">{entry.total_score} pts</p>
-                    </div>
-                    <div className={`mt-4 flex w-24 items-start justify-center rounded-t-[26px] bg-gradient-to-b from-[#DDF0FF] to-[#8EC0FF] pt-3 text-2xl font-bold text-[#16324F] ${height}`}>
-                      {rank}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </section>
-
-          {myEntry && (
-            <section className="rounded-[28px] bg-[#C9F258] px-5 py-4 text-[#16324F] shadow-[0_18px_34px_rgba(17,87,145,0.12)]">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <span className="text-lg font-semibold">#{myRank}</span>
-                  <ProfileAvatar displayName={myEntry.user_display_name} photoURL={myEntry.user_photo_url} size={42} />
-                  <span className="text-lg font-semibold">{t('leaderboard.your_result')}</span>
-                </div>
-                <span className="text-lg font-semibold">{myEntry.total_score} pts</span>
-              </div>
-            </section>
-          )}
-
-          {entriesBelow3.length > 0 && (
-            <section className="rounded-[34px] bg-[#EEF6E4]/80 p-4 md:p-5">
-              <div
-                ref={entriesParentRef}
-                style={{ height: Math.min(entriesBelow3.length * 80, 480), overflowY: 'auto' }}
-              >
-                <div style={{ height: entriesVirtualizer.getTotalSize(), position: 'relative' }}>
-                  {entriesVirtualizer.getVirtualItems().map((virtualItem) => {
-                    const entry = entriesBelow3[virtualItem.index];
-                    const rank = virtualItem.index + 4;
-                    const isMe = !!entry.is_me;
-                    return (
-                      <div
-                        key={virtualItem.key}
-                        data-index={virtualItem.index}
-                        ref={entriesVirtualizer.measureElement}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          transform: `translateY(${virtualItem.start}px)`,
-                        }}
-                      >
-                        <div className={`flex items-center gap-4 rounded-[22px] px-4 py-3 ${isMe ? 'bg-[#C9F258] text-[#16324F]' : 'bg-white text-[#16324F]'}`}>
-                          <span className="w-6 text-center text-lg font-semibold">{rank}</span>
-                          <ProfileAvatar displayName={entry.user_display_name} photoURL={entry.user_photo_url} size={40} />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-lg font-semibold">{isMe ? 'You' : entry.user_display_name}</p>
-                            <p className="text-sm text-[#5D7EA1]">
-                              {entry.correct_count}/{entry.correct_count + entry.incorrect_count} correct · 🔥 {entry.streak}
-                            </p>
-                          </div>
-                          <span className="text-lg font-semibold">{entry.total_score} pts</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </section>
-          )}
-        </>
-      )}
-    </div>
-  );
+  const current = result?.sessionId === selectedSession ? result : null;
+  const loading = selectedSession && !current;
+  return <div className={styles.dashboard}>
+    <section className={styles.surface}>
+      <div className={styles.pageHeading}><div><span className={styles.eyebrow}>NOVARQUIZ · LEADERBOARD</span><h1>{copy('Leaderboard', 'อันดับผู้เล่น')}</h1><p>{copy('Explore completed quiz results. Scores refresh as more players finish.', 'ดูผลแบบทดสอบที่ทำเสร็จแล้ว อันดับจะอัปเดตเมื่อมีผู้เล่นทำเสร็จเพิ่ม')}</p></div>
+        <div className={styles.sessionControl}><label htmlFor="leaderboard-session">{copy('Quiz session', 'เลือกแบบทดสอบ')}</label><select id="leaderboard-session" className={styles.sessionSelect} value={selectedSession} onChange={(event) => router.replace(event.target.value ? `/leaderboard?session=${encodeURIComponent(event.target.value)}` : '/leaderboard')}>
+          <option value="">{copy('Select a session', 'เลือกแบบทดสอบเพื่อดูอันดับ')}</option>
+          {selectedSession && !selectedSessionMeta && <option value={selectedSession}>{copy('Current quiz session', 'แบบทดสอบปัจจุบัน')}</option>}
+          {sessions.map((session) => <option key={session.id} value={session.id}>{session.name} · {new Date(session.started_at).toLocaleDateString(th ? 'th-TH' : 'en-GB')}</option>)}
+        </select></div>
+      </div>
+      {sessionsError && <div className={styles.error} role="alert">{copy('Could not load the session list.', 'โหลดรายการแบบทดสอบไม่สำเร็จ')} <button type="button" className={styles.secondaryButton} onClick={() => setRetry((value) => value + 1)}>{copy('Try again', 'ลองอีกครั้ง')}</button></div>}
+    </section>
+    <section className={styles.surface} aria-busy={!!loading}>
+      {!selectedSession ? <div className={styles.empty}><h3>{copy('Choose a quiz to see the rankings', 'เลือกแบบทดสอบเพื่อดูอันดับ')}</h3><p>{copy('Your result will be highlighted alongside other completed scores.', 'ผลของคุณจะมีป้ายกำกับเพื่อให้หาได้ง่าย')}</p></div> : loading ? <div className={styles.loading} role="status"><span className={styles.spinner} /><span>{copy('Loading completed results…', 'กำลังโหลดผลและอันดับ…')}</span></div> : <>
+        {selectedSessionMeta && <div className={styles.boardSession}><h2>{selectedSessionMeta.name}</h2>{selectedSessionMeta.description && <p>{selectedSessionMeta.description}</p>}</div>}
+        {current?.error && <div className={styles.error} role="alert">{copy('Could not refresh the rankings. Please try again.', 'อัปเดตอันดับไม่สำเร็จ กรุณาลองอีกครั้ง')} <button type="button" className={styles.secondaryButton} onClick={() => setRetry((value) => value + 1)}>{copy('Try again', 'ลองอีกครั้ง')}</button></div>}
+        {current && (!current.error || current.entries.length > 0) && <LeaderboardStandings key={selectedSession} entries={current.entries} th={th} />}
+        <div className={styles.actions}>{current?.entries.some((entry) => entry.is_me) && <button type="button" className={styles.secondaryButton} onClick={() => router.push(`/stats?session=${encodeURIComponent(selectedSession)}`)}>{copy('View my answer summary', 'ดูสรุปจากคำตอบของฉัน')}</button>}<button type="button" className={styles.secondaryButton} onClick={() => router.push('/')}>{copy('Back to home', 'กลับหน้าหลัก')}</button></div>
+      </>}
+    </section>
+  </div>;
 }
 
 export default function LeaderboardPage() {
-  return (
-    <Suspense fallback={<div className="min-h-[40vh]" />}>
-      <LeaderboardPageContent />
-    </Suspense>
-  );
+  return <Suspense fallback={<div className={styles.surface}><div className={styles.loading} role="status"><span className={styles.spinner} />Loading…</div></div>}><LeaderboardPageContent /></Suspense>;
 }
