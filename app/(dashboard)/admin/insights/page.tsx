@@ -90,6 +90,36 @@ export default function InsightsAdminPage() {
   const editor: Editor = selected && edits[selected.id] ? edits[selected.id] : selected ? { headline: selected.headline, body: selected.body, suggestion: selected.suggestion ?? "" } : EMPTY;
   const valid = (value: Editor) => !!value.headline.trim() && !!value.body.trim();
   const dirty = selected && (editor.headline !== selected.headline || editor.body !== selected.body || editor.suggestion !== (selected.suggestion ?? ""));
+
+  // New quiz recaps arrive while this desk is open. Refresh just the AI queue,
+  // and pause during edits or review so a draft/revision cannot change mid-save.
+  useEffect(() => {
+    if (!isAdmin || loading || busy || creating || rejectTarget || deleteTemplateTarget || Object.keys(edits).length) return;
+    const controller = new AbortController();
+    let inFlight = false;
+    const refreshQueue = async () => {
+      if (inFlight || document.visibilityState !== "visible") return;
+      inFlight = true;
+      try {
+        const response = await fetch("/api/admin/provisional-insights", { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error("Review queue unavailable");
+        const rows: ProvisionalInsight[] = await response.json();
+        if (!controller.signal.aborted) {
+          setSelection(value => value ?? selectedAI?.id ?? null);
+          setSummaries(rows);
+        }
+      } catch { /* Preserve the current queue and any review work on a transient failure. */ }
+      finally { inFlight = false; }
+    };
+    const interval = window.setInterval(() => { void refreshQueue(); }, 10_000);
+    window.addEventListener("focus", refreshQueue);
+    document.addEventListener("visibilitychange", refreshQueue);
+    return () => {
+      controller.abort(); window.clearInterval(interval);
+      window.removeEventListener("focus", refreshQueue);
+      document.removeEventListener("visibilitychange", refreshQueue);
+    };
+  }, [isAdmin, loading, busy, creating, rejectTarget, deleteTemplateTarget, edits, selectedAI?.id]);
   const statusName = (status: string) => ({ provisional: text("Awaiting review", "รอตรวจสอบ"), approved: text("Approved", "อนุมัติแล้ว"), rejected: text("Not approved", "ไม่อนุมัติ"), draft: text("Private draft", "ฉบับร่างส่วนตัว"), reviewed: text("Reviewed", "ตรวจแล้ว") })[status] ?? status;
   const status = selectedAI?.status ?? selectedTemplate?.review_status ?? "draft";
 

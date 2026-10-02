@@ -3,6 +3,7 @@ import { Pool as PgPool, type QueryResult, type QueryResultRow } from 'pg';
 import { Pool as NeonPool, neonConfig } from '@neondatabase/serverless';
 import ws from 'ws';
 import { getDatabaseConnectionOptions, getDatabaseProvider } from './config';
+import { getScopedDbClient } from './query-context';
 
 neonConfig.webSocketConstructor = ws;
 // Pipeline the 3 startup round-trips into 1, cutting connection overhead ~60%.
@@ -158,6 +159,10 @@ export async function queryWithRetry<R extends QueryResultRow = QueryResultRow>(
   values?: readonly unknown[],
   options?: QueryRetryOptions,
 ): Promise<QueryResult<R>> {
+  const scoped = getScopedDbClient();
+  // A transaction cannot safely retry on another connection: that would lose
+  // its lock and snapshot. Let its caller roll back instead.
+  if (scoped) return scoped.query<R>(queryText, values as unknown[]);
   for (let attempt = 0; attempt <= MAX_QUERY_RETRIES; attempt++) {
     try {
       return await runQuery<R>(queryText, values);
@@ -181,6 +186,8 @@ export async function queryWithRetry<R extends QueryResultRow = QueryResultRow>(
 // without holding a stale reference after a pool replacement.
 const pool = new Proxy({} as IDbPool, {
   get(_target, prop, receiver) {
+    const scoped = getScopedDbClient();
+    if (prop === 'query' && scoped) return scoped.query.bind(scoped);
     const value = Reflect.get(getPool(), prop, receiver);
     return typeof value === 'function' ? value.bind(getPool()) : value;
   },

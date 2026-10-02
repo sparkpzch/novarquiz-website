@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import pool, { queryWithRetry } from './postgres';
+import { withDbClient } from './query-context';
 import { maskPublicLeaderboardEntry, toPublicLeaderboardEntry } from './schema';
 import { SESSION_STATUS, SessionStatus } from '../constants/session';
 import { incrementMediaUsage, decrementMediaUsage, syncMediaUsage } from './media';
@@ -265,7 +266,7 @@ export async function withPlayerAnswerLock<T>(sessionId: string, userId: string,
   try {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`${sessionId}:${userId}`]);
-    const result = await work();
+    const result = await withDbClient(client, work);
     await client.query('COMMIT');
     return result;
   } catch (error) {

@@ -2,12 +2,12 @@ import { getQuizById, getUserConsent } from '../db/queries';
 import type { HistoryAnswer, UserHistoryRow } from '../analytics/history';
 import { historyCoaching } from '../analytics/history-coaching';
 import { PRIVACY_VERSION } from '../privacy/versions';
-import { prepareProvisionalInsight, type PreparedInsight } from './auto-provisional-insight';
+import { prepareProvisionalInsight, type InsightDependencies, type PreparedInsight } from './auto-provisional-insight';
 
 /** Home, Stats, and quiz completion share the same completed-answer context.
  * Personal identity and health profile never enter the model input. */
 export async function preparePersonalRecap(
-  uid: string, session: UserHistoryRow, answers: HistoryAnswer[], locale: 'en' | 'th',
+  uid: string, session: UserHistoryRow, answers: HistoryAnswer[], locale: 'en' | 'th', dependencies?: InsightDependencies,
 ): Promise<PreparedInsight> {
   if (!session.quiz_id || !answers.length) return { state: 'unavailable' };
   const [quiz, consent] = await Promise.all([getQuizById(session.quiz_id), getUserConsent(uid)]);
@@ -20,5 +20,5 @@ export async function preparePersonalRecap(
       answers: answers.map(({ question, selected, selectedExplanation, selectedAligned, alignedChoices }) => ({ question, selected, selectedExplanation, selectedAligned, alignedChoices })),
       ...(coaching.nextAnswer && coaching.nextArea ? { learningFocus: { topic: coaching.nextArea.title, question: coaching.nextAnswer.question } } : {}),
     },
-  });
+  }, dependencies);
 }

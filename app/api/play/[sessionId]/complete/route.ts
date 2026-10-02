@@ -8,6 +8,7 @@ import { verifyQuestionToken } from '@/lib/security/question-token';
 import { preparePersonalRecap } from '@/lib/ai/personal-recap';
 import type { UserHistoryRow } from '@/lib/analytics/history';
 import type { PreparedInsight } from '@/lib/ai/auto-provisional-insight';
+import { withDbSavepoint } from '@/lib/db/query-context';
 
 export const maxDuration = 60;
 
@@ -85,12 +86,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       // Persist the shared generation claim before returning completion. Capture
       // the exact finished attempt while the player's answer lock is still held.
       try {
-        const rows = await getUserHistory(user.uid) as UserHistoryRow[];
-        const session = rows.find((row) => row.session_id === sessionId);
-        if (session) {
+        prepared = await withDbSavepoint(async () => {
+          const rows = await getUserHistory(user.uid) as UserHistoryRow[];
+          const session = rows.find((row) => row.session_id === sessionId);
+          if (!session) return { state: 'unavailable' } as PreparedInsight;
           const answers = await getUserHistoryAnswers(user.uid, sessionId, session.completed_at);
-          prepared = await preparePersonalRecap(user.uid, session, answers, body.data.locale);
-        }
+          return preparePersonalRecap(user.uid, session, answers, body.data.locale);
+        });
       } catch (error) {
         console.error('completion recap preparation failed:', error instanceof Error ? error.message : 'unknown error');
       }

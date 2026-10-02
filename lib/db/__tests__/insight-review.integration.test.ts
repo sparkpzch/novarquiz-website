@@ -99,5 +99,41 @@ test('insight drafts and review lifecycle preserve scope, share pending text, an
     assert.equal((await templates.getUserHistoryAnswers(`other-${historyUid}`, run.id, cutoff)).length, 0);
 
 
+    // The original consent bug stored a Next client reference instead of a
+    // document version. It must request a fresh affirmative consent, then
+    // generate and persist a pending recap without opening Stats first.
+    const { preparePersonalRecap } = await import('../../ai/personal-recap');
+    const { PRIVACY_VERSION, TOS_VERSION } = await import('../../privacy/versions');
+    const { withDbClient, withDbSavepoint } = await import('../query-context');
+    const brokenVersion = 'function(){throw Error("Attempted to call PRIVACY_VERSION() from the server but PRIVACY_VERSION is on the client.")}';
+    const consent = { uid: historyUid, tos_version: TOS_VERSION, privacy_version: brokenVersion, consent_purposes: { platform_account: true, marketing_follow_up: false }, ip_address: 'test', user_agent: 'rollback-only-test' };
+    await templates.upsertUserConsent(consent);
+    let modelCalls = 0;
+    const recap = { headline: `Review this quiz example ${tag}`, body: 'You selected a listed option; revisit its explanation in the quiz example.', suggestion: 'Revisit the explanation for the option you selected.' };
+    const dependencies = { ...db, generateText: async (prompt: string) => {
+      modelCalls++; assert.ok(prompt.includes(completedAnswers[0].selected)); assert.ok(!prompt.includes(historyUid));
+      return JSON.stringify(recap);
+    }, geminiModel: () => 'qa-flash-lite', isGeminiConfigured: () => true };
+    const session = history[0] as import('../../analytics/history').UserHistoryRow;
+    const blocked = await preparePersonalRecap(historyUid, session, completedAnswers, 'en', dependencies);
+    assert.equal(blocked.state, 'consent-required'); assert.equal(blocked.generate, undefined); assert.equal(modelCalls, 0);
+    await templates.upsertUserConsent({ ...consent, privacy_version: PRIVACY_VERSION });
+    const prepared = await withDbClient(client, () => withDbSavepoint(() => preparePersonalRecap(historyUid, session, completedAnswers, 'en', dependencies)));
+    assert.equal(prepared.state, 'generating'); assert.ok(prepared.generate);
+    assert.equal((await prepared.generate())?.status, 'provisional');
+    const queued = (await db.listProvisionalInsights()).find(row => row.headline === recap.headline);
+    assert.ok(queued); assert.equal(queued.status, 'provisional');
+    const pendingRecap = await preparePersonalRecap(historyUid, session, completedAnswers, 'en', dependencies);
+    assert.equal(pendingRecap.state, 'pending'); assert.equal(modelCalls, 1);
+    await db.reviewProvisionalInsight(queued.id, 'approved', 'qa', { expectedRevision: queued.revision });
+    const reviewedRecap = await preparePersonalRecap(historyUid, session, completedAnswers, 'en', dependencies);
+    assert.equal(reviewedRecap.state, 'approved'); assert.equal(modelCalls, 1);
+    assert.deepEqual(reviewedRecap.insight?.summary, pendingRecap.insight?.summary);
+    await withDbClient(client, async () => {
+      await assert.rejects(withDbSavepoint(async () => { await client.query('SELECT nonexistent_recap_column'); }));
+      assert.equal((await templates.getUserHistory(historyUid)).length, 1, 'A failed recap must not abort the completed result transaction');
+    });
+
+
   } finally { await client.query('ROLLBACK'); client.release(); await pool.end(); }
 });

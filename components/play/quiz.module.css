@@ -166,7 +166,6 @@
 }
 @media (prefers-reduced-motion: reduce) { .choice, .primaryButton, .secondaryButton { transition: none; } }
 
-.mobileRankingToggle { display: none; }
 
 /* The score and recap share the left half; completed standings fill the right. */
 .resultScreen { display: flex; align-items: center; min-height: 100dvh; padding-block: 24px; }
@@ -198,7 +197,8 @@
 .compactStandings .standingsTitle { margin-bottom: 16px; }
 .compactStandings .rankingRow { padding: 12px; gap: 9px; }
 .compactStandings .rankingHeading { padding: 10px 12px; }
-.compactStandings .rankingTable ol { max-height: 280px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.compactStandings .rankingTable ol { height: 240px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-gutter: stable; }
+.compactStandings .rankingTable ol:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 .compactStandings .rankingNote { margin-top: 12px; }
 .topRank { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--amber-soft); color: var(--amber); font-weight: 700; }
 .compactStandings .rankingTable + .secondaryButton { margin-top: 12px; min-height: 40px; }
@@ -219,19 +219,8 @@
   .insightActions { padding-top: 8px; }
   .compactStandings .standingsTitle { margin-bottom: 10px; }
   .compactStandings .rankingRow { padding: 9px 10px; }
+  .compactStandings .rankingTable ol { height: 144px; }
   .compactStandings .rankingNote { margin-top: 8px; }
   .standingsPanel > .actions { padding-top: 12px; }
   .resultsDashboard .pageHeading { gap: 10px; }
-}
-
-@media (max-width: 800px) {
-  .mobileRankingToggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; margin: 0 0 8px; padding: 8px 12px; color: var(--blue); background: var(--blue-soft); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: 600; }
-  .previewStandings .rankingTable ol:not(.expandedRankings) { display: none; }
-  .previewStandings:not(:has(.expandedRankings)) .rankingGap { display: none; }
-}
-
-.mobileOwnRow { display: none; }
-@media (max-width: 800px) {
-  .mobileOwnRow { display: grid; }
-  .previewStandings:has(.expandedRankings) .mobileOwnRow { display: none; }
 }

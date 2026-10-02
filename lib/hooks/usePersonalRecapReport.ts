@@ -13,6 +13,7 @@ export function usePersonalRecapReport(uid: string | null, sessionId: string | n
     const abort = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let inFlight = false;
+    let refreshQueued = false;
     let started = Date.now();
     async function load() {
       if (inFlight || abort.signal.aborted) return;
@@ -30,6 +31,10 @@ export function usePersonalRecapReport(uid: string | null, sessionId: string | n
         if (!abort.signal.aborted) setResult({ key, data: null, error: true });
       } finally {
         inFlight = false;
+        if (refreshQueued && !abort.signal.aborted) {
+          refreshQueued = false;
+          void load();
+        }
       }
     }
     function poll() {
@@ -38,16 +43,19 @@ export function usePersonalRecapReport(uid: string | null, sessionId: string | n
     function resume() {
       if (document.visibilityState === 'visible') {
         started = Date.now();
-        void load();
+        if (inFlight) refreshQueued = true;
+        else void load();
       }
     }
     void load();
     window.addEventListener('focus', resume);
+    window.addEventListener('novarquiz:consent-updated', resume);
     document.addEventListener('visibilitychange', resume);
     return () => {
       abort.abort();
       clearTimeout(timer);
       window.removeEventListener('focus', resume);
+      window.removeEventListener('novarquiz:consent-updated', resume);
       document.removeEventListener('visibilitychange', resume);
     };
   }, [uid, sessionId, locale, version, key]);
