@@ -1,6 +1,7 @@
 {
   "app_name": "NovarQuiz",
   "nav": {
+    "main_navigation": "Main navigation",
     "home": "Home",
     "dashboard": "Dashboard",
     "profile": "Profile",

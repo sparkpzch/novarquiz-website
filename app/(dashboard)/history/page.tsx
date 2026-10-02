@@ -58,7 +58,7 @@ function HistoryContent() {
   const total = report?.answers.length ?? 0;
   const retry = () => setVersion((value) => value + 1);
 
-  return <div className="nq-full-report nq-personal-report">
+  return <div className="nq-full-report nq-report-canvas nq-personal-report">
     <div className="pr-wrap">
       <header className="pr-card pr-header">
         <div className="pr-header-top">

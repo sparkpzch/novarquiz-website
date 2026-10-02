@@ -16,10 +16,11 @@ export type GameStatsSummary = {
   topRank: number | null;
 };
 
-/** Canonical aggregate used by both the Dashboard and the Stats game tab. */
+/** Personal game aggregates; individual run scores retain their penalties. */
 export function summarizeGameStats(history: GameHistoryScore[]): GameStatsSummary {
   const totalPlayed = history.length;
-  const bestScore = totalPlayed ? Math.max(...history.map((entry) => entry.total_score)) : 0;
+  // Personal best starts at zero; individual runs can still carry penalties.
+  const bestScore = Math.max(0, ...history.map((entry) => entry.total_score));
   const avgScore = totalPlayed
     ? Math.round(history.reduce((sum, entry) => sum + entry.total_score, 0) / totalPlayed)
     : 0;

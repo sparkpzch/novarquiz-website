@@ -1,6 +1,7 @@
 {
   "app_name": "NovarQuiz",
   "nav": {
+    "main_navigation": "เมนูหลัก",
     "home": "หน้าหลัก",
     "dashboard": "แดชบอร์ด",
     "profile": "โปรไฟล์",

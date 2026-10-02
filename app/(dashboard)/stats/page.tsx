@@ -99,7 +99,6 @@ function StatsPageContent() {
 
             {coaching.total > 0 && <>
               <section className="history-card history-next-step" aria-labelledby="next-step-title">
-                <div className="history-next-icon"><Icon name={coaching.nextArea?.icon ?? 'learn'} /></div>
                 <div className="history-next-content"><p className="history-section-label">{copy('One small next step', 'เริ่มจากเรื่องเล็ก ๆ หนึ่งเรื่อง')}</p>
                   <h2 id="next-step-title">{coaching.nextArea?.title ?? copy('Take a closer look at one question', 'ลองทำความเข้าใจหนึ่งคำถาม')}</h2>
                   <p>{coaching.review.length ? copy(`You have ${coaching.nextArea?.reviewIds.length ?? 1} ${(coaching.nextArea?.reviewIds.length ?? 1) === 1 ? 'question' : 'questions'} to revisit on this topic. Let’s walk through one together.`, `คุณมี ${coaching.nextArea?.reviewIds.length ?? 1} ข้อในเรื่องนี้ที่ควรทบทวน มาค่อย ๆ ทำความเข้าใจหนึ่งข้อไปด้วยกัน`) : copy('You answered these questions correctly. Take another look at one explanation to keep the idea fresh.', 'คุณตอบคำถามเหล่านี้ได้ถูกต้อง ลองอ่านเหตุผลของคำตอบอีกครั้งเพื่อทบทวนสิ่งที่เรียนรู้')}</p>

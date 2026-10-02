@@ -98,7 +98,6 @@ export function TopicUnderstandingBreakdown({
       <div className={`flex flex-col gap-3 pb-3.5 sm:flex-row sm:items-center sm:justify-between ${dashboardVariant ? 'border-b border-white/8' : 'border-b border-[#0460A9]/10'}`}>
         <div>
           <div className="flex items-center gap-2">
-            <span className={`flex h-6 w-6 items-center justify-center rounded-md ${dashboardVariant ? 'bg-[#4f76ff]/15 text-[#91a7ff]' : 'bg-[#0460A9]/10 text-[#0460A9]'}`} aria-hidden="true">▦</span>
             <h2 className={`text-base font-bold tracking-tight sm:text-lg ${dashboardVariant ? 'text-white' : 'text-[#16324F]'}`}>{t('topic_breakdown.title')}</h2>
           </div>
           <p className={`mt-0.5 text-xs ${dashboardVariant ? 'text-[#9aa8d1]' : 'text-[#5D7EA1]'}`}>{description}</p>
@@ -170,7 +169,7 @@ export function TopicUnderstandingBreakdown({
                 <div className={`nq-topic-content flex min-h-[112px] flex-col justify-between gap-2.5 p-3 ${dashboardVariant ? 'bg-white/[0.025]' : 'bg-[#F8FAFC]'}`}>
                   <div className="flex items-center justify-between gap-1.5">
                     <div className="flex min-w-0 items-center gap-1.5">
-                      <span className="shrink-0 text-sm">{meta?.icon ?? '📊'}</span>
+                      {meta?.icon && !everyday && !dashboardVariant && <span className="shrink-0 text-sm">{meta.icon}</span>}
                       <span className={`truncate rounded-md border px-2 py-0.5 font-mono text-[11px] font-bold ${theme.badge}`}>{topicLabel(item.tag)}</span>
                     </div>
                     <span className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold ${theme.badge}`}>{theme.status}</span>

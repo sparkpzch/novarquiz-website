@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "motion/react";
@@ -17,6 +17,7 @@ import {
 import { canResumeRoom, hasRecentSessionPresence } from "@/lib/session-resume";
 import { ROOM_STATUS } from "@/lib/constants/session";
 import { useToast } from "@/components/ui/Toast";
+import WelcomeBackdrop from "@/components/ui/WelcomeBackdrop";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
 import LatestPersonalRecap from "@/components/stats/LatestPersonalRecap";
 import { TopicUnderstandingBreakdown, type TopicBreakdownItem } from "@/components/admin/AnalyticsBreakdownComponents";
@@ -109,14 +110,6 @@ function parseJoinInput(input: string): ParsedJoinInput {
   return /^[A-Za-z0-9_-]{6,}$/.test(trimmed)
     ? { type: "token", token: trimmed }
     : null;
-}
-
-function DashboardIcon({ children }: { children: ReactNode }) {
-  return (
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#4f76ff]/15 text-[#7898ff]">
-      {children}
-    </span>
-  );
 }
 
 function LiveSessionsWidget() {
@@ -283,11 +276,6 @@ function JoinByCodeCard() {
     <section className="nq-dashboard-panel relative overflow-hidden rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
       <div className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-[#3f6fff]/20 blur-3xl" />
       <div className="relative flex items-start gap-3">
-        <DashboardIcon>
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5h18M6.75 3v4.5m10.5-4.5v4.5M5 11h4m2 0h4m2 0h2M5 15h4m2 0h4m2 0h2" />
-          </svg>
-        </DashboardIcon>
         <div>
           <h2 className="text-sm font-semibold text-white">Quick Join</h2>
           <p className="mt-1 text-xs leading-5 text-[#8391bc]">Enter a room code or paste an invite link.</p>
@@ -458,14 +446,9 @@ function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUi
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="nq-always-dark relative min-h-[205px] overflow-hidden rounded-xl border border-[#506eff]/25 bg-[linear-gradient(135deg,#17246f_0%,#3435b6_45%,#294ee5_100%)] p-5 sm:min-h-[226px] sm:p-6"
+          className="nq-welcome-card nq-always-dark relative min-h-[205px] overflow-hidden rounded-xl p-5 sm:min-h-[226px] sm:p-6"
         >
-          <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div className="absolute -right-12 -top-16 h-60 w-60 rounded-[42%] bg-[#ce6cff]/55 blur-2xl" />
-            <div className="absolute bottom-[-90px] left-[20%] h-56 w-72 rotate-[-18deg] rounded-[48%] bg-[#159cff]/55 blur-2xl" />
-            <div className="absolute right-[12%] top-[40%] h-24 w-52 rotate-[-28deg] rounded-[80%_20%] bg-white/40 blur-xl" />
-            <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_25%,rgba(255,255,255,.12)_55%,transparent_70%)]" />
-          </div>
+          <WelcomeBackdrop />
           <div className="relative flex h-full flex-col">
             <div className="flex items-center gap-3">
               <ProfileAvatar

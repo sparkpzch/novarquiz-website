@@ -55,6 +55,9 @@ const primaryNavItems: NavItem[] = [
   profileNavItem,
 ];
 
+// Keep Home in the centre without changing the desktop navigation order.
+const mobileNavItems = [primaryNavItems[1], primaryNavItems[2], primaryNavItems[0], primaryNavItems[3], profileNavItem];
+
 const desktopAdminItems: NavItem[] = [
   {
     href: '/admin',
@@ -309,7 +312,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
 
           <main
             className={`flex-1 px-4 pt-4 sm:px-5 md:px-7 lg:px-8 lg:pt-7 xl:px-10 ${
-              isProfileDetail ? 'pb-8' : 'pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-8'
+              isProfileDetail ? 'pb-8' : 'pb-[calc(7.5rem+env(safe-area-inset-bottom))] lg:pb-8'
             }`}
           >
             <motion.div
@@ -325,21 +328,21 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
       </div>
 
       {!isProfileDetail && (
-        <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(0.65rem+env(safe-area-inset-bottom))] lg:hidden">
-          <div className="nq-dashboard-mobile-nav mx-auto flex h-[62px] max-w-[440px] items-center justify-around rounded-2xl border border-white/10 bg-[#0b1337]/94 px-1 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-            {primaryNavItems.map((item) => {
+        <nav aria-label={t('nav.main_navigation', { defaultValue: 'Main navigation' })} className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(0.65rem+env(safe-area-inset-bottom))] lg:hidden">
+          <div className="nq-dashboard-mobile-nav mx-auto flex h-[80px] max-w-[500px] items-center justify-around gap-1 rounded-[32px] border border-white/10 bg-[#0b1337]/94 px-2 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+            {mobileNavItems.map((item) => {
               const active = isActive(item.href, item.exact);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex h-[50px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl text-[9px] font-semibold transition ${
+                  className={`nq-mobile-nav-link flex h-[64px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[24px] text-[10px] font-semibold transition ${item.href === '/' ? 'nq-mobile-nav-home' : ''} ${
                     active ? 'bg-[#17275f] text-white' : 'text-[#7180ad]'
                   }`}
                 >
-                  <Icon path={item.icon} className="h-[18px] w-[18px]" />
-                  <span className="max-w-full truncate px-1">{t(item.label)}</span>
+                  <span className="nq-mobile-nav-icon"><Icon path={item.icon} className="h-6 w-6" /></span>
+                  <span className="max-w-full truncate">{t(item.label)}</span>
                 </Link>
               );
             })}

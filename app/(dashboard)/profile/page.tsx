@@ -16,11 +16,9 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
 import { Card } from "@/components/ui/Card";
-
-type UserHistoryRow = {
-  total_score: number;
-  streak: number;
-};
+import WelcomeBackdrop from "@/components/ui/WelcomeBackdrop";
+import { summarizeGameStats } from "@/lib/stats/game";
+import type { UserHistoryRow } from "@/lib/analytics/history";
 
 function ChevronRight() {
   return (
@@ -330,16 +328,16 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!user || user.isAnonymous) return;
-    fetch(`/api/users/${user.uid}/history`)
+    const controller = new AbortController();
+    fetch(`/api/users/${user.uid}/history`, { signal: controller.signal })
       .then((response) => (response.ok ? response.json() : []))
       .then((history: UserHistoryRow[]) => {
-        if (!history.length) return;
-        setUserStats({
-          bestScore: Math.max(...history.map((item) => item.total_score)),
-          bestStreak: Math.max(...history.map((item) => item.streak)),
-        });
+        if (controller.signal.aborted) return;
+        const stats = summarizeGameStats(Array.isArray(history) ? history : []);
+        setUserStats({ bestScore: stats.bestScore, bestStreak: stats.bestStreak });
       })
       .catch(() => {});
+    return () => controller.abort();
   }, [user]);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -442,10 +440,9 @@ export default function ProfilePage() {
       <motion.section
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
-        className="nq-card-blue relative overflow-hidden rounded-[28px] p-5 text-white"
+        className="nq-welcome-card nq-always-dark relative self-start overflow-hidden rounded-[28px] p-5 text-white"
       >
-        <div className="absolute inset-y-0 right-[-18px] top-[18px] w-48 rounded-full border border-white/10 bg-white/10" />
-        <div className="absolute inset-y-0 right-[32px] top-[-6px] w-32 rounded-full border border-white/10 bg-white/10" />
+        <WelcomeBackdrop />
         <div className="relative">
           <div className="flex items-center gap-4">
             <ProfileAvatar
@@ -468,19 +465,19 @@ export default function ProfilePage() {
             <Card.Tile
               label={t("dashboard.best_streak")}
               value={userStats.bestStreak || 0}
-              className="bg-white/14 border-none shadow-none [&_p]:nq-on-dark"
+              className="nq-profile-stat bg-white/14 border-none shadow-none [&_p]:nq-on-dark"
             />
             <Card.Tile
               label={t("profile.best_score")}
               value={(userStats.bestScore || 0).toLocaleString()}
-              className="bg-white/14 border-none shadow-none [&_p]:nq-on-dark"
+              className="nq-profile-stat bg-white/14 border-none shadow-none [&_p]:nq-on-dark"
             />
           </div>
 
           <button
             type="button"
             onClick={() => { setNewName(user?.displayName || ""); setEditModal(true); }}
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded-[18px] bg-white px-4 py-3 text-base font-semibold text-[#70A2F9] shadow-lg shadow-[#113D7A]/15 transition hover:scale-[1.02] active:scale-[0.98]"
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-[18px] bg-white px-4 py-3 text-base font-semibold text-[#075b95] shadow-lg shadow-[#113D7A]/15 transition hover:scale-[1.02] active:scale-[0.98]"
           >
             <EditIcon />
             <span>{t("profile.edit_profile")}</span>

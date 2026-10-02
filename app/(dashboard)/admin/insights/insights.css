@@ -42,7 +42,7 @@
 .insights-filters select { min-width: 120px; max-width: 220px; padding: 8px 30px 8px 12px; border: 1px solid var(--desk-line); border-radius: 10px; background: var(--desk-card); color: var(--desk-ink); font-size: 12px; }
 .insights-refresh { width: 44px; min-height: 44px; border-radius: 10px; background: var(--desk-card); border: 1px solid var(--desk-line); font-size: 23px !important; color: var(--desk-muted); flex-shrink: 0; }
 .insights-review-layout { display: grid; grid-template-columns: 310px minmax(0, 1fr); min-height: 620px; }
-.insights-list { padding: 20px 14px; background: var(--desk-page); border-right: 1px solid var(--desk-line); max-height: 1100px; overflow-y: auto; }
+.insights-list { align-self: start; padding: 20px 14px; background: var(--desk-page); border-right: 1px solid var(--desk-line); max-height: min(720px, calc(100dvh - 128px)); overflow-y: auto; overscroll-behavior: contain; }
 .insights-list-heading { font-size: 10px; letter-spacing: 1px; color: var(--desk-muted); padding: 0 10px; margin: 0 0 16px; font-weight: 600; }
 .insights-list-item { display: block; width: 100%; text-align: left; border: 1px solid transparent; border-radius: 13px; padding: 15px; background: transparent; color: var(--desk-ink); margin-bottom: 8px; }
 .insights-list-item:hover { background: var(--desk-card); }
