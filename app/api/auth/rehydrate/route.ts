@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { SignJWT } from 'jose';
-import { verifySessionToken } from '@/lib/security/session';
+import { verifySessionToken, SESSION_VERSION } from '@/lib/security/session';
 import { adminAuth } from '@/lib/firebase/admin';
 import { checkRateLimit } from '@/lib/ratelimit';
 import { getRateLimitIp } from '@/lib/security/request-ip';
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Session expired' }, { status: 401 });
       }
 
-      const newToken = await new SignJWT({ uid, isAdmin: currentIsAdmin })
+      const newToken = await new SignJWT({ uid, isAdmin: currentIsAdmin, sessionVersion: SESSION_VERSION })
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()
         .setExpirationTime(`${maxAge}s`)

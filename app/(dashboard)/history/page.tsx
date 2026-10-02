@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { useAuth } from '@/lib/hooks/useAuth';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
-import { TopicUnderstandingBreakdown } from '@/components/admin/AnalyticsBreakdownComponents';
+import TopicUnderstandingGraph from '@/components/admin/TopicUnderstandingGraph';
 import { learningTopic, personalLearningAreas } from '@/lib/analytics/history-coaching';
 import type { HistoryAnswer, PersonalHistoryReport, UserHistoryRow } from '@/lib/analytics/history';
 import './history.css';
@@ -94,7 +94,7 @@ function PersonalReport({ report, locale }: { report: PersonalHistoryReport; loc
   const answerTopics = (answer: HistoryAnswer) => personalLearningAreas([answer], locale);
   const answers = report.answers.filter((answer) => (!onlyReview || !answer.selectedAligned) && (!topic || answer.tags.includes(topic)) && `${answer.question} ${answer.selected} ${answerTopics(answer).map((area) => area.title).join(' ')}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   return <>
-    <TopicUnderstandingBreakdown
+    <TopicUnderstandingGraph
       items={report.topics}
       description={copy('Explore how your answers matched what this quiz teaches. Choose a topic to see its questions below.', 'ดูว่าคำตอบของคุณสอดคล้องกับสิ่งที่แบบทดสอบอธิบายมากน้อยแค่ไหน เลือกเรื่องเพื่อดูคำถามด้านล่าง')}
       readingStyle="everyday"

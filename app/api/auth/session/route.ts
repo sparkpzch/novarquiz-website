@@ -5,6 +5,8 @@ import { cookies } from 'next/headers';
 import { syncUserProfile } from '@/lib/db/queries';
 import { checkRateLimit } from '@/lib/ratelimit';
 import { getRateLimitIp } from '@/lib/security/request-ip';
+import { SESSION_VERSION } from '@/lib/security/session';
+import { getSessionUser } from '@/lib/auth';
 
 const COOKIE_NAME = 'session';
 const DEFAULT_MAX_AGE = 60 * 60 * 24 * 5;   // 5 days — session-scoped default
@@ -61,7 +63,7 @@ export async function POST(request: NextRequest) {
     const isAdmin = decoded.admin === true;
     const maxAge = isAdmin ? ADMIN_MAX_AGE : (rememberMe ? REMEMBER_MAX_AGE : DEFAULT_MAX_AGE);
 
-    const token = await new SignJWT({ uid: decoded.uid, isAdmin })
+    const token = await new SignJWT({ uid: decoded.uid, isAdmin, sessionVersion: SESSION_VERSION })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime(`${maxAge}s`)
@@ -88,4 +90,11 @@ export async function DELETE() {
   const cookieStore = await cookies();
   cookieStore.delete(COOKIE_NAME);
   return NextResponse.json({ success: true });
+}
+
+export async function GET() {
+  const user = await getSessionUser();
+  return NextResponse.json(user ? { uid: user.uid } : { error: 'Session expired' }, {
+    status: user ? 200 : 401, headers: { 'Cache-Control': 'private, no-store' },
+  });
 }

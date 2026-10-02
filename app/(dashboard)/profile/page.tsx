@@ -1,4 +1,5 @@
 "use client";
+import SurveyGate from '@/components/onboarding/SurveyGate';
 
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -502,6 +503,7 @@ export default function ProfilePage() {
       >
         <h2 className="mb-5 text-2xl font-semibold text-[#202A3F]">{t("profile.general")}</h2>
         <div className="space-y-5">
+          <SurveyGate editing />
           <GeneralRow
             icon={<LockIcon />}
             label={t("profile.change_password")}

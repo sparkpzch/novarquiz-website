@@ -14,6 +14,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
+import SurveyGate from '@/components/onboarding/SurveyGate';
 import { useTheme } from '@/lib/hooks/useTheme';
 import { useToast } from '@/components/ui/Toast';
 
@@ -59,6 +60,7 @@ const primaryNavItems: NavItem[] = [
 const mobileNavItems = [primaryNavItems[1], primaryNavItems[2], primaryNavItems[0], primaryNavItems[3], profileNavItem];
 
 const desktopAdminItems: NavItem[] = [
+  { href: '/admin/analytics', label: 'Analytics', icon: 'M3 3v18h18M7 16v-4m5 4V8m5 8V5' },
   {
     href: '/admin',
     exact: true,
@@ -163,6 +165,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
 
   return (
     <div className={`nq-dashboard-shell nq-theme-${theme} min-h-dvh`}>
+      <SurveyGate />
       <div className="flex min-h-dvh">
         <aside className="nq-dashboard-sidebar sticky top-0 hidden h-dvh w-[264px] shrink-0 overflow-hidden border-r px-4 py-5 lg:flex">
           <div className="nq-sidebar-scroll flex min-h-0 w-full flex-col overflow-y-auto pr-1">
@@ -197,10 +200,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
               </div>
             </Link>
 
-            <p className="nq-sidebar-label mt-5 px-2 text-[8px] font-semibold uppercase tracking-[0.12em]">
-              Main
-            </p>
-            <nav className="mt-2 space-y-1.5">
+            <nav className="mt-5 space-y-1.5">
               {primaryNavItems.filter((item) => item.href !== '/profile').map((item) => {
                 const active = isActive(item.href, item.exact);
                 return (

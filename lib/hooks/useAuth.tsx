@@ -66,7 +66,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let firstAuthEvent = true;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      const checkExistingSession = firstAuthEvent;
+      firstAuthEvent = false;
       const version = ++authVersionRef.current;
       const isCurrent = () => version === authVersionRef.current && !signingOutRef.current;
       if (!isCurrent()) return;
@@ -74,6 +77,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Recovery is for initial startup only, never a later sign-out event.
         rehydrateTriedRef.current = true;
         try {
+          if (checkExistingSession && !firebaseUser.isAnonymous) {
+            const response = await fetch('/api/auth/session', { cache: 'no-store' });
+            if (!isCurrent()) return;
+            if (response.status === 401) {
+              await signOut(auth);
+              clearLocalSession();
+              return;
+            }
+            if (!response.ok) throw new Error('Session check unavailable');
+            const session = await response.json();
+            if (session.uid !== firebaseUser.uid) { await signOut(auth); clearLocalSession(); return; }
+          }
           const tokenResult = await firebaseUser.getIdTokenResult();
           if (!isCurrent()) return;
           setIsAdmin(tokenResult.claims.admin === true);
@@ -148,6 +163,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = useCallback(async () => {
     if (!auth.currentUser) return;
     await auth.currentUser.reload();
+    await auth.currentUser.getIdToken(true);
+    saveProfileCache(auth.currentUser);
+    setCachedProfile({ displayName: auth.currentUser.displayName, photoURL: auth.currentUser.photoURL, email: auth.currentUser.email });
     // Force React to see the updated user by setting a fresh reference
     setUser(null);
     setUser(auth.currentUser);

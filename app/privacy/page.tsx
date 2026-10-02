@@ -2,7 +2,7 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-[#0a0a1a] text-gray-300 p-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold text-white mb-2">Privacy Policy</h1>
-      <p className="text-gray-500 text-sm mb-4">Last updated: September 30, 2026 · Version 2026-09-30</p>
+      <p className="text-gray-500 text-sm mb-4">Last updated: October 3, 2026 · Version 2026-10-03</p>
       <div className="rounded-xl p-4 mb-8 text-sm" style={{ background: 'rgba(59,91,212,0.15)', border: '1px solid rgba(59,91,212,0.4)' }}>
         <p className="font-semibold text-blue-300 mb-1">PDPA Compliance Notice</p>
         <p className="text-blue-200 text-xs leading-relaxed">
@@ -16,12 +16,14 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold text-white mb-2">1. Personal Data We Collect</h2>
           <p><strong className="text-white">Account Data:</strong> Email address, display name, profile picture.</p>
+          <p className="mt-1"><strong className="text-white">Questionnaire Data:</strong> First and last name, and optionally age, gender, weight, height, and usual activity level. Your name becomes your default profile name. Questionnaire answers are not sent to the AI summary service.</p>
           <p className="mt-1"><strong className="text-white">Usage Data:</strong> Quiz responses, scores, session participation, streak counts.</p>
           <p className="mt-1"><strong className="text-white">Technical Data:</strong> IP address (stored only in consent records for legal proof), browser type, session cookies.</p>
           <p className="mt-1"><strong className="text-white">Legal Basis:</strong> Your explicit consent given at registration (PDPA §19).</p>
         </section>
         <section>
           <h2 className="text-lg font-semibold text-white mb-2">2. How We Use Your Data</h2>
+          <p className="mb-2">If you separately opt in, your questionnaire answers contribute to demographic charts visible to administrators. These charts count each account once and do not display names or account identifiers. You may edit your answers or withdraw this optional analytics consent in Profile. Withdrawal removes your answers from subsequent demographic chart queries.</p>
           <p>We use your data to: (a) authenticate your identity; (b) calculate scores and leaderboards; (c) provide quiz history and statistics; (d) improve the Service through analytics; (e) comply with PDPA obligations.</p>
           <p className="mt-1">When a published quiz has no matching cached feedback summary, your selected answers, the answer key, and authored explanations may be sent to Google Gemini to draft feedback marked as awaiting review. Your name, email, account ID, and scores are not included in that request. The answer pattern and draft are stored under a hashed draft key for review. Pending and approved summaries can be reused for people with closely matching answers. Pending summaries carry an unreviewed label; approval updates that label.</p>
         </section>

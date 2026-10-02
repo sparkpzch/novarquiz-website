@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification, type User } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
@@ -10,9 +10,14 @@ import TermsModal from '@/components/ui/TermsModal';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { motion } from 'motion/react';
+import SurveyFields, { emptySurvey } from '@/components/onboarding/SurveyFields';
+import { SurveySchema } from '@/lib/onboarding/survey';
 
 export default function SignUpPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [survey, setSurvey] = useState(emptySurvey);
+  const [step, setStep] = useState<'survey' | 'account'>('survey');
+  const [createdUser, setCreatedUser] = useState<User | null>(null);
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,6 +32,11 @@ export default function SignUpPage() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (step === 'survey') {
+      if (!SurveySchema.safeParse(survey).success) { setError(i18n.language.startsWith('th') ? 'กรุณาตรวจสอบข้อมูลแบบสอบถาม' : 'Please check your questionnaire answers.'); return; }
+      setStep('account');
+      return;
+    }
 
     if (password.length < 8) {
       setError('Password must be at least 8 characters.');
@@ -40,30 +50,22 @@ export default function SignUpPage() {
       setError('You must agree to the Terms of Service.');
       return;
     }
+    if (!SurveySchema.safeParse(survey).success) { setError(i18n.language.startsWith('th') ? 'กรุณาตรวจสอบข้อมูลแบบสอบถาม' : 'Please check your questionnaire answers.'); return; }
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(userCredential.user, { displayName: email.split('@')[0] });
-      await sendEmailVerification(userCredential.user);
-      const idToken = await userCredential.user.getIdToken();
-      await fetch('/api/auth/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-      await fetch('/api/auth/consent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          consent_purposes: {
-            platform_account: true,
-          },
-        }),
-      });
+      const account = createdUser ?? (await createUserWithEmailAndPassword(auth, email, password)).user;
+      setCreatedUser(account);
+      await updateProfile(account, { displayName: `${survey.firstName.trim()} ${survey.lastName.trim()}` });
+      await sendEmailVerification(account);
+      const idToken = await account.getIdToken(true);
+      const saved = await fetch('/api/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify(survey) });
+      if (!saved.ok) throw new Error('survey-save-failed');
       setVerified(true);
     } catch (err: unknown) {
       const firebaseError = err as { code?: string };
-      if (firebaseError.code === 'auth/email-already-in-use') {
+      if (err instanceof Error && err.message === 'survey-save-failed') {
+        setError(i18n.language.startsWith('th') ? 'สร้างบัญชีแล้ว แต่ยังบันทึกแบบสอบถามไม่ได้ กดลองอีกครั้งเพื่อบันทึกข้อมูล' : 'Your account was created, but the questionnaire could not save. Submit again to retry.');
+      } else if (firebaseError.code === 'auth/email-already-in-use') {
         setError('This email is already registered.');
       } else {
         setError('Sign up failed. Please try again.');
@@ -95,11 +97,14 @@ export default function SignUpPage() {
 
 
       <form onSubmit={handleSignUp} className="space-y-4">
+        <p className="text-sm font-semibold">{i18n.language.startsWith('th') ? (step === 'survey' ? 'ขั้นตอน 1 จาก 2 · ข้อมูลของคุณ' : 'ขั้นตอน 2 จาก 2 · สร้างบัญชี') : (step === 'survey' ? 'Step 1 of 2 · About you' : 'Step 2 of 2 · Create your account')}</p>
+        {step === 'survey' ? <SurveyFields value={survey} onChange={setSurvey} th={i18n.language.startsWith('th')} /> : <>
         <Input
           label={t('auth.email')}
           type="email"
           placeholder="Example@gmail.com"
           value={email}
+          disabled={!!createdUser}
           onChange={(e) => setEmail(e.target.value)}
           required
         />
@@ -180,6 +185,8 @@ export default function SignUpPage() {
           </span>
         </label>
 
+        </>}
+
         {error && (
           <div className="rounded-lg bg-red-50 border border-red-200 p-3">
             <p className="text-sm text-red-500">{error}</p>
@@ -187,8 +194,9 @@ export default function SignUpPage() {
         )}
 
         <Button type="submit" loading={loading} className="w-full">
-          Sign Up
+          {i18n.language.startsWith('th') ? (step === 'survey' ? 'ไปต่อ' : 'สร้างบัญชี') : (step === 'survey' ? 'Continue' : 'Sign Up')}
         </Button>
+        {step === 'account' && <button type="button" className="w-full py-2 text-sm underline underline-offset-4" disabled={loading} onClick={() => { setStep('survey'); setError(''); }}>{i18n.language.startsWith('th') ? 'กลับไปแก้ไขข้อมูล' : 'Back to questionnaire'}</button>}
       </form>
 
       {/* Desktop: sign-in link */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "motion/react";
@@ -20,7 +20,6 @@ import { useToast } from "@/components/ui/Toast";
 import WelcomeBackdrop from "@/components/ui/WelcomeBackdrop";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
 import LatestPersonalRecap from "@/components/stats/LatestPersonalRecap";
-import { TopicUnderstandingBreakdown, type TopicBreakdownItem } from "@/components/admin/AnalyticsBreakdownComponents";
 import "@/lib/i18n";
 
 type ParsedJoinInput =
@@ -31,47 +30,6 @@ type ParsedJoinInput =
 type SessionResumeSnapshot = {
   is_private?: boolean;
 };
-
-type DashboardHealthStats = {
-  topicBreakdown: TopicBreakdownItem[];
-  answered: number;
-};
-
-type CachedDashboardHealthStats = {
-  data: DashboardHealthStats;
-  fetchedAt: number;
-};
-
-const HEALTH_STATS_CACHE_TTL_MS = 5 * 60 * 1000;
-
-function dashboardHealthStatsCacheKey(uid: string, locale: string) {
-  return `novarquiz:health-stats:v1:${uid}:${locale}`;
-}
-
-function readDashboardHealthStatsCache(key: string): CachedDashboardHealthStats | null {
-  try {
-    const raw = sessionStorage.getItem(key);
-    if (!raw) return null;
-    const value = JSON.parse(raw) as CachedDashboardHealthStats;
-    if (
-      !value ||
-      typeof value.fetchedAt !== "number" ||
-      !value.data ||
-      !Array.isArray(value.data.topicBreakdown)
-    ) return null;
-    return value;
-  } catch {
-    return null;
-  }
-}
-
-function writeDashboardHealthStatsCache(key: string, value: CachedDashboardHealthStats) {
-  try {
-    sessionStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Keep analytics usable when browser storage is disabled or full.
-  }
-}
 
 type DashboardSession = {
   id: string;
@@ -355,60 +313,10 @@ export default function DashboardPage() {
 }
 
 function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUid: string | null; healthStatsLocale: "en" | "th" }) {
-  const { t } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
-  const [initialCache] = useState(() => healthStatsUid
-    ? readDashboardHealthStatsCache(dashboardHealthStatsCacheKey(healthStatsUid, healthStatsLocale))
-    : null);
-  const [initialCacheIsFresh] = useState(() => !!initialCache && Date.now() - initialCache.fetchedAt < HEALTH_STATS_CACHE_TTL_MS);
-  const [healthStats, setHealthStats] = useState<DashboardHealthStats | null>(initialCache?.data ?? null);
-  const [healthStatsLoading, setHealthStatsLoading] = useState(!!healthStatsUid && !initialCache);
-  const [healthStatsError, setHealthStatsError] = useState(false);
-  const [healthStatsRefreshing, setHealthStatsRefreshing] = useState(!!healthStatsUid && !initialCacheIsFresh);
-  const [healthStatsFetchedAt, setHealthStatsFetchedAt] = useState<number | null>(initialCache?.fetchedAt ?? null);
-  const healthStatsRequestId = useRef(0);
   const [sessions, setSessions] = useState<DashboardSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
-
-  const refreshHealthStats = useCallback(() => {
-    if (!healthStatsUid) return;
-    const requestId = ++healthStatsRequestId.current;
-    return fetch(
-      `/api/users/${healthStatsUid}/health-stats?locale=${healthStatsLocale}&summary=none`,
-      { cache: "no-store" },
-    )
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Failed to load topic understanding");
-        return await response.json() as DashboardHealthStats;
-      })
-      .then((stats) => {
-        if (requestId !== healthStatsRequestId.current) return;
-        const fetchedAt = Date.now();
-        setHealthStats(stats);
-        setHealthStatsFetchedAt(fetchedAt);
-        setHealthStatsLoading(false);
-        writeDashboardHealthStatsCache(
-          dashboardHealthStatsCacheKey(healthStatsUid, healthStatsLocale),
-          { data: stats, fetchedAt },
-        );
-      })
-      .catch(() => {
-        if (requestId === healthStatsRequestId.current) setHealthStatsError(true);
-      })
-      .finally(() => {
-        if (requestId === healthStatsRequestId.current) {
-          setHealthStatsRefreshing(false);
-          setHealthStatsLoading(false);
-        }
-      });
-  }, [healthStatsUid, healthStatsLocale]);
-
-  useEffect(() => {
-    if (!healthStatsUid || initialCacheIsFresh) return;
-    void refreshHealthStats();
-    return () => { healthStatsRequestId.current += 1; };
-  }, [healthStatsUid, initialCacheIsFresh, refreshHealthStats]);
 
   useEffect(() => {
     fetch("/api/sessions")
@@ -479,41 +387,6 @@ function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUi
           <JoinByCodeCard />
         </div>
       </section>
-
-      <div id="topic-understanding" className="scroll-mt-24">
-        {healthStatsLoading ? (
-          <section aria-label={t('topic_breakdown.loading')} className="nq-dashboard-panel min-h-[205px] animate-pulse rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
-            <div className="h-4 w-52 rounded bg-white/10" />
-            <div className="mt-2 h-3 w-72 max-w-full rounded bg-white/[0.06]" />
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <div className="h-24 rounded-xl bg-white/[0.04]" /><div className="h-24 rounded-xl bg-white/[0.04]" />
-            </div>
-          </section>
-        ) : healthStatsError && !healthStats ? (
-          <section role="status" className="nq-dashboard-panel flex min-h-[205px] items-center rounded-xl border border-white/8 bg-[#0d173e] p-5 text-xs leading-5 text-[#9aa8d1]">
-            {t('topic_breakdown.load_error')}
-          </section>
-        ) : (
-          <TopicUnderstandingBreakdown
-            variant="dashboard"
-            items={healthStats?.topicBreakdown ?? []}
-            description={t('topic_breakdown.descriptions.home')}
-            onRefresh={() => {
-              setHealthStatsRefreshing(true);
-              setHealthStatsError(false);
-              void refreshHealthStats();
-            }}
-            isRefreshing={healthStatsRefreshing}
-            lastFetchedAt={healthStatsFetchedAt}
-            refreshError={healthStatsError}
-            emptyMessage={user?.isAnonymous
-              ? t('topic_breakdown.guest_empty')
-              : healthStats?.answered
-                ? t('topic_breakdown.untagged', { count: healthStats.answered })
-                : t('topic_breakdown.no_answers')}
-          />
-        )}
-      </div>
 
       <section className="nq-dashboard-panel rounded-xl border border-white/8 bg-[#0d173e] p-4 sm:p-5">
           <div className="mb-4 flex items-end justify-between gap-3">

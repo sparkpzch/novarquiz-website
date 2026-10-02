@@ -314,7 +314,7 @@ function TermsContent({ c }: { c: Palette }) {
 function PrivacyContent({ c }: { c: Palette }) {
   return (
     <div>
-      <p className="text-xs mb-4" style={{ color: c.subtle }}>Last updated: September 30, 2026 · Version {PRIVACY_VERSION}</p>
+      <p className="text-xs mb-4" style={{ color: c.subtle }}>Last updated: October 3, 2026 · Version {PRIVACY_VERSION}</p>
 
       <div
         className="rounded-xl p-3 mb-4 text-xs"
@@ -337,6 +337,7 @@ function PrivacyContent({ c }: { c: Palette }) {
 
       <Section title="2. Personal Data We Collect" c={c}>
         <p><strong>Account Data:</strong> Email address, display name, profile picture.</p>
+        <p><strong>Questionnaire Data:</strong> First and last name, and optionally age, gender, weight, height, and usual activity level. Your name becomes your default profile name. These answers are not sent to the AI summary service.</p>
         <p><strong>Usage Data:</strong> Quiz responses, scores, session participation, streaks.</p>
         <p>
           <strong>Technical Data:</strong> IP address (stored only in consent records as legal
@@ -350,6 +351,7 @@ function PrivacyContent({ c }: { c: Palette }) {
 
       <Section title="3. How We Use Your Data" c={c}>
         <p>Processing is split by consent purpose:</p>
+        <p>If you separately opt in, questionnaire answers contribute to administrator demographic charts without names or account identifiers. You can edit answers or withdraw this optional analytics consent in Profile; withdrawal excludes your answers from subsequent chart queries.</p>
         <ul className="list-disc list-inside space-y-0.5 mt-1">
           <li>
             <strong>Platform Account</strong> (required): authenticate identity, maintain account,

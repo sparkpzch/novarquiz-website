@@ -6,7 +6,11 @@ import { useRouter } from 'next/navigation';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 import type { Session, LeaderboardEntry, Quiz } from '@/lib/types';
 import CompareSessionsModal, { type CompareSessionsModalProps } from './CompareSessionsModal';
-import { FilteredQuestionAnalysisTable, TopicUnderstandingBreakdown } from './AnalyticsBreakdownComponents';
+import { FilteredQuestionAnalysisTable } from './AnalyticsBreakdownComponents';
+import TopicUnderstandingGraph from './TopicUnderstandingGraph';
+import DemographicsPanel from './DemographicsPanel';
+import ReportOverviewGraphs from './ReportOverviewGraphs';
+import chartStyles from './report-charts.module.css';
 import PlayerInsightPanel from './PlayerInsightPanel';
 
 type CompareSessionItem = CompareSessionsModalProps['allSessions'][number];
@@ -224,7 +228,6 @@ export default function MedicalAnalyticsDashboard({
   session,
   leaderboard,
   questions,
-  insights,
   insightBreakdown,
   peerSessions = [],
   allQuizzes: initialAllQuizzes,
@@ -277,8 +280,6 @@ export default function MedicalAnalyticsDashboard({
   const [selectedAggregateSessionId, setSelectedAggregateSessionId] = useState<string | null>(null);
   const [aggregateSessionSearch, setAggregateSessionSearch] = useState('');
   const [aggregateSessionFilter, setAggregateSessionFilter] = useState<'all' | 'high' | 'developing' | 'review'>('all');
-  const [showCohortInsightsDrawer, setShowCohortInsightsDrawer] = useState<boolean>(false);
-  const [isLiveTelemetry, setIsLiveTelemetry] = useState<boolean>(false);
 
   // -------------------------------------------------------------
   // DYNAMIC REAL DATA CONTRACT CONVERSION
@@ -799,7 +800,9 @@ export default function MedicalAnalyticsDashboard({
             </aside>
 
             <main className="space-y-5 lg:col-span-9">
-              <TopicUnderstandingBreakdown
+              <ReportOverviewGraphs accuracy={displayMetrics.totalParticipants ? displayMetrics.avgAccuracy : null} players={[]} questions={effectiveQuestions} showDistribution={false} averageTime={displayMetrics.totalParticipants ? displayMetrics.avgTimeSeconds : null} />
+              <DemographicsPanel sessionId={selectedAggregateSession?.id} quizId={session?.session_id} />
+              <TopicUnderstandingGraph
                 items={displayTopics.map((topic) => ({
                   tag: topic.tag,
                   percentage: topic.maxPossibleUtility && topic.maxPossibleUtility > 0 ? topic.percentage : null,
@@ -882,7 +885,7 @@ export default function MedicalAnalyticsDashboard({
                 {sessionTitle}
               </h1>
               <p className="text-xs sm:text-sm text-[#5D7EA1] mt-0.5">
-                Unified live analytics: Real-time session KPIs, interactive clinician leaderboard, and 2D clinical comprehension matrices in one view.
+                Understand the results, explore topics, and review each participant’s answers and AI recap.
               </p>
             </div>
           </div>
@@ -906,18 +909,7 @@ export default function MedicalAnalyticsDashboard({
               <span>Compare</span>
             </button>
 
-            <button
-              onClick={() => setIsLiveTelemetry(!isLiveTelemetry)}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shadow-2xs ${isLiveTelemetry
-                ? 'bg-[#0460A9] text-white hover:bg-[#03508C]'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              {isLiveTelemetry ? 'Live WebSocket' : 'Paused'}
-            </button>
+
           </div>
         </div>
 
@@ -937,7 +929,7 @@ export default function MedicalAnalyticsDashboard({
                       SESSION BENCHMARK COMPARISON (SAME QUIZ)
                     </span>
                     <span className="px-2 py-0.2 rounded-full text-[9px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
-                      Cross-Cohort Telemetry
+                      Session comparison
                     </span>
                   </div>
                   <div className="text-sm sm:text-base font-bold text-white flex flex-wrap items-center gap-2 mt-0.5">
@@ -976,7 +968,7 @@ export default function MedicalAnalyticsDashboard({
               {/* Delta 1: Audience Size */}
               <div className="rounded-xl bg-white/5 border border-white/10 p-3">
                 <div className="text-[10px] uppercase tracking-wider text-indigo-200 font-semibold">
-                  Cohort Size
+                  Participants
                 </div>
                 <div className="mt-1 flex items-baseline justify-between">
                   <div className="text-base sm:text-lg font-bold font-mono text-white">
@@ -992,7 +984,7 @@ export default function MedicalAnalyticsDashboard({
               {/* Delta 2: Guideline Accuracy */}
               <div className="rounded-xl bg-white/5 border border-white/10 p-3">
                 <div className="text-[10px] uppercase tracking-wider text-indigo-200 font-semibold">
-                  Cohort Accuracy Delta
+                  Difference in correct answers
                 </div>
                 <div className="mt-1 flex items-baseline justify-between">
                   <div className="text-base sm:text-lg font-bold font-mono text-white">
@@ -1025,194 +1017,16 @@ export default function MedicalAnalyticsDashboard({
           </div>
         )}
 
-        {/* Row 2: Real-Time Metric Cards (3 Cards Grid) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
-          {/* Card 1 (Leftmost): Whose Data Is Displayed */}
-          <div className="nq-report-dark-panel rounded-2xl bg-gradient-to-br from-[#0460A9] to-[#03508C] text-white p-4 shadow-sm flex flex-col justify-between">
-            <div className="flex items-center justify-between text-xs text-white/80">
-              <span className="font-bold uppercase tracking-wider text-[10px]">ACTIVE DATA SCOPE</span>
-              <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded font-mono font-bold">
-                {selectedPlayer ? 'INDIVIDUAL PLAYER' : 'ALL PLAYERS'}
-              </span>
-            </div>
-
-            <div className="my-2 flex items-center gap-3">
-              {selectedPlayer ? (
-                <>
-                  {selectedPlayer.photoUrl ? (
-                    <img src={selectedPlayer.photoUrl} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-white/40 shrink-0" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center font-bold text-white text-sm shrink-0">
-                      {selectedPlayer.displayName.charAt(0)}
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <div className="font-bold text-base sm:text-lg text-white truncate">
-                      {selectedPlayer.displayName}
-                    </div>
-                    <div className="text-xs text-sky-200 truncate font-mono">
-                      #{selectedPlayer.rank} · {selectedPlayer.score} pts
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div>
-                  <div className="text-2xl sm:text-3xl font-bold font-mono text-white tracking-tight">
-                    All Players ({activePlayersCount})
-                  </div>
-                  <div className="text-xs text-sky-200 mt-0.5">
-                    Aggregate metrics across all active session participants
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="pt-2 border-t border-white/20 flex items-center justify-between text-[11px]">
-              <span className="text-white/80">Showing Data For:</span>
-              {selectedPlayer ? (
-                <button
-                  onClick={() => setSelectedPlayer(null)}
-                  className="font-mono font-bold bg-white/20 hover:bg-white/30 text-white px-2 py-0.5 rounded transition flex items-center gap-1 text-[10px]"
-                  title="Click to view all players"
-                >
-                  <span>#{selectedPlayer.rank}</span>
-                </button>
-              ) : (
-                <span className="font-mono font-bold bg-white/15 px-2 py-0.5 rounded text-white">
-                  All Players ({activePlayersCount})
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Card 2: Accuracy / Correction Rate */}
-          {(() => {
-            const activeAccuracy = selectedPlayer ? selectedPlayer.accuracy : cohortAccuracy;
-            const hasAccuracyData = Boolean(selectedPlayer) || activePlayersCount > 0;
-            let accuracyBadgeStyle = hasAccuracyData ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-slate-50 text-slate-600 border-slate-200';
-            let accuracyStatusText = hasAccuracyData ? 'Critical Gap' : 'No data';
-            let accuracyStatusStyle = hasAccuracyData ? 'bg-rose-100 text-rose-900 border-rose-300' : 'bg-slate-100 text-slate-600 border-slate-300';
-            let accuracyProgressBg = hasAccuracyData ? 'bg-gradient-to-r from-rose-500 to-rose-600' : 'bg-slate-300';
-
-            if (activeAccuracy >= 75) {
-              accuracyBadgeStyle = 'bg-emerald-50 text-emerald-800 border-emerald-200';
-              accuracyStatusText = 'Optimal';
-              accuracyStatusStyle = 'bg-emerald-100 text-emerald-900 border-emerald-300';
-              accuracyProgressBg = 'bg-gradient-to-r from-emerald-500 to-[#0D8C6D]';
-            } else if (activeAccuracy >= 50) {
-              accuracyBadgeStyle = 'bg-amber-50 text-amber-800 border-amber-200';
-              accuracyStatusText = 'Moderate';
-              accuracyStatusStyle = 'bg-amber-100 text-amber-900 border-amber-300';
-              accuracyProgressBg = 'bg-gradient-to-r from-amber-400 to-amber-600';
-            }
-
-            return (
-              <div className="rounded-2xl bg-[#F8FAFC] border border-[#0460A9]/10 p-4 transition-all hover:border-[#0460A9]/30">
-                <div className="flex items-center justify-between text-xs text-[#5D7EA1]">
-                  <span className="font-bold uppercase tracking-wider text-[10px]">
-                    Accuracy
-                  </span>
-                  <span className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold border ${accuracyBadgeStyle}`}>
-                    {hasAccuracyData ? `${activeAccuracy}%` : '—'}
-                  </span>
-                </div>
-                <div className="mt-2 flex items-baseline justify-between">
-                  <div>
-                    <div className="text-2xl sm:text-3xl font-bold font-mono text-[#16324F] tracking-tight">
-                      {hasAccuracyData ? `${activeAccuracy}%` : '—'}
-                    </div>
-                            {activePlayersCount > 0 && <div className="text-xs text-[#5D7EA1] mt-0.5">Target Benchmark: ≥ 75%</div>}
-                  </div>
-                  <div className="text-right">
-                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${accuracyStatusStyle}`}>
-                      {accuracyStatusText}
-                    </span>
-                    <span className="block text-[10px] text-[#5D7EA1] mt-0.5">Status</span>
-                  </div>
-                </div>
-                <div className="mt-2.5 w-full bg-[#EBF3FA] rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className={`${accuracyProgressBg} h-full rounded-full transition-all duration-300`}
-                    style={{ width: `${Math.min(100, Math.max(0, activeAccuracy))}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Card 3: Decision Velocity (Avg Response Time) */}
-          <div className="rounded-2xl bg-[#F8FAFC] border border-[#0460A9]/10 p-4 transition-all hover:border-[#0460A9]/30">
-            <div className="flex items-center justify-between text-xs text-[#5D7EA1]">
-              <span className="font-bold uppercase tracking-wider text-[10px]">
-                Decision Time
-              </span>
-              <span className="px-2 py-0.5 rounded-full bg-sky-50 text-[#0284C7] font-mono text-[10px] font-bold border border-sky-200">
-                Pacing Normal
-              </span>
-            </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <div>
-                <div className="text-2xl sm:text-3xl font-bold font-mono text-[#16324F] tracking-tight">
-                  {selectedPlayer ? `${(selectedPlayer.totalTimeSeconds / Math.max(1, effectiveQuestions.length)).toFixed(1)}s` : activePlayersCount > 0 ? `${cohortVelocity}s` : '—'}
-                </div>
-                <div className="text-xs text-[#5D7EA1] mt-0.5">Mean Latency</div>
-              </div>
-              <div className="text-right">
-                <span className="text-sm font-mono font-semibold text-[#5D7EA1]">&lt; 12.0s</span>
-                <span className="block text-[10px] text-[#5D7EA1]">Target Limit</span>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Row 3: Cohort insights */}
-        {showCohortInsightsDrawer && (
-          <div className="rounded-2xl bg-[#F8FAFC] border border-[#0460A9]/15 p-4 space-y-3">
-            <div className="flex items-center justify-between border-b border-[#0460A9]/10 pb-2">
-              <span className="text-xs font-bold text-[#16324F] uppercase tracking-wider">
-                Audience Modes
-              </span>
-              <button
-                onClick={() => setShowCohortInsightsDrawer(false)}
-                className="text-xs text-[#5D7EA1] hover:text-[#16324F]"
-              >
-                ✕ Close
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div className="bg-white p-3 rounded-xl border border-[#0460A9]/10">
-                <p className="text-[10px] font-bold uppercase text-[#5D7EA1]">Audience Modes</p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {Object.entries(insights?.audience_mode_summary ?? {}).map(([k, v]) => (
-                    <span key={k} className="px-2 py-1 bg-[#F4F8FC] border border-[#0460A9]/15 rounded-lg text-xs font-semibold text-[#16324F]">
-                      {k}: {v}
-                    </span>
-                  ))}
-                  {Object.keys(insights?.audience_mode_summary ?? {}).length === 0 && <span className="text-[11px] text-[#5D7EA1]">No audience summary data.</span>}
-                </div>
-              </div>
-
-              <div className="bg-white p-3 rounded-xl border border-[#0460A9]/10">
-                <p className="text-[10px] font-bold uppercase text-[#5D7EA1]">Highest Friction Nodes</p>
-                <div className="mt-2 space-y-1">
-                  {(insights?.highest_friction_nodes ?? []).slice(0, 2).map((node) => (
-                    <div key={node.question_id} className="flex justify-between items-center text-[11px]">
-                      <span className="text-[#16324F] truncate max-w-[170px]">{node.question_text}</span>
-                      <span className="font-bold text-rose-700 font-mono bg-rose-50 px-1.5 py-0.5 rounded">
-                        Friction {node.node_friction_score}
-                      </span>
-                    </div>
-                  ))}
-                  {(insights?.highest_friction_nodes ?? []).length === 0 && <span className="text-[11px] text-[#5D7EA1]">No friction data.</span>}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
+        <ReportOverviewGraphs
+          accuracy={selectedPlayer ? selectedPlayer.accuracy : activePlayersCount ? cohortAccuracy : null}
+          players={selectedPlayer ? [selectedPlayer] : effectivePlayers}
+          name={selectedPlayer?.displayName}
+          questions={selectedPlayer ? effectiveQuestions.flatMap(q => {
+            const response = q.userResponses[selectedPlayer.id];
+            return response ? [{ ...q, errorRatePercent: response.isCorrect ? 0 : 100, sampleSize: 1, avgTimeSeconds: response.timeSeconds }] : [];
+          }) : effectiveQuestions}
+        />
+        <nav className={chartStyles.sections} aria-label="Report sections"><a href="#report-answers">Answers & AI recap</a><a href="#report-audience">Participant demographics</a></nav>
         {/* Row 4: Active Filter Chips Bar (With Click-to-Unfilter indicators) */}
         <div className="rounded-2xl bg-[#EBF3FA] border border-[#0460A9]/20 p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex flex-wrap items-center gap-2">
@@ -1248,7 +1062,7 @@ export default function MedicalAnalyticsDashboard({
               </button>
             ) : (
               <span className="px-2.5 py-1 rounded-lg bg-white/70 border border-[#0460A9]/10 text-[#5D7EA1] font-mono text-[11px]">
-                All Clinical Tags
+                All Topics
               </span>
             )}
           </div>
@@ -1324,7 +1138,7 @@ export default function MedicalAnalyticsDashboard({
                   : 'text-indigo-900 hover:bg-indigo-100/60'
                   }`}
               >
-                <span>Benchmark Cohort</span>
+                <span>Comparison session</span>
                 <span className="font-mono opacity-80">({selectedCompareSession.participant_count ?? 0})</span>
               </button>
             </div>
@@ -1470,11 +1284,11 @@ export default function MedicalAnalyticsDashboard({
         {/* -------------------------------------------------------------
             3. RIGHT COMPONENT: CLINICAL HEATMAP & QUESTION TABLE (EXPANDED)
         -------------------------------------------------------------- */}
-        <main className="lg:col-span-9 xl:col-span-9 space-y-6">
+        <main id="report-answers" className="lg:col-span-9 xl:col-span-9 space-y-6">
 
           {session?.id && <PlayerInsightPanel sessionId={session.id} player={selectedPlayer} th={i18n.language?.startsWith('th') ?? false} />}
 
-          <TopicUnderstandingBreakdown
+          <TopicUnderstandingGraph
             items={availableTags.map((tag) => {
               const tagQuestions = effectiveQuestions.filter((question) => question.tags.includes(tag));
               const answeredQuestions = tagQuestions.filter((question) => question.sampleSize > 0);
@@ -1528,6 +1342,7 @@ export default function MedicalAnalyticsDashboard({
       {/* =============================================================
           MODAL: COMPARE SESSIONS (MATCHING QUIZMANAGE)
       ============================================================== */}
+      <div id="report-audience"><DemographicsPanel sessionId={session?.id} /></div>
       <CompareSessionsModal
         isOpen={compareModal.isOpen}
         onClose={() => setCompareModal({ isOpen: false, quizId: null, selectedSessionIds: [] })}

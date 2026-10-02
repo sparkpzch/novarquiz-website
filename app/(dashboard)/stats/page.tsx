@@ -63,7 +63,6 @@ function StatsPageContent() {
   }, [uid, historyKey]);
 
   const date = (value: string | null) => value ? new Date(value).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : copy('Completed quiz', 'แบบทดสอบที่ทำเสร็จแล้ว');
-  const firstName = user?.displayName?.trim().split(/\s+/)[0];
   const coaching = report ? historyCoaching(report, locale) : null;
   const feedback = report?.feedback;
   const everydayFeedback = feedback && feedback.reviewStatus !== 'metrics' && isEverydayInsight(feedback) ? feedback : null;
@@ -74,7 +73,7 @@ function StatsPageContent() {
       <div className="history-wrap">
         <div className="history-topbar">
           <Link href="/" className="history-back">← {copy('Home', 'หน้าหลัก')}</Link>
-          <div className="history-person"><ProfileAvatar displayName={user?.displayName} photoURL={user?.photoURL} size={32} /><span>{firstName ? copy(`For ${firstName}`, `สำหรับ ${firstName}`) : copy('For you', 'สำหรับคุณ')}</span></div>
+          <div className="history-person"><ProfileAvatar displayName={user?.displayName} photoURL={user?.photoURL} size={32} /></div>
         </div>
         <header className="history-heading">
           <p className="history-eyebrow">{copy('A little learning, every day', 'เรียนรู้วันละนิด เข้าใจมากขึ้น')}</p>

@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { motion } from "motion/react";
+import { useTranslation } from "react-i18next";
 import type { Session } from "@/lib/types";
 
 type BrowseSession = Session & { created_at?: string };
@@ -112,6 +113,8 @@ function SessionCard({
 // ─── Quizzes Content ──────────────────────────────────────────────────────────
 
 function QuizzesContent() {
+  const { i18n } = useTranslation();
+  const th = i18n.language.startsWith("th");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -207,10 +210,10 @@ function QuizzesContent() {
   ];
 
   const lengthOptions = [
-    { value: "all", label: "All Lengths" },
-    { value: "short", label: "Short (< 5Q)" },
-    { value: "medium", label: "Medium (5–15Q)" },
-    { value: "long", label: "Long (> 15Q)" },
+    { value: "all", label: th ? "ทุกจำนวนข้อ" : "Any number" },
+    { value: "short", label: th ? "น้อยกว่า 5 ข้อ" : "Fewer than 5" },
+    { value: "medium", label: th ? "5–15 ข้อ" : "5–15 questions" },
+    { value: "long", label: th ? "มากกว่า 15 ข้อ" : "More than 15" },
   ];
 
   return (
@@ -277,7 +280,7 @@ function QuizzesContent() {
           <div className="space-y-4">
             {/* Sort */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <span className="shrink-0 nq-details font-bold uppercase tracking-[0.18em] text-[#5D7EA1] sm:w-10">
+              <span className="shrink-0 nq-details font-bold uppercase tracking-[0.18em] text-[#5D7EA1] sm:w-24">
                 Sort
               </span>
               <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar sm:pb-0">
@@ -294,8 +297,8 @@ function QuizzesContent() {
 
             {/* Length */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <span className="shrink-0 nq-details font-bold uppercase tracking-[0.18em] text-[#5D7EA1] sm:w-10">
-                Size
+              <span className="shrink-0 nq-details font-bold uppercase tracking-[0.18em] text-[#5D7EA1] sm:w-24">
+                {th ? "จำนวนข้อ" : "Questions"}
               </span>
               <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar sm:pb-0">
                 {lengthOptions.map((opt) => (

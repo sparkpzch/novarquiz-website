@@ -1,7 +1,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SignJWT } from 'jose';
-import { verifySessionToken } from '../session';
+import { verifySessionToken, SESSION_VERSION } from '../session';
 
 const originalSecret = process.env.SESSION_SECRET;
 const secret = new TextEncoder().encode('session-security-test-secret');
@@ -13,7 +13,7 @@ after(() => {
 
 async function token(claims: Record<string, unknown> = {}, alg = 'HS256') {
   const now = Math.floor(Date.now() / 1000);
-  return new SignJWT({ uid: 'player-1', isAdmin: false, iat: now, exp: now + 60, ...claims })
+  return new SignJWT({ uid: 'player-1', isAdmin: false, sessionVersion: SESSION_VERSION, iat: now, exp: now + 60, ...claims })
     .setProtectedHeader({ alg }).sign(secret);
 }
 
@@ -36,4 +36,11 @@ test('expired, tampered, unsigned and unexpected-algorithm sessions fail', async
   parts[1] = Buffer.from(JSON.stringify({ uid: 'attacker', isAdmin: true })).toString('base64url');
   await assert.rejects(verifySessionToken(parts.join('.')));
   await assert.rejects(verifySessionToken('eyJhbGciOiJub25lIn0.eyJ1aWQiOiJhZG1pbiJ9.'));
+});
+
+test('rollout rejects every older player and admin session', async () => {
+  for (const isAdmin of [false, true]) {
+    await assert.rejects(verifySessionToken(await token({ isAdmin, sessionVersion: undefined })));
+    await assert.rejects(verifySessionToken(await token({ isAdmin, sessionVersion: 'older-rollout' })));
+  }
 });

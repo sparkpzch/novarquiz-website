@@ -1,3 +1,4 @@
+import { SESSION_VERSION } from '../session';
 import { before, after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NextRequest } from 'next/server';
@@ -74,7 +75,7 @@ test('verified player sessions cannot open admin pages, and admins land in Quiz 
   process.env.SESSION_SECRET = 'proxy-security-test-secret';
   try {
     for (const isAdmin of [false, true]) {
-      const token = await new SignJWT({ uid: 'player-1', isAdmin })
+      const token = await new SignJWT({ uid: 'player-1', isAdmin, sessionVersion: SESSION_VERSION })
         .setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime('60s')
         .sign(new TextEncoder().encode(process.env.SESSION_SECRET));
       const adminResponse = await proxy(new NextRequest('https://quiz.example/admin', {
