@@ -11,7 +11,7 @@ import CompareSessionsModal from './CompareSessionsModal';
 const COHORT_COLORS = [
   {
     id: 0,
-    name: 'Cohort A',
+    name: 'Group A',
     hex: '#0460A9',
     bgLight: 'bg-[#0460A9]/10',
     border: 'border-[#0460A9]',
@@ -22,7 +22,7 @@ const COHORT_COLORS = [
   },
   {
     id: 1,
-    name: 'Cohort B',
+    name: 'Group B',
     hex: '#7C3AED',
     bgLight: 'bg-[#7C3AED]/10',
     border: 'border-[#7C3AED]',
@@ -33,7 +33,7 @@ const COHORT_COLORS = [
   },
   {
     id: 2,
-    name: 'Cohort C',
+    name: 'Group C',
     hex: '#059669',
     bgLight: 'bg-[#059669]/10',
     border: 'border-[#059669]',
@@ -44,7 +44,7 @@ const COHORT_COLORS = [
   },
   {
     id: 3,
-    name: 'Cohort D',
+    name: 'Group D',
     hex: '#D97706',
     bgLight: 'bg-[#D97706]/10',
     border: 'border-[#D97706]',
@@ -118,11 +118,11 @@ export default function QuizSessionsCompareView({
   const cohorts = useMemo(() => {
     return comparedSessions.map((item, index) => {
       const colorScheme = COHORT_COLORS[index % COHORT_COLORS.length];
-      const name = item.session.name || `Cohort ${String.fromCharCode(65 + index)}`;
+      const name = item.session.name || `Group ${String.fromCharCode(65 + index)}`;
       return {
         ...item,
         cohortIndex: index,
-        cohortLabel: `Cohort ${String.fromCharCode(65 + index)}`,
+        cohortLabel: `Group ${String.fromCharCode(65 + index)}`,
         displayName: name,
         color: colorScheme,
       };
@@ -291,7 +291,7 @@ export default function QuizSessionsCompareView({
             </button>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#5D7EA1]">Cross-Cohort Analysis</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#5D7EA1]">Cross-Group Analysis</span>
                 <span className="rounded-full bg-[#0460A9]/10 px-2.5 py-0.5 text-[10px] font-extrabold text-[#0460A9]">
                   Macro Overview Only
                 </span>
@@ -311,7 +311,7 @@ export default function QuizSessionsCompareView({
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
               </svg>
-              Manage Cohorts ({cohorts.length})
+              Select sessions ({cohorts.length})
             </button>
 
             <button
@@ -360,7 +360,7 @@ export default function QuizSessionsCompareView({
                   <p className="text-base font-extrabold text-[#0460A9]">{cohort.macroMetrics.avgAccuracy}%</p>
                 </div>
                 <div>
-                  <p className="text-[9px] font-bold uppercase text-[#5D7EA1]">Velocity</p>
+                  <p className="text-[9px] font-bold uppercase text-[#5D7EA1]">Response time</p>
                   <p className="text-base font-extrabold text-[#16324F]">{cohort.macroMetrics.avgTimeSeconds}s</p>
                 </div>
               </div>
@@ -374,10 +374,10 @@ export default function QuizSessionsCompareView({
           <div className="relative z-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest text-white backdrop-blur-md">
-                Cross-Cohort Benchmark Aggregate
+                Combined results
               </div>
               <h2 className="mt-2 text-2xl md:text-3xl font-bold">
-                Multi-Cohort Educational Impact Overview
+                Session results
               </h2>
               <p className="mt-1 max-w-2xl text-xs md:text-sm text-blue-100/80 leading-relaxed">
                 Aggregated comparison across {macroSummary.cohortCount} quiz sessions.
@@ -387,19 +387,19 @@ export default function QuizSessionsCompareView({
 
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:gap-6">
               <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/10">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Combined Quorum</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Total participants</p>
                 <p className="mt-1 text-2xl font-black text-white">{macroSummary.totalParticipants} <span className="text-xs font-semibold text-blue-200">players</span></p>
               </div>
               <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/10">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Avg Adherence</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Average correct answers</p>
                 <p className="mt-1 text-2xl font-black text-white">{macroSummary.avgAccuracy}%</p>
               </div>
               <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/10">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Decision Speed</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Response time</p>
                 <p className="mt-1 text-2xl font-black text-white">{macroSummary.avgTimeSeconds}s</p>
               </div>
               <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/10">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Cohort Spread</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Difference in correct-answer rates</p>
                 <p className="mt-1 text-2xl font-black text-emerald-300">±{macroSummary.accuracySpread}%</p>
               </div>
             </div>
@@ -419,7 +419,7 @@ export default function QuizSessionsCompareView({
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
-            Clinical Domains Matrix
+            Topic comparison
           </button>
 
           <button
@@ -555,7 +555,7 @@ export default function QuizSessionsCompareView({
                   Aggregated Question Friction & Distractor Trap Comparison
                 </h3>
                 <p className="text-xs text-[#5D7EA1]">
-                  Macro identification of pedagogical sticking points and clinical misconception traps.
+                  Questions with the highest incorrect-answer rates.
                 </p>
               </div>
             </div>
@@ -607,7 +607,7 @@ export default function QuizSessionsCompareView({
                         {/* Distractor summary */}
                         {cf.distractors.length > 0 && (
                           <div className="mt-3 border-t border-[#0460A9]/10 pt-2 text-[10px]">
-                            <p className="font-bold text-[#5D7EA1]">Top Distractor Trap:</p>
+                            <p className="font-bold text-[#5D7EA1]">Most selected incorrect answer:</p>
                             <p className="font-semibold text-[#16324F] line-clamp-1">
                               Option {cf.distractors[0].label}: {cf.distractors[0].text} ({cf.distractors[0].percentage}%)
                             </p>

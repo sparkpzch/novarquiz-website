@@ -57,7 +57,7 @@ export default function AnswerGraphDialog({ report, playerName, th, onClose }: {
   const selectFromMobile = (index: number) => { setFilter('all'); setSelected(index); setPage(Math.floor(index / PAGE_SIZE)); };
   return <dialog ref={dialog} className={styles.dialog} aria-labelledby={titleId} onCancel={onClose}>
     <div className={styles.dialogHeader}>
-      <div className={styles.journeyHeading}><span className={styles.headingIcon}><JourneyIcon kind="graph" /></span><div><p className={styles.eyebrow}>{playerName} · {copy('ANSWER INSIGHTS', 'ข้อมูลเชิงลึกจากคำตอบ')}</p><h2 id={titleId}>{copy('The story behind this summary', 'เบื้องหลังสรุปของผู้เล่น')}</h2><p className={styles.muted}>{copy('Explore how recorded choices connect to this player’s AI summary.', 'ดูว่าคำตอบที่เลือกเชื่อมโยงกับสรุปจาก AI ของผู้เล่นอย่างไร')}</p></div></div>
+      <div className={styles.journeyHeading}><span className={styles.headingIcon}><JourneyIcon kind="graph" /></span><div><p className={styles.eyebrow}>{playerName} · {copy('ANSWER INSIGHTS', 'ข้อมูลเชิงลึกจากคำตอบ')}</p><h2 id={titleId}>{copy('Answers used in this summary', 'คำตอบที่ใช้สร้างสรุป')}</h2><p className={styles.muted}>{copy('Selected answers and the resulting AI summary.', 'คำตอบที่เลือกและสรุปจาก AI ที่ได้')}</p></div></div>
       <button type="button" className={styles.close} aria-label={copy('Close answer graph', 'ปิดกราฟคำตอบ')} onClick={onClose}>×</button>
     </div>
     <div className={styles.journeyBody}>

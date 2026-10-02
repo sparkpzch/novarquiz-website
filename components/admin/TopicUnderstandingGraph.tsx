@@ -10,8 +10,8 @@ export default function TopicUnderstandingGraph({items,description,selectedTag,o
   const copy=(en:string,thai:string)=>th?thai:en;
   const [sort,setSort]=useState('lowest');
   const sorted=[...items].sort((a,b)=>sort==='name'?a.tag.localeCompare(b.tag):(sort==='highest'?-1:1)*((a.percentage??-1)-(b.percentage??-1)));
-  return <section className={styles.panel} aria-label={copy('Understanding by topic','ความเข้าใจแยกตามหัวข้อ')}>
-    <div className={styles.heading}><div><h2>{copy('Understanding by topic','ความเข้าใจแยกตามหัวข้อ')}</h2><p>{description}</p>{selectedPlayerName&&<p>{selectedPlayerName}</p>}</div><select className={styles.select} aria-label={copy('Sort topics','เรียงหัวข้อ')} value={sort} onChange={e=>setSort(e.target.value)}><option value="lowest">{copy('Lowest first','น้อยไปมาก')}</option><option value="highest">{copy('Highest first','มากไปน้อย')}</option><option value="name">{copy('Topic name','ชื่อหัวข้อ')}</option></select></div>
+  return <section className={styles.panel} aria-label={copy('Scores by topic','คะแนนรายหัวข้อ')}>
+    <div className={styles.heading}><div><h2>{copy('Scores by topic','คะแนนรายหัวข้อ')}</h2><p>{description}</p>{selectedPlayerName&&<p>{selectedPlayerName}</p>}</div><select className={styles.select} aria-label={copy('Sort topics','เรียงหัวข้อ')} value={sort} onChange={e=>setSort(e.target.value)}><option value="lowest">{copy('Lowest first','น้อยไปมาก')}</option><option value="highest">{copy('Highest first','มากไปน้อย')}</option><option value="name">{copy('Topic name','ชื่อหัวข้อ')}</option></select></div>
     {sorted.length?<div className={styles.bars}>{sorted.map(item=>{
       const title=readingStyle==='everyday'?(learningTopic(item.tag,locale)?.title??copy('Other quiz topics','เรื่องอื่น ๆ ในแบบทดสอบ')):item.tag.replace(/^#/,'').replaceAll('_',' ');
       const pct=item.percentage===null?null:Math.min(100,Math.max(0,item.percentage));

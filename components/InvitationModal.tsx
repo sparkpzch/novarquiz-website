@@ -59,8 +59,8 @@ export default function InvitationModal({ isOpen, onClose, sessionName, joinToke
 
             <div className="space-y-2 text-center">
               <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#92BFFF]">Invitation</p>
-              <h2 className="text-3xl font-bold text-[#92BFFF]">Join the Quiz!</h2>
-              <p className="text-sm text-white/60">Scan the QR code below to join instantly</p>
+              <h2 className="text-3xl font-bold text-[#92BFFF]">Join the quiz</h2>
+              <p className="text-sm text-white/60">Scan the QR code to join</p>
               {sessionName && (
                 <p className="mx-auto max-w-sm text-sm font-medium text-white/75">{sessionName}</p>
               )}

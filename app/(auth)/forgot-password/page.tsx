@@ -59,7 +59,7 @@ export default function ForgotPasswordPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="text-xl font-bold text-gray-900 md:text-white mb-2">Email Sent!</h2>
+        <h2 className="text-xl font-bold text-gray-900 md:text-white mb-2">Email sent</h2>
         <p className="text-gray-500 md:text-gray-400 text-sm mb-6">Check your email for a link to reset your password.</p>
         <Link href="/sign-in">
           <Button className="w-full">Back to Login</Button>

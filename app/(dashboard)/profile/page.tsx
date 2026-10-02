@@ -351,7 +351,7 @@ export default function ProfilePage() {
       const url = await getDownloadURL(storageRef);
       await updateProfile(auth.currentUser!, { photoURL: url });
       await refreshUser();
-      showToast("Profile photo updated!", "success");
+      showToast("Profile photo updated", "success");
     } catch {
       showToast("Upload failed", "error");
     } finally {
@@ -368,7 +368,7 @@ export default function ProfilePage() {
         await updateProfile(auth.currentUser!, { displayName: trimmed });
         await refreshUser();
       }
-      showToast("Profile updated!", "success");
+      showToast("Profile updated", "success");
       setEditModal(false);
     } catch {
       showToast("Failed to update profile", "error");
@@ -503,7 +503,14 @@ export default function ProfilePage() {
       >
         <h2 className="mb-5 text-2xl font-semibold text-[#202A3F]">{t("profile.general")}</h2>
         <div className="space-y-5">
-          <SurveyGate editing />
+          <SurveyGate editing renderTrigger={(open, label) => (
+            <GeneralRow
+              icon={<EditIcon />}
+              label={label}
+              onClick={open}
+              trailing={<ChevronRight />}
+            />
+          )} />
           <GeneralRow
             icon={<LockIcon />}
             label={t("profile.change_password")}

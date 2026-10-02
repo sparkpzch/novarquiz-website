@@ -228,7 +228,7 @@ function QuizzesContent() {
           <p className="nq-details font-bold uppercase tracking-[0.28em] text-white/80 drop-shadow-sm">
             Library
           </p>
-          <h1 className="mt-1 text-3xl font-bold text-white drop-shadow-md font-display tracking-tight">Browse Quizzes</h1>
+          <h1 className="mt-1 text-3xl font-bold text-white drop-shadow-md font-display tracking-tight">Quizzes</h1>
         </motion.div>
 
         {/* Search + Filters */}

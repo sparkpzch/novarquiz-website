@@ -188,27 +188,27 @@ export const UNDERSTANDING_TIERS: {
 }[] = [
     {
       id: 'low',
-      label: 'Low Understanding',
+      label: 'Below 50%',
       range: '< 50%',
-      thresholdDesc: 'Critical Knowledge Gap',
+      thresholdDesc: 'More than half of answers incorrect',
       accentColor: '#E11D48',
       headerBg: 'from-rose-500/10 via-rose-500/5 to-transparent border-rose-200 text-rose-900',
       badgeStyle: 'bg-rose-50 text-rose-700 border-rose-200',
     },
     {
       id: 'moderate',
-      label: 'Moderate Understanding',
+      label: '50–75%',
       range: '50% - 75%',
-      thresholdDesc: 'Borderline Adherence',
+      thresholdDesc: 'Some answers incorrect',
       accentColor: '#D97706',
       headerBg: 'from-amber-500/10 via-amber-500/5 to-transparent border-amber-200 text-amber-900',
       badgeStyle: 'bg-amber-50 text-amber-800 border-amber-200',
     },
     {
       id: 'high',
-      label: 'High Understanding',
+      label: 'Above 75%',
       range: '> 75%',
-      thresholdDesc: 'Target Guideline Mastery',
+      thresholdDesc: 'Most answers correct',
       accentColor: '#0284C7',
       headerBg: 'from-sky-500/10 via-sky-500/5 to-transparent border-sky-200 text-sky-900',
       badgeStyle: 'bg-sky-50 text-sky-800 border-sky-200',
@@ -365,7 +365,7 @@ export default function MedicalAnalyticsDashboard({
             percentage: pct,
             isCorrect,
             utilityScore: Number(c.score_impact) || 0,
-            clinicalNote: c.behavior_meaning || (!isCorrect && pct > 20 ? 'High selection distractor trap.' : undefined),
+            clinicalNote: c.behavior_meaning || (!isCorrect && pct > 20 ? 'Frequently selected incorrect answer.' : undefined),
           };
         });
 
@@ -759,10 +759,10 @@ export default function MedicalAnalyticsDashboard({
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-[#0460A9]/20 bg-[#EBF3FA] px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wide text-[#0460A9]"><span className="h-2 w-2 rounded-full bg-[#0D8C6D]" />{selectedAggregateSession ? 'SESSION FILTER' : 'QUIZ ANALYTICS'}</span>
-                    <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-800">AGGREGATED SESSION DATA</span>
+                    <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-800">All session results</span>
                   </div>
                   <h1 className="mt-2 text-xl font-bold tracking-tight text-[#16324F] sm:text-2xl">{sessionTitle}</h1>
-                  <p className="mt-0.5 text-xs text-[#5D7EA1] sm:text-sm">{selectedAggregateSession ? `Filtered to ${selectedAggregateSession.name}. Individual participant details are not shown.` : `Quiz-wide understanding and question performance across ${metrics.totalSessions} sessions. Individual participant details are not shown.`}</p>
+                  <p className="mt-0.5 text-xs text-[#5D7EA1] sm:text-sm">{selectedAggregateSession ? `Filtered to ${selectedAggregateSession.name}. Individual participant details are not shown.` : `Quiz results across ${metrics.totalSessions} sessions. Individual participant details are not shown.`}</p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
@@ -786,7 +786,7 @@ export default function MedicalAnalyticsDashboard({
               {aggregateSessions.length > 0 && <div className="space-y-2">
                 <input type="search" value={aggregateSessionSearch} onChange={(event) => setAggregateSessionSearch(event.target.value)} placeholder="Search sessions..." aria-label="Search sessions" className="nq-report-control w-full rounded-xl border border-[#0460A9]/20 bg-white px-3 py-2 text-xs text-[#16324F] placeholder-[#5D7EA1] focus:outline-none focus:ring-2 focus:ring-[#0460A9]" />
                 <select value={aggregateSessionFilter} onChange={(event) => setAggregateSessionFilter(event.target.value as typeof aggregateSessionFilter)} aria-label="Filter sessions by accuracy" className="nq-report-control w-full rounded-xl border border-[#0460A9]/20 bg-white px-3 py-2 text-xs text-[#16324F] focus:outline-none focus:ring-2 focus:ring-[#0460A9]">
-                  <option value="all">All accuracy levels</option><option value="high">Strong · 75% and above</option><option value="developing">Developing · 50–74%</option><option value="review">Priority review · below 50%</option>
+                  <option value="all">All accuracy levels</option><option value="high">75% and above</option><option value="developing">50–74%</option><option value="review">Below 50%</option>
                 </select>
               </div>}
               {aggregateSessions.length === 0 ? <p className="py-3 text-xs text-[#5D7EA1]">No sessions recorded yet.</p> : visibleAggregateSessions.length === 0 ? <p className="py-3 text-xs text-[#5D7EA1]">No sessions match your search and accuracy filter.</p> : visibleAggregateSessions.map((item, index) => (
@@ -800,8 +800,7 @@ export default function MedicalAnalyticsDashboard({
             </aside>
 
             <main className="space-y-5 lg:col-span-9">
-              <ReportOverviewGraphs accuracy={displayMetrics.totalParticipants ? displayMetrics.avgAccuracy : null} players={[]} questions={effectiveQuestions} showDistribution={false} averageTime={displayMetrics.totalParticipants ? displayMetrics.avgTimeSeconds : null} />
-              <DemographicsPanel sessionId={selectedAggregateSession?.id} quizId={session?.session_id} />
+              <ReportOverviewGraphs accuracy={displayMetrics.totalParticipants ? displayMetrics.avgAccuracy : null} players={[]} questions={effectiveQuestions} showDistribution={false} averageTime={displayMetrics.totalParticipants ? displayMetrics.avgTimeSeconds : null}><DemographicsPanel embedded sessionId={selectedAggregateSession?.id} quizId={session?.session_id} /></ReportOverviewGraphs>
               <TopicUnderstandingGraph
                 items={displayTopics.map((topic) => ({
                   tag: topic.tag,
@@ -870,7 +869,7 @@ export default function MedicalAnalyticsDashboard({
                     className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0460A9] bg-[#0460A9]/10 hover:bg-[#0460A9]/20 border border-[#0460A9]/25 px-2.5 py-0.5 rounded-md transition"
                     title="View overall aggregated analytics across all sessions of this quiz template"
                   >
-                    <span>✦ Quiz Overall Analytics</span>
+                    <span>✦ Quiz results</span>
                   </button>
                 )}
                 {selectedCompareSession && (
@@ -885,7 +884,7 @@ export default function MedicalAnalyticsDashboard({
                 {sessionTitle}
               </h1>
               <p className="text-xs sm:text-sm text-[#5D7EA1] mt-0.5">
-                Understand the results, explore topics, and review each participant’s answers and AI recap.
+                Results, answers and AI summaries for each participant.
               </p>
             </div>
           </div>
@@ -997,10 +996,10 @@ export default function MedicalAnalyticsDashboard({
                 </div>
               </div>
 
-              {/* Delta 3: Mean Decision Velocity */}
+              {/* Delta 3: Mean Response time */}
               <div className="rounded-xl bg-white/5 border border-white/10 p-3">
                 <div className="text-[10px] uppercase tracking-wider text-indigo-200 font-semibold">
-                  Decision Velocity
+                  Response time
                 </div>
                 <div className="mt-1 flex items-baseline justify-between">
                   <div className="text-base sm:text-lg font-bold font-mono text-white">
@@ -1025,8 +1024,8 @@ export default function MedicalAnalyticsDashboard({
             const response = q.userResponses[selectedPlayer.id];
             return response ? [{ ...q, errorRatePercent: response.isCorrect ? 0 : 100, sampleSize: 1, avgTimeSeconds: response.timeSeconds }] : [];
           }) : effectiveQuestions}
-        />
-        <nav className={chartStyles.sections} aria-label="Report sections"><a href="#report-answers">Answers & AI recap</a><a href="#report-audience">Participant demographics</a></nav>
+        ><div id="report-audience"><DemographicsPanel embedded sessionId={session?.id} /></div></ReportOverviewGraphs>
+        <nav className={chartStyles.sections} aria-label="Report sections"><a href="#report-answers">Answers & AI recap</a><a href="#report-audience">Participant information</a></nav>
         {/* Row 4: Active Filter Chips Bar (With Click-to-Unfilter indicators) */}
         <div className="rounded-2xl bg-[#EBF3FA] border border-[#0460A9]/20 p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex flex-wrap items-center gap-2">
@@ -1193,7 +1192,7 @@ export default function MedicalAnalyticsDashboard({
                 : 'text-[#5D7EA1] hover:text-sky-800'
                 }`}
             >
-              Mastery
+              Correct answers
             </button>
           </div>
 
@@ -1342,7 +1341,6 @@ export default function MedicalAnalyticsDashboard({
       {/* =============================================================
           MODAL: COMPARE SESSIONS (MATCHING QUIZMANAGE)
       ============================================================== */}
-      <div id="report-audience"><DemographicsPanel sessionId={session?.id} /></div>
       <CompareSessionsModal
         isOpen={compareModal.isOpen}
         onClose={() => setCompareModal({ isOpen: false, quizId: null, selectedSessionIds: [] })}

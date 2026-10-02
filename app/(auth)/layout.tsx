@@ -6,8 +6,8 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 
 const AUTH_TABS = [
-  { label: 'Login', href: '/sign-in' },
-  { label: 'Sign Up', href: '/sign-up' },
+  { label: 'Sign in', href: '/sign-in' },
+  { label: 'Create account', href: '/sign-up' },
 ];
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
@@ -20,9 +20,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <div className="nq-auth-shell flex min-h-dvh flex-col">
         <header className="nq-auth-header relative shrink-0 overflow-hidden">
           <div className="nq-auth-welcome relative z-10 mx-auto w-full max-w-md">
-            <p className="font-semibold">Welcome back</p>
+            <p className="font-semibold">Health quizzes</p>
             <div className="flex items-baseline gap-1.5">
-              <span className="nq-auth-welcome-to font-normal">To</span>
+
               <span className="nq-auth-brand font-extrabold tracking-tight">NovarQuiz</span>
             </div>
           </div>

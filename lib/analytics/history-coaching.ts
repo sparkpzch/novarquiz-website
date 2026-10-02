@@ -99,14 +99,14 @@ export function historyCoaching(report: PersonalHistoryReport, locale: InsightLo
     ? practice.find((area) => area.reviewIds.includes(nextAnswer.id)) ?? areas.find((area) => nextTopics.some((topic) => topic.id === area.id)) ?? null
     : null;
   const headline = !answers.length
-    ? (locale === 'th' ? 'ยังไม่มีคำตอบให้ทบทวน' : 'Your quiz recap will appear here')
+    ? (locale === 'th' ? 'ยังไม่มีคำตอบให้ทบทวน' : 'No quiz answers yet')
     : review.length === 0
-      ? (locale === 'th' ? 'ตอบถูกครบทุกข้อ เยี่ยมเลย' : 'You got every question right. Nice work.')
-      : (locale === 'th' ? `ลองทบทวน: ${nextArea?.title ?? 'คำถามที่คุณตอบพลาด'}` : `Worth another look: ${nextArea?.title ?? 'the questions you missed'}`);
+      ? (locale === 'th' ? 'ตอบถูกทุกข้อ' : 'All answers correct')
+      : (locale === 'th' ? `ลองทบทวน: ${nextArea?.title ?? 'คำถามที่คุณตอบพลาด'}` : `Review: ${nextArea?.title ?? 'the questions you missed'}`);
   const body = !answers.length
-    ? (locale === 'th' ? 'เลือกแบบทดสอบที่ทำเสร็จแล้วเพื่อดูคำแนะนำของคุณ' : 'Choose a completed quiz to see what you learned.')
+    ? (locale === 'th' ? 'เลือกแบบทดสอบที่ทำเสร็จแล้วเพื่อดูผล' : 'Choose a completed quiz to see the results.')
     : locale === 'th'
-      ? `คุณตอบถูก ${correct} จาก ${answers.length} ข้อ${review.length ? ` มาทบทวนอีก ${review.length} ข้อไปด้วยกัน` : ' ลองอ่านเหตุผลของคำตอบเพื่อทบทวนสิ่งที่เรียนรู้'}`
-      : `You got ${correct} of ${answers.length} questions right.${review.length ? ` Let’s take another look at the ${review.length === 1 ? 'one question' : `${review.length} questions`} you missed.` : ' Revisit the explanations to keep what you learned fresh.'}`;
+      ? `ตอบถูก ${correct} จาก ${answers.length} ข้อ${review.length ? ` มี ${review.length} ข้อที่ควรทบทวน` : ''}`
+      : `${correct} of ${answers.length} answers correct.${review.length ? ` ${review.length} to review.` : ''}`;
   return { correct, total: answers.length, review, strengths, practice, nextAnswer, nextArea, headline, body };
 }

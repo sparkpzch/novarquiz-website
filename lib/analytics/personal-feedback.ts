@@ -36,8 +36,8 @@ export function composePersonalFeedback(input: {
       ? `ภาพรวมแบบทดสอบ: ${latestTopic.name}`
       : `Quiz overview: ${latestTopic.name}`,
     body: locale === 'th'
-      ? `จากคำตอบทั้งหมดในแบบทดสอบนี้ ${latestTopic.score}% ตรงกับเป้าหมายของคำถาม ลองทบทวนคำอธิบายของแต่ละข้อเพื่อเตรียมตัวครั้งถัดไป`
-      : `Across your answers to this quiz, ${latestTopic.score}% met the questions’ goals. Review the answer explanations before your next attempt.`,
+      ? `จากคำตอบทั้งหมดในแบบทดสอบนี้ ${latestTopic.score}% ตรงกับเฉลย ดูคำอธิบายเพิ่มเติมได้ในประวัติ`
+      : `Across your answers to this quiz, ${latestTopic.score}% matched the answer key. View explanations in History.`,
     context: null,
     suggestion: null,
     question: null,

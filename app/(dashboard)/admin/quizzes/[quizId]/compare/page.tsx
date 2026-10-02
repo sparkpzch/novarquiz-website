@@ -49,7 +49,7 @@ function ComparePageContent({ params }: { params: Promise<{ quizId: string }> })
     return (
       <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#0460A9] border-t-transparent" />
-        <p className="text-sm font-semibold text-[#5D7EA1]">Generating multi-cohort comparative overview...</p>
+        <p className="text-sm font-semibold text-[#5D7EA1]">Loading session comparison…</p>
       </div>
     );
   }

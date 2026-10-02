@@ -144,10 +144,10 @@ export default function ChangePasswordPage() {
         className="nq-card rounded-[34px] px-6 py-8"
       >
         <h1 className="text-[2.2rem] font-bold leading-tight text-[#111827]">
-          Change new password
+          Change password
         </h1>
         <p className="mt-4 max-w-md text-[1.05rem] font-medium leading-8 text-[#6A7485]">
-          Your new password must be different from previous used password.
+          Enter and confirm your new password.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">

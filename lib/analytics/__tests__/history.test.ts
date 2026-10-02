@@ -78,7 +78,7 @@ test('coaching changes with recorded answers and picks the topic with most misse
   const second = historyCoaching(report([answer({ id: 'food', tags: ['nutrition'], selectedAligned: true })]), 'en');
   assert.equal(second.practice.length, 0);
   assert.equal(second.nextAnswer?.id, 'food');
-  assert.match(second.headline, /every question right/);
+  assert.equal(second.headline, 'All answers correct');
   assert.notEqual(first.body, second.body);
   assert.doesNotMatch(first.body, /score|rank|streak|accuracy|health risk/i);
 });

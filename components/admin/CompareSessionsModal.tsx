@@ -142,7 +142,7 @@ export default function CompareSessionsModal({
                     <span className="rounded-full bg-[#0460A9]/10 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[#0460A9]">
                       Macro Comparison
                     </span>
-                    <span className="text-xs font-semibold text-[#5D7EA1]">Cross-Cohort Analysis</span>
+                    <span className="text-xs font-semibold text-[#5D7EA1]">Session comparison</span>
                   </div>
                   <h2 className="mt-0.5 text-2xl font-bold text-[#16324F]">Compare Quiz Sessions</h2>
                 </div>
@@ -209,7 +209,7 @@ export default function CompareSessionsModal({
                       2. Choose Sessions to Compare
                     </label>
                     <p className="text-xs text-[#5D7EA1]">
-                      Select 2 or more cohorts to generate side-by-side aggregated clinical analytics.
+                      Select at least 2 sessions to compare results.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -283,7 +283,7 @@ export default function CompareSessionsModal({
                 {sessionsForQuiz.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-[#0460A9]/20 bg-[#F8FAFC] p-8 text-center">
                     <p className="text-sm font-bold text-[#16324F]">No sessions found for this quiz template.</p>
-                    <p className="mt-1 text-xs text-[#5D7EA1]">Create at least 2 sessions to run a cross-cohort comparison.</p>
+                    <p className="mt-1 text-xs text-[#5D7EA1]">At least 2 sessions are needed to compare results.</p>
                   </div>
                 ) : filteredSessions.length === 0 ? (
                   <div className="rounded-2xl bg-[#F8FAFC] p-6 text-center text-xs text-[#5D7EA1]">

@@ -35,7 +35,7 @@ export default function PersonalRecapCard({ report, locale, compact = false, det
   return <section className={`nq-personal-recap history-card history-recap${compact ? ' personal-recap-compact' : ''}`} aria-labelledby={headingId}>
     <div className="history-recap-art" aria-hidden="true"><div className="history-bloom bloom-one" /><div className="history-bloom bloom-two" /><div className="history-bloom bloom-three" /><div className="history-art-center"><RecapIcon name="book" /></div><RecapIcon name="spark" className="history-art-spark" /></div>
     <div className="history-recap-copy">
-      <p className="history-section-label"><RecapIcon name="spark" />{copy('Your personal recap', 'สรุปสำหรับคุณ')}</p>
+      <p className="history-section-label"><RecapIcon name="spark" />{copy('Quiz summary', 'สรุปผลแบบทดสอบ')}</p>
       {everydayFeedback?.reviewStatus === 'approved' && <span className="personal-recap-review-badge personal-recap-approved">{copy('AI · admin reviewed', 'AI · ผ่านการตรวจสอบจากผู้ดูแลแล้ว')}</span>}
       {everydayFeedback?.reviewStatus === 'provisional' && <span className="personal-recap-review-badge">{copy('AI · awaiting admin or doctor review', 'AI · ยังไม่ผ่านการตรวจสอบจากผู้ดูแลหรือแพทย์')}</span>}
       <h2 id={headingId}>{everydayFeedback?.headline ?? coaching.headline}</h2>
@@ -45,8 +45,8 @@ export default function PersonalRecapCard({ report, locale, compact = false, det
         <span className="history-fact-review"><RecapIcon name="book" />{copy(`${coaching.review.length} to revisit`, `อีก ${coaching.review.length} ข้อที่ควรทบทวน`)}</span>
       </div>}
       {detailsHref && <>
-        <Link className="personal-recap-details" href={detailsHref}>{copy('View full feedback', 'ดูคำแนะนำทั้งหมด')} <span aria-hidden="true">→</span></Link>
-        <p className="personal-recap-note">{copy('A recap of your learning, not medical advice.', 'สรุปสิ่งที่คุณเรียนรู้ ไม่ใช่คำแนะนำทางการแพทย์')}</p>
+        <Link className="personal-recap-details" href={detailsHref}>{copy('View summary', 'ดูสรุปทั้งหมด')} <span aria-hidden="true">→</span></Link>
+        <p className="personal-recap-note">{copy('Quiz summary, not medical advice.', 'สรุปผลแบบทดสอบ ไม่ใช่คำแนะนำทางการแพทย์')}</p>
       </>}
     </div>
   </section>;

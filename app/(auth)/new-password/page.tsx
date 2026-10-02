@@ -79,7 +79,7 @@ function NewPasswordForm() {
           Reset Password
         </h1>
         <p className="text-gray-500 md:text-gray-400 text-sm mb-6" style={{ lineHeight: 1.55 }}>
-          Your new password must be different from previous used password.
+          Enter and confirm your new password.
         </p>
       </motion.div>
 

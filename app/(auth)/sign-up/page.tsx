@@ -97,7 +97,7 @@ export default function SignUpPage() {
 
 
       <form onSubmit={handleSignUp} className="space-y-4">
-        <p className="text-sm font-semibold">{i18n.language.startsWith('th') ? (step === 'survey' ? 'ขั้นตอน 1 จาก 2 · ข้อมูลของคุณ' : 'ขั้นตอน 2 จาก 2 · สร้างบัญชี') : (step === 'survey' ? 'Step 1 of 2 · About you' : 'Step 2 of 2 · Create your account')}</p>
+        <p className="text-sm font-semibold">{i18n.language.startsWith('th') ? (step === 'survey' ? 'ขั้นตอน 1 จาก 2 · ข้อมูลของคุณ' : 'ขั้นตอน 2 จาก 2 · สร้างบัญชี') : (step === 'survey' ? 'Step 1 of 2 · Profile information' : 'Step 2 of 2 · Create your account')}</p>
         {step === 'survey' ? <SurveyFields value={survey} onChange={setSurvey} th={i18n.language.startsWith('th')} /> : <>
         <Input
           label={t('auth.email')}

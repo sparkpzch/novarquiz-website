@@ -24,7 +24,7 @@ test('fully correct answers request topic-specific praise in either language, wi
   for (const locale of ['en', 'th'] as const) {
     const prompt = buildProvisionalInsightPrompt({ ...perfectFood, locale, audience: 'public', readingStyle: 'everyday' });
     assert.match(prompt, /every answer is correct/);
-    assert.match(prompt, /Celebrate understanding of this topic: Everyday food choices/);
+    assert.match(prompt, /Acknowledge correct answers on this topic: Everyday food choices/);
     assert.match(prompt, /praising understanding of a specific quiz subject/);
     assert.match(prompt, /Player selected: Serving size/);
     assert.match(prompt, new RegExp(`Write every JSON text field .* in ${locale === 'th' ? 'Thai' : 'English'}`));

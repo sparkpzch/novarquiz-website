@@ -235,7 +235,7 @@ function JoinByCodeCard() {
       <div className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-[#3f6fff]/20 blur-3xl" />
       <div className="relative flex items-start gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-white">Quick Join</h2>
+          <h2 className="text-sm font-semibold text-white">Join a room</h2>
           <p className="mt-1 text-xs leading-5 text-[#8391bc]">Enter a room code or paste an invite link.</p>
         </div>
       </div>
@@ -294,7 +294,7 @@ function QuizCard({ session, onClick, eagerImage = false }: { session: Dashboard
       <div className="p-3.5">
         <h3 className="line-clamp-1 text-sm font-semibold text-white">{session.name || "Untitled quiz"}</h3>
         <p className="mt-1 line-clamp-2 min-h-8 text-[11px] leading-4 text-[#7987b3]">
-          {session.description || "Test your knowledge and challenge your friends."}
+          {session.description || "Answer the questions to see your results."}
         </p>
         <span className="mt-3 inline-flex items-center rounded-md border border-[#557cff]/45 px-2.5 py-1 text-[10px] font-semibold text-[#91a7ff] transition group-hover:bg-[#4f76ff] group-hover:text-white">
           Play now
@@ -366,7 +366,7 @@ function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUi
                 ringClassName="ring-2 ring-white/35 shadow-lg"
               />
               <div className="min-w-0">
-                <p className="text-xs font-medium text-white/70">Welcome back!</p>
+                <p className="text-xs font-medium text-white/70">Home</p>
                 <h1 className="truncate text-xl font-semibold text-white sm:text-2xl">
                   {user?.displayName || "Player"}
                 </h1>
@@ -392,7 +392,7 @@ function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUi
           <div className="mb-4 flex items-end justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-white">Quizzes</h2>
-              <p className="mt-1 text-xs text-[#7886b2]">Available quizzes picked for you.</p>
+              <p className="mt-1 text-xs text-[#7886b2]">Choose a quiz to start.</p>
             </div>
             <button
               type="button"
@@ -427,7 +427,7 @@ function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUi
               className="nq-dashboard-metric flex min-h-44 w-full flex-col items-center justify-center rounded-xl border border-dashed border-white/12 bg-[#0a1234] px-5 text-center transition hover:border-[#557cff]/45"
             >
               <span className="text-2xl">✦</span>
-              <span className="mt-2 text-sm font-semibold text-white">Explore the quiz library</span>
+              <span className="mt-2 text-sm font-semibold text-white">View all quizzes</span>
               <span className="mt-1 text-xs text-[#7886b2]">New public sessions will appear here.</span>
             </button>
           )}

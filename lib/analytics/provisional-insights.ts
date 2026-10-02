@@ -102,19 +102,19 @@ export function buildProvisionalInsightPrompt(context: AnswerReviewContext & {
     ...answers,
     '',
     allCorrect
-      ? 'Outcome across ALL recorded answers: every answer is correct. Celebrate the understanding demonstrated in this quiz; do not suggest the reader made mistakes or needs remedial practice.'
+      ? 'Outcome across ALL recorded answers: every answer is correct. Acknowledge the correct answers in this quiz; do not suggest the reader made mistakes or needs remedial practice.'
       : 'Outcome: some recorded answers need another look. Give kind, specific feedback on those selections; do not claim every answer is correct.',
     ...(context.learningFocus ? [allCorrect
-      ? `Celebrate understanding of this topic: ${context.learningFocus.topic}. Ground the praise in this recorded question: ${context.learningFocus.question}.`
+      ? `Acknowledge correct answers on this topic: ${context.learningFocus.topic}. Use this recorded question as the example: ${context.learningFocus.question}.`
       : `Prioritise this learning topic: ${context.learningFocus.topic}. Use this recorded question for the hint: ${context.learningFocus.question}.`] : []),
     'Mention one or two specific selections and explain the learning point using the matching author explanations.',
     ...(context.readingStyle === 'everyday' ? [
-      'Use everyday words, short sentences, and a warm, helpful tone. This is a health learning website, not a game or a clinician report.',
+      'Use everyday words and short, direct sentences. Sound like a person explaining the actual answers, without motivational slogans or scripted encouragement. This is a health learning website, not a game or a clinician report.',
       'Do not show internal tags, underscores, hashtags, acronyms, accuracy percentages, points, ranks, timers, or streaks.',
       'Replace professional terms with ordinary phrases: adherence means following a care plan; risk factors means things that can affect health; screening means check-ups; symptom awareness means noticing warning signs.',
       'Never use clinical, cohort, utility, aligned, distractor, guideline, or pedagogical in the output.',
       allCorrect
-        ? 'Write warm, topic-specific praise, such as Great work—you showed a strong understanding of [subject from the answers]. Use the requested language and the actual quiz subject, never the placeholder. Reinforce one idea the reader got right.'
+        ? 'Briefly acknowledge that the recorded answers were correct and name the subject. Use the requested language and the actual quiz subject. Explain one idea the reader got right. Avoid exclamations, exaggerated praise and claims of real-world expertise.'
         : 'Focus on the topic with the most missed questions. Mention a strength only if the recorded answers support it. If all are incorrect, be kind without inventing success.',
       'The headline must name the specific learning subject, not generic praise such as You’re doing well or Keep building on it.',
       'The suggestion must describe one specific question or authored learning point, not generic advice to read explanations, compare aligned answers, and try again.',

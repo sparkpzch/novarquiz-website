@@ -53,7 +53,7 @@ export function AnswerFeedbackDialog({ choice, feedback, nextLoading, error, ope
   return <dialog className={`${styles.feedbackDialog} ${styles[tone]}`} ref={dialog} aria-labelledby="answer-feedback-title" onCancel={(event) => { if (nextLoading) event.preventDefault(); }} onClose={onClose}>
     <div className={styles.feedbackTop}><span className={styles.eyebrow}>{copy('YOUR ANSWER', 'คำตอบของคุณ')}</span><button type="button" className={styles.iconButton} aria-label={copy('Close explanation', 'ปิดคำอธิบาย')} disabled={nextLoading} onClick={onClose}>×</button></div>
     <div className={styles.feedbackMark} aria-hidden="true">{feedback.points_earned > 0 ? '✓' : '↗'}</div>
-    <h2 id="answer-feedback-title">{feedback.points_earned > 0 ? copy('A good point to build on', 'เข้าใจประเด็นนี้ได้ดี') : copy('Let’s learn from this answer', 'มาทำความเข้าใจคำตอบนี้กัน')}</h2>
+    <h2 id="answer-feedback-title">{feedback.points_earned > 0 ? copy('Answer feedback', 'ผลการตอบคำถาม') : copy('Answer feedback', 'ผลการตอบคำถาม')}</h2>
     <p className={styles.feedbackScore}>{impact(feedback.points_earned)} {copy('points', 'คะแนน')}</p>
     <div className={styles.selectedAnswer}><small>{copy('You selected', 'คุณเลือก')}</small><p>{choice.choice_text}</p></div>
     <h3>{copy('Why this answer matters', 'คำอธิบายของคำตอบ')}</h3><p className={styles.explanation}>{feedback.explanation || copy('No explanation was provided for this answer.', 'คำตอบนี้ยังไม่มีคำอธิบายเพิ่มเติม')}</p>

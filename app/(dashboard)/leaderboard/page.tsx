@@ -65,7 +65,7 @@ function LeaderboardPageContent() {
   const me = board[myIndex];
   return <div className={`${styles.dashboard} ${styles.resultsDashboard}`}>
     <section className={styles.surface}>
-      <div className={styles.pageHeading}><div><span className={styles.eyebrow}>NOVARQUIZ · LEADERBOARD</span><h1>{copy('Leaderboard', 'อันดับผู้เล่น')}</h1><p>{copy('Explore completed quiz results. Scores refresh as more players finish.', 'ดูผลแบบทดสอบที่ทำเสร็จแล้ว อันดับจะอัปเดตเมื่อมีผู้เล่นทำเสร็จเพิ่ม')}</p></div>
+      <div className={styles.pageHeading}><div><span className={styles.eyebrow}>NOVARQUIZ · LEADERBOARD</span><h1>{copy('Leaderboard', 'อันดับผู้เล่น')}</h1><p>{copy('Rankings update when players finish the quiz.', 'อันดับอัปเดตเมื่อมีผู้เล่นทำแบบทดสอบเสร็จ')}</p></div>
         <div className={styles.sessionControl}><label htmlFor="leaderboard-session">{copy('Quiz session', 'เลือกแบบทดสอบ')}</label><select id="leaderboard-session" className={styles.sessionSelect} value={selectedSession} onChange={(event) => router.replace(event.target.value ? `/leaderboard?session=${encodeURIComponent(event.target.value)}` : '/leaderboard')}>
           <option value="">{copy('Select a session', 'เลือกแบบทดสอบเพื่อดูอันดับ')}</option>
           {selectedSession && !selectedSessionMeta && <option value={selectedSession}>{copy('Current quiz session', 'แบบทดสอบปัจจุบัน')}</option>}

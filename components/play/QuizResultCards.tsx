@@ -33,8 +33,8 @@ export function ResultInsightCard({ uid, sessionId, saving = false, guest = fals
   const feedback = result?.data?.feedback;
   const insight = feedback && feedback.reviewStatus !== 'metrics' ? feedback : null;
   const state = result?.data?.insightState;
-  const status = guest ? copy('Sign in to save answers and receive personal recaps.', 'เข้าสู่ระบบเพื่อเก็บคำตอบและรับสรุปสำหรับคุณ')
-    : saving ? copy('Your recap starts as soon as your result is saved.', 'สรุปจะเริ่มทันทีที่บันทึกผลแล้ว')
+  const status = guest ? copy('Sign in to save your results.', 'เข้าสู่ระบบเพื่อเก็บคำตอบและรับสรุปผลแบบทดสอบ')
+    : saving ? copy('Your summary will load after your result is saved.', 'สรุปจะเริ่มทันทีที่บันทึกผลแล้ว')
       : result?.error ? copy('Could not load your recap.', 'โหลดสรุปไม่สำเร็จ')
         : !result || state === 'generating' ? copy('AI is analysing your answers…', 'AI กำลังวิเคราะห์คำตอบของคุณ…')
           : state === 'rejected' ? copy('This recap was removed after review.', 'สรุปนี้ถูกนำออกหลังการตรวจทาน')
