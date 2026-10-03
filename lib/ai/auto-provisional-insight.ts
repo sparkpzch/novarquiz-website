@@ -8,7 +8,7 @@ import { generatePersonalInsight, geminiLiteModel, isGeminiConfigured } from './
 
 export type AutoProvisionalInsight = {
   summary: InsightSummary;
-  status: 'provisional' | 'approved';
+  status: 'provisional' | 'approved' | 'standard';
   context?: AnswerReviewContext | null;
 };
 
@@ -57,6 +57,21 @@ export async function prepareProvisionalInsight(input: ProvisionalInput, depende
   } = dependencies ?? await defaultDependencies();
   const context = input.context ?? await getUserAnswerReviewContext(input.userId, input.quizId);
   if (!context || context.answers.length === 0) return { state: 'unavailable' };
+  // Correct answers need no paid analysis, generation lease, or review queue.
+  if (context.answers.every(answer => answer.selectedAligned)) {
+    return {
+      state: 'standard',
+      insight: {
+        status: 'standard', context,
+        summary: input.locale === 'th'
+          ? { headline: 'ตอบถูกครบทุกข้อ', body: 'คุณตอบถูกทุกข้อ แสดงว่าเข้าใจเนื้อหาในแบบทดสอบนี้ได้ดี', suggestion: null }
+          : { headline: 'All answers correct', body: 'You answered every question correctly, showing a good understanding of this quiz.', suggestion: null },
+      },
+    };
+  }
+  const usable = (summary: InsightSummary, status: string) => status === 'approved' ||
+    (validateInsightLanguage(summary, input.locale) && (input.readingStyle !== 'everyday' || (isEverydayInsight(summary) && hasSpecificInsightHeadline(summary))));
+
   const patternSignature = answerPatternSignature({
     ...context,
     quizId: input.quizId,
@@ -73,7 +88,7 @@ export async function prepareProvisionalInsight(input: ProvisionalInput, depende
   const reusable = await getSimilarReusableInsight(input.quizId, input.audience, input.locale, context);
   if (reusable) {
     const summary = { headline: reusable.headline, body: reusable.body, suggestion: reusable.suggestion };
-    if (validateInsightLanguage(summary, input.locale) && (input.readingStyle !== 'everyday' || (isEverydayInsight(summary) && hasSpecificInsightHeadline(summary)))) {
+    if (usable(summary, reusable.status)) {
       const status = reusable.status === 'approved' ? 'approved' : 'provisional';
       return { state: status === 'approved' ? 'approved' : 'pending', insight: { summary, status, context: reusable.answer_context } };
     }
@@ -83,7 +98,7 @@ export async function prepareProvisionalInsight(input: ProvisionalInput, depende
   const existing = await getProvisionalInsight(input.quizId, input.audience, input.locale, answerSignature);
   if (existing) {
     const summary = { headline: existing.headline, body: existing.body, suggestion: existing.suggestion };
-    if (validateInsightLanguage(summary, input.locale) && (input.readingStyle !== 'everyday' || (isEverydayInsight(summary) && hasSpecificInsightHeadline(summary)))) {
+    if (usable(summary, existing.status)) {
       return { state: existing.status === 'approved' ? 'approved' : 'pending', insight: { summary, status: existing.status as 'provisional' | 'approved', context: existing.answer_context } };
     }
     if (existing.status === 'approved' || input.readOnly) return { state: 'unavailable' };
@@ -104,7 +119,7 @@ export async function prepareProvisionalInsight(input: ProvisionalInput, depende
       const latest = await getProvisionalInsight(input.quizId, input.audience, input.locale, answerSignature);
       if (latest) {
         const summary = { headline: latest.headline, body: latest.body, suggestion: latest.suggestion };
-        if (validateInsightLanguage(summary, input.locale) && (input.readingStyle !== 'everyday' || (isEverydayInsight(summary) && hasSpecificInsightHeadline(summary)))) {
+        if (usable(summary, latest.status)) {
           return { state: latest.status === 'approved' ? 'approved' : 'pending', insight: { summary, status: latest.status as 'provisional' | 'approved' } };
         }
       }

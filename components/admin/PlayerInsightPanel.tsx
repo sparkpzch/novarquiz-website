@@ -54,13 +54,13 @@ export default function PlayerInsightPanel({ sessionId, player, th }: {
   const summary = report?.summary;
   return <section className={styles.panel} aria-label={copy('Personal AI summary', 'สรุปจาก AI รายบุคคล')}>
     <div className={styles.header}>
-      <div><p className={styles.eyebrow}>✧ {copy('AI SUMMARY', 'สรุปจาก AI')}</p><h2>{player?.displayName ?? copy('Personal summaries', 'สรุปสำหรับแต่ละคน')}</h2></div>
+      <div><p className={styles.eyebrow}>✧ {report?.state === 'standard' ? copy('QUIZ SUMMARY', 'สรุปผลแบบทดสอบ') : copy('AI SUMMARY', 'สรุปจาก AI')}</p><h2>{player?.displayName ?? copy('Personal summaries', 'สรุปสำหรับแต่ละคน')}</h2></div>
       {summary && <button type="button" className={styles.graphButton} onClick={() => setGraphOpen(true)}>{copy('Answer graph', 'กราฟคำตอบ')} <span aria-hidden="true">↗</span></button>}
     </div>
     {!player ? <p className={styles.muted}>{copy('Choose a player from the leaderboard to see their summary and the choices behind it.', 'เลือกผู้เล่นจากอันดับเพื่อดูสรุปและคำตอบที่ใช้สร้างสรุปของแต่ละคน')}</p>
       : active?.error ? <div role="alert"><p>{copy('Could not load this player’s summary.', 'โหลดสรุปของผู้เล่นไม่สำเร็จ')}</p><button type="button" className={styles.graphButton} onClick={() => setRetry(value => value + 1)}>{copy('Try again', 'ลองอีกครั้ง')}</button></div>
         : !report || report.state === 'generating' ? <p className={styles.muted} role="status">{copy('Loading this player’s AI summary…', 'กำลังโหลดสรุปจาก AI ของผู้เล่น…')}</p>
-          : summary ? <><h3>{summary.headline}</h3><p className={styles.body}>{firstInsightSentence(summary.body, report.locale)}</p><span className={`${styles.badge} ${report.state === 'approved' ? styles.approved : ''}`}>{report.state === 'approved' ? copy('Admin reviewed', 'ผ่านการตรวจสอบแล้ว') : copy('Not yet reviewed', 'ยังไม่ผ่านการตรวจสอบ')}</span></>
+          : summary ? <><h3>{summary.headline}</h3><p className={styles.body}>{firstInsightSentence(summary.body, report.locale)}</p>{report.state !== 'standard' && <span className={`${styles.badge} ${report.state === 'approved' ? styles.approved : ''}`}>{report.state === 'approved' ? copy('Admin reviewed', 'ผ่านการตรวจสอบแล้ว') : copy('Not yet reviewed', 'ยังไม่ผ่านการตรวจสอบ')}</span>}</>
             : <p className={styles.muted}>{report.state === 'rejected' ? copy('This summary is hidden after review.', 'สรุปนี้ถูกซ่อนหลังการตรวจสอบ') : copy('No saved AI summary for this completed run yet.', 'ยังไม่มีสรุปจาก AI ที่บันทึกไว้สำหรับการเล่นครั้งนี้')}</p>}
     {graphOpen && player && report?.summary && <AnswerGraphDialog key={key} report={report} playerName={player.displayName} th={th} onClose={() => setGraphOpen(false)} />}
   </section>;

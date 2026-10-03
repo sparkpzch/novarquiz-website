@@ -24,7 +24,6 @@ export function answerPatternSignature(input: AnswerReviewContext & {
     readingStyle: input.readingStyle,
     quizName: input.quizName,
     quizDescription: input.quizDescription,
-    learningFocus: input.learningFocus,
     answers: canonicalAnswers(input.answers),
   })).digest('hex');
 }
@@ -51,6 +50,8 @@ export function approvedAnswerCoverage(source: AnswerReviewContext, target: Answ
   if (source.quizName !== target.quizName || source.quizDescription !== target.quizDescription || !source.answers.length || !target.answers.length) return 0;
   // Praise for a fully correct path must not cover a nearby path with a miss.
   if (source.answers.every(answer => answer.selectedAligned) !== target.answers.every(answer => answer.selectedAligned)) return 0;
+  // A derived focus can change with question order; identical evidence still reuses wording.
+  if (sameAnswerPattern(source, target)) return 1;
   if (source.learningFocus && target.learningFocus) {
     if (JSON.stringify(source.learningFocus) !== JSON.stringify(target.learningFocus)) return 0;
   } else if ((source.learningFocus || target.learningFocus) && !sameAnswerPattern(source, target)) {

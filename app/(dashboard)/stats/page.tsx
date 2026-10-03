@@ -65,7 +65,7 @@ function StatsPageContent() {
   const date = (value: string | null) => value ? new Date(value).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : copy('Completed quiz', 'แบบทดสอบที่ทำเสร็จแล้ว');
   const coaching = report ? historyCoaching(report, locale) : null;
   const feedback = report?.feedback;
-  const everydayFeedback = feedback && feedback.reviewStatus !== 'metrics' && isEverydayInsight(feedback) ? feedback : null;
+  const everydayFeedback = feedback && feedback.reviewStatus !== 'metrics' && (feedback.reviewStatus !== 'provisional' || isEverydayInsight(feedback)) ? feedback : null;
   const openQuestion = (id: string) => setFocus((previous) => ({ key: reportKey, id, version: (previous?.version ?? 0) + 1 }));
 
   return (
@@ -117,7 +117,7 @@ function StatsPageContent() {
               </div>
               <AnswerReview key={reportKey} report={report} locale={locale} focusedId={focus?.key === reportKey ? focus.id : null} focusVersion={focus?.version ?? 0} />
             </>}
-            <footer className="history-footnote"><p>{everydayFeedback?.reviewStatus === 'provisional' ? copy('AI helped write this recap from your quiz answers. It hasn’t been reviewed yet.', 'AI ช่วยเขียนสรุปนี้จากคำตอบของคุณ โดยยังไม่ได้รับการตรวจทาน') : everydayFeedback ? copy('This recap uses reviewed quiz feedback.', 'สรุปนี้ใช้คำแนะนำจากแบบทดสอบที่ผ่านการตรวจทาน') : copy('This recap is based on your quiz answers.', 'สรุปนี้อ้างอิงจากคำตอบในแบบทดสอบของคุณ')}</p><p>{copy('Quiz results are not a health assessment or medical advice.', 'ผลแบบทดสอบไม่ใช่การประเมินสุขภาพหรือคำแนะนำทางการแพทย์')}</p></footer>
+            <footer className="history-footnote"><p>{everydayFeedback?.reviewStatus === 'provisional' ? copy('AI helped write this recap from your quiz answers. It hasn’t been reviewed yet.', 'AI ช่วยเขียนสรุปนี้จากคำตอบของคุณ โดยยังไม่ได้รับการตรวจทาน') : everydayFeedback && everydayFeedback.reviewStatus !== 'standard' ? copy('This recap uses reviewed quiz feedback.', 'สรุปนี้ใช้คำแนะนำจากแบบทดสอบที่ผ่านการตรวจทาน') : copy('This recap is based on your quiz answers.', 'สรุปนี้อ้างอิงจากคำตอบในแบบทดสอบของคุณ')}</p><p>{copy('Quiz results are not a health assessment or medical advice.', 'ผลแบบทดสอบไม่ใช่การประเมินสุขภาพหรือคำแนะนำทางการแพทย์')}</p></footer>
           </>}
         </>}
       </div>

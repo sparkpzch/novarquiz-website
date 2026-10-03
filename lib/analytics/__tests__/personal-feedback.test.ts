@@ -56,3 +56,9 @@ test('returns no feedback before any quiz answer exists', () => {
     locale: 'en',
   }), null);
 });
+
+
+test('standard correct-answer feedback is not marked as AI reviewed or pending', () => {
+  const feedback = composePersonalFeedback({ summary: approvedSummary, summaryStatus: 'standard', latestTopic: null, locale: 'en' });
+  assert.equal(feedback?.reviewStatus, 'standard');
+});

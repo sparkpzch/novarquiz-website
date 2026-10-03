@@ -25,7 +25,7 @@ export type HistoryAnswer = AnswerReviewItem & {
   tags: string[];
 };
 
-export type PersonalInsightState = 'generating' | 'pending' | 'approved' | 'rejected' | 'unavailable' | 'consent-required';
+export type PersonalInsightState = 'generating' | 'pending' | 'approved' | 'rejected' | 'unavailable' | 'consent-required' | 'standard';
 
 export type PersonalHistoryReport = {
   session: UserHistoryRow;

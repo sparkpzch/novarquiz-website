@@ -46,7 +46,7 @@ test('fully correct praise is reusable across correct paths but not paths with a
   assert.equal(approvedAnswerCoverage(perfectFood, perfectFood), 1);
 });
 
-function fixture(context = food, generatedSummary = summary) {
+function fixture(context = food, generatedSummary: { headline: string; body: string; suggestion: string | null } = summary) {
   let status: ProvisionalStatus | null = null;
   let calls = 0;
   let saves = 0;
@@ -68,18 +68,29 @@ function fixture(context = food, generatedSummary = summary) {
   return { dependencies, setStatus: (value: ProvisionalStatus) => { status = value; }, get calls() { return calls; }, get saves() { return saves; }, get failures() { return failures; } };
 }
 
-test('correct-answer praise is saved pending, shared with another person, then marked reviewed without regeneration', async () => {
-  const praise = { headline: 'Understanding food labels', body: 'Great work—choosing serving size showed a strong understanding of comparing food portions.', suggestion: 'Try using serving size when comparing the example food labels.' };
-  const f = fixture(perfectFood, praise);
-  const prepared = await prepareProvisionalInsight({ ...input, context: perfectFood }, f.dependencies);
-  const generated = await prepared.generate!();
-  assert.deepEqual(generated?.summary, praise);
-  assert.equal(generated?.status, 'provisional');
-  const shared = { ...input, context: perfectFood, userId: 'another-person' };
-  assert.equal((await prepareProvisionalInsight(shared, f.dependencies)).state, 'pending');
-  f.setStatus('approved');
-  assert.equal((await prepareProvisionalInsight(shared, f.dependencies)).state, 'approved');
-  assert.equal(f.calls, 1); assert.equal(f.saves, 1);
+test('fully correct attempts return standard localized feedback without AI, cache writes, or approval labels', async () => {
+  for (const locale of ['en', 'th'] as const) {
+    const f = fixture(perfectFood);
+    f.dependencies.isGeminiConfigured = () => false;
+    const forbidden = async () => { throw new Error('Correct-answer recap accessed the AI cache'); };
+    f.dependencies.claimProvisionalInsight = forbidden;
+    f.dependencies.finishProvisionalInsight = forbidden;
+    f.dependencies.getSimilarReusableInsight = forbidden;
+    f.dependencies.getProvisionalInsight = forbidden;
+    f.dependencies.isAnswerPatternRejected = forbidden;
+    for (const readOnly of [false, true]) {
+      const result = await prepareProvisionalInsight({ ...input, locale, context: perfectFood, allowGeneration: false, readOnly }, f.dependencies);
+      assert.equal(result.state, 'standard');
+      assert.equal(result.insight?.status, 'standard');
+      assert.equal(result.generate, undefined);
+      assert.match(result.insight!.summary.body, locale === 'th' ? /ตอบถูกทุกข้อ/ : /every question correctly/);
+    }
+    assert.equal(f.calls, 0); assert.equal(f.saves, 0);
+    const mixed = await prepareProvisionalInsight(input, fixture().dependencies);
+    assert.notEqual(mixed.state, 'standard');
+    const empty = await prepareProvisionalInsight({ ...input, context: { ...perfectFood, answers: [] } }, f.dependencies);
+    assert.equal(empty.state, 'unavailable');
+  }
 });
 
 test('admin reports read pending and approved evidence without claims, writes, or Gemini calls', async () => {
@@ -182,7 +193,9 @@ test('food hints and movement hints follow each person’s missed answers, not t
 });
 
 test('approved reuse fails when added answers change the priority topic even with similar answer coverage', () => {
-  assert.equal(approvedAnswerCoverage(food, { ...food, learningFocus: { topic: 'Staying active', question: 'Which movement?' } }), 0);
+  const source = { ...food, answers: Array.from({ length: 4 }, (_, i) => ({ ...food.answers[0], question: `Food ${i}` })) };
+  const target = { ...source, answers: [...source.answers, { ...food.answers[0], question: 'Which movement?' }], learningFocus: { topic: 'Staying active', question: 'Which movement?' } };
+  assert.equal(approvedAnswerCoverage(source, target), 0);
   assert.equal(approvedAnswerCoverage(food, food), 1);
 });
 
@@ -210,9 +223,10 @@ test('shared draft signatures change with recorded choices, quiz, audience, and 
   const base = { ...food, quizId: 'quiz', audience: 'public' as const, locale: 'en' as const, readingStyle: 'everyday' as const };
   const key = answerPatternSignature(base);
   assert.equal(key, answerPatternSignature({ ...base, answers: [...base.answers].reverse() }));
-  for (const other of [{ ...base, quizId: 'another-quiz' }, { ...base, audience: 'hcp' as const }, { ...base, locale: 'th' as const }, { ...base, learningFocus: { topic: 'A changed topic', question: food.answers[0].question } }, { ...base, answers: [{ ...food.answers[0], selected: 'Serving size' }] }]) {
+  for (const other of [{ ...base, quizId: 'another-quiz' }, { ...base, audience: 'hcp' as const }, { ...base, locale: 'th' as const }, { ...base, answers: [{ ...food.answers[0], selected: 'Serving size' }] }]) {
     assert.notEqual(key, answerPatternSignature(other));
   }
+  assert.equal(key, answerPatternSignature({ ...base, learningFocus: { topic: 'A changed topic', question: food.answers[0].question } }));
   assert.equal(sameAnswerPattern(food, { ...food, learningFocus: undefined }), true);
   assert.equal(sameAnswerPattern(food, { ...food, answers: [{ ...food.answers[0], selected: 'Serving size' }] }), false);
 });
@@ -274,4 +288,18 @@ test('a nearby path reuses a pending draft without a model call and keeps its un
   const pending = await prepareProvisionalInsight({ ...input, context: target, userId: 'another-person' }, f.dependencies);
   assert.equal(pending.state, 'pending'); assert.equal(pending.insight?.status, 'provisional');
   assert.deepEqual(pending.insight?.summary, summary); assert.equal(f.calls, 0);
+});
+
+
+test('identical answers reuse approved wording despite derived focus and automatic style checks', async () => {
+  const reviewed = { headline: 'Screening and adherence', body: 'Review the clinical guideline.', suggestion: null };
+  const f = fixture(food, reviewed);
+  f.setStatus('approved');
+  const target = { ...food, learningFocus: { topic: 'Another derived topic', question: food.answers[0].question } };
+  assert.equal(approvedAnswerCoverage(food, target), 1);
+  const result = await prepareProvisionalInsight({ ...input, context: target }, f.dependencies);
+  assert.equal(result.state, 'approved');
+  assert.deepEqual(result.insight?.summary, reviewed);
+  assert.equal(result.generate, undefined);
+  assert.equal(f.calls, 0); assert.equal(f.saves, 0);
 });

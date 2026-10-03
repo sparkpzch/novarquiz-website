@@ -6,18 +6,18 @@ export type PersonalFeedback = {
   context: string | null;
   suggestion: string | null;
   question: string | null;
-  reviewStatus: 'approved' | 'provisional' | 'metrics';
+  reviewStatus: 'approved' | 'provisional' | 'standard' | 'metrics';
 };
 
 /** Combine the reviewed summary and quiz metrics without rewriting either. */
 export function composePersonalFeedback(input: {
   summary: InsightSummary | null;
-  summaryStatus?: 'approved' | 'provisional' | null;
+  summaryStatus?: 'approved' | 'provisional' | 'standard' | null;
   latestTopic: { name: string; score: number } | null;
   locale: InsightLocale;
 }): PersonalFeedback | null {
   const { summary, latestTopic, locale } = input;
-  const reviewStatus = input.summaryStatus === 'provisional' ? 'provisional' : 'approved';
+  const reviewStatus = input.summaryStatus ?? 'approved';
 
   if (summary) {
     return {

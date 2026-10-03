@@ -23,7 +23,7 @@ export default function PersonalRecapCard({ report, locale, compact = false, det
   const copy = (en: string, th: string) => locale === 'th' ? th : en;
   const coaching = historyCoaching(report, locale);
   const feedback = report.feedback;
-  const everydayFeedback = feedback && feedback.reviewStatus !== 'metrics' && isEverydayInsight(feedback) ? feedback : null;
+  const everydayFeedback = feedback && feedback.reviewStatus !== 'metrics' && (feedback.reviewStatus !== 'provisional' || isEverydayInsight(feedback)) ? feedback : null;
   const generating = report.insightState === 'generating';
   const stateText = generating
     ? copy('AI is analysing your quiz answers…', 'AI กำลังวิเคราะห์คำตอบของคุณ…')
