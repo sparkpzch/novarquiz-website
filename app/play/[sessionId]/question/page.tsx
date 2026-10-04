@@ -10,6 +10,7 @@ import type { LeaderboardEntry, Question, Quiz } from '@/lib/types';
 import { updatePlayerMetadata, watchScores, untrackAllUserSessionsFor, type PlayerScore } from '@/lib/firebase/rtdb';
 import { trackEvent } from '@/lib/firebase/analytics';
 import QuizHeader from '@/components/play/QuizHeader';
+import LiveLeaderboardDialog from '@/components/play/LiveLeaderboardDialog';
 import FinishedQuiz from '@/components/play/FinishedQuiz';
 import { QuizChoices, AnswerFeedbackDialog, type AnswerFeedback } from '@/components/play/QuizChoices';
 import styles from '@/components/play/quiz.module.css';
@@ -81,9 +82,10 @@ function QuestionVisual({ question, totalQuestions, preparedVideo, th, children 
   const mediaQuestion = question as QuestionWithPoster;
   const copy = (en: string, thai: string) => th ? thai : en;
   const isScenario = question.node_type === 'situation' || (question.choices.length === 0 && !!question.media_url);
+  const isFinal = question.node_type === 'end';
   const mediaExplanation = question.media_explanation || (isScenario ? question.question_text : null);
   return <div
-    className={`${styles.visualGrid} ${question.media_url ? styles.visualGridWithMedia : ''} ${isScenario ? styles.visualGridScenario : ''}`}
+    className={`${styles.visualGrid} ${question.media_url ? styles.visualGridWithMedia : ''} ${isScenario ? styles.visualGridScenario : ''} ${isFinal ? styles.visualGridFinal : ''}`}
     style={isScenario ? { display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 0 } : undefined}
   >
     {question.media_url && <div className={styles.media}>
@@ -539,11 +541,8 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     <div className={styles.coverTint} aria-hidden="true" />
     <div className={styles.container}>
     <div className={styles.brandLine}><strong>NOVARQUIZ</strong><span>{sessionMeta?.quiz_name || sessionMeta?.name}</span></div>
-    <QuizHeader elapsed={elapsed} score={score} rank={playerRankIndex >= 0 ? playerRankIndex + 1 : null} userName={user?.displayName} photoURL={user?.photoURL} lastDelta={lastDelta} leaderboardOpen={showLeaderboard} onLeaderboard={() => setShowLeaderboard((open) => !open)} th={th} />
-    {showLeaderboard && <section id="play-leaderboard" className={styles.leaderboardPanel} aria-label={copy('Live leaderboard', 'ตารางคะแนนสด')}>
-      <h2>{copy('Live leaderboard', 'ตารางคะแนนสด')}</h2>
-      {topScores.length ? <ol>{topScores.map((player, index) => <li key={player.uid}><strong>#{index + 1}</strong><span>{player.uid === user?.uid ? copy('You', 'คุณ') : player.displayName}</span><b>{player.score.toLocaleString()}</b></li>)}</ol> : <p>{copy('No scores yet.', 'ยังไม่มีคะแนน')}</p>}
-    </section>}
+    <QuizHeader elapsed={elapsed} score={score} rank={playerRankIndex >= 0 ? playerRankIndex + 1 : null} userName={user?.displayName} photoURL={user?.photoURL} lastDelta={lastDelta} leaderboardOpen={showLeaderboard} onLeaderboard={() => setShowLeaderboard(true)} th={th} />
+    <LiveLeaderboardDialog open={showLeaderboard} players={topScores} currentUserId={user?.uid} onClose={() => setShowLeaderboard(false)} th={th} />
     <section className={`${styles.surface} ${styles.questionSurface}`}>
       {requestError && <p role="alert" className={styles.error}>{requestError}</p>}
       <QuestionVisual question={question} totalQuestions={sessionMeta?.question_count} preparedVideo={preparedVideo} th={th}>
@@ -559,6 +558,6 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       </QuestionVisual>
     </section>
     </div>
-    {selectedChoice && answerFeedback && <AnswerFeedbackDialog choice={selectedChoice} feedback={answerFeedback} nextLoading={nextLoading || answerSaving} error={requestError} open={showExplanationModal} onClose={() => setShowExplanationModal(false)} onContinue={handleContinue} th={th} />}
+    {selectedChoice && answerFeedback && <AnswerFeedbackDialog choice={selectedChoice} questionText={question?.question_text ?? ''} feedback={answerFeedback} nextLoading={nextLoading || answerSaving} error={requestError} open={showExplanationModal} onClose={() => setShowExplanationModal(false)} onContinue={handleContinue} th={th} />}
   </main>;
 }

@@ -34,8 +34,9 @@ export function QuizChoices({ choices, selectedLabel, feedback, saving, submitte
   </section>;
 }
 
-export function AnswerFeedbackDialog({ choice, feedback, nextLoading, error, open, onClose, onContinue, th }: {
+export function AnswerFeedbackDialog({ choice, questionText, feedback, nextLoading, error, open, onClose, onContinue, th }: {
   choice: PlayChoice;
+  questionText: string;
   feedback: AnswerFeedback;
   nextLoading: boolean;
   error: string | null;
@@ -52,10 +53,10 @@ export function AnswerFeedbackDialog({ choice, feedback, nextLoading, error, ope
     else if (!open && dialog.current?.open) dialog.current?.close();
   }, [open]);
   return <dialog className={`${styles.feedbackDialog} ${styles[tone]}`} ref={dialog} aria-labelledby="answer-feedback-title" onCancel={(event) => { if (nextLoading) event.preventDefault(); }} onClose={onClose}>
-    <div className={styles.feedbackTop}><span className={styles.eyebrow}>{copy('YOUR ANSWER', 'คำตอบของคุณ')}</span><button type="button" className={styles.iconButton} aria-label={copy('Close explanation', 'ปิดคำอธิบาย')} disabled={nextLoading} onClick={onClose}>×</button></div>
-    <div className={styles.feedbackMark} aria-hidden="true">{feedback.points_earned > 0 ? '✓' : '↗'}</div>
+    <div className={styles.feedbackTop}><span className={styles.eyebrow}>{copy('YOUR ANSWER', 'คำตอบของคุณ')}</span></div>
     <h2 id="answer-feedback-title">{feedback.points_earned > 0 ? copy('Answer feedback', 'ผลการตอบคำถาม') : copy('Answer feedback', 'ผลการตอบคำถาม')}</h2>
     <p className={styles.feedbackScore}>{impact(feedback.points_earned)} {copy('points', 'คะแนน')}</p>
+    <div className={styles.feedbackQuestion}><small>{copy('QUESTION', 'คำถาม')}</small><p>{questionText}</p></div>
     <div className={styles.selectedAnswer}><small>{copy('You selected', 'คุณเลือก')}</small><p>{choice.choice_text}</p></div>
     <h3>{copy('Why this answer matters', 'คำอธิบายของคำตอบ')}</h3><p className={styles.explanation}>{feedback.explanation || copy('No explanation was provided for this answer.', 'คำตอบนี้ยังไม่มีคำอธิบายเพิ่มเติม')}</p>
     {error && <p className={styles.error} role="alert">{error}</p>}

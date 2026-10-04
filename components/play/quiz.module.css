@@ -35,6 +35,19 @@
 .leaderboardPanel ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
 .leaderboardPanel li { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 9px; background: var(--soft); font-size: 13px; }
 .leaderboardPanel li span:nth-child(2) { flex: 1; }
+.leaderboardDialog { width: min(440px, calc(100% - 28px)); max-height: calc(100dvh - 32px); margin: auto; padding: 20px; border: 1px solid var(--line); border-radius: 18px; color: var(--ink); background: var(--paper); box-shadow: 0 24px 100px #07152b38; overflow-y: auto; }
+.leaderboardDialog::backdrop { background: #08182bb3; backdrop-filter: blur(5px); }
+:global([data-theme="dark"]) .leaderboardDialog::backdrop { background: #000000b3; }
+.leaderboardDialogHead { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.leaderboardDialogHead h2 { margin: 0; font-size: 18px; }
+.leaderboardClose { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 50%; color: var(--ink); background: var(--soft); font-size: 22px; cursor: pointer; }
+.leaderboardDialogList { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.leaderboardDialogList li { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; align-items: center; gap: 10px; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--soft); font-size: 13px; }
+.leaderboardDialogList li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaderboardDialogRank { color: var(--quiz-muted); }
+.leaderboardDialogList li b { font-variant-numeric: tabular-nums; }
+.leaderboardDialogMe { border-color: var(--blue) !important; background: var(--blue-soft) !important; }
+.leaderboardDialogEmpty { margin: 0; padding: 22px 8px; color: var(--quiz-muted); text-align: center; }
 .visualGrid { display: grid; gap: 24px; }
 .visualGrid, .visualGrid * { box-sizing: border-box; }
 .visualGridWithMedia { grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); align-items: stretch; width: 100%; min-width: 0; }
@@ -42,6 +55,8 @@
 .visualGridScenario .media, .visualGridScenario .promptColumn { width: min(100%, 760px); }
 .visualGridScenario .media { margin-bottom: 16px; }
 .visualGridScenario .questionTitle { margin-top: 4px; }
+.visualGridFinal .media, .visualGridFinal .promptColumn { margin-inline: auto; }
+.visualGridFinal .actions { width: min(100%, 760px); margin-inline: auto; }
 .promptColumn { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .questionMeta { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
 .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .12em; color: var(--quiz-muted); }
@@ -110,6 +125,9 @@
 .feedbackMark { margin: 20px 0 16px; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 18px; background: var(--tone-soft); color: var(--tone); font-size: 28px; }
 .feedbackDialog h2 { font-size: 23px; line-height: 1.5; margin: 0 0 6px; }
 .feedbackScore { color: var(--tone); font-weight: 650; font-size: 16px; margin: 0 0 20px; }
+.feedbackQuestion { margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--soft); }
+.feedbackQuestion small { color: var(--quiz-muted); font-size: 9px; font-weight: 750; letter-spacing: .1em; }
+.feedbackQuestion p { margin: 5px 0 0; font-size: 14px; line-height: 1.65; white-space: pre-line; overflow-wrap: anywhere; }
 .selectedAnswer { background: var(--soft); border: 1px solid var(--line); padding: 16px; border-radius: 14px; margin-bottom: 22px; }
 .selectedAnswer small { color: var(--quiz-muted); font-size: 11px; }
 .selectedAnswer p { margin: 4px 0 0; line-height: 1.7; font-size: 14px; overflow-wrap: anywhere; }
