@@ -48,9 +48,12 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* Apply the saved palette before paint, using the request's CSP nonce. */}
+        {/* Apply the saved palette before paint, using the request's CSP nonce.
+            Browsers hide the nonce attribute before hydration; suppress only
+            this script's expected attribute mismatch. */}
         <script
           nonce={nonce}
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: `(function(){var t='light';try{var s=localStorage.getItem('novarquiz-theme');if(s==='dark'||s==='light')t=s;}catch(e){}document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t;})();` }}
         />
       </head>
