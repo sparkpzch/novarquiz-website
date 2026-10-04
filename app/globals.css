@@ -659,8 +659,8 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
   background-color: rgba(255, 255, 255, 0.14) !important;
 }
 
-/* Novartis logo — invert dark text so it shows on dark backgrounds */
-[data-theme="dark"] img[src*="novartis-logo"] {
+/* NovaQuiz logo — invert dark text so it shows on dark backgrounds */
+[data-theme="dark"] img[src*="novarquiz-logo"] {
   filter: brightness(0) invert(0.92);
 }
 

@@ -171,8 +171,8 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
           <div className="nq-sidebar-scroll flex min-h-0 w-full flex-col overflow-y-auto pr-1">
             <Link href="/" className="flex h-10 items-center px-1">
               <Image
-                src="/image/icon/novartis-logo-transparent.png"
-                alt="Novartis"
+                src="/image/icon/novarquiz-logo.png"
+                alt="NovaQuiz"
                 width={150}
                 height={36}
                 className="nq-dashboard-logo h-[30px] w-auto object-contain brightness-0 invert"
@@ -289,8 +289,8 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
           <header className="nq-dashboard-mobile-header sticky top-0 z-30 flex h-[68px] items-center justify-between border-b border-white/8 bg-[#080e2d]/92 px-4 backdrop-blur-xl lg:hidden">
             <Link href="/" className="flex items-center">
               <Image
-                src="/image/icon/novartis-logo-transparent.png"
-                alt="Novartis"
+                src="/image/icon/novarquiz-logo.png"
+                alt="NovaQuiz"
                 width={130}
                 height={32}
                 className="nq-dashboard-logo h-7 w-auto brightness-0 invert"

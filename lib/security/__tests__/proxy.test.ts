@@ -65,7 +65,7 @@ test('an exhausted login budget cannot prevent logout and CSRF is still blocked'
 });
 
 test('legal pages, password reset and known static assets remain publicly accessible', async () => {
-  for (const path of ['/terms', '/privacy', '/new-password', '/image/icon/novartis-logo-transparent.png']) {
+  for (const path of ['/terms', '/privacy', '/new-password', '/image/icon/novarquiz-logo.png']) {
     assert.equal((await proxy(new NextRequest(`https://quiz.example${path}`))).status, 200, path);
   }
 });
