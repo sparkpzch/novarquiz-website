@@ -102,6 +102,7 @@ export const defaultNormalData = (): NormalNodeData => ({
   ],
   media_type: null,
   media_url: null,
+  media_explanation: null,
   media_path: null,
   is_entry_point: false,
   timer_override: null,
@@ -112,6 +113,7 @@ export const defaultSituationData = (): SituationNodeData => ({
   question_text: '',
   media_type: null,
   media_url: null,
+  media_explanation: null,
   media_path: null,
   is_entry_point: false,
 });
@@ -121,6 +123,7 @@ export const defaultEndData = (): EndNodeData => ({
   question_text: '',
   media_type: null,
   media_url: null,
+  media_explanation: null,
   media_path: null,
   is_entry_point: false,
 });

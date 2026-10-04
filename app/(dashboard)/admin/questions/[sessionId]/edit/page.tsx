@@ -70,6 +70,7 @@ function serializeGraph(nodes: AppNode[], edges: AppEdge[]) {
         node_name: data.node_name ?? null,
         media_type: data.media_type,
         media_url: data.media_url,
+        media_explanation: data.media_explanation ?? (node.type === "situationNode" ? data.question_text : null),
         media_path: data.media_path,
         is_entry_point: data.is_entry_point,
         node_x: Math.round(node.position.x),
@@ -120,6 +121,7 @@ function toFlowNodes(questions: Question[]): AppNode[] {
       question_text: q.question_text,
       media_type: q.media_type,
       media_url: q.media_url,
+      media_explanation: q.media_explanation ?? (q.node_type === "situation" ? q.question_text : null),
       media_path: q.media_path,
       is_entry_point: q.is_entry_point,
     };

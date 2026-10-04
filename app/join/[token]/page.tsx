@@ -8,16 +8,20 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import {
   resolveJoinToken,
   getRoom,
+  watchScores,
+  type PlayerScore,
 } from "@/lib/firebase/rtdb";
 import { trackEvent } from "@/lib/firebase/analytics";
 import { ROOM_STATUS } from "@/lib/constants/session";
 import { motion } from "motion/react";
 import { getVideoSourceType } from "@/components/ui/AutoPlayVideo";
+import ProfileAvatar from "@/components/ui/ProfileAvatar";
 
 type SessionInfo = {
   id: string;
   name: string;
   description: string | null;
+  cover_image_url?: string | null;
   is_private?: boolean;
 };
 
@@ -38,6 +42,15 @@ export default function JoinPage({
   const [guestName, setGuestName] = useState("");
   const [firstVideoUrl, setFirstVideoUrl] = useState<string | null>(null);
   const [videoReady, setVideoReady] = useState(true);
+  const [scores, setScores] = useState<Record<string, PlayerScore>>({});
+  const rankedPlayers = Object.entries(scores)
+    .filter(([, player]) => typeof player?.score === "number" && Number.isFinite(player.score))
+    .sort(([, a], [, b]) => b.score - a.score);
+  const podium = [
+    rankedPlayers[1] ? { player: rankedPlayers[1][1], uid: rankedPlayers[1][0], rank: 2 } : null,
+    rankedPlayers[0] ? { player: rankedPlayers[0][1], uid: rankedPlayers[0][0], rank: 1 } : null,
+    rankedPlayers[2] ? { player: rankedPlayers[2][1], uid: rankedPlayers[2][0], rank: 3 } : null,
+  ];
 
   // Sign in anonymously if there's no existing session.
   // This lets anyone join via a shareable link without creating an account.
@@ -85,7 +98,7 @@ export default function JoinPage({
         if (apiRes?.ok) {
           const data = await apiRes.json();
           if (cancelled) return;
-          setSession({ id: data.id, name: data.name, description: data.description, is_private: data.is_private });
+          setSession({ id: data.id, name: data.name, description: data.description, cover_image_url: data.cover_image_url, is_private: data.is_private });
           setRoomChecking(true);
           backgroundRoomCheck(data.id);
           return;
@@ -104,7 +117,7 @@ export default function JoinPage({
         if (!res.ok) { setFetchError("Session not found"); return; }
         const data = await res.json();
         if (cancelled) return;
-        setSession({ id: data.id, name: data.quiz_name || data.name, description: data.quiz_description || data.description, is_private: data.is_private });
+        setSession({ id: data.id, name: data.quiz_name || data.name, description: data.quiz_description || data.description, cover_image_url: data.cover_image_url, is_private: data.is_private });
         setRoomChecking(true);
         backgroundRoomCheck(rtdbResult);
       } catch {
@@ -113,6 +126,11 @@ export default function JoinPage({
     })();
     return () => { cancelled = true; };
   }, [token, user]);
+
+  useEffect(() => {
+    if (!session || !user) return;
+    return watchScores(session.id, setScores);
+  }, [session?.id, user]);
 
   useEffect(() => {
     if (!session || !user) return;
@@ -214,48 +232,50 @@ export default function JoinPage({
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      {/* Background orbs */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-angular-700/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-angular-300/15 rounded-full blur-3xl" />
-      </div>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#eaf1fb] px-4 py-8 text-[#16324F] dark:bg-[#101010] dark:text-[#f5f5f5] sm:py-12">
+      {session?.cover_image_url && <img src={session.cover_image_url} alt="" aria-hidden="true" className="pointer-events-none fixed inset-0 h-full w-full scale-105 object-cover opacity-30 blur-md dark:opacity-40" />}
+      <div className="pointer-events-none absolute inset-0 bg-[#eaf1fb]/65 dark:bg-[#101010]/65" />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative w-full max-w-md"
+        className="relative w-full max-w-5xl"
       >
         {fetchError ? (
-          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-8 text-center">
+          <div className="nq-card rounded-2xl p-8 text-center">
             <div className="text-5xl mb-4">🔒</div>
-            <h1 className="text-xl font-bold text-white mb-2">
+            <h1 className="mb-2 text-xl font-bold text-[#16324F] dark:text-white">
               Session Unavailable
             </h1>
-            <p className="text-gray-400 text-sm">{fetchError}</p>
+            <p className="text-sm text-[#5D7EA1] dark:text-[#b4c1d3]">{fetchError}</p>
           </div>
         ) : !session ? (
           <div className="flex justify-center">
             <div className="w-8 h-8 border-2 border-angular-700 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-8">
-            {/* Header */}
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-angular-700 to-angular-500 flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">🎮</span>
+          <div className="nq-card grid overflow-hidden rounded-[28px] md:grid-cols-[1.08fr_.92fr]">
+            <section className="flex min-h-full flex-col border-b border-[#0460A9]/10 dark:border-white/10 md:border-b-0 md:border-r">
+              <div className="relative min-h-64 overflow-hidden bg-gradient-to-br from-[#22334c] to-[#255956] sm:min-h-80 md:flex-1">
+                {session.cover_image_url ? <img src={session.cover_image_url} alt={`${session.name} cover`} className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_24%,rgba(134,186,169,.38),transparent_30%),radial-gradient(circle_at_20%_90%,rgba(100,132,183,.45),transparent_38%)]" />}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#10294a]/95 via-[#10294a]/25 to-black/5" />
+                <div className="absolute inset-x-6 bottom-6">
+                  <p className="mb-2 text-[11px] font-medium uppercase tracking-[.18em] text-white/75">You’re invited to play</p>
+                  <h1 className="text-3xl font-semibold leading-tight text-white sm:text-4xl">{session.name}</h1>
+                </div>
               </div>
-              <h1 className="text-2xl font-bold text-white mb-1">
-                {session.name}
-              </h1>
-              {session.description && (
-                <p className="text-gray-400 text-sm">{session.description}</p>
-              )}
-            </div>
+              {session.description && <p className="px-6 py-5 text-sm leading-relaxed text-[#5D7EA1] dark:text-[#bdc9d8]">{session.description}</p>}
+            </section>
+
+            <section className="bg-white/65 p-5 dark:bg-[#191919]/90 sm:p-7">
+              <div className="mb-5">
+                <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#0460A9] dark:text-[#92bfff]">Join session</p>
+                <p className="mt-1 text-sm text-[#5D7EA1] dark:text-[#b4b4b4]">Enter the game and see how you rank.</p>
+              </div>
 
             {user.isAnonymous && (
-              <div className="mb-6">
-                <label className="text-sm font-medium text-gray-300 block mb-2">
+              <div className="mb-4">
+                <label className="mb-2 block text-sm font-medium text-[#294867] dark:text-[#e5e5e5]">
                   Your name (optional)
                 </label>
                 <input
@@ -265,7 +285,7 @@ export default function JoinPage({
                   onChange={(e) => setGuestName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleJoin()}
                   placeholder="Guest"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-angular-700 focus:outline-none placeholder:text-gray-600"
+                  className="w-full rounded-xl border border-[#0460A9]/20 bg-white/85 px-4 py-3 text-[#16324F] placeholder:text-[#8298b2] focus:border-[#0460A9] focus:outline-none dark:border-white/15 dark:bg-[#262626] dark:text-white dark:placeholder:text-[#9a9a9a] dark:focus:border-[#70A2F9]"
                 />
               </div>
             )}
@@ -274,7 +294,7 @@ export default function JoinPage({
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-red-400 text-sm mb-4 text-center"
+                className="text-red-600 text-sm mb-4 text-center"
               >
                 {joinError}
               </motion.p>
@@ -300,11 +320,11 @@ export default function JoinPage({
             <button
               onClick={handleJoin}
               disabled={joining || !videoReady}
-              className="w-full py-3 rounded-xl bg-linear-to-r from-angular-700 to-angular-500 text-white! font-semibold text-base disabled:opacity-50 disabled:cursor-not-allowed hover:from-angular-500 hover:to-angular-700 transition-all"
+              className="w-full rounded-xl bg-[#0460A9] px-4 py-3.5 text-base font-semibold text-white! shadow-[0_10px_24px_rgba(4,96,169,.2)] transition hover:bg-[#055a9e] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {joining ? (
                 <span className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   Joining…
                 </span>
               ) : roomChecking ? (
@@ -322,18 +342,43 @@ export default function JoinPage({
               )}
             </button>
 
-            <p className="text-center text-xs text-gray-500 mt-4">
+            <p className="mt-4 text-center text-xs text-[#7187a1] dark:text-[#a3a3a3]">
               {user.isAnonymous ? (
                 "Playing as guest — progress won't be saved"
               ) : (
                 <>
                   Joining as{" "}
-                  <span className="text-angular-300">
+                  <span className="text-[#0460A9] dark:text-[#92bfff]">
                     {user.displayName || user.email}
                   </span>
                 </>
               )}
             </p>
+
+            <div className="mt-7 border-t border-[#0460A9]/12 pt-5 dark:border-white/10">
+              <div className="mb-3 flex items-center justify-between">
+                <div><h2 className="text-sm font-semibold text-[#16324F] dark:text-white">Leaderboard</h2><p className="mt-0.5 text-xs text-[#7187a1] dark:text-[#a3a3a3]">Live session scores</p></div>
+                <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#0D8C6D] dark:text-emerald-300"><span className="h-1.5 w-1.5 rounded-full bg-[#0D8C6D] dark:bg-emerald-400" /> Live</span>
+              </div>
+              {rankedPlayers.length ? <div className="flex items-end justify-center gap-2 pt-2">
+                {podium.map((place, index) => {
+                  const height = place?.rank === 1 ? 'h-[104px]' : place?.rank === 2 ? 'h-[78px]' : 'h-[60px]';
+                  const accent = place?.rank === 1 ? 'border-[#70A2F9]/55 bg-[#0460A9]/10 text-[#0460A9]' : place?.rank === 2 ? 'border-slate-300 bg-slate-100 text-[#456786]' : 'border-amber-700/20 bg-amber-100 text-[#8b5e20]';
+                  return <div key={place?.uid ?? `empty-${index}`} className="flex min-w-0 flex-1 flex-col items-center">
+                    {place ? <>
+                      <ProfileAvatar displayName={place.player.displayName} photoURL={place.player.photoURL} size={44} ringClassName={`ring-2 shadow-lg ${place.rank === 1 ? 'ring-amber-300/80' : place.rank === 2 ? 'ring-slate-200/70' : 'ring-orange-300/70'}`} />
+                      <p className="mt-2 w-full truncate text-center text-[11px] font-semibold text-[#294867] dark:text-[#e5e5e5]">{place.uid === user.uid ? 'You' : place.player.displayName}</p>
+                      <p className="mt-0.5 text-xs font-semibold tabular-nums text-[#16324F] dark:text-white">{(place.player.score ?? 0).toLocaleString()} <span className="font-normal text-[#8298b2] dark:text-[#a3a3a3]">pts</span></p>
+                    </> : <div className="h-[82px]" />}
+                    <div className={`mt-2 flex w-full flex-col items-center justify-start rounded-t-xl border-t px-2 pt-2 ${height} ${place ? accent : 'border-[#0460A9]/10 bg-[#0460A9]/[.025] text-[#9bb2c9] dark:border-white/10 dark:bg-white/[.03] dark:text-white/25'}`}>
+                      <span className="text-base leading-none">{place ? '🏆' : '·'}</span>
+                      <span className="mt-1 text-xs font-semibold">{place ? `#${place.rank}` : '—'}</span>
+                    </div>
+                  </div>;
+                })}
+              </div> : <p className="rounded-lg bg-[#0460A9]/[.04] px-3 py-3 text-xs leading-relaxed text-[#7187a1] dark:bg-white/[.04] dark:text-[#a3a3a3]">Scores will appear here as players answer questions.</p>}
+            </div>
+            </section>
           </div>
         )}
       </motion.div>

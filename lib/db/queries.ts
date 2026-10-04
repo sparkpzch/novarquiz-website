@@ -668,6 +668,7 @@ export async function createQuestion(data: {
   node_name?: string;
   media_type?: 'image' | 'gif' | 'video';
   media_url?: string;
+  media_explanation?: string | null;
   media_path?: string;
   timer_override?: number;
   is_entry_point?: boolean;
@@ -684,9 +685,9 @@ export async function createQuestion(data: {
       layered
         ? `INSERT INTO questions (
              id, session_id, question_order, question_text, node_name,
-             media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
+             media_type, media_url, media_explanation, media_path, timer_override, is_entry_point, node_x, node_y, node_type
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
            ON CONFLICT (id) DO UPDATE SET
              session_id = EXCLUDED.session_id,
              question_order = EXCLUDED.question_order,
@@ -694,6 +695,7 @@ export async function createQuestion(data: {
              node_name = EXCLUDED.node_name,
              media_type = EXCLUDED.media_type,
              media_url = EXCLUDED.media_url,
+             media_explanation = EXCLUDED.media_explanation,
              media_path = EXCLUDED.media_path,
              timer_override = EXCLUDED.timer_override,
              is_entry_point = EXCLUDED.is_entry_point,
@@ -704,9 +706,9 @@ export async function createQuestion(data: {
            RETURNING *`
         : `INSERT INTO questions (
              id, session_id, question_order, question_text, node_name,
-             media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
+             media_type, media_url, media_explanation, media_path, timer_override, is_entry_point, node_x, node_y, node_type
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
            ON CONFLICT (id) DO UPDATE SET
              session_id = EXCLUDED.session_id,
              question_order = EXCLUDED.question_order,
@@ -714,6 +716,7 @@ export async function createQuestion(data: {
              node_name = EXCLUDED.node_name,
              media_type = EXCLUDED.media_type,
              media_url = EXCLUDED.media_url,
+             media_explanation = EXCLUDED.media_explanation,
              media_path = EXCLUDED.media_path,
              timer_override = EXCLUDED.timer_override,
              is_entry_point = EXCLUDED.is_entry_point,
@@ -730,6 +733,7 @@ export async function createQuestion(data: {
         data.node_name || null,
         data.media_type || null,
         data.media_url || null,
+        data.media_explanation ?? null,
         data.media_path || null,
         data.timer_override || null,
         data.is_entry_point || false,
@@ -835,6 +839,7 @@ type GraphQuestionInput = {
   node_name?: string | null;
   media_type?: 'image' | 'gif' | 'video' | null;
   media_url?: string | null;
+  media_explanation?: string | null;
   media_path?: string | null;
   timer_override?: number | null;
   is_entry_point?: boolean;
@@ -893,14 +898,14 @@ export async function replaceQuizGraph(
         layered
           ? `INSERT INTO questions (
                id, session_id, question_order, question_text, node_name,
-               media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
+               media_type, media_url, media_explanation, media_path, timer_override, is_entry_point, node_x, node_y, node_type
              )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
           : `INSERT INTO questions (
                id, session_id, question_order, question_text, node_name,
-               media_type, media_url, media_path, timer_override, is_entry_point, node_x, node_y, node_type
+               media_type, media_url, media_explanation, media_path, timer_override, is_entry_point, node_x, node_y, node_type
              )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
         [
           questionId,
           sessionId,
@@ -909,6 +914,7 @@ export async function replaceQuizGraph(
           question.node_name ?? null,
           question.media_type ?? null,
           question.media_url ?? null,
+          question.media_explanation ?? null,
           question.media_path ?? null,
           question.timer_override ?? null,
           question.is_entry_point ?? false,
@@ -979,7 +985,7 @@ export async function replaceQuizGraph(
 }
 
 const ALLOWED_QUESTION_FIELDS: ReadonlySet<string> = new Set([
-  'question_text', 'node_name', 'media_type', 'media_url', 'media_path',
+  'question_text', 'node_name', 'media_type', 'media_url', 'media_explanation', 'media_path',
   'timer_override', 'is_entry_point', 'node_x', 'node_y', 'question_order',
 ]);
 
@@ -988,6 +994,7 @@ export async function updateQuestion(questionId: string, data: Partial<{
   node_name: string;
   media_type: string;
   media_url: string;
+  media_explanation: string | null;
   media_path: string;
   timer_override: number;
   is_entry_point: boolean;

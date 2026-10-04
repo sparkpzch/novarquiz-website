@@ -28,7 +28,8 @@ export async function GET(
     return NextResponse.json({
       id: session.id,
       name: session.name,
-      description: session.quiz_description,
+      description: session.description,
+      cover_image_url: session.cover_image_url,
       is_private: session.is_private
     });
   } catch (error) {

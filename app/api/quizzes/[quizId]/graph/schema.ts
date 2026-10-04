@@ -52,6 +52,7 @@ export const QuestionSchema = z.object({
     (v) => !v || isAllowedMediaUrl(v),
     { message: 'media_url must be an https URL from an allowed storage domain' },
   ),
+  media_explanation: z.string().max(5000).optional().nullable(),
   media_path: z.string().max(500).optional().nullable().refine(
     (v) => !v || MEDIA_PATH_RE.test(v),
     { message: 'media_path must be a path inside an allowed storage prefix' },

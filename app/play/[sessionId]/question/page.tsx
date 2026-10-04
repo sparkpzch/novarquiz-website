@@ -1,6 +1,7 @@
 'use client';
 
 import { use, useEffect, useState, useCallback, useRef } from 'react';
+import type { ReactNode } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
@@ -71,25 +72,37 @@ function releaseVideo(video: HTMLVideoElement | null) {
   video.remove();
 }
 
-function QuestionVisual({ question, totalQuestions, preparedVideo, th }: {
-  question: Question; totalQuestions?: number; preparedVideo?: HTMLVideoElement | null; th: boolean;
+function QuestionVisual({ question, totalQuestions, preparedVideo, th, children }: {
+  question: Question; totalQuestions?: number; preparedVideo?: HTMLVideoElement | null; th: boolean; children?: ReactNode;
 }) {
   const [failedMediaQuestionId, setFailedMediaQuestionId] = useState<string | null>(null);
   const quality = useVideoQuality();
   const mediaError = failedMediaQuestionId === question.id;
   const mediaQuestion = question as QuestionWithPoster;
   const copy = (en: string, thai: string) => th ? thai : en;
-  return <>
+  const isScenario = question.node_type === 'situation' || (question.choices.length === 0 && !!question.media_url);
+  const mediaExplanation = question.media_explanation || (isScenario ? question.question_text : null);
+  return <div
+    className={`${styles.visualGrid} ${question.media_url ? styles.visualGridWithMedia : ''} ${isScenario ? styles.visualGridScenario : ''}`}
+    style={isScenario ? { display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 0 } : undefined}
+  >
     {question.media_url && <div className={styles.media}>
       {mediaError ? <div className={styles.mediaError}>{copy('Media unavailable', 'ไม่สามารถโหลดสื่อได้')}</div> : question.media_type === 'video' ?
         <QuestionMediaPlayer key={question.id} src={question.media_url} preload={resolvePreload(quality)} poster={mediaQuestion.poster_url ?? mediaQuestion.thumbnail_url ?? undefined} preparedVideo={preparedVideo} onError={() => setFailedMediaQuestionId(question.id)} /> :
         <img src={question.media_url} alt="" onError={() => setFailedMediaQuestionId(question.id)} />}
+      {mediaExplanation && <div className={styles.mediaExplanation}>
+        {isScenario && <span className={styles.eyebrow}>{copy('SCENARIO', 'สถานการณ์')}</span>}
+        <p>{mediaExplanation}</p>
+      </div>}
     </div>}
-    <div className={styles.questionMeta}><span className={styles.eyebrow}>{question.node_type === 'situation' ? copy('SCENARIO', 'สถานการณ์') : question.node_type === 'end' ? copy('FINAL REFLECTION', 'ก่อนดูผลของคุณ') : copy(`QUESTION ${question.question_order + 1}`, `คำถามที่ ${question.question_order + 1}`)}</span>
-      {question.node_type === 'normal' && !!totalQuestions && <span className={styles.eyebrow}>{copy(`${totalQuestions} questions`, `ทั้งหมด ${totalQuestions} ข้อ`)}</span>}
+    <div className={styles.promptColumn}>
+      {!(isScenario && question.media_url) && <div className={styles.questionMeta}><span className={styles.eyebrow}>{question.node_type === 'situation' ? copy('SCENARIO', 'สถานการณ์') : question.node_type === 'end' ? copy('FINAL REFLECTION', 'ก่อนดูผลของคุณ') : copy(`QUESTION ${question.question_order + 1}`, `คำถามที่ ${question.question_order + 1}`)}</span>
+        {question.node_type === 'normal' && !!totalQuestions && <span className={styles.eyebrow}>{copy(`${totalQuestions} questions`, `ทั้งหมด ${totalQuestions} ข้อ`)}</span>}
+      </div>}
+      {!(isScenario && question.media_url) && <h1 className={styles.questionTitle}>{question.question_text}</h1>}
+      {children}
     </div>
-    <h1 className={styles.questionTitle}>{question.question_text}</h1>
-  </>;
+  </div>;
 }
 
 export default function QuestionPage({ params }: { params: Promise<{ sessionId: string }> }) {
@@ -108,6 +121,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [pendingLabel, setPendingLabel] = useState<string | null>(null);
   const [answerFeedback, setAnswerFeedback] = useState<AnswerFeedback | null>(null);
   const [lastDelta, setLastDelta] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
@@ -121,6 +135,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
   const [completionSaving, setCompletionSaving] = useState(true);
   const [showExplanationModal, setShowExplanationModal] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const completedRef = useRef(false);
   const guestAttemptRef = useRef<string | null>(null);
   const completionRef = useRef<{ questionId: string; questionToken: string; choiceLabel?: string } | null>(null);
@@ -216,6 +231,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     setQuestion(nextQuestion);
     setRequestError(null);
     setSelectedLabel(null);
+    setPendingLabel(null);
     setAnswerFeedback(null);
     setLastDelta(null);
     setShowExplanationModal(false);
@@ -512,23 +528,37 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     </section></div></main>;
   }
 
-  const topScores = Object.entries(scores).map(([uid, value]) => ({ uid, ...value })).sort((a, b) => b.score - a.score).slice(0, 3);
-  return <main className={styles.screen}><div className={styles.container}>
+  const rankedScores = Object.entries(scores)
+    .filter(([, value]) => typeof value?.score === 'number' && Number.isFinite(value.score))
+    .map(([uid, value]) => ({ uid, ...value }))
+    .sort((a, b) => b.score - a.score);
+  const topScores = rankedScores.slice(0, 3);
+  const playerRankIndex = rankedScores.findIndex((entry) => entry.uid === user?.uid);
+  return <main className={styles.screen}>
+    {sessionMeta?.cover_image_url && <img src={sessionMeta.cover_image_url} alt="" aria-hidden="true" className={styles.coverBackdrop} />}
+    <div className={styles.coverTint} aria-hidden="true" />
+    <div className={styles.container}>
     <div className={styles.brandLine}><strong>NOVARQUIZ</strong><span>{sessionMeta?.quiz_name || sessionMeta?.name}</span></div>
-    <QuizHeader elapsed={elapsed} score={score} streak={streak} userName={user?.displayName} photoURL={user?.photoURL} lastDelta={lastDelta} totalPlayers={Object.keys(scores).length} topScores={topScores} currentUserId={user?.uid} th={th} />
-    <section className={styles.surface}>
-      <QuestionVisual question={question} totalQuestions={sessionMeta?.question_count} preparedVideo={preparedVideo} th={th} />
+    <QuizHeader elapsed={elapsed} score={score} rank={playerRankIndex >= 0 ? playerRankIndex + 1 : null} userName={user?.displayName} photoURL={user?.photoURL} lastDelta={lastDelta} leaderboardOpen={showLeaderboard} onLeaderboard={() => setShowLeaderboard((open) => !open)} th={th} />
+    {showLeaderboard && <section id="play-leaderboard" className={styles.leaderboardPanel} aria-label={copy('Live leaderboard', 'ตารางคะแนนสด')}>
+      <h2>{copy('Live leaderboard', 'ตารางคะแนนสด')}</h2>
+      {topScores.length ? <ol>{topScores.map((player, index) => <li key={player.uid}><strong>#{index + 1}</strong><span>{player.uid === user?.uid ? copy('You', 'คุณ') : player.displayName}</span><b>{player.score.toLocaleString()}</b></li>)}</ol> : <p>{copy('No scores yet.', 'ยังไม่มีคะแนน')}</p>}
+    </section>}
+    <section className={`${styles.surface} ${styles.questionSurface}`}>
       {requestError && <p role="alert" className={styles.error}>{requestError}</p>}
+      <QuestionVisual question={question} totalQuestions={sessionMeta?.question_count} preparedVideo={preparedVideo} th={th}>
       {isEnd ? <div className={styles.actions}><button type="button" className={styles.primaryButton} onClick={() => {
         if (!question.question_token) return;
         completionRef.current = { questionId: question.id, questionToken: question.question_token };
         setFinished(true);
       }}>{copy('See my result', 'ดูผลของฉัน')}<span aria-hidden="true">→</span></button></div> : isSituation ? <div className={styles.actions}><button type="button" className={styles.primaryButton} onClick={handleSituationNext} disabled={nextLoading}>{nextLoading ? copy('Loading…', 'กำลังโหลด…') : copy('Start the next part', 'ไปต่อเมื่อพร้อม')}<span aria-hidden="true">→</span></button></div> : <>
-        <QuizChoices choices={question.choices} selectedLabel={selectedLabel} feedback={answerFeedback} saving={answerSaving} onSelect={(label) => void handleAnswer(label, performance.now())} th={th} />
+        <QuizChoices choices={question.choices} selectedLabel={selectedLabel ?? pendingLabel} feedback={answerFeedback} saving={answerSaving} submitted={selectedLabel !== null} onSelect={setPendingLabel} th={th} />
+        {!selectedLabel && <div className={styles.actions}><button type="button" className={styles.primaryButton} disabled={!pendingLabel || answerSaving} onClick={() => pendingLabel && void handleAnswer(pendingLabel, performance.now())}>{copy('Submit answer', 'ส่งคำตอบ')}<span aria-hidden="true">→</span></button></div>}
         {selectedChoice && answerFeedback && <div className={styles.actions}><button type="button" className={styles.secondaryButton} disabled={nextLoading} onClick={() => setShowExplanationModal(true)}>{copy('View explanation', 'ดูคำอธิบาย')}</button><button type="button" className={styles.primaryButton} disabled={nextLoading || answerSaving} onClick={handleContinue}>{nextLoading ? copy('Loading…', 'กำลังโหลด…') : copy('Continue', 'ไปต่อ')}<span aria-hidden="true">→</span></button></div>}
       </>}
+      </QuestionVisual>
     </section>
-  </div>
+    </div>
     {selectedChoice && answerFeedback && <AnswerFeedbackDialog choice={selectedChoice} feedback={answerFeedback} nextLoading={nextLoading || answerSaving} error={requestError} open={showExplanationModal} onClose={() => setShowExplanationModal(false)} onContinue={handleContinue} th={th} />}
   </main>;
 }

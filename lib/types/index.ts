@@ -34,6 +34,7 @@ export interface Question {
   node_name: string | null;
   media_type: 'image' | 'gif' | 'video' | null;
   media_url: string | null;
+  media_explanation?: string | null;
   media_path: string | null;
   timer_override: number | null;
   session_timer_seconds: number | null;

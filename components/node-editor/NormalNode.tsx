@@ -19,6 +19,7 @@ export type NormalNodeData = {
   }>;
   media_type: string | null;
   media_url: string | null;
+  media_explanation?: string | null;
   media_path: string | null;
   is_entry_point: boolean;
   timer_override: number | null;
@@ -36,6 +37,7 @@ const QUESTION_NODE_ACCENT_SOFT = '#92BFFF';
 const QUESTION_NODE_HEADER_BG = 'rgba(112,162,249,0.2)';
 const H_HEADER = 36;
 const H_TEXT = 52;
+const H_MEDIA_EXPLANATION = 42;
 const H_CHOICE = 32;
 
 export const NormalNode = memo(({ data, selected }: NodeProps) => {
@@ -52,7 +54,9 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
   );
   const allChoicesConnected = ['A', 'B', 'C', 'D'].every(l => connectedChoices.has(l));
 
-  const choiceAreaTop = H_HEADER + H_TEXT;
+  const mediaExplanation = d.media_explanation?.trim() ?? '';
+  const mediaExplanationHeight = mediaExplanation ? H_MEDIA_EXPLANATION : 0;
+  const choiceAreaTop = H_HEADER + mediaExplanationHeight + H_TEXT;
 
   const choiceHandleStyle = (color: string, idx: number): React.CSSProperties => ({
     top: choiceAreaTop + idx * H_CHOICE + H_CHOICE / 2,
@@ -173,6 +177,25 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
           )}
         </div>
       </div>
+
+      {mediaExplanation && (
+        <div style={{
+          height: H_MEDIA_EXPLANATION,
+          padding: '6px 10px',
+          background: 'rgba(240,247,255,0.96)',
+          borderBottom: '1px solid rgba(112,162,249,0.12)',
+          color: '#526b8e',
+          fontSize: 10,
+          lineHeight: '1.45',
+          overflow: 'hidden',
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical' as const,
+        }}>
+          <span style={{ color: '#6d87aa', fontSize: 8, fontWeight: 700, letterSpacing: '0.06em' }}>MEDIA EXPLANATION · </span>
+          {mediaExplanation}
+        </div>
+      )}
 
       {/* Question text */}
       <div style={{

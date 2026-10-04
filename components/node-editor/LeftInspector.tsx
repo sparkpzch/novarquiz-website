@@ -433,15 +433,30 @@ export function LeftInspector({
 
         <Divider />
 
+        {draft.media_url && (isNormal || isEnd) && (
+          <div style={{ marginBottom: 12 }}>
+            <FieldLabel hint="Shown below media">Media Explanation</FieldLabel>
+            <textarea
+              rows={3}
+              value={draft.media_explanation ?? ''}
+              onChange={e => patch({ media_explanation: e.target.value })}
+              placeholder="Add context or a caption for the media…"
+              style={{ ...textareaStyle, resize: 'none', overflow: 'hidden' }}
+            />
+          </div>
+        )}
+
         {/* ── Question / Scene text ── */}
         <div style={{ marginBottom: 12 }}>
-          <FieldLabel hint={isNormal ? 'Shown to player' : undefined}>
-            {isNormal ? 'Question Text' : isEnd ? 'Final Message' : 'Scene Description'}
+          <FieldLabel hint={isNormal ? 'Shown to player' : draft.media_url ? 'Shown below media' : undefined}>
+            {isNormal ? 'Question Text' : isEnd ? 'Final Message' : 'Media Explanation'}
           </FieldLabel>
           <textarea
             rows={3}
-            value={draft.question_text ?? ''}
-            onChange={e => patch({ question_text: e.target.value })}
+            value={!isNormal && !isEnd ? (draft.media_explanation ?? draft.question_text ?? '') : (draft.question_text ?? '')}
+            onChange={e => patch(!isNormal && !isEnd
+              ? { media_explanation: e.target.value, question_text: e.target.value }
+              : { question_text: e.target.value })}
             ref={el => {
               if (el) {
                 el.style.height = 'auto';
@@ -453,7 +468,7 @@ export function LeftInspector({
               t.style.height = 'auto';
               t.style.height = `${t.scrollHeight}px`;
             }}
-            placeholder={isNormal ? 'Type the question here…' : isEnd ? 'Message shown at end of path…' : 'Describe the scene…'}
+            placeholder={isNormal ? 'Type the question here…' : isEnd ? 'Message shown at end of path…' : 'Explain what the player should notice in the media…'}
             style={{ ...textareaStyle, resize: 'none', overflow: 'hidden' }}
           />
         </div>

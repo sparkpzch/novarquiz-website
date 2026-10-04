@@ -46,6 +46,7 @@ function sanitizeQuestion(question: Record<string, unknown> | null, shuffleSeed?
     node_type: question.node_type,
     media_type: question.media_type,
     media_url: question.media_url,
+    media_explanation: question.media_explanation,
     poster_url: question.poster_url,
     thumbnail_url: question.thumbnail_url,
     session_timer_seconds: question.session_timer_seconds,

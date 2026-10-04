@@ -8,6 +8,7 @@ export type SituationNodeData = {
   question_text: string;
   media_type: string | null;
   media_url: string | null;
+  media_explanation?: string | null;
   media_path: string | null;
   is_entry_point: boolean;
 };
@@ -16,6 +17,7 @@ const H_HEADER = 36;
 
 export const SituationNode = memo(({ data, selected }: NodeProps) => {
   const d = data as SituationNodeData;
+  const description = d.media_explanation ?? d.question_text;
 
   const totalH = H_HEADER + 52 + 28;
 
@@ -90,7 +92,7 @@ export const SituationNode = memo(({ data, selected }: NodeProps) => {
         padding: '8px 10px',
         background: '#0d0d20',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
-        color: d.question_text ? '#e2e8f0' : '#4b5563',
+        color: description ? '#e2e8f0' : '#4b5563',
         fontSize: 12,
         lineHeight: '1.5',
         overflow: 'hidden',
@@ -98,7 +100,7 @@ export const SituationNode = memo(({ data, selected }: NodeProps) => {
         WebkitLineClamp: 2,
         WebkitBoxOrient: 'vertical' as const,
       }}>
-        {d.question_text || 'Double-click to edit…'}
+        {description || 'Double-click to edit…'}
       </div>
 
       {/* Display-only badge */}

@@ -11,6 +11,7 @@ export type EndNodeData = {
   question_text: string;
   media_type: string | null;
   media_url: string | null;
+  media_explanation?: string | null;
   media_path: string | null;
   is_entry_point: boolean;
 };
@@ -66,6 +67,25 @@ export const EndNode = memo(({ data, selected }: NodeProps) => {
           )}
         </div>
       </div>
+
+      {d.media_explanation?.trim() && (
+        <div style={{
+          minHeight: 42,
+          padding: '6px 10px',
+          background: 'rgba(255,245,247,0.96)',
+          borderBottom: '1px solid rgba(244,63,94,0.12)',
+          color: '#7c4755',
+          fontSize: 10,
+          lineHeight: '1.45',
+          overflow: 'hidden',
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical' as const,
+        }}>
+          <span style={{ color: '#9b6472', fontSize: 8, fontWeight: 700, letterSpacing: '0.06em' }}>MEDIA EXPLANATION · </span>
+          {d.media_explanation}
+        </div>
+      )}
 
       {/* Message */}
       <div style={{
