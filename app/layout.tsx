@@ -48,13 +48,16 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        {/* Browser chrome must follow the app preference, not the OS theme.
+            Keep this tag owned by the root layout across client navigation. */}
+        <meta name="theme-color" content="#f8f9fc" suppressHydrationWarning />
         {/* Apply the saved palette before paint, using the request's CSP nonce.
             Browsers hide the nonce attribute before hydration; suppress only
             this script's expected attribute mismatch. */}
         <script
           nonce={nonce}
           suppressHydrationWarning
-          dangerouslySetInnerHTML={{ __html: `(function(){var t='light';try{var s=localStorage.getItem('novarquiz-theme');if(s==='dark'||s==='light')t=s;}catch(e){}document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t;})();` }}
+          dangerouslySetInnerHTML={{ __html: `(function(){var t='light';try{var s=localStorage.getItem('novarquiz-theme');if(s==='dark'||s==='light')t=s;}catch(e){}document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.content=t==='dark'?'#171717':'#f8f9fc';})();` }}
         />
       </head>
       <body className="min-h-full flex flex-col font-sans antialiased">

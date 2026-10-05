@@ -85,6 +85,28 @@ npm run dev:neon
 
 The development app is available at [http://localhost:3000](http://localhost:3000).
 
+Development scripts bind to the loopback address for `localhost` so HMR, development source maps, and
+developer filesystem paths are accessible only from this machine. Keep development
+servers behind trusted access controls; `allowedDevOrigins` does not restrict
+network access to a development listener. Production browser source maps are
+explicitly disabled in `next.config.ts`.
+
+For access by other users, run `npm run build` followed by `npm run start` behind
+an HTTPS reverse proxy, or use Firebase App Hosting. Load the same environment
+for both commands (Next.js loads `.env.local` automatically; `.env.neon` needs
+`npx dotenv -e .env.neon -- npm run build` and
+`npx dotenv -e .env.neon -- npm run start`). Do not send real authentication
+tokens over a shared HTTP connection.
+
+Set `APP_ORIGIN` to the exact browser-facing origin, including its scheme and
+non-default port, without a trailing slash or path. For example, a production
+reverse proxy requires its public HTTPS origin even if Next.js listens internally
+over HTTP. A mismatch causes `403 Cross-origin request denied`; the CSRF check
+must stay enabled. Use one canonical origin for each running instance.
+For local development, open `http://localhost:3000` as shown above; an IP address
+is a different origin. If you intentionally use a different browser-facing
+origin, configure `APP_ORIGIN` for that instance and restart it.
+
 ## Scripts
 
 | Script | Purpose |

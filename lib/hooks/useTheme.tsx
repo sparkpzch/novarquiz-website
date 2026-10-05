@@ -35,6 +35,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setThemeState(next);
     document.documentElement.dataset.theme = next;
     document.documentElement.style.colorScheme = next;
+    // Safari/Chrome tint their mobile browser bars separately from the DOM.
+    const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = next === 'dark' ? '#171717' : '#f8f9fc';
     try { localStorage.setItem('novarquiz-theme', next); } catch {}
   };
   const toggleTheme = () => setTheme(themeRef.current === 'light' ? 'dark' : 'light');

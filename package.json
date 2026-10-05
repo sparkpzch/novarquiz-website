@@ -4,9 +4,9 @@
   "private": true,
   "packageManager": "bun@1.2.0",
   "scripts": {
-    "dev": "dotenv -e .env.neon -- next dev",
-    "dev:docker": "dotenv -e .env.local -- next dev",
-    "dev:neon": "dotenv -e .env.neon -- next dev",
+    "dev": "dotenv -e .env.neon -- next dev --hostname localhost",
+    "dev:docker": "dotenv -e .env.local -- next dev --hostname localhost",
+    "dev:neon": "dotenv -e .env.neon -- next dev --hostname localhost",
     "build": "next build",
     "analyze": "ANALYZE=true next build --webpack",
     "start": "next start",

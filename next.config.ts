@@ -2,7 +2,9 @@ import type { NextConfig } from "next";
 import NextBundleAnalyzer from "@next/bundle-analyzer";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["192.168.*"],
+  // Development source maps are unavoidable; keep dev listeners on loopback.
+  // Production browser source maps must never be published with client assets.
+  productionBrowserSourceMaps: false,
   async headers() {
     return [
       {
