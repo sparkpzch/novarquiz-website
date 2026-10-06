@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { UserHistoryRow } from '@/lib/analytics/history';
 import { usePersonalRecapReport } from '@/lib/hooks/usePersonalRecapReport';
 import PersonalRecapCard from './PersonalRecapCard';
+import { createRequestFreshness } from '@/lib/client/request-freshness';
 
 export default function LatestPersonalRecap({ uid, locale }: { uid: string | null; locale: 'en' | 'th' }) {
   const copy = (en: string, th: string) => locale === 'th' ? th : en;
@@ -17,19 +18,22 @@ export default function LatestPersonalRecap({ uid, locale }: { uid: string | nul
   useEffect(() => {
     if (!uid) return;
     const abort = new AbortController();
-    let inFlight = false;
+    const freshness = createRequestFreshness();
     async function load() {
-      if (inFlight || abort.signal.aborted) return;
-      inFlight = true;
+      if (abort.signal.aborted || !freshness.start()) return;
+      let success = false;
       try {
         const response = await fetch(`/api/users/${encodeURIComponent(uid!)}/history`, { signal: abort.signal, cache: 'no-store' });
         if (!response.ok) throw new Error('History unavailable');
         const rows: UserHistoryRow[] = await response.json();
         const latest = rows[0];
-        if (!abort.signal.aborted) setResult({ key, sessionId: latest?.session_id ?? null, error: false });
+        if (!abort.signal.aborted) {
+          success = true;
+          setResult({ key, sessionId: latest?.session_id ?? null, error: false });
+        }
       } catch {
         if (!abort.signal.aborted) setResult({ key, sessionId: null, error: true });
-      } finally { inFlight = false; }
+      } finally { freshness.finish(success); }
     }
     const resume = () => { if (document.visibilityState === 'visible') void load(); };
     void load();
