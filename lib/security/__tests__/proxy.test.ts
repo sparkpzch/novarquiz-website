@@ -93,3 +93,41 @@ test('verified player sessions cannot open admin pages, and admins land in Quiz 
     else process.env.SESSION_SECRET = originalSecret;
   }
 });
+
+test('QR invitations and direct play require a session and preserve the full return URL', async () => {
+  for (const path of ['/join/yOSlr1fnBp2d?source=qr', '/play/session/question?mode=solo']) {
+    const response = await proxy(new NextRequest(`https://quiz.example${path}`, {
+      headers: { authorization: 'Bearer anonymous-token' },
+    }));
+    assert.equal(response.status, 307);
+    const destination = new URL(response.headers.get('location')!);
+    assert.equal(destination.pathname, '/sign-in');
+    assert.equal(destination.searchParams.get('next'), path);
+  }
+});
+
+test('expired sessions retain the QR destination instead of dropping the invitation', async () => {
+  const response = await proxy(new NextRequest('https://quiz.example/join/yOSlr1fnBp2d?source=qr', {
+    headers: { cookie: 'session=expired' },
+  }));
+  assert.equal(new URL(response.headers.get('location')!).searchParams.get('next'), '/join/yOSlr1fnBp2d?source=qr');
+  assert.equal(response.cookies.get('session')?.value, '');
+});
+
+test('already signed-in players return to the invitation from sign-in', async () => {
+  const originalSecret = process.env.SESSION_SECRET;
+  process.env.SESSION_SECRET = 'invitation-return-test-secret';
+  try {
+    const token = await new SignJWT({ uid: 'player-1', isAdmin: false, sessionVersion: SESSION_VERSION })
+      .setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime('60s')
+      .sign(new TextEncoder().encode(process.env.SESSION_SECRET));
+    const response = await proxy(new NextRequest('https://quiz.example/sign-in?next=%2Fjoin%2FyOSlr1fnBp2d', {
+      headers: { cookie: `session=${token}` },
+    }));
+    assert.equal(response.headers.get('location'), 'https://quiz.example/join/yOSlr1fnBp2d');
+    assert.equal((await proxy(new NextRequest('https://quiz.example/join/yOSlr1fnBp2d', { headers: { cookie: `session=${token}` } }))).status, 200);
+  } finally {
+    if (originalSecret === undefined) delete process.env.SESSION_SECRET;
+    else process.env.SESSION_SECRET = originalSecret;
+  }
+});

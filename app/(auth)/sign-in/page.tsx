@@ -1,11 +1,11 @@
 'use client';
 
-import { safeRedirectPath } from '@/lib/security/redirect';
+import { authHref } from '@/lib/security/auth-return';
+import { useAuthReturnPath, clearAuthReturnPath } from '@/lib/hooks/useAuthReturnPath';
 
 import { useState, Suspense } from 'react';
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
-import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -15,8 +15,7 @@ import '@/lib/i18n';
 
 function SignInForm() {
   const { t } = useTranslation();
-  const searchParams = useSearchParams();
-  const nextUrl = searchParams.get('next');
+  const safeNextUrl = useAuthReturnPath();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -24,9 +23,6 @@ function SignInForm() {
   const [loading, setLoading] = useState(false);
   // Holds the pending ID token for new Google OAuth users until they accept ToS
   const [consentPending, setConsentPending] = useState<string | null>(null);
-
-  const safeNextUrl =
-    safeRedirectPath(nextUrl);
 
   const createSession = async (idToken: string, beforeRedirect?: () => Promise<unknown>) => {
     const res = await fetch('/api/auth/session', {
@@ -38,6 +34,7 @@ function SignInForm() {
     if (!res.ok) throw new Error(data.error || 'Session creation failed');
     await beforeRedirect?.();
     // Read the newly issued cookie on a fresh request, without an old route cache.
+    clearAuthReturnPath();
     window.location.replace(safeNextUrl);
   };
 
@@ -172,7 +169,7 @@ function SignInForm() {
             <span className="text-sm">Remember me</span>
           </label>
           <Link
-            href="/forgot-password"
+            href={authHref('/forgot-password', safeNextUrl)}
             className="nq-auth-link text-sm font-medium"
           >
             Forgot password ?
@@ -220,21 +217,10 @@ function SignInForm() {
         Continue with Google
       </button>
 
-      {/* Continue as a guest (mobile)
-      <div className="md:hidden text-center mt-4">
-        <button
-          onClick={() => router.push('/')}
-          className="text-sm text-gray-500 underline underline-offset-2 hover:text-gray-700 transition-colors"
-        >
-          Continue as a guest
-        </button>
-      </div> */}
-
-
       {/* Desktop: sign-up link */}
       <p className="nq-auth-muted hidden md:block text-center text-sm mt-6">
         {t('auth.no_account')}{' '}
-        <Link href="/sign-up" className="nq-auth-link font-medium">
+        <Link href={authHref('/sign-up', safeNextUrl)} className="nq-auth-link font-medium">
           {t('auth.sign_up')}
         </Link>
       </p>

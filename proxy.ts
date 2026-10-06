@@ -3,10 +3,10 @@ import { checkRateLimit } from '@/lib/ratelimit';
 import { getRateLimitIp } from '@/lib/security/request-ip';
 import { isTrustedMutation } from '@/lib/security/request-origin';
 import { verifySessionToken } from '@/lib/security/session';
+import { authReturnPath, authHref } from '@/lib/security/auth-return';
 
 const COOKIE_NAME = 'session';
 const PUBLIC_PATHS = ['/sign-in', '/sign-up', '/forgot-password', '/new-password', '/terms', '/privacy'];
-const GUEST_PLAY_PATHS = ['/join/', '/play/'];
 
 function buildCsp(nonce: string): string {
   const isDev = process.env.NODE_ENV === 'development';
@@ -81,12 +81,6 @@ export async function proxy(request: NextRequest) {
   const isPublic = PUBLIC_PATHS.includes(pathname);
   const session = request.cookies.get(COOKIE_NAME)?.value;
 
-  // Guest pages render a client shell. Their APIs verify the Firebase
-  // anonymous ID token, so a missing application cookie must not redirect
-  // an invited player before anonymous sign-in can run.
-  if (GUEST_PLAY_PATHS.some((p) => pathname.startsWith(p))) {
-    return withCsp(request, nonce);
-  }
 
   // Authenticated users are redirected away from auth pages
   if (isPublic) {
@@ -94,7 +88,7 @@ export async function proxy(request: NextRequest) {
       try {
         const user = await verifySessionToken(session);
         if (!['/terms', '/privacy'].includes(pathname)) {
-          return NextResponse.redirect(new URL(user.isAdmin ? '/admin' : '/', request.url));
+          return NextResponse.redirect(new URL(authReturnPath(request.nextUrl.searchParams.get('next'), user.isAdmin ? '/admin' : '/'), request.url));
         }
       } catch {
         // Expired / invalid — let through to sign-in
@@ -106,7 +100,7 @@ export async function proxy(request: NextRequest) {
   // Unauthenticated → sign-in
   if (!session) {
     return NextResponse.redirect(
-      new URL(`/sign-in?next=${encodeURIComponent(pathname)}`, request.url),
+      new URL(authHref('/sign-in', pathname + request.nextUrl.search), request.url),
     );
   }
 
@@ -117,7 +111,7 @@ export async function proxy(request: NextRequest) {
     }
     return withCsp(request, nonce);
   } catch {
-    const res = NextResponse.redirect(new URL('/sign-in', request.url));
+    const res = NextResponse.redirect(new URL(authHref('/sign-in', pathname + request.nextUrl.search), request.url));
     res.cookies.delete(COOKIE_NAME);
     return res;
   }

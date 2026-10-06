@@ -2,8 +2,6 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signInAnonymously, updateProfile } from "firebase/auth";
-import { auth } from "@/lib/firebase/config";
 import { useAuth } from "@/lib/hooks/useAuth";
 import {
   resolveJoinToken,
@@ -42,7 +40,6 @@ export default function JoinPage({
   const [roomChecking, setRoomChecking] = useState(false);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState("");
-  const [guestName, setGuestName] = useState("");
   const [firstVideoUrl, setFirstVideoUrl] = useState<string | null>(null);
   const [scores, setScores] = useState<Record<string, PlayerScore>>({});
   const [roomPlayers, setRoomPlayers] = useState<Record<string, WaitingPlayer>>({});
@@ -56,21 +53,18 @@ export default function JoinPage({
     rankedPlayers[2] ? { player: rankedPlayers[2][1], uid: rankedPlayers[2][0], rank: 3 } : null,
   ];
 
-  // Sign in anonymously if there's no existing session.
-  // This lets anyone join via a shareable link without creating an account.
   useEffect(() => {
-    if (!authLoading && !user) {
-      signInAnonymously(auth).catch(() => {
-        setFetchError("Could not start a guest session. Please try again.");
-      });
+    if (!authLoading && (!user || user.isAnonymous)) {
+      const destination = window.location.pathname + window.location.search + window.location.hash;
+      router.replace(`/sign-in?next=${encodeURIComponent(destination)}`);
     }
-  }, [authLoading, user]);
+  }, [authLoading, user, router]);
 
   // Resolve join token → session info, then check room status in the background.
   // API path (~200 ms) covers pin_code / session-id tokens from the quizzes page.
   // RTDB path covers ephemeral lobby tokens from host-generated share links.
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.isAnonymous) return;
     let cancelled = false;
 
     const TIMED_OUT = Symbol('timed_out');
@@ -95,8 +89,7 @@ export default function JoinPage({
       try {
         // Fast path: API resolves pin_code / session.id in ~200 ms.
         // Show the modal immediately; verify room status in the background.
-        const guestHeaders = user.isAnonymous ? { Authorization: `Bearer ${await user.getIdToken()}` } : undefined;
-        const apiRes = await fetch(`/api/join/${token}`, { headers: guestHeaders }).catch(() => null);
+        const apiRes = await fetch(`/api/join/${token}`).catch(() => null);
         if (cancelled) return;
 
         if (apiRes?.ok) {
@@ -133,19 +126,18 @@ export default function JoinPage({
 
   const liveSessionId = session?.id;
   useEffect(() => {
-    if (!liveSessionId || !user) return;
+    if (!liveSessionId || !user || user.isAnonymous) return;
     const stopScores = watchScores(liveSessionId, setScores);
     const stopPlayers = watchRoomPlayers(liveSessionId, setRoomPlayers);
     return () => { stopScores(); stopPlayers(); };
   }, [liveSessionId, user]);
 
   useEffect(() => {
-    if (!session || !user) return;
+    if (!session || !user || user.isAnonymous) return;
     let cancelled = false;
     (async () => {
       try {
-        const guestHeaders = user.isAnonymous ? { Authorization: `Bearer ${await user.getIdToken()}` } : undefined;
-        const res = await fetch(`/api/sessions/${session.id}/preview`, { headers: guestHeaders });
+        const res = await fetch(`/api/sessions/${session.id}/preview`);
         const data = res.ok ? await res.json() : null;
         if (cancelled) return;
         if (data?.media_type === "video" && data?.media_url) {
@@ -161,25 +153,20 @@ export default function JoinPage({
   }, [session, user]);
 
   const handleJoin = async () => {
-    if (!session || !user) return;
+    if (!session || !user || user.isAnonymous) return;
     setJoining(true);
     setJoinError("");
 
     trackEvent("session_join_attempted", { session_id: session.id });
 
     try {
-      if (user.isAnonymous && guestName.trim()) {
-        await updateProfile(user, { displayName: guestName.trim() });
-      }
-
       // 1. Call RESTful Join API
       const headers = new Headers({ "Content-Type": "application/json" });
-      if (user.isAnonymous) headers.set('Authorization', `Bearer ${await user.getIdToken()}`);
       const res = await fetch(`/api/sessions/${session.id}/join`, {
         method: "POST",
         headers,
         body: JSON.stringify({
-          displayName: user.displayName || guestName.trim() || "Anonymous",
+          displayName: user.displayName || "Player",
           photoURL: user.photoURL,
         }),
       });
@@ -208,21 +195,7 @@ export default function JoinPage({
     }
   };
 
-  // Show spinner while Firebase resolves auth state (including anonymous sign-in).
-  // Show error early if anonymous sign-in failed (user stays null after auth settles).
-  if (!authLoading && !user && fetchError) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-8 text-center max-w-md w-full">
-          <div className="text-5xl mb-4">⚠️</div>
-          <h1 className="text-xl font-bold text-white mb-2">Unable to Join</h1>
-          <p className="text-gray-400 text-sm">{fetchError}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (authLoading || !user) {
+  if (authLoading || !user || user.isAnonymous) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-angular-700 border-t-transparent rounded-full animate-spin" />
@@ -272,23 +245,6 @@ export default function JoinPage({
                 <p className="mt-1 text-sm text-[#5D7EA1] dark:text-[#b4b4b4]">Enter the game and see how you rank.</p>
               </div>
 
-            {user.isAnonymous && (
-              <div className="mb-4">
-                <label className="mb-2 block text-sm font-medium text-[#294867] dark:text-[#e5e5e5]">
-                  Your name (optional)
-                </label>
-                <input
-                  type="text"
-                  maxLength={30}
-                  value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleJoin()}
-                  placeholder="Guest"
-                  className="w-full rounded-xl border border-[#0460A9]/20 bg-white/85 px-4 py-3 text-[#16324F] placeholder:text-[#8298b2] focus:border-[#0460A9] focus:outline-none dark:border-white/15 dark:bg-[#262626] dark:text-white dark:placeholder:text-[#9a9a9a] dark:focus:border-[#70A2F9]"
-                />
-              </div>
-            )}
-
             {joinError && (
               <motion.p
                 initial={{ opacity: 0 }}
@@ -333,16 +289,7 @@ export default function JoinPage({
             </button>
 
             <p className="mt-4 text-center text-xs text-[#7187a1] dark:text-[#a3a3a3]">
-              {user.isAnonymous ? (
-                "Playing as guest — progress won't be saved"
-              ) : (
-                <>
-                  Joining as{" "}
-                  <span className="text-[#0460A9] dark:text-[#92bfff]">
-                    {user.displayName || user.email}
-                  </span>
-                </>
-              )}
+              Joining as <span className="text-[#0460A9] dark:text-[#92bfff]">{user.displayName || user.email}</span>
             </p>
 
             <div className="mt-7 border-t border-[#0460A9]/12 pt-5 dark:border-white/10">

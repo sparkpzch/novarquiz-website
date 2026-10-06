@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
+import { useAuthReturnPath } from '@/lib/hooks/useAuthReturnPath';
+import { authHref } from '@/lib/security/auth-return';
 import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification, type User } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import { useRouter } from 'next/navigation';
@@ -13,7 +15,8 @@ import { motion } from 'motion/react';
 import SurveyFields, { emptySurvey } from '@/components/onboarding/SurveyFields';
 import { SurveySchema } from '@/lib/onboarding/survey';
 
-export default function SignUpPage() {
+function SignUpForm() {
+  const returnPath = useAuthReturnPath();
   const { t, i18n } = useTranslation();
   const [survey, setSurvey] = useState(emptySurvey);
   const [step, setStep] = useState<'survey' | 'account'>('survey');
@@ -87,7 +90,7 @@ export default function SignUpPage() {
         <p className="text-gray-500 md:text-gray-400 text-sm">
           We sent a verification link to <span className="font-medium text-gray-800 md:text-white">{email}</span>. Click it to activate your account, then sign in.
         </p>
-        <Button className="w-full mt-2" onClick={() => router.push('/sign-in')}>Go to Login</Button>
+        <Button className="w-full mt-2" onClick={() => router.push(authHref('/sign-in', returnPath))}>Go to Login</Button>
       </motion.div>
     );
   }
@@ -202,7 +205,7 @@ export default function SignUpPage() {
       {/* Desktop: sign-in link */}
       <p className="hidden md:block text-center text-sm text-gray-400 mt-6">
         {t('auth.have_account')}{' '}
-        <a href="/sign-in" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
+        <a href={authHref('/sign-in', returnPath)} className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
           {t('auth.sign_in')}
         </a>
       </p>
@@ -219,4 +222,8 @@ export default function SignUpPage() {
       )}
     </>
   );
+}
+
+export default function SignUpPage() {
+  return <Suspense><SignUpForm /></Suspense>;
 }
