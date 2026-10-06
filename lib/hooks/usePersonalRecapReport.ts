@@ -2,60 +2,82 @@
 
 import { useEffect, useState } from 'react';
 import type { PersonalHistoryReport } from '../analytics/history';
+import { createRequestFreshness } from '../client/request-freshness';
 
-/** Shared freshness policy for Home and Stats: bounded generation polling,
- * slower review polling, and refresh when returning to the visible page. */
+/** Focus refresh uses 30-second freshness; generation/review polling and
+ * explicit consent changes can still refresh immediately. */
 export function usePersonalRecapReport(uid: string | null, sessionId: string | null, locale: 'en' | 'th', version = 0) {
   const key = `${uid}:${sessionId}:${locale}:${version}`;
   const [result, setResult] = useState<{ key: string; data: PersonalHistoryReport | null; error: boolean } | null>(null);
   useEffect(() => {
     if (!uid || !sessionId) return;
     const abort = new AbortController();
+    const freshness = createRequestFreshness();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let inFlight = false;
     let refreshQueued = false;
     let started = Date.now();
-    async function load() {
-      if (inFlight || abort.signal.aborted) return;
-      inFlight = true;
+    let latest: PersonalHistoryReport | null = null;
+
+    function schedulePoll() {
       clearTimeout(timer);
+      timer = undefined;
+      if (document.visibilityState !== 'visible' || !latest) return;
+      if (latest.insightState === 'generating' && Date.now() - started < 120_000) timer = setTimeout(poll, 5_000);
+      else if (latest.insightState === 'pending' || latest.insightState === 'approved') timer = setTimeout(poll, 30_000);
+    }
+    async function load(force = false, restartWindow = false) {
+      if (abort.signal.aborted || !freshness.start(force)) return;
+      if (restartWindow) started = Date.now();
+      clearTimeout(timer);
+      timer = undefined;
+      let success = false;
       try {
         const response = await fetch(`/api/users/${encodeURIComponent(uid!)}/history?session=${encodeURIComponent(sessionId!)}&locale=${locale}`, { cache: 'no-store', signal: abort.signal });
         if (!response.ok) throw new Error('Recap unavailable');
         const data: PersonalHistoryReport = await response.json();
         if (abort.signal.aborted) return;
+        latest = data;
+        success = true;
         setResult({ key, data, error: false });
-        if (data.insightState === 'generating' && Date.now() - started < 120_000) timer = setTimeout(poll, 5_000);
-        else if (data.insightState === 'pending' || data.insightState === 'approved') timer = setTimeout(poll, 30_000);
       } catch {
+        latest = null;
         if (!abort.signal.aborted) setResult({ key, data: null, error: true });
       } finally {
-        inFlight = false;
-        if (refreshQueued && !abort.signal.aborted) {
-          refreshQueued = false;
-          void load();
+        freshness.finish(success);
+        if (!abort.signal.aborted) {
+          if (refreshQueued) {
+            refreshQueued = false;
+            void load(true, true);
+          } else schedulePoll();
         }
       }
     }
     function poll() {
-      if (document.visibilityState === 'visible') void load();
+      timer = undefined;
+      if (document.visibilityState === 'visible') void load(true);
     }
     function resume() {
-      if (document.visibilityState === 'visible') {
-        started = Date.now();
-        if (inFlight) refreshQueued = true;
-        else void load();
-      }
+      if (document.visibilityState !== 'visible') return;
+      // Paired focus/visibility events never queue a second request.
+      void load(false, true);
+      // A polling timer may have expired while hidden. Restore it even if
+      // the previous result is still fresh enough to skip a focus request.
+      if (!freshness.pending && timer === undefined) schedulePoll();
+    }
+    function consentUpdated() {
+      // Consent changes invalidate data even if a request is already running.
+      if (freshness.pending) refreshQueued = true;
+      else void load(true, true);
     }
     void load();
     window.addEventListener('focus', resume);
-    window.addEventListener('novarquiz:consent-updated', resume);
+    window.addEventListener('novarquiz:consent-updated', consentUpdated);
     document.addEventListener('visibilitychange', resume);
     return () => {
       abort.abort();
       clearTimeout(timer);
       window.removeEventListener('focus', resume);
-      window.removeEventListener('novarquiz:consent-updated', resume);
+      window.removeEventListener('novarquiz:consent-updated', consentUpdated);
       document.removeEventListener('visibilitychange', resume);
     };
   }, [uid, sessionId, locale, version, key]);
