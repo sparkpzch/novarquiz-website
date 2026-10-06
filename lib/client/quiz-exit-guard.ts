@@ -4,18 +4,21 @@ export const QUIZ_GUARD_KEY = '__novarquiz_quiz_guard';
 export function installQuizExitGuard(browser: Window, message: () => string) {
   const url = browser.location.href;
   const guardedState = { ...browser.history.state, [QUIZ_GUARD_KEY]: url };
+  const popOptions = { capture: true };
+  let leaving = false;
   const beforeUnload = (event: BeforeUnloadEvent) => {
     event.preventDefault();
     event.returnValue = '';
   };
   const dispose = () => {
-    browser.removeEventListener('popstate', onPopState, true);
+    browser.removeEventListener('popstate', onPopState, popOptions);
     browser.removeEventListener('beforeunload', beforeUnload);
   };
   function onPopState(event: PopStateEvent) {
-    if (event.state?.[QUIZ_GUARD_KEY] === url) return;
+    if (leaving || event.state?.[QUIZ_GUARD_KEY] === url) return;
     const samePage = browser.location.href === url;
     if (browser.confirm(message())) {
+      leaving = true;
       dispose();
       if (samePage) {
         event.stopImmediatePropagation();
@@ -27,7 +30,7 @@ export function installQuizExitGuard(browser: Window, message: () => string) {
     if (samePage) browser.history.forward();
     else browser.history.pushState(guardedState, '', url);
   }
-  browser.addEventListener('popstate', onPopState, true);
+  browser.addEventListener('popstate', onPopState, popOptions);
   browser.addEventListener('beforeunload', beforeUnload);
   // Reuse the entry on refresh or React Strict Mode remounts.
   if (browser.history.state?.[QUIZ_GUARD_KEY] !== url) browser.history.pushState(guardedState, '', url);
