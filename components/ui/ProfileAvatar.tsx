@@ -19,10 +19,10 @@ export default function ProfileAvatar({
   className = '',
   textClassName = '',
 }: ProfileAvatarProps) {
-  const [imgFailed, setImgFailed] = useState(false);
+  const [failedPhotoURL, setFailedPhotoURL] = useState<string | null>(null);
   const initial = (displayName?.trim()?.[0] || '?').toUpperCase();
 
-  if (photoURL && !imgFailed) {
+  if (photoURL && photoURL !== failedPhotoURL) {
     return (
       <div
         className={`shrink-0 overflow-hidden rounded-full bg-white/40 ${ringClassName} ${className}`}
@@ -32,7 +32,7 @@ export default function ProfileAvatar({
           src={photoURL}
           alt={displayName || 'Profile'}
           className="h-full w-full object-cover"
-          onError={() => setImgFailed(true)}
+          onError={() => setFailedPhotoURL(photoURL)}
         />
       </div>
     );
