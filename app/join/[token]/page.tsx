@@ -9,6 +9,8 @@ import {
   resolveJoinToken,
   getRoom,
   watchScores,
+  watchRoomPlayers,
+  type WaitingPlayer,
   type PlayerScore,
 } from "@/lib/firebase/rtdb";
 import { trackEvent } from "@/lib/firebase/analytics";
@@ -16,6 +18,7 @@ import { ROOM_STATUS } from "@/lib/constants/session";
 import { motion } from "motion/react";
 import AutoPlayVideo from "@/components/ui/AutoPlayVideo";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
+import { resolveLivePlayerIdentity } from "@/lib/play/player-identity";
 
 type SessionInfo = {
   id: string;
@@ -42,8 +45,10 @@ export default function JoinPage({
   const [guestName, setGuestName] = useState("");
   const [firstVideoUrl, setFirstVideoUrl] = useState<string | null>(null);
   const [scores, setScores] = useState<Record<string, PlayerScore>>({});
+  const [roomPlayers, setRoomPlayers] = useState<Record<string, WaitingPlayer>>({});
   const rankedPlayers = Object.entries(scores)
     .filter(([, player]) => typeof player?.score === "number" && Number.isFinite(player.score))
+    .map(([uid, player]): [string, PlayerScore] => [uid, { ...player, ...resolveLivePlayerIdentity(player, roomPlayers[uid], uid === user?.uid ? user : undefined) }])
     .sort(([, a], [, b]) => b.score - a.score);
   const podium = [
     rankedPlayers[1] ? { player: rankedPlayers[1][1], uid: rankedPlayers[1][0], rank: 2 } : null,
@@ -126,10 +131,13 @@ export default function JoinPage({
     return () => { cancelled = true; };
   }, [token, user]);
 
+  const liveSessionId = session?.id;
   useEffect(() => {
-    if (!session || !user) return;
-    return watchScores(session.id, setScores);
-  }, [session?.id, user]);
+    if (!liveSessionId || !user) return;
+    const stopScores = watchScores(liveSessionId, setScores);
+    const stopPlayers = watchRoomPlayers(liveSessionId, setRoomPlayers);
+    return () => { stopScores(); stopPlayers(); };
+  }, [liveSessionId, user]);
 
   useEffect(() => {
     if (!session || !user) return;
