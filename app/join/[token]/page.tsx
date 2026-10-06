@@ -41,7 +41,6 @@ export default function JoinPage({
   const [joinError, setJoinError] = useState("");
   const [guestName, setGuestName] = useState("");
   const [firstVideoUrl, setFirstVideoUrl] = useState<string | null>(null);
-  const [videoReady, setVideoReady] = useState(true);
   const [scores, setScores] = useState<Record<string, PlayerScore>>({});
   const rankedPlayers = Object.entries(scores)
     .filter(([, player]) => typeof player?.score === "number" && Number.isFinite(player.score))
@@ -142,24 +141,16 @@ export default function JoinPage({
         const data = res.ok ? await res.json() : null;
         if (cancelled) return;
         if (data?.media_type === "video" && data?.media_url) {
-          setVideoReady(false);
           setFirstVideoUrl(data.media_url);
         }
       } catch {
-        // no video to preload — leave videoReady as true
+        // Preview warmup is optional and never blocks joining.
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [session, user]);
-
-  useEffect(() => {
-    if (!firstVideoUrl) return;
-    // failsafe: unblock button after 10 s even if canplaythrough never fires
-    const timeout = window.setTimeout(() => setVideoReady(true), 10_000);
-    return () => window.clearTimeout(timeout);
-  }, [firstVideoUrl]);
 
   const handleJoin = async () => {
     if (!session || !user) return;
@@ -310,16 +301,12 @@ export default function JoinPage({
                 playsInline
                 aria-hidden="true"
                 style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
-                onLoadedData={() => setVideoReady(true)}
-                onCanPlay={() => setVideoReady(true)}
-                onCanPlayThrough={() => setVideoReady(true)}
-                onError={() => setVideoReady(true)}
               />
             )}
 
             <button
               onClick={handleJoin}
-              disabled={joining || !videoReady}
+              disabled={joining}
               className="w-full rounded-xl bg-[#0460A9] px-4 py-3.5 text-base font-semibold text-white! shadow-[0_10px_24px_rgba(4,96,169,.2)] transition hover:bg-[#055a9e] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {joining ? (
@@ -331,11 +318,6 @@ export default function JoinPage({
                 <span className="flex items-center justify-center gap-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   Checking availability…
-                </span>
-              ) : !videoReady ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Preparing Question…
                 </span>
               ) : (
                 "Join Session"
