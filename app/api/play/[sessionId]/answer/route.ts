@@ -128,7 +128,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     if (raw?.action === 'start') {
       const parsed = StartBody.safeParse(raw);
       if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
-      if (parsed.data.is_guest) return NextResponse.json({ is_guest: true });
       const user = await getSessionUser();
       if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       const playSession = await getOrCreateSession(sessionId, user.uid);

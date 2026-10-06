@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const version = ++authVersionRef.current;
       const isCurrent = () => version === authVersionRef.current && !signingOutRef.current;
       if (!isCurrent()) return;
-      if (firebaseUser) {
+      if (firebaseUser && !firebaseUser.isAnonymous) {
         // Recovery is for initial startup only, never a later sign-out event.
         rehydrateTriedRef.current = true;
         try {

@@ -16,6 +16,7 @@ import { QuizChoices, AnswerFeedbackDialog, type AnswerFeedback } from '@/compon
 import styles from '@/components/play/quiz.module.css';
 import QuestionMediaPlayer from '@/components/ui/QuestionMediaPlayer';
 import { attachVideoSource, disposeVideoSource } from '@/lib/video/playback';
+import { useQuizExitGuard } from '@/lib/hooks/useQuizExitGuard';
 
 
 type VideoQuality = 'auto' | 'hd' | 'sd';
@@ -203,24 +204,10 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     };
   }, [sessionId]);
 
-  // Guard against an accidental refresh/close mid-quiz: reloading restarts
-  // from the entry question. overscroll-behavior stops mobile pull-to-refresh,
-  // which never triggers the beforeunload prompt.
-  useEffect(() => {
-    if (finished) return;
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = ''; // Safari and older Chromium still require this
-    };
-    const root = document.documentElement;
-    const previousOverscroll = root.style.overscrollBehaviorY;
-    root.style.overscrollBehaviorY = 'contain';
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      root.style.overscrollBehaviorY = previousOverscroll;
-    };
-  }, [finished]);
+  useQuizExitGuard(!finished && !!question, copy(
+    'Leave this quiz? Your current progress may be lost. Choose Cancel to keep playing.',
+    'ต้องการออกจากแบบทดสอบหรือไม่? ความคืบหน้าปัจจุบันอาจสูญหาย เลือกยกเลิกเพื่อเล่นต่อ',
+  ));
 
   const isSituation = question?.node_type === 'situation';
   const isEnd = question?.node_type === 'end';

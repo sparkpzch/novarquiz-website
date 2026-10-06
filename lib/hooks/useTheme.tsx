@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 
-type Theme = 'light' | 'dark';
+import { resolveTheme, THEME_KEY, type Theme } from '../client/theme-preference';
 
 interface ThemeContextType {
   theme: Theme;
@@ -16,29 +16,35 @@ const ThemeContext = createContext<ThemeContextType>({
   setTheme: () => {},
 });
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('light');
-  const themeRef = useRef<Theme>('light');
+function applyTheme(theme: Theme) {
+  document.documentElement.dataset.theme = theme;
+  document.documentElement.style.colorScheme = theme;
+  const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (themeColor) themeColor.content = theme === 'dark' ? '#171717' : '#f8f9fc';
+  // Let the next server render use the same palette before JavaScript starts.
+  try { document.cookie = `${THEME_KEY}=${theme}; Path=/; Max-Age=31536000; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`; } catch {}
+}
+
+export function ThemeProvider({ children, initialTheme = 'light' }: { children: ReactNode; initialTheme?: Theme }) {
+  const [theme, setThemeState] = useState<Theme>(initialTheme);
+  const themeRef = useRef<Theme>(initialTheme);
 
   useEffect(() => {
-    // The bootstrap script has already applied this before the first paint.
-    // Do not persist the initial light state over a saved dark preference.
-    const current = document.documentElement.dataset.theme;
-    if (current === 'dark' || current === 'light') {
-      themeRef.current = current;
-      setThemeState(current);
-    }
-  }, []);
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch {}
+    // Recover the stored palette even if hydration or a blocked bootstrap
+    // script changed the root attribute. Never overwrite storage with light.
+    const current = resolveTheme(saved, initialTheme);
+    themeRef.current = current;
+    setThemeState(current);
+    applyTheme(current);
+  }, [initialTheme]);
 
   const setTheme = (next: Theme) => {
     themeRef.current = next;
     setThemeState(next);
-    document.documentElement.dataset.theme = next;
-    document.documentElement.style.colorScheme = next;
-    // Safari/Chrome tint their mobile browser bars separately from the DOM.
-    const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-    if (themeColor) themeColor.content = next === 'dark' ? '#171717' : '#f8f9fc';
-    try { localStorage.setItem('novarquiz-theme', next); } catch {}
+    applyTheme(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch {}
   };
   const toggleTheme = () => setTheme(themeRef.current === 'light' ? 'dark' : 'light');
 
