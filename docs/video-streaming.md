@@ -2,7 +2,7 @@
 
 The shared player accepts MP4 and HTTPS HLS `.m3u8` URLs. Safari uses native HLS; other supported browsers load hls.js on demand. HLS.js starts at the first (lowest-bandwidth) variant, caps quality to the displayed player size, adapts automatically, and keeps a bounded forward/back buffer. Native Safari chooses its own quality and buffer policy.
 
-Answer submission fetches the next question while feedback is open. On a good connection (or HD preference), it prepares only that next video and reuses the same media element on continuation. Data Saver, SD preference, and networks without a positive speed signal skip speculative video downloads. Safari preload/autoplay remain best effort: offscreen playback and Low Power Mode may prevent warmup. The current visible player still loads independently, and native controls let the user start it if autoplay is blocked. The join page also accepts HLS and retains its existing readiness timeout.
+Answer submission fetches the next question while feedback is open. On a good connection (or HD preference), it prepares only that next video and reuses the same media element on continuation. Data Saver, SD preference, and networks without a positive speed signal skip speculative video downloads. Safari preload/autoplay remain best effort: offscreen playback and Low Power Mode may prevent warmup. The current visible player still loads independently, and native controls let the user start it if autoplay is blocked. The join page also accepts HLS; its warmup is optional and never blocks joining, because Safari can defer loading an offscreen video.
 
 ## Prepare streams
 
@@ -34,3 +34,22 @@ Prefer CDN and browser HTTP caching over app-managed full-video Cache Storage/In
 No assets are converted, uploaded, or switched remotely by this code change. Production ABR starts only after an encoded multivariant playlist is hosted and selected for a question.
 
 References: [Apple HLS authoring specification](https://developer.apple.com/documentation/http-live-streaming/hls-authoring-specification-for-apple-devices/), [HLS.js API](https://github.com/video-dev/hls.js/blob/master/docs/API.md).
+
+
+## Keep existing Firebase videos as MP4
+
+`optimize-firebase-mp4.ts` reads the MP4 paths currently referenced by questions, checks atom ordering, and moves the movie metadata before media data with FFmpeg stream copy. It never changes bitrate, resolution, or encoded audio/video packets. The script compares every encoded packet hash per track before uploading, uses generation-specific new filenames, verifies unauthenticated byte-range playback, then switches question URLs in a database transaction. Originals and their existing usage records are retained as rollback sources. A private local snapshot records the original question URLs.
+
+Sign in to the Firebase CLI and load the intended database/bucket environment. Audit first (omit `--limit=1` to audit all referenced clips):
+
+```sh
+bunx dotenv -e .env.neon -- tsx scripts/video/optimize-firebase-mp4.ts --limit=1
+```
+
+Apply the verified copies to Firebase and the connected database:
+
+```sh
+bunx dotenv -e .env.neon -- tsx scripts/video/optimize-firebase-mp4.ts --apply
+```
+
+The CLI account needs Storage read/create/object ACL permissions. No service-account key is required. Optimized clips keep MP4 progressive playback; they do not become ABR streams. Keep the printed backup directory until the rollout is verified.
