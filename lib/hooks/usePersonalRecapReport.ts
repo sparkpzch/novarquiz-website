@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { PersonalHistoryReport } from '../analytics/history';
 import { createRequestFreshness } from '../client/request-freshness';
+import { recapPollDelay } from '../client/recap-polling';
 
 /** Focus refresh uses 30-second freshness; generation/review polling and
  * explicit consent changes can still refresh immediately. */
@@ -21,9 +22,8 @@ export function usePersonalRecapReport(uid: string | null, sessionId: string | n
     function schedulePoll() {
       clearTimeout(timer);
       timer = undefined;
-      if (document.visibilityState !== 'visible' || !latest) return;
-      if (latest.insightState === 'generating' && Date.now() - started < 120_000) timer = setTimeout(poll, 5_000);
-      else if (latest.insightState === 'pending' || latest.insightState === 'approved') timer = setTimeout(poll, 30_000);
+      const delay = recapPollDelay(latest?.insightState, Date.now() - started, document.visibilityState === 'visible');
+      if (delay !== null) timer = setTimeout(poll, delay);
     }
     async function load(force = false, restartWindow = false) {
       if (abort.signal.aborted || !freshness.start(force)) return;

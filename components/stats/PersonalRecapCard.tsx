@@ -28,7 +28,7 @@ export default function PersonalRecapCard({ report, locale, compact = false, det
   const stateText = generating
     ? copy('AI is analysing your quiz answers…', 'AI กำลังวิเคราะห์คำตอบของคุณ…')
     : report.insightState === 'rejected'
-      ? copy('The AI recap was removed after review. Your recorded quiz answers are still available.', 'สรุปจาก AI ถูกนำออกหลังการตรวจทาน คุณยังดูคำตอบในแบบทดสอบของคุณได้')
+      ? copy('A new AI recap is being prepared. Here is a recap from your recorded answers.', 'กำลังเตรียมสรุป AI ใหม่ นี่คือสรุปจากคำตอบที่คุณเลือก')
       : report.insightState === 'consent-required'
         ? copy('Accept the current privacy notice to enable AI analysis. This recap uses your recorded answers.', 'ยอมรับประกาศความเป็นส่วนตัวฉบับปัจจุบันเพื่อใช้ AI วิเคราะห์ สรุปนี้อ้างอิงจากคำตอบของคุณ')
         : !everydayFeedback ? copy('AI recap is unavailable. Here is a recap from your recorded answers.', 'ยังไม่มีสรุปจาก AI นี่คือสรุปจากคำตอบที่คุณเลือก') : null;

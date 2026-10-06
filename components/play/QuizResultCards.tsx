@@ -37,7 +37,7 @@ export function ResultInsightCard({ uid, sessionId, saving = false, guest = fals
     : saving ? copy('Your summary will load after your result is saved.', 'สรุปจะเริ่มทันทีที่บันทึกผลแล้ว')
       : result?.error ? copy('Could not load your recap.', 'โหลดสรุปไม่สำเร็จ')
         : !result || state === 'generating' ? copy('AI is analysing your answers…', 'AI กำลังวิเคราะห์คำตอบของคุณ…')
-          : state === 'rejected' ? copy('This recap was removed after review.', 'สรุปนี้ถูกนำออกหลังการตรวจทาน')
+          : state === 'rejected' ? copy('A new AI recap is being prepared.', 'กำลังเตรียมสรุป AI ใหม่')
             : state === 'consent-required' ? copy('Accept the privacy notice to enable AI analysis.', 'ยอมรับประกาศความเป็นส่วนตัวเพื่อใช้ AI วิเคราะห์')
               : copy('AI recap is unavailable. You can still review your answers.', 'ยังไม่มีสรุปจาก AI คุณยังทบทวนคำตอบได้');
   return <section className={`${styles.surface} ${styles.insightPanel}`} aria-labelledby="result-insight-title">

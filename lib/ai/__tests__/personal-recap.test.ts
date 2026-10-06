@@ -2,7 +2,7 @@ import test from 'node:test';
 import { geminiLiteModel } from '../gemini';
 import assert from 'node:assert/strict';
 import { prepareProvisionalInsight, type InsightDependencies } from '../auto-provisional-insight';
-import { approvedAnswerCoverage, buildProvisionalInsightPrompt, answerPatternSignature, parseProvisionalInsight, sameAnswerPattern } from '../../analytics/provisional-insights';
+import { approvedAnswerCoverage, buildProvisionalInsightPrompt, answerPatternSignature, personalDraftSignature, parseProvisionalInsight, sameAnswerPattern } from '../../analytics/provisional-insights';
 import type { AnswerReviewContext, ProvisionalStatus } from '../../db/provisional-insights';
 import { historyCoaching } from '../../analytics/history-coaching';
 import type { HistoryAnswer, PersonalHistoryReport } from '../../analytics/history';
@@ -47,25 +47,28 @@ test('fully correct praise is reusable across correct paths but not paths with a
 });
 
 function fixture(context = food, generatedSummary: { headline: string; body: string; suggestion: string | null } = summary) {
-  let status: ProvisionalStatus | null = null;
+  const statuses = new Map<string, ProvisionalStatus>();
+  const defaultKey = personalDraftSignature(answerPatternSignature({ ...input, ...context }), input.userId);
   let calls = 0;
   let saves = 0;
   let failures = 0;
-  const row = () => ({ ...generatedSummary, id: 'draft', quiz_id: 'quiz', audience: 'public' as const, locale: 'en' as const, answer_signature: 'signature', answer_context: context, status: status!, model: 'test', reviewed_by: null, reviewed_at: null, updated_at: 'now', revision: 'claim' });
+  const row = (key: string) => ({ ...generatedSummary, id: key, quiz_id: 'quiz', audience: 'public' as const, locale: 'en' as const, answer_signature: key, answer_context: context, status: statuses.get(key)!, model: 'test', reviewed_by: null, reviewed_at: null, updated_at: 'now', revision: 'claim' });
   const dependencies: InsightDependencies = {
-    isAnswerPatternRejected: async () => status === 'rejected',
-    getSimilarReusableInsight: async (_quiz, _audience, _locale, target) => (status === 'approved' || status === 'provisional') && approvedAnswerCoverage(context, target) ? row() : null,
-    getProvisionalInsight: async () => status === 'provisional' || status === 'approved' ? row() : null,
-    getInsightGenerationState: async () => status,
-    claimProvisionalInsight: async () => { if (status) return null; status = 'generating'; return { id: 'draft', claim_token: 'claim' }; },
-    finishProvisionalInsight: async () => { if (status !== 'generating') return false; status = 'provisional'; saves++; return true; },
-    failProvisionalInsight: async () => { status = 'failed'; failures++; },
-    invalidateProvisionalLanguage: async () => { status = null; },
+    getSimilarReusableInsight: async (_quiz, _audience, _locale, target) => {
+      const key = [...statuses.keys()].find(key => statuses.get(key) === 'approved');
+      return key && approvedAnswerCoverage(context, target) ? row(key) : null;
+    },
+    getProvisionalInsight: async (_quiz, _audience, _locale, key) => ['provisional', 'approved'].includes(statuses.get(key) ?? '') ? row(key) : null,
+    getInsightGenerationState: async (_quiz, _audience, _locale, key) => statuses.get(key) ?? null,
+    claimProvisionalInsight: async (_quiz, _audience, _locale, key) => { if (statuses.has(key)) return null; statuses.set(key, 'generating'); return { id: key, claim_token: 'claim' }; },
+    finishProvisionalInsight: async (id) => { if (statuses.get(id) !== 'generating') return false; statuses.set(id, 'provisional'); saves++; return true; },
+    failProvisionalInsight: async (id) => { statuses.set(id, 'failed'); failures++; },
+    invalidateProvisionalLanguage: async (id) => { statuses.delete(id); },
     getUserAnswerReviewContext: async () => context,
     generateText: async (prompt) => { calls++; assert.ok(!prompt.includes(input.userId)); return JSON.stringify(generatedSummary); },
     geminiModel: () => 'test', isGeminiConfigured: () => true,
   };
-  return { dependencies, setStatus: (value: ProvisionalStatus) => { status = value; }, get calls() { return calls; }, get saves() { return saves; }, get failures() { return failures; } };
+  return { dependencies, setStatus: (value: ProvisionalStatus) => { statuses.set(defaultKey, value); }, get calls() { return calls; }, get saves() { return saves; }, get failures() { return failures; } };
 }
 
 test('fully correct attempts return standard localized feedback without AI, cache writes, or approval labels', async () => {
@@ -77,7 +80,6 @@ test('fully correct attempts return standard localized feedback without AI, cach
     f.dependencies.finishProvisionalInsight = forbidden;
     f.dependencies.getSimilarReusableInsight = forbidden;
     f.dependencies.getProvisionalInsight = forbidden;
-    f.dependencies.isAnswerPatternRejected = forbidden;
     for (const readOnly of [false, true]) {
       const result = await prepareProvisionalInsight({ ...input, locale, context: perfectFood, allowGeneration: false, readOnly }, f.dependencies);
       assert.equal(result.state, 'standard');
@@ -200,23 +202,24 @@ test('approved reuse fails when added answers change the priority topic even wit
 });
 
 
-test('simultaneous completions from different accounts share one pending generation and approval only changes its label', async () => {
+test('different accounts generate their own pending drafts until an approved summary is available', async () => {
   const f = fixture();
   const keys: string[] = [];
   const originalClaim = f.dependencies.claimProvisionalInsight;
   f.dependencies.claimProvisionalInsight = async (...args) => { keys.push(args[3]); return originalClaim(...args); };
   const burst = await Promise.all(Array.from({ length: 30 }, (_, i) => prepareProvisionalInsight({ ...input, userId: `person-${i}` }, f.dependencies)));
-  assert.equal(new Set(keys).size, 1);
-  assert.equal(burst.filter(result => result.generate).length, 1);
+  assert.equal(new Set(keys).size, 30);
+  assert.equal(burst.filter(result => result.generate).length, 30);
   assert.equal(f.calls, 0);
-  await burst.find(result => result.generate)!.generate!();
-  const pending = await prepareProvisionalInsight({ ...input, userId: 'new-person' }, f.dependencies);
+  await Promise.all(burst.map(result => result.generate!()));
+  const pending = await prepareProvisionalInsight({ ...input, userId: 'person-0' }, f.dependencies);
   assert.equal(pending.state, 'pending'); assert.deepEqual(pending.insight?.summary, summary);
-  assert.equal(f.calls, 1); assert.equal(f.saves, 1);
+  const other = await prepareProvisionalInsight({ ...input, userId: 'new-person' }, f.dependencies);
+  assert.equal(other.state, 'generating'); assert.ok(other.generate);
   f.setStatus('approved');
   const approved = await prepareProvisionalInsight({ ...input, userId: 'new-person' }, f.dependencies);
   assert.equal(approved.state, 'approved'); assert.deepEqual(approved.insight?.summary, pending.insight?.summary);
-  assert.equal(f.calls, 1);
+  assert.equal(approved.generate, undefined); assert.equal(f.calls, 30);
 });
 
 test('shared draft signatures change with recorded choices, quiz, audience, and language, while rejection matching ignores order', () => {
@@ -278,18 +281,14 @@ test('oversized metadata cannot cause an unbounded paid model request', async ()
   assert.equal(f.calls, 0); assert.equal(f.failures, 1);
 });
 
-test('a nearby path reuses a pending draft without a model call and keeps its unreviewed status', async () => {
-  const f = fixture();
-  f.setStatus('provisional');
-  const source = { ...food, answers: Array.from({ length: 4 }, (_, i) => ({ ...food.answers[0], question: `Food example ${i}` })) };
-  const target = { ...source, answers: [...source.answers, { ...food.answers[0], question: 'Extra question' }] };
-  const row = await f.dependencies.getProvisionalInsight('quiz', 'public', 'en', 'test');
-  f.dependencies.getSimilarReusableInsight = async (_quiz, _audience, _locale, context) => approvedAnswerCoverage(source, context) ? row : null;
-  const pending = await prepareProvisionalInsight({ ...input, context: target, userId: 'another-person' }, f.dependencies);
-  assert.equal(pending.state, 'pending'); assert.equal(pending.insight?.status, 'provisional');
-  assert.deepEqual(pending.insight?.summary, summary); assert.equal(f.calls, 0);
+test('pending summaries from other accounts are not reused for nearby answers', async () => {
+  const f = fixture(); f.setStatus('provisional');
+  const own = await prepareProvisionalInsight(input, f.dependencies);
+  assert.equal(own.state, 'pending'); assert.equal(own.generate, undefined);
+  const other = await prepareProvisionalInsight({ ...input, userId: 'another-person' }, f.dependencies);
+  assert.equal(other.state, 'generating'); assert.ok(other.generate);
+  assert.equal(f.calls, 0);
 });
-
 
 test('identical answers reuse approved wording despite derived focus and automatic style checks', async () => {
   const reviewed = { headline: 'Screening and adherence', body: 'Review the clinical guideline.', suggestion: null };
@@ -316,7 +315,6 @@ test('approved CMS wording takes precedence over pending/rejected patterns witho
     f.dependencies.claimProvisionalInsight = forbidden;
     f.dependencies.getSimilarReusableInsight = forbidden;
     f.dependencies.getProvisionalInsight = forbidden;
-    f.dependencies.isAnswerPatternRejected = forbidden;
     for (let refresh = 0; refresh < 3; refresh++) {
       const result = await prepareProvisionalInsight({ ...input, tags: ['nutrition'], allowGeneration: false }, f.dependencies);
       assert.equal(result.state, 'approved'); assert.deepEqual(result.insight?.summary, reviewed);
@@ -326,7 +324,7 @@ test('approved CMS wording takes precedence over pending/rejected patterns witho
   }
 });
 
-test('the same missed answer reuses approved or pending feedback despite different correct choices', async () => {
+test('the same missed answer reuses approved feedback despite different correct choices', async () => {
   const correct = { ...perfectFood.answers[0], question: 'A different question', selected: 'First correct option' };
   const source = { ...food, answers: [...food.answers, correct] };
   const target = { ...source, answers: [...food.answers, { ...correct, selected: 'Second correct option' }] };
@@ -336,7 +334,7 @@ test('the same missed answer reuses approved or pending feedback despite differe
   assert.equal(approvedAnswerCoverage(source, { ...target, answers: [{ ...food.answers[0], selected: 'Another wrong option' }, target.answers[1]] }), 0);
   const prompt = buildProvisionalInsightPrompt({ ...source, audience: 'public', locale: 'en', readingStyle: 'everyday' });
   assert.doesNotMatch(prompt, /First correct option/);
-  for (const status of ['approved', 'provisional'] as const) {
+  for (const status of ['approved'] as const) {
     const f = fixture(source); f.setStatus(status);
     for (let repeat = 0; repeat < 3; repeat++) {
       const result = await prepareProvisionalInsight({ ...input, context: target, userId: 'another-user' }, f.dependencies);
@@ -345,4 +343,24 @@ test('the same missed answer reuses approved or pending feedback despite differe
     }
     assert.equal(f.calls, 0); assert.equal(f.saves, 0);
   }
+});
+
+test('refresh after generation returns the saved draft without a second model call', async () => {
+  const f = fixture();
+  const first = await prepareProvisionalInsight(input, f.dependencies);
+  const refreshed = await prepareProvisionalInsight(input, f.dependencies);
+  assert.equal(refreshed.state, 'generating'); assert.equal(refreshed.generate, undefined);
+  await first.generate!();
+  for (let i = 0; i < 3; i++) {
+    const result = await prepareProvisionalInsight(input, f.dependencies);
+    assert.equal(result.state, 'pending'); assert.deepEqual(result.insight?.summary, summary);
+  }
+  assert.equal(f.calls, 1);
+});
+
+test('a rejected pattern from another account cannot block new personal summaries', async () => {
+  const f = fixture(); f.setStatus('rejected');
+  const result = await prepareProvisionalInsight({ ...input, userId: 'new-user' }, f.dependencies);
+  assert.equal(result.state, 'generating'); assert.ok(result.generate);
+  assert.equal((await result.generate())?.status, 'provisional');
 });

@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 
 const databaseUrl = process.env.INSIGHTS_TEST_DATABASE_URL;
 
-test('insight drafts and review lifecycle preserve scope, share pending text, and block deleted patterns', { skip: !databaseUrl }, async () => {
+test('insight drafts and review lifecycle preserve scope, share approved text, and regenerate deleted patterns', { skip: !databaseUrl }, async () => {
   process.env.DATABASE_URL = databaseUrl!;
   process.env.DB_PROVIDER = databaseUrl!.includes('neon.tech') ? 'neon' : 'docker';
   const pool = new Pool({ connectionString: databaseUrl, ssl: databaseUrl!.includes('neon.tech') ? { rejectUnauthorized: true } : false });
@@ -40,7 +40,7 @@ test('insight drafts and review lifecycle preserve scope, share pending text, an
     assert.equal(await db.getInsightGenerationState(quiz.id, 'public', 'en', signature), 'provisional');
     const row = (await db.listProvisionalInsights()).find(r => r.id === claim.id)!; assert.ok(row.revision);
     const pending = await db.getSimilarReusableInsight(quiz.id, 'public', 'en', context);
-    assert.equal(pending?.id, claim.id); assert.equal(pending?.status, 'provisional', 'Pending wording is reusable before review');
+    assert.equal(pending, null, 'Pending wording must not be reused across accounts');
     assert.equal(await db.getSimilarReusableInsight(quiz.id, 'hcp', 'en', context), null);
     assert.equal(await db.getSimilarReusableInsight(quiz.id, 'public', 'en', { ...context, answers: [{ ...context.answers[0], selected: 'Different answer' }] }), null);
     const saved = await db.saveProvisionalDraft(row.id, { headline: 'A helpful label check', body: 'You chose to check the serving size.', suggestion: null }, row.revision); assert.ok(saved); assert.notEqual(saved.revision, row.revision);
@@ -73,7 +73,10 @@ test('insight drafts and review lifecycle preserve scope, share pending text, an
       assert.equal(result.state, 'approved'); assert.equal(result.generate, undefined); assert.deepEqual(result.insight?.summary, reviewedWording);
     }
     await db.reviewProvisionalInsight(sharedClaim.id, 'rejected', 'qa', { expectedRevision: sharedApproved.revision, disposition: 'delete' });
-    assert.equal(await db.isAnswerPatternRejected(quiz.id, 'public', 'en', 'another-legacy-signature', changedCorrect), true);
+    const sharedRegenerated = await db.claimProvisionalInsight(quiz.id, 'public', 'en', sharedSignature, changedCorrect);
+    assert.ok(sharedRegenerated, 'Deleting wording must release the generation lease');
+    assert.notEqual(sharedRegenerated.claim_token, sharedClaim.claim_token);
+    assert.equal(await db.finishProvisionalInsight(sharedClaim.id, sharedClaim.claim_token, reviewedWording, 'stale'), false);
 
     assert.equal(await db.getSimilarReusableInsight(quiz.id, 'public', 'th', context), null);
     const rejected = await db.reviewProvisionalInsight(row.id, 'rejected', 'qa', { expectedRevision: approved.revision, disposition: 'keep' }); assert.ok(rejected); assert.equal(rejected.headline, saved.headline);
@@ -83,10 +86,11 @@ test('insight drafts and review lifecycle preserve scope, share pending text, an
     assert.equal(await db.getProvisionalInsight(quiz.id, 'public', 'en', signature), null, 'Editing retained text must not make it visible before approval');
     const deleted = await db.reviewProvisionalInsight(row.id, 'rejected', 'qa', { expectedRevision: reconsidered.revision, disposition: 'delete' }); assert.ok(deleted); assert.equal(deleted.headline, null);
     assert.equal((await db.listProvisionalInsights()).some(r => r.id === row.id), false);
-    assert.equal(await db.isAnswerPatternRejected(quiz.id, 'public', 'en', signature), true);
-    assert.equal(await db.claimProvisionalInsight(quiz.id, 'public', 'en', signature, context), null);
-    assert.equal(await db.getInsightGenerationState(quiz.id, 'public', 'en', signature), 'rejected');
-    assert.equal(await db.isAnswerPatternRejected(quiz.id, 'public', 'en', 'another-account-key', context), true, 'Deleted rejected patterns must stay blocked for other accounts');
+    const replacement = await db.claimProvisionalInsight(quiz.id, 'public', 'en', signature, context);
+    assert.ok(replacement, 'Retained rejected copy must not prevent a replacement');
+    const deletedReplacement = await db.claimProvisionalInsight(quiz.id, 'public', 'en', deleted.answer_signature, context);
+    assert.ok(deletedReplacement, 'Deleted copies can be regenerated immediately');
+    assert.equal(await db.getInsightGenerationState(quiz.id, 'public', 'en', signature), 'generating');
 
     // A interrupted post-response job is recoverable, while its old owner can
     // never overwrite the newer generation or an admin decision.

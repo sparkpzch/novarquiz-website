@@ -1,6 +1,6 @@
 import pool, { queryWithRetry } from './postgres';
 import type { InsightLocale, InsightSummary } from '../analytics/insights';
-import { approvedAnswerCoverage, sameAnswerPattern, sameMissedAnswerPattern } from '../analytics/provisional-insights';
+import { approvedAnswerCoverage } from '../analytics/provisional-insights';
 
 export type AnswerReviewItem = {
   question: string;
@@ -60,30 +60,13 @@ export async function getSimilarReusableInsight(
     `SELECT p.*, p.claim_token AS revision FROM provisional_insight_summaries p
      JOIN quizzes q ON q.id = p.quiz_id AND q.is_published = TRUE
      WHERE p.quiz_id = $1 AND p.audience = $2 AND p.locale = $3
-       AND p.status IN ('approved', 'provisional') AND p.answer_context IS NOT NULL
+       AND p.status = 'approved' AND p.answer_context IS NOT NULL
        AND p.headline IS NOT NULL AND p.body IS NOT NULL
      ORDER BY (p.status = 'approved') DESC, p.reviewed_at DESC NULLS LAST, p.updated_at DESC`, [quizId, audience, locale],
   );
   return result.rows.map((row) => ({ row, coverage: approvedAnswerCoverage(row.answer_context!, context, row) }))
     .filter(({ coverage }) => coverage > 0)
     .sort((a, b) => Number(b.row.status === 'approved') - Number(a.row.status === 'approved') || b.coverage - a.coverage)[0]?.row ?? null;
-}
-
-export async function isAnswerPatternRejected(
-  quizId: string, audience: 'public' | 'hcp', locale: InsightLocale, signature: string,
-  context?: AnswerReviewContext,
-): Promise<boolean> {
-  if (!(await hasSchema())) return false;
-  // Deleted text retains the source context as a tombstone. A new account
-  // must not regenerate the same rejected wording under another cache key.
-  const result = await queryWithRetry<{ answer_signature: string; answer_context: AnswerReviewContext | null }>(
-    `SELECT answer_signature, answer_context FROM provisional_insight_summaries
-     WHERE quiz_id = $1 AND audience = $2 AND locale = $3 AND status = 'rejected'
-       AND (answer_signature = $4 OR ($5::boolean AND answer_context IS NOT NULL))`,
-    [quizId, audience, locale, signature, !!context],
-  );
-  return result.rows.some((row) => row.answer_signature === signature ||
-    (context && row.answer_context && (sameAnswerPattern(row.answer_context, context) || sameMissedAnswerPattern(row.answer_context, context))));
 }
 
 /** Authenticated caller supplies the user ID; only authored choice text and
@@ -184,7 +167,7 @@ export async function invalidateProvisionalLanguage(id: string): Promise<void> {
   );
 }
 
-/** Claim a single model call across app instances; rejected rows never retry. */
+/** Claim one model call per account and pattern; deleted drafts retry immediately. */
 export async function claimProvisionalInsight(
   quizId: string,
   audience: 'public' | 'hcp',
@@ -198,9 +181,13 @@ export async function claimProvisionalInsight(
      SELECT id, $2, $3, $4, $5::jsonb FROM quizzes WHERE id = $1 AND is_published = TRUE
      ON CONFLICT (quiz_id, audience, locale, answer_signature) DO UPDATE SET
        status = 'generating', claim_token = uuid_generate_v4(),
-       answer_context = EXCLUDED.answer_context, updated_at = now()
-     WHERE (provisional_insight_summaries.status = 'failed'
-              AND provisional_insight_summaries.updated_at < now() - interval '15 minutes')
+       answer_context = EXCLUDED.answer_context, headline = NULL, body = NULL, suggestion = NULL,
+       reviewed_by = NULL, reviewed_at = NULL, model = NULL, updated_at = now()
+     WHERE (provisional_insight_summaries.status = 'rejected'
+              AND provisional_insight_summaries.headline IS NULL
+              AND provisional_insight_summaries.body IS NULL)
+        OR (provisional_insight_summaries.status = 'failed'
+              AND provisional_insight_summaries.updated_at < now() - interval '1 minute')
         OR (provisional_insight_summaries.status = 'generating'
               AND provisional_insight_summaries.updated_at < now() - interval '1 minute')
      RETURNING id, claim_token`,
@@ -255,7 +242,7 @@ export async function listProvisionalInsights(): Promise<ProvisionalInsight[]> {
   return result.rows;
 }
 
-/** Deleted wording retains its rejected cache key to block regeneration. */
+/** Retained rejections are archived for reconsideration; deleted drafts may regenerate. */
 export async function reviewProvisionalInsight(
   id: string,
   status: 'approved' | 'rejected',
@@ -265,7 +252,9 @@ export async function reviewProvisionalInsight(
   if (!(await hasSchema())) return null;
   const result = await queryWithRetry<ProvisionalInsight>(
     `UPDATE provisional_insight_summaries p
-     SET status = $2, reviewed_by = $3, reviewed_at = now(), updated_at = now(), claim_token = uuid_generate_v4(),
+     SET answer_signature = CASE WHEN $2 = 'rejected' AND NOT $5
+           THEN 'retained:' || p.id::text ELSE p.answer_signature END,
+         status = $2, reviewed_by = $3, reviewed_at = now(), updated_at = now(), claim_token = uuid_generate_v4(),
          headline = CASE WHEN $5 THEN NULL ELSE COALESCE($6, p.headline) END,
          body = CASE WHEN $5 THEN NULL ELSE COALESCE($7, p.body) END,
          suggestion = CASE WHEN $5 THEN NULL WHEN $9 THEN $8 ELSE p.suggestion END

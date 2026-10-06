@@ -1,4 +1,4 @@
-import { answerPatternSignature, approvedAnswerCoverage, buildProvisionalInsightPrompt, hasSpecificInsightHeadline, parseProvisionalInsight } from '../analytics/provisional-insights';
+import { answerPatternSignature, personalDraftSignature, approvedAnswerCoverage, buildProvisionalInsightPrompt, hasSpecificInsightHeadline, parseProvisionalInsight } from '../analytics/provisional-insights';
 import type { InsightLocale, InsightSummary } from '../analytics/insights';
 import { isEverydayInsight } from '../analytics/history-coaching';
 import { validateInsightLanguage } from '../analytics/insights';
@@ -13,7 +13,7 @@ export type AutoProvisionalInsight = {
 };
 
 /** Sends recorded selections and authored explanations, but never a UID or
- * clinical profile. Matching answers share one draft and generation lease. */
+ * clinical profile. Each account keeps its own draft and generation lease until approval. */
 type ProvisionalInput = {
   userId: string;
   quizId: string;
@@ -39,13 +39,13 @@ async function defaultDependencies() {
   const {
     claimProvisionalInsight, failProvisionalInsight, finishProvisionalInsight,
     getProvisionalInsight, getInsightGenerationState, getSimilarReusableInsight,
-    isAnswerPatternRejected, getUserAnswerReviewContext, invalidateProvisionalLanguage,
+    getUserAnswerReviewContext, invalidateProvisionalLanguage,
   } = await import('../db/provisional-insights');
   return {
     getApprovedInsightSummary,
     claimProvisionalInsight, failProvisionalInsight, finishProvisionalInsight,
     getProvisionalInsight, getInsightGenerationState, getSimilarReusableInsight,
-    isAnswerPatternRejected, getUserAnswerReviewContext, invalidateProvisionalLanguage,
+    getUserAnswerReviewContext, invalidateProvisionalLanguage,
     generateText: generatePersonalInsight, geminiModel: geminiLiteModel, isGeminiConfigured,
   };
 }
@@ -57,7 +57,7 @@ export async function prepareProvisionalInsight(input: ProvisionalInput, depende
   const {
     claimProvisionalInsight, failProvisionalInsight, finishProvisionalInsight,
     getProvisionalInsight, getInsightGenerationState, getSimilarReusableInsight,
-    isAnswerPatternRejected, getUserAnswerReviewContext, invalidateProvisionalLanguage,
+    getUserAnswerReviewContext, invalidateProvisionalLanguage,
     generateText, geminiModel, isGeminiConfigured,
     getApprovedInsightSummary,
   } = dependencies ?? await defaultDependencies();
@@ -90,20 +90,12 @@ export async function prepareProvisionalInsight(input: ProvisionalInput, depende
     ...(input.readingStyle ? { readingStyle: input.readingStyle } : {}),
   });
 
-  const answerSignature = patternSignature;
-  // Review verifies wording; it does not gate reuse. Prefer reviewed wording,
-  // then a compatible pending draft, including drafts stored under older keys.
+  const answerSignature = personalDraftSignature(patternSignature, input.userId);
+  // Only approved wording can cross account boundaries. It takes precedence
+  // over this user's pending draft, including drafts under older cache keys.
   const reusable = await getSimilarReusableInsight(input.quizId, input.audience, input.locale, context);
   if (reusable?.status === 'approved') {
     return { state: 'approved', insight: { status: 'approved', summary: { headline: reusable.headline, body: reusable.body, suggestion: reusable.suggestion }, context: reusable.answer_context } };
-  }
-  if (await isAnswerPatternRejected(input.quizId, input.audience, input.locale, patternSignature, context)) return { state: 'rejected' };
-  if (reusable) {
-    const summary = { headline: reusable.headline, body: reusable.body, suggestion: reusable.suggestion };
-    if (usable(summary, reusable.status)) {
-      return { state: 'pending', insight: { summary, status: 'provisional', context: reusable.answer_context } };
-    }
-    if (!input.readOnly && reusable.status === 'provisional') await invalidateProvisionalLanguage(reusable.id);
   }
 
   const existing = await getProvisionalInsight(input.quizId, input.audience, input.locale, answerSignature);
