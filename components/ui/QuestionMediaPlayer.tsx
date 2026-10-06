@@ -4,12 +4,13 @@ import { useEffect, useRef } from 'react';
 import AutoPlayVideo from './AutoPlayVideo';
 
 function showPreparedVideo(video: HTMLVideoElement, container: HTMLDivElement, onError?: () => void) {
-  video.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+  video.style.cssText = 'position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;';
   video.controls = true;
   video.loop = true;
   video.onloadeddata = null;
   video.onerror = () => onError?.();
   container.appendChild(video);
+  if (video.error) onError?.();
   void video.play().catch(() => {});
   return () => {
     video.pause();

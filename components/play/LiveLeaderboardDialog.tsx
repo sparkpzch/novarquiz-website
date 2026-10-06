@@ -2,8 +2,9 @@
 
 import { useEffect, useRef } from 'react';
 import styles from './quiz.module.css';
+import ProfileAvatar from '@/components/ui/ProfileAvatar';
 
-export type LiveLeaderboardPlayer = { uid: string; displayName?: string; score: number };
+export type LiveLeaderboardPlayer = { uid: string; displayName?: string; photoURL?: string | null; score: number };
 
 export default function LiveLeaderboardDialog({ open, players, currentUserId, onClose, th }: {
   open: boolean;
@@ -29,7 +30,7 @@ export default function LiveLeaderboardDialog({ open, players, currentUserId, on
     </div>
     {players.length ? <ol className={styles.leaderboardDialogList}>{players.map((player, index) => <li key={player.uid} className={player.uid === currentUserId ? styles.leaderboardDialogMe : ''}>
       <strong className={styles.leaderboardDialogRank}>#{index + 1}</strong>
-      <span>{player.uid === currentUserId ? copy('You', 'คุณ') : player.displayName || copy('Player', 'ผู้เล่น')}</span>
+      <div className={styles.livePlayerIdentity}><ProfileAvatar displayName={player.displayName} photoURL={player.photoURL} size={32} /><span title={player.displayName}>{player.displayName || copy('Player', 'ผู้เล่น')}{player.uid === currentUserId && <small> · {copy('You', 'คุณ')}</small>}</span></div>
       <b>{player.score.toLocaleString()}</b>
     </li>)}</ol> : <p className={styles.leaderboardDialogEmpty}>{copy('No scores yet.', 'ยังไม่มีคะแนน')}</p>}
   </dialog>;

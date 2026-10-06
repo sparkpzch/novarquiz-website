@@ -15,6 +15,7 @@ import FinishedQuiz from '@/components/play/FinishedQuiz';
 import { QuizChoices, AnswerFeedbackDialog, type AnswerFeedback } from '@/components/play/QuizChoices';
 import styles from '@/components/play/quiz.module.css';
 import QuestionMediaPlayer from '@/components/ui/QuestionMediaPlayer';
+import { attachVideoSource, disposeVideoSource } from '@/lib/video/playback';
 
 
 type VideoQuality = 'auto' | 'hd' | 'sd';
@@ -34,6 +35,7 @@ function isSafariBrowser() {
 }
 
 function resolvePreload(quality: VideoQuality): 'auto' | 'metadata' {
+  if (typeof navigator !== 'undefined' && (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return 'metadata';
   if (quality === 'hd') return 'auto';
   if (quality === 'sd') return 'metadata';
   if (isSafariBrowser()) return 'auto';
@@ -54,22 +56,24 @@ function prepareInlineVideo(src: string, preload: 'auto' | 'metadata') {
   video.setAttribute('muted', '');
   video.setAttribute('playsinline', '');
   video.setAttribute('webkit-playsinline', '');
-  // iOS Safari ignores preload and video.load() on detached elements.
-  // Attaching to the DOM and calling play() is the only reliable trigger.
+  // Keep the same attached element for warmup and playback. Safari may still
+  // defer loading offscreen media; visible playback must work independently.
   video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;pointer-events:none;';
-  video.src = src;
   video.dataset.warmSrc = src;
   video.onloadeddata = () => video.pause();
+  video.setAttribute('aria-hidden', 'true');
+  video.tabIndex = -1;
   document.body.appendChild(video);
-  video.play().catch(() => {});
+  attachVideoSource(video, src);
+  // Preload is a browser hint; do not depend on hidden autoplay succeeding.
+  if (preload === 'auto') void video.play().catch(() => {});
   return video;
 }
 
 function releaseVideo(video: HTMLVideoElement | null) {
   if (!video) return;
   video.pause();
-  video.src = '';
-  video.load();
+  disposeVideoSource(video);
   video.remove();
 }
 
@@ -404,7 +408,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
         const next: Question = await r.json();
         if (!next?.id || controller.signal.aborted) return;
         prefetchedNextRef.current = next;
-        if (next.media_type === 'video' && next.media_url) {
+        if (next.media_type === 'video' && next.media_url && resolvePreload(videoQualityRef.current) === 'auto') {
           prefetchVideoRef.current = prepareInlineVideo(next.media_url, resolvePreload(videoQualityRef.current));
         }
       } catch { /* non-fatal */ }

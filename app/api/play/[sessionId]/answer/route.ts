@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getQuizForQuestion, getQuizById, resolveSessionToQuizId, getExistingAnswer, getAttemptBoundary, withPlayerAnswerLock } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
-import { adminRtdb } from '@/lib/firebase/admin';
+import { adminAuth, adminRtdb } from '@/lib/firebase/admin';
 import type { Choice } from '@/lib/types';
 import { createQuestionToken, readQuestionToken, verifyQuestionToken } from '@/lib/security/question-token';
 import { getPlayUser } from '@/lib/play-auth';
@@ -212,19 +212,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     });
     if (saved && 'invalidToken' in saved) return NextResponse.json({ error: 'Invalid question' }, { status: 403 });
     if (!saved) return NextResponse.json({ error: 'Invalid answer' }, { status: 400 });
-    const { answer: result, score: cumScore } = saved;
+    const { answer: result } = saved;
 
-    // Fire-and-forget: server writes authoritative score to RTDB so clients
-    // cannot spoof the live leaderboard by writing arbitrary values directly.
-    void (async () => {
+    // Keep authoritative score and Auth identity updates alive after the response.
+    after(async () => {
       try {
-        await adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).update({
-          score: cumScore,
-          displayName: 'Player',
-          updatedAt: Date.now(),
+        const profile = await adminAuth.getUser(user.uid).catch(() => null);
+        // Serialize publication with answer writes, and read the latest total
+        // after Auth resolves so delayed callbacks cannot publish stale scores.
+        await withPlayerAnswerLock(sessionId, user.uid, async () => {
+          const score = await getUserCumulativeScore(sessionId, user.uid);
+          await adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).update({
+            score,
+            ...(profile ? { displayName: profile.displayName || 'Player', photoURL: profile.photoURL || null } : {}),
+            updatedAt: Date.now(),
+          });
         });
       } catch { /* non-fatal — live leaderboard degrades gracefully */ }
-    })();
+    });
 
     return NextResponse.json({
       chosen_label: 'chosen_label' in result ? result.chosen_label : parsed.data.chosen_label,

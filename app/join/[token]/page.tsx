@@ -14,7 +14,7 @@ import {
 import { trackEvent } from "@/lib/firebase/analytics";
 import { ROOM_STATUS } from "@/lib/constants/session";
 import { motion } from "motion/react";
-import { getVideoSourceType } from "@/components/ui/AutoPlayVideo";
+import AutoPlayVideo from "@/components/ui/AutoPlayVideo";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
 
 type SessionInfo = {
@@ -301,7 +301,9 @@ export default function JoinPage({
             )}
 
             {firstVideoUrl && (
-              <video
+              <AutoPlayVideo
+                src={firstVideoUrl}
+                autoPlay={false}
                 key={firstVideoUrl}
                 preload="auto"
                 muted
@@ -312,9 +314,7 @@ export default function JoinPage({
                 onCanPlay={() => setVideoReady(true)}
                 onCanPlayThrough={() => setVideoReady(true)}
                 onError={() => setVideoReady(true)}
-              >
-                <source src={firstVideoUrl} type={getVideoSourceType(firstVideoUrl)} />
-              </video>
+              />
             )}
 
             <button
@@ -358,7 +358,6 @@ export default function JoinPage({
             <div className="mt-7 border-t border-[#0460A9]/12 pt-5 dark:border-white/10">
               <div className="mb-3 flex items-center justify-between">
                 <div><h2 className="text-sm font-semibold text-[#16324F] dark:text-white">Leaderboard</h2><p className="mt-0.5 text-xs text-[#7187a1] dark:text-[#a3a3a3]">Live session scores</p></div>
-                <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#0D8C6D] dark:text-emerald-300"><span className="h-1.5 w-1.5 rounded-full bg-[#0D8C6D] dark:bg-emerald-400" /> Live</span>
               </div>
               {rankedPlayers.length ? <div className="flex items-end justify-center gap-2 pt-2">
                 {podium.map((place, index) => {
@@ -367,7 +366,7 @@ export default function JoinPage({
                   return <div key={place?.uid ?? `empty-${index}`} className="flex min-w-0 flex-1 flex-col items-center">
                     {place ? <>
                       <ProfileAvatar displayName={place.player.displayName} photoURL={place.player.photoURL} size={44} ringClassName={`ring-2 shadow-lg ${place.rank === 1 ? 'ring-amber-300/80' : place.rank === 2 ? 'ring-slate-200/70' : 'ring-orange-300/70'}`} />
-                      <p className="mt-2 w-full truncate text-center text-[11px] font-semibold text-[#294867] dark:text-[#e5e5e5]">{place.uid === user.uid ? 'You' : place.player.displayName}</p>
+                      <p className="mt-2 w-full truncate text-center text-[11px] font-semibold text-[#294867] dark:text-[#e5e5e5]">{place.player.displayName || 'Player'}{place.uid === user.uid && <span className="font-normal"> · You</span>}</p>
                       <p className="mt-0.5 text-xs font-semibold tabular-nums text-[#16324F] dark:text-white">{(place.player.score ?? 0).toLocaleString()} <span className="font-normal text-[#8298b2] dark:text-[#a3a3a3]">pts</span></p>
                     </> : <div className="h-[82px]" />}
                     <div className={`mt-2 flex w-full flex-col items-center justify-start rounded-t-xl border-t px-2 pt-2 ${height} ${place ? accent : 'border-[#0460A9]/10 bg-[#0460A9]/[.025] text-[#9bb2c9] dark:border-white/10 dark:bg-white/[.03] dark:text-white/25'}`}>

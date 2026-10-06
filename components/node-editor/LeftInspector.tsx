@@ -15,6 +15,7 @@ import { ref, deleteObject } from 'firebase/storage';
 import { storage } from '@/lib/firebase/config';
 import { useFFmpeg } from '@/lib/hooks/useFFmpeg';
 import { useToast } from '@/components/ui/Toast';
+import { getVideoSourceType } from '@/lib/video/source';
 import AutoPlayVideo from '@/components/ui/AutoPlayVideo';
 import type { NormalNodeData } from './NormalNode';
 import type { SituationNodeData } from './SituationNode';
@@ -318,6 +319,26 @@ export function LeftInspector({
           onDrop={handleDrop}
         >
           <FieldLabel hint="Optional">Media</FieldLabel>
+          <label style={{ display: 'block', fontSize: 11, color: '#35527e', margin: '8px 0' }}>
+            Adaptive video URL (HLS)
+            <input type="url" placeholder="https://cdn.example.com/video/master.m3u8"
+              defaultValue={getVideoSourceType(draft.media_url ?? '') === 'application/vnd.apple.mpegurl' ? draft.media_url ?? '' : ''}
+              key={`${selectedNode.id}-${draft.media_url}`}
+              style={{ width: '100%', marginTop: 4, padding: 8, borderRadius: 6, border: '1px solid rgba(112,162,249,0.3)' }}
+              onBlur={(event) => {
+                const url = event.currentTarget.value.trim();
+                if (!url || url === draft.media_url) return;
+                let valid = false;
+                try { valid = new URL(url).protocol === 'https:' && getVideoSourceType(url) === 'application/vnd.apple.mpegurl'; } catch { /* invalid URL */ }
+                if (!valid) { event.currentTarget.setCustomValidity('Enter an HTTPS .m3u8 playlist URL'); event.currentTarget.reportValidity(); return; }
+                event.currentTarget.setCustomValidity('');
+                const next = { ...draft, media_type: 'video', media_url: url, media_path: null } as NodeData;
+                setDraft(next);
+                onChange(selectedNode.id, next);
+              }}
+              onInput={(event) => event.currentTarget.setCustomValidity('')}
+            />
+          </label>
           <input
             ref={fileInputRef}
             type="file"

@@ -69,9 +69,9 @@
 .visualGridWithMedia:not(.visualGridScenario) .mediaExplanation { flex: 1; }
 .mediaExplanation p { margin: 8px 0 0; font-size: 17px; line-height: 1.8; white-space: pre-line; overflow-wrap: anywhere; }
 .media img { width: 100%; max-width: 100%; max-height: min(320px, 42vh); display: block; object-fit: contain; }
-.media :global(.nq-question-player) { width: 100%; max-width: 100%; height: auto; aspect-ratio: 16 / 9; max-height: min(360px, 46vh); background: #0b1422; }
+.media :global(.nq-question-player) { position: relative; flex: 0 0 auto; width: 100%; max-width: 100%; height: auto; aspect-ratio: 16 / 9; max-height: min(360px, 46dvh); overflow: hidden; background: #0b1422; }
 :global([data-theme="dark"]) .media :global(.nq-question-player) { background: var(--nq-dark-canvas); }
-.media :global(.nq-question-player) video { object-fit: contain; }
+.media :global(.nq-question-player) video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; }
 .mediaError { padding: 64px 16px; text-align: center; color: var(--quiz-muted); font-size: 14px; }
 .choices { margin-top: 20px; min-width: 0; max-width: 100%; }
 .choiceHint { font-size: 12px; color: var(--quiz-muted); margin: 0 0 12px; }
@@ -290,3 +290,6 @@
   .standingsPanel > .actions { padding-top: 12px; }
   .resultsDashboard .pageHeading { gap: 10px; }
 }
+
+.livePlayerIdentity { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.livePlayerIdentity small { color: var(--quiz-muted); }

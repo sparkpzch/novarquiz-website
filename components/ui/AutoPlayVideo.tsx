@@ -7,20 +7,16 @@ import {
   type VideoHTMLAttributes,
 } from 'react';
 
+import { getVideoSourceType } from '@/lib/video/source';
+import { attachVideoSource } from '@/lib/video/playback';
+export { getVideoSourceType } from '@/lib/video/source';
+
 type AutoPlayVideoProps = Omit<VideoHTMLAttributes<HTMLVideoElement>, 'src' | 'children'> & {
   src: string;
   sourceType?: string;
   onAutoplayBlocked?: () => void;
 };
 
-export function getVideoSourceType(src: string): string | undefined {
-  const path = src.split(/[?#]/)[0]?.toLowerCase() ?? '';
-  if (path.endsWith('.mp4') || path.endsWith('.m4v')) return 'video/mp4';
-  if (path.endsWith('.webm')) return 'video/webm';
-  if (path.endsWith('.ogg') || path.endsWith('.ogv')) return 'video/ogg';
-  if (path.endsWith('.mov')) return 'video/quicktime';
-  return undefined;
-}
 
 export default function AutoPlayVideo({
   src,
@@ -67,9 +63,12 @@ export default function AutoPlayVideo({
 
   useEffect(() => {
     prepareForInlineAutoplay();
+    const video = videoRef.current;
+    if (!video) return;
+    const dispose = attachVideoSource(video, src, sourceType);
     const frame = window.requestAnimationFrame(attemptPlay);
-    return () => window.cancelAnimationFrame(frame);
-  }, [attemptPlay, prepareForInlineAutoplay, src]);
+    return () => { window.cancelAnimationFrame(frame); dispose(); };
+  }, [attemptPlay, prepareForInlineAutoplay, src, sourceType]);
 
   const handleLoadedMetadata: VideoHTMLAttributes<HTMLVideoElement>['onLoadedMetadata'] = (event) => {
     onLoadedMetadata?.(event);
@@ -97,8 +96,6 @@ export default function AutoPlayVideo({
       onLoadedData={handleLoadedData}
       onCanPlay={handleCanPlay}
       {...props}
-    >
-      <source src={src} type={sourceType} />
-    </video>
+    />
   );
 }
