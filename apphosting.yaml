@@ -10,6 +10,9 @@ runConfig:
 
 # Environment variables and secrets.
 env:
+  - variable: VIDEO_PROCESSING_JOB
+    value: "projects/novartis-decisionlab/locations/asia-southeast1/jobs/novarquiz-video-worker"
+    availability: [RUNTIME]
   # Browser-facing origin for CSRF checks; request.url may use Cloud Run's host.
   - variable: APP_ORIGIN
     value: "https://novarquiz-website-sg--novartis-decisionlab.asia-southeast1.hosted.app"

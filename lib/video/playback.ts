@@ -1,9 +1,11 @@
-import { getVideoSourceType } from './source';
+import { getVideoSourceType, getShortNativeVideoSource } from './source';
 
 const disposers = new WeakMap<HTMLVideoElement, () => void>();
 
 /** Native HLS on Safari, dynamically loaded MSE player elsewhere. */
 export function attachVideoSource(video: HTMLVideoElement, src: string, type = getVideoSourceType(src)) {
+  const shortSource = type === 'application/vnd.apple.mpegurl' && video.canPlayType(type) ? getShortNativeVideoSource(src) : null;
+  if (shortSource) { src = shortSource; type = 'video/mp4'; }
   disposeVideoSource(video);
   let cancelled = false;
   let destroyHls: (() => void) | undefined;

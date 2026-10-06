@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { installQuizExitGuard, QUIZ_GUARD_KEY } from '../client/quiz-exit-guard';
+import { installPullToRefreshGuard } from '../client/pull-to-refresh-guard';
 
 export function useQuizExitGuard(active: boolean, message: string) {
   const messageRef = useRef(message);
@@ -13,10 +14,11 @@ export function useQuizExitGuard(active: boolean, message: string) {
     installed.current = true;
     removed.current = false;
     const dispose = installQuizExitGuard(window, () => messageRef.current);
+    const disposeTouchGuard = installPullToRefreshGuard(document);
     const root = document.documentElement;
     const previous = root.style.overscrollBehaviorY;
     root.style.overscrollBehaviorY = 'contain';
-    return () => { dispose(); root.style.overscrollBehaviorY = previous; };
+    return () => { dispose(); disposeTouchGuard(); root.style.overscrollBehaviorY = previous; };
   }, [active]);
   useEffect(() => {
     // Remove the duplicate entry only after completion, never during Strict

@@ -1,5 +1,6 @@
 "use client";
 
+import QuizThumbnail from '@/components/ui/QuizThumbnail';
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -282,11 +283,7 @@ function QuizCard({ session, onClick, eagerImage = false }: { session: Dashboard
             className="object-cover transition duration-500 group-hover:scale-105"
           />
         ) : (
-          <div className="absolute inset-0">
-            <div className="absolute -left-8 top-3 h-28 w-28 rounded-full bg-[#4f76ff]/70 blur-2xl" />
-            <div className="absolute right-0 top-0 h-24 w-24 rotate-12 rounded-[30%] bg-[#bf5eff]/45 blur-xl" />
-            <div className="absolute bottom-4 left-5 text-3xl opacity-80">✦</div>
-          </div>
+          <QuizThumbnail />
         )}
         <span className="absolute right-2 top-2 rounded-full border border-white/15 bg-[#080e2d]/80 px-2 py-1 text-[9px] font-semibold text-white backdrop-blur">
           {session.question_count ?? 0} questions

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { resolveProcessedVideos, UnpreparedVideoError } from '../video/jobs';
 import pool, { queryWithRetry } from './postgres';
 import { withDbClient } from './query-context';
 import { maskPublicLeaderboardEntry, toPublicLeaderboardEntry } from './schema';
@@ -357,8 +358,13 @@ export async function updateQuiz(sessionId: string, data: Partial<{
     const realId = await resolveQuizId(sessionId);
 
     // Get old path
-    const { rows: oldRows } = await client.query('SELECT cover_image_path FROM quizzes WHERE id = $1', [realId]);
+    const { rows: oldRows } = await client.query('SELECT cover_image_path FROM quizzes WHERE id = $1 FOR UPDATE', [realId]);
     const oldPath = oldRows[0]?.cover_image_path;
+    if (data.is_published) {
+      const pending = await client.query(`SELECT 1 FROM questions q JOIN video_processing_jobs j ON j.source_path=q.media_path
+        WHERE q.session_id=$1 AND q.media_type='video' AND j.status<>'ready' LIMIT 1`, [realId]);
+      if (pending.rowCount) throw new UnpreparedVideoError();
+    }
 
     const fields: string[] = [];
     const values: unknown[] = [];
@@ -679,6 +685,8 @@ export async function createQuestion(data: {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const publication = await client.query('SELECT is_published FROM quizzes WHERE id=$1 FOR UPDATE', [data.session_id]);
+    [data] = await resolveProcessedVideos([data], client, !!publication.rows[0]?.is_published);
     const layered = await hasLayeredAnalyticsSchema();
     const questionId = data.id ?? randomUUID();
     const result = await client.query(
@@ -874,6 +882,8 @@ export async function replaceQuizGraph(
     await client.query('BEGIN');
     const layered = await hasLayeredAnalyticsSchema();
 
+    const publication = await client.query('SELECT is_published FROM quizzes WHERE id=$1 FOR UPDATE', [sessionId]);
+    questions = await resolveProcessedVideos(questions, client, !!publication.rows[0]?.is_published);
     const { rows: oldRows } = await client.query(
       'SELECT media_path FROM questions WHERE session_id = $1',
       [sessionId],

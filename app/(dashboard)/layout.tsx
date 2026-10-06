@@ -334,7 +334,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
                   key={item.href}
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
-                  className={`nq-mobile-nav-link flex h-[64px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[24px] text-[10px] font-semibold transition ${item.href === '/' ? 'nq-mobile-nav-home' : ''} ${
+                  className={`nq-mobile-nav-link flex h-[64px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[24px] text-[10px] font-semibold transition ${
                     active ? 'bg-[#17275f] text-white' : 'text-[#7180ad]'
                   }`}
                 >

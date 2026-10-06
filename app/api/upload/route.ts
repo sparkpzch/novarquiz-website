@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
+import { createVideoJob, dispatchVideoJob, videoJobResult } from '@/lib/video/jobs';
 import { adminStorage } from '@/lib/firebase/admin';
 import { getSessionUser } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/ratelimit';
@@ -9,6 +11,7 @@ const MIME_TO_EXT: Record<string, string> = {
   'image/gif': 'gif',
   'image/webp': 'webp',
   'video/mp4': 'mp4',
+  'video/quicktime': 'mov',
 };
 const ALLOWED_TYPES = Object.keys(MIME_TO_EXT);
 const MAX_BYTES = 50 * 1024 * 1024; // 50 MB
@@ -24,7 +27,7 @@ function detectMimeFromBytes(buf: Buffer): string | null {
     buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
     buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
   ) return 'image/webp';
-  if (buf.length > 11 && buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) return 'video/mp4';
+  if (buf.length > 11 && buf.toString('ascii',4,8) === 'ftyp') return buf.toString('ascii',8,12) === 'qt  ' ? 'video/quicktime' : 'video/mp4';
   return null;
 }
 
@@ -65,7 +68,10 @@ export async function POST(req: NextRequest) {
 
     // Extension derived from the validated MIME type, not the client-supplied filename.
     const ext = MIME_TO_EXT[file.type];
-    const dest = `quiz-media/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const video = file.type.startsWith('video/');
+    if (video && !process.env.VIDEO_PROCESSING_JOB) return NextResponse.json({ error: 'Video processing is not configured yet' }, { status: 503 });
+    const id = randomUUID();
+    const dest = video ? `quiz-media/original-${id}.${ext}` : `quiz-media/${id}.${ext}`;
 
     const bucket = adminStorage.bucket();
     const fileRef = bucket.file(dest);
@@ -76,6 +82,15 @@ export async function POST(req: NextRequest) {
         contentDisposition: 'inline',
       },
     });
+    if (video) {
+      const [metadata] = await fileRef.getMetadata();
+      const job = await createVideoJob(user.uid, dest, String(metadata.generation), id);
+      after(async () => {
+        try { await dispatchVideoJob(job.id); }
+        catch { console.error('Video job dispatch failed; job retained for retry'); }
+      });
+      return NextResponse.json({ ...videoJobResult(job), processing: true }, { status: 202 });
+    }
     await fileRef.makePublic();
 
     const url = `https://storage.googleapis.com/${bucket.name}/${dest}`;

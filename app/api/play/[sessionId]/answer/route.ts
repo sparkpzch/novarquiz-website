@@ -1,20 +1,23 @@
 import { after, NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getQuizForQuestion, getQuizById, resolveSessionToQuizId, getExistingAnswer, getAttemptBoundary, withPlayerAnswerLock } from '@/lib/db/queries';
+import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getQuizForQuestion, getQuizById, resolveSessionToQuizId, getExistingAnswer, getSessionById, getAttemptBoundary, withPlayerAnswerLock } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminAuth, adminRtdb } from '@/lib/firebase/admin';
 import type { Choice } from '@/lib/types';
 import { createQuestionToken, readQuestionToken, verifyQuestionToken } from '@/lib/security/question-token';
 import { getPlayUser } from '@/lib/play-auth';
 import { shuffleChoices } from '@/lib/play/choice-order';
+import { getProgress, startProgress, advanceProgress, answerProgress, resetProgress } from '@/lib/db/play-progress';
 
 const StartBody = z.object({
   action: z.literal('start'),
   is_guest: z.boolean().optional(),
+  attempt: z.string().uuid().optional(),
   display_name: z.string().max(100).optional(),
   photo_url: z.string().url().max(500).optional().nullable(),
 });
 const AnswerBody = z.object({
+  attempt: z.string().uuid().optional(),
   question_id: z.string().uuid(),
   chosen_label: z.string().min(1).max(10),
   question_token: z.string().optional(),
@@ -65,6 +68,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const attemptBoundary = user.isGuest ? 'guest' : await getAttemptBoundary(sessionId, user.uid);
     const shuffleAttempt = user.isGuest ? (searchParams.get('attempt') ?? 'guest').slice(0, 64) : attemptBoundary;
+    const progressBoundary = user.isGuest ? `guest:${shuffleAttempt}` : attemptBoundary;
     if (searchParams.get('entry') === 'true') {
       const quizId = await resolveSessionToQuizId(sessionId);
       if (!quizId) return NextResponse.json(null, { status: 404 });
@@ -72,13 +76,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       if (!quiz || (!quiz.is_published && !user.isAdmin && quiz.created_by !== user.uid)) {
         return NextResponse.json(null, { status: 404 });
       }
-      const question = await getEntryQuestion(sessionId);
-      if (!question) return NextResponse.json(null, { status: 404 });
-      return NextResponse.json(
-        sanitizeQuestion(question, quiz.shuffle_choices ? `${user.uid}:${sessionId}:${shuffleAttempt}:${question.id}` : undefined,
-          createQuestionToken(sessionId, user.uid, question.id, attemptBoundary)),
-        { headers: { 'Cache-Control': 'no-store' } },
-      );
+      return withPlayerAnswerLock(sessionId, user.uid, async () => {
+        const latest = await getProgress(sessionId, user.uid);
+        if (latest?.completed && (!user.isGuest || latest.attempt_boundary === progressBoundary)) {
+          return NextResponse.json({ completed: true, score: latest.score, streak: latest.streak, elapsed_ms: new Date(latest.updated_at).getTime() - Number(latest.started_at) });
+        }
+        let progress = await getProgress(sessionId, user.uid, progressBoundary);
+        let question = progress ? await getQuestionById(progress.question_id) : await getEntryQuestion(sessionId);
+        if (!question) return NextResponse.json(null, { status: 404 });
+        if (!progress) progress = await startProgress(sessionId, user.uid, progressBoundary, question.id);
+        if (progress && progress.question_id !== question.id) question = await getQuestionById(progress.question_id);
+        if (!question || !progress) return NextResponse.json(null, { status: 404 });
+        return NextResponse.json({
+          ...sanitizeQuestion(question, quiz.shuffle_choices ? `${user.uid}:${sessionId}:${shuffleAttempt}:${question.id}` : undefined,
+            createQuestionToken(sessionId, user.uid, question.id, attemptBoundary, Number(progress.question_started_at))),
+          resume: { score: progress.score, streak: progress.streak, answer: progress.answer,
+            question_elapsed_ms: Date.now() - Number(progress.question_started_at), elapsed_ms: Date.now() - Number(progress.started_at) },
+        }, { headers: { 'Cache-Control': 'no-store' } });
+      });
     }
 
     const fromQuestionId = searchParams.get('fromQuestionId');
@@ -103,13 +118,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         if (!answer || answer.chosen_label !== choiceLabel) {
           return NextResponse.json({ error: 'Answer required' }, { status: 403 });
         }
+      } else {
+        const progress = await getProgress(sessionId, user.uid, progressBoundary);
+        if (progress?.question_id !== fromQuestionId || progress.answer?.chosen_label !== choiceLabel) {
+          return NextResponse.json({ error: 'Answer required' }, { status: 403 });
+        }
       }
       const next = await getNextQuestion(fromQuestionId, choiceLabel);
       if (!next) return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
       // `next` is reachable only via a connection, so it shares fromQuestionId's quiz.
+      const progress = searchParams.get('prefetch') === 'true' ? null : await withPlayerAnswerLock(sessionId, user.uid,
+        () => advanceProgress(sessionId, user.uid, progressBoundary, fromQuestionId, next.id));
+      if (progress && progress.question_id !== next.id) return NextResponse.json({ error: 'Progress changed; reload to resume' }, { status: 409 });
       return NextResponse.json(
         sanitizeQuestion(next, access.shuffle_choices ? `${user.uid}:${sessionId}:${shuffleAttempt}:${next.id}` : undefined,
-          createQuestionToken(sessionId, user.uid, next.id, attemptBoundary)),
+          createQuestionToken(sessionId, user.uid, next.id, attemptBoundary, progress ? Number(progress.question_started_at) : Date.now())),
         { headers: { 'Cache-Control': 'no-store' } },
       );
     }
@@ -130,8 +153,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
       const user = await getSessionUser();
       if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const playSession = await getOrCreateSession(sessionId, user.uid);
-      return NextResponse.json(playSession);
+      const quizId = await resolveSessionToQuizId(sessionId);
+      const quiz = quizId ? await getQuizById(quizId) : null;
+      if (!quiz || (!quiz.is_published && !user.isAdmin && quiz.created_by !== user.uid)) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      const existingSession = await getSessionById(sessionId);
+      const playSession = existingSession ?? await getOrCreateSession(quiz.id, user.uid);
+      await withPlayerAnswerLock(playSession.id, user.uid, () => resetProgress(playSession.id, user.uid));
+      return NextResponse.json({ id: playSession.id });
     }
 
     const parsed = AnswerBody.safeParse(raw);
@@ -162,10 +190,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       if (!selectedChoice || question?.node_type !== 'normal') {
         return NextResponse.json({ error: 'Invalid answer' }, { status: 400 });
       }
-      return NextResponse.json({
-        is_guest: true,
-        points_earned: selectedChoice?.score_impact ?? 0,
-        explanation: selectedChoice?.explanation ?? null,
+      return withPlayerAnswerLock(sessionId, user.uid, async () => {
+        const boundary = `guest:${parsed.data.attempt ?? 'guest'}`;
+        const progress = await getProgress(sessionId, user.uid, boundary);
+        if (!progress || progress.question_id !== question.id || progress.completed) return NextResponse.json({ error: 'Invalid progress' }, { status: 409 });
+        const saved = await answerProgress(sessionId, user.uid, boundary, question.id, {
+          chosen_label: parsed.data.chosen_label, points_earned: selectedChoice.score_impact ?? 0, explanation: selectedChoice.explanation ?? null,
+        });
+        return NextResponse.json({ is_guest: true, ...saved?.answer });
       });
     }
 
@@ -194,7 +226,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
         return { invalidToken: true } as const;
       }
       const existing = await getExistingAnswer(sessionId, user.uid, parsed.data.question_id);
-      if (existing) return { answer: existing, score: await getUserCumulativeScore(sessionId, user.uid) };
+      if (existing) {
+        await answerProgress(sessionId, user.uid, boundary, parsed.data.question_id, existing);
+        return { answer: existing, score: await getUserCumulativeScore(sessionId, user.uid) };
+      }
+      const progress = await getProgress(sessionId, user.uid, boundary);
+      if (!progress || progress.completed || progress.question_id !== parsed.data.question_id) return { invalidProgress: true } as const;
       const question = await getQuestionById(parsed.data.question_id);
       if (!question || question.node_type === 'situation' || question.node_type === 'end' ||
           !question.choices?.some((choice: Choice) => choice.label === parsed.data.chosen_label)) {
@@ -205,10 +242,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
         user_id: user.uid,
         question_id: parsed.data.question_id,
         chosen_label: parsed.data.chosen_label,
-        time_taken_ms: parsed.data.time_taken_ms,
+        time_taken_ms: Math.min(300_000, Math.max(parsed.data.time_taken_ms, Date.now() - readQuestionToken(parsed.data.question_token!, sessionId, user.uid, parsed.data.question_id, boundary)!)),
       });
+      await answerProgress(sessionId, user.uid, boundary, question.id, { chosen_label: parsed.data.chosen_label, points_earned: answer.points_earned, explanation: answer.explanation });
       return { answer, score: await getUserCumulativeScore(sessionId, user.uid) };
     });
+    if (saved && 'invalidProgress' in saved) return NextResponse.json({ error: 'Progress changed; reload to resume' }, { status: 409 });
     if (saved && 'invalidToken' in saved) return NextResponse.json({ error: 'Invalid question' }, { status: 403 });
     if (!saved) return NextResponse.json({ error: 'Invalid answer' }, { status: 400 });
     const { answer: result } = saved;
@@ -217,15 +256,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     after(async () => {
       try {
         const profile = await adminAuth.getUser(user.uid).catch(() => null);
-        // Serialize publication with answer writes, and read the latest total
-        // after Auth resolves so delayed callbacks cannot publish stale scores.
-        await withPlayerAnswerLock(sessionId, user.uid, async () => {
-          const score = await getUserCumulativeScore(sessionId, user.uid);
-          await adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).update({
-            score,
+        // Release the database lock before contacting Firebase. A slow live
+        // leaderboard must never block the player's next answer or refresh.
+        const snapshot = await withPlayerAnswerLock(sessionId, user.uid, async () => {
+          const progress = await getProgress(sessionId, user.uid);
+          return { score: progress?.score ?? await getUserCumulativeScore(sessionId, user.uid),
+            version: progress ? new Date(progress.updated_at).getTime() : Date.now() };
+        });
+        await adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).transaction(current => {
+          if (current?.authorityVersion > snapshot.version) return;
+          return { ...current, score: snapshot.score, authorityVersion: snapshot.version,
             ...(profile ? { displayName: profile.displayName || 'Player', photoURL: profile.photoURL || null } : {}),
-            updatedAt: Date.now(),
-          });
+            updatedAt: Date.now() };
         });
       } catch { /* non-fatal — live leaderboard degrades gracefully */ }
     });
@@ -235,7 +277,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       points_earned: result.points_earned,
       explanation: result.explanation,
     });
-  } catch {
+  } catch (error) {
+    console.error('Could not save quiz answer:', error instanceof Error ? error.message : 'unknown error');
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

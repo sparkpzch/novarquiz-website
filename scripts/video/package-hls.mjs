@@ -52,7 +52,7 @@ for (const range of hlgInput ? ['SDR', 'HLG'] : ['SDR']) {
     mkdirSync(directory);
     const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-i', hdr ? hlgInput : input,
       '-map', '0:v:0', '-map', '0:a:0?',
-      '-vf', `scale=${width}:${height}:force_original_aspect_ratio=decrease:force_divisible_by=2,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`,
+      '-vf', `scale=w='min(${width},iw)':h='min(${height},ih)':force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1`,
       '-r', '30', '-c:v', hdr ? 'libx265' : 'libx264', '-preset', 'fast',
       '-profile:v', hdr ? 'main10' : 'main', '-pix_fmt', hdr ? 'yuv420p10le' : 'yuv420p',
       '-b:v', `${rate}k`, '-maxrate', `${peak}k`, '-bufsize', `${peak * 2}k`,
@@ -69,7 +69,7 @@ for (const range of hlgInput ? ['SDR', 'HLG'] : ['SDR']) {
     const video = streams.find(stream => stream.codec_type === 'video');
     const hex = video.extradata.split('\n').filter(line => line.includes(':')).map(line => line.split(':')[1].trim().split('  ')[0].replace(/\s/g, '')).join('');
     const bytes = Buffer.from(hex, 'hex');
-    let videoCodec = codec;
+    let videoCodec = hdr ? codec : `avc1.${bytes.subarray(1,4).toString('hex')}`;
     if (hdr) {
       let compatibility = bytes.readUInt32BE(2);
       let reversed = 0;
@@ -79,7 +79,7 @@ for (const range of hlgInput ? ['SDR', 'HLG'] : ['SDR']) {
       videoCodec = `hvc1.${['', 'A', 'B', 'C'][bytes[1] >> 6]}${bytes[1] & 31}.${reversed.toString(16).toUpperCase()}.${bytes[1] & 32 ? 'H' : 'L'}${bytes[12]}${constraints.map(value => '.' + value.toString(16).toUpperCase()).join('')}`;
     }
     const codecs = `,CODECS="${videoCodec}${streams.some(stream => stream.codec_type === 'audio') ? ',mp4a.40.2' : ''}"`;
-    master.push(`#EXT-X-STREAM-INF:BANDWIDTH=${(peak + 120) * 1000},AVERAGE-BANDWIDTH=${(rate + 96) * 1000},RESOLUTION=${width}x${height},FRAME-RATE=30.000,VIDEO-RANGE=${range}${codecs}`, `${name}/index.m3u8`);
+    master.push(`#EXT-X-STREAM-INF:BANDWIDTH=${(peak + 120) * 1000},AVERAGE-BANDWIDTH=${(rate + 96) * 1000},RESOLUTION=${video.width}x${video.height},FRAME-RATE=30.000,VIDEO-RANGE=${range}${codecs}`, `${name}/index.m3u8`);
   }
 }
 writeFileSync(join(output, 'master.m3u8'), `${master.join('\n')}\n`);

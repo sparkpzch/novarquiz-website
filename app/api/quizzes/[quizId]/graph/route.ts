@@ -13,6 +13,7 @@ import {
   getQuizById,
 } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
+import { resolveProcessedVideos, UnpreparedVideoError } from '@/lib/video/jobs';
 
 async function requireQuizOwnership(quizId: string) {
   const user = await getSessionUser();
@@ -34,6 +35,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ qui
     const connections = await getConnectionsByQuiz(realId);
     return NextResponse.json({ questions, connections });
   } catch (err) {
+    if (err instanceof UnpreparedVideoError) return NextResponse.json({ error: err.message }, { status: 409 });
     console.error(`Failed to load graph for quiz ${quizId}:`, err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
@@ -54,7 +56,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // and rewrites session_id, so honouring a client-chosen id would let an
     // owner of quiz A pull a question row out of quiz B. Ids are only accepted
     // on PUT, where replaceQuizGraph re-mints anything that isn't a UUID.
-    const { choices, ...questionData } = parsed.data;
+    const [resolved] = await resolveProcessedVideos([parsed.data]);
+    const { choices, ...questionData } = resolved;
     delete questionData.id;
     const question = await createQuestion({
       ...questionData,
@@ -70,6 +73,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     return NextResponse.json(question, { status: 201 });
   } catch (err) {
+    if (err instanceof UnpreparedVideoError) return NextResponse.json({ error: err.message }, { status: 409 });
     console.error(`Failed to create question for quiz ${quizId}:`, err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
@@ -96,6 +100,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     await deleteQuestionsByQuiz(realId, preservePaths);
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof UnpreparedVideoError) return NextResponse.json({ error: err.message }, { status: 409 });
     console.error(`Failed to delete questions for quiz ${quizId}:`, err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
@@ -126,6 +131,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof UnpreparedVideoError) return NextResponse.json({ error: err.message }, { status: 409 });
     console.error(`Failed to update graph for quiz ${quizId}:`, err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }

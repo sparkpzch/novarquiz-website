@@ -1,4 +1,4 @@
-import { answerPatternSignature, buildProvisionalInsightPrompt, hasSpecificInsightHeadline, parseProvisionalInsight } from '../analytics/provisional-insights';
+import { answerPatternSignature, approvedAnswerCoverage, buildProvisionalInsightPrompt, hasSpecificInsightHeadline, parseProvisionalInsight } from '../analytics/provisional-insights';
 import type { InsightLocale, InsightSummary } from '../analytics/insights';
 import { isEverydayInsight } from '../analytics/history-coaching';
 import { validateInsightLanguage } from '../analytics/insights';
@@ -25,6 +25,7 @@ type ProvisionalInput = {
   allowGeneration?: boolean;
   /** Admin reports inspect saved wording without spending quota or changing it. */
   readOnly?: boolean;
+  tags?: string[];
 };
 
 export type PreparedInsight = {
@@ -34,19 +35,23 @@ export type PreparedInsight = {
 };
 
 async function defaultDependencies() {
+  const { getApprovedInsightSummary } = await import('../db/queries');
   const {
     claimProvisionalInsight, failProvisionalInsight, finishProvisionalInsight,
     getProvisionalInsight, getInsightGenerationState, getSimilarReusableInsight,
     isAnswerPatternRejected, getUserAnswerReviewContext, invalidateProvisionalLanguage,
   } = await import('../db/provisional-insights');
   return {
+    getApprovedInsightSummary,
     claimProvisionalInsight, failProvisionalInsight, finishProvisionalInsight,
     getProvisionalInsight, getInsightGenerationState, getSimilarReusableInsight,
     isAnswerPatternRejected, getUserAnswerReviewContext, invalidateProvisionalLanguage,
     generateText: generatePersonalInsight, geminiModel: geminiLiteModel, isGeminiConfigured,
   };
 }
-export type InsightDependencies = Awaited<ReturnType<typeof defaultDependencies>>;
+export type InsightDependencies = Omit<Awaited<ReturnType<typeof defaultDependencies>>, 'getApprovedInsightSummary'> & {
+  getApprovedInsightSummary?: Awaited<ReturnType<typeof defaultDependencies>>['getApprovedInsightSummary'];
+};
 
 export async function prepareProvisionalInsight(input: ProvisionalInput, dependencies?: InsightDependencies): Promise<PreparedInsight> {
   const {
@@ -54,9 +59,14 @@ export async function prepareProvisionalInsight(input: ProvisionalInput, depende
     getProvisionalInsight, getInsightGenerationState, getSimilarReusableInsight,
     isAnswerPatternRejected, getUserAnswerReviewContext, invalidateProvisionalLanguage,
     generateText, geminiModel, isGeminiConfigured,
+    getApprovedInsightSummary,
   } = dependencies ?? await defaultDependencies();
   const context = input.context ?? await getUserAnswerReviewContext(input.userId, input.quizId);
   if (!context || context.answers.length === 0) return { state: 'unavailable' };
+  // The template CMS and answer-pattern review queue are separate stores.
+  // Approved CMS wording must win before any lease or model invocation.
+  const approved = await getApprovedInsightSummary?.({ quizId: input.quizId, tags: input.tags ?? [], audience: input.audience, locale: input.locale });
+  if (approved) return { state: 'approved', insight: { status: 'approved', summary: approved, context } };
   // Correct answers need no paid analysis, generation lease, or review queue.
   if (context.answers.every(answer => answer.selectedAligned)) {
     return {
@@ -81,16 +91,17 @@ export async function prepareProvisionalInsight(input: ProvisionalInput, depende
   });
 
   const answerSignature = patternSignature;
-  if (await isAnswerPatternRejected(input.quizId, input.audience, input.locale, patternSignature, context)) return { state: 'rejected' };
-
   // Review verifies wording; it does not gate reuse. Prefer reviewed wording,
   // then a compatible pending draft, including drafts stored under older keys.
   const reusable = await getSimilarReusableInsight(input.quizId, input.audience, input.locale, context);
+  if (reusable?.status === 'approved') {
+    return { state: 'approved', insight: { status: 'approved', summary: { headline: reusable.headline, body: reusable.body, suggestion: reusable.suggestion }, context: reusable.answer_context } };
+  }
+  if (await isAnswerPatternRejected(input.quizId, input.audience, input.locale, patternSignature, context)) return { state: 'rejected' };
   if (reusable) {
     const summary = { headline: reusable.headline, body: reusable.body, suggestion: reusable.suggestion };
     if (usable(summary, reusable.status)) {
-      const status = reusable.status === 'approved' ? 'approved' : 'provisional';
-      return { state: status === 'approved' ? 'approved' : 'pending', insight: { summary, status, context: reusable.answer_context } };
+      return { state: 'pending', insight: { summary, status: 'provisional', context: reusable.answer_context } };
     }
     if (!input.readOnly && reusable.status === 'provisional') await invalidateProvisionalLanguage(reusable.id);
   }
@@ -98,7 +109,7 @@ export async function prepareProvisionalInsight(input: ProvisionalInput, depende
   const existing = await getProvisionalInsight(input.quizId, input.audience, input.locale, answerSignature);
   if (existing) {
     const summary = { headline: existing.headline, body: existing.body, suggestion: existing.suggestion };
-    if (usable(summary, existing.status)) {
+    if (usable(summary, existing.status) && (!existing.answer_context || approvedAnswerCoverage(existing.answer_context, context, summary) > 0)) {
       return { state: existing.status === 'approved' ? 'approved' : 'pending', insight: { summary, status: existing.status as 'provisional' | 'approved', context: existing.answer_context } };
     }
     if (existing.status === 'approved' || input.readOnly) return { state: 'unavailable' };
@@ -119,7 +130,7 @@ export async function prepareProvisionalInsight(input: ProvisionalInput, depende
       const latest = await getProvisionalInsight(input.quizId, input.audience, input.locale, answerSignature);
       if (latest) {
         const summary = { headline: latest.headline, body: latest.body, suggestion: latest.suggestion };
-        if (usable(summary, latest.status)) {
+        if (usable(summary, latest.status) && (!latest.answer_context || approvedAnswerCoverage(latest.answer_context, context, summary) > 0)) {
           return { state: latest.status === 'approved' ? 'approved' : 'pending', insight: { summary, status: latest.status as 'provisional' | 'approved' } };
         }
       }

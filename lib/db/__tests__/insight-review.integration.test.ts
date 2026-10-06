@@ -47,6 +47,34 @@ test('insight drafts and review lifecycle preserve scope, share pending text, an
     assert.equal(await db.reviewProvisionalInsight(row.id, 'approved', 'qa', { expectedRevision: row.revision }), null, 'Stale approvals must fail');
     const approved = await db.reviewProvisionalInsight(row.id, 'approved', 'qa', { expectedRevision: saved.revision }); assert.ok(approved); assert.equal(approved.status, 'approved');
     const reused = await db.getSimilarReusableInsight(quiz.id, 'public', 'en', context); assert.equal(reused?.id, row.id);
+    // The same mistake shares approved wording and one generation lease even
+    // when the other questions were answered with different correct options.
+    const { answerPatternSignature } = await import('../../analytics/provisional-insights');
+    const { prepareProvisionalInsight } = await import('../../ai/auto-provisional-insight');
+    const missedContext = { ...context, answers: [
+      { ...context.answers[0], question: `QA missed ${tag}`, selected: 'Skip the check', selectedAligned: false },
+      { ...context.answers[0], question: `QA correct ${tag}` },
+    ] };
+    const changedCorrect = { ...missedContext, answers: [missedContext.answers[0], { ...missedContext.answers[1], selected: 'Another correct option' }] };
+    const scope = { quizId: quiz.id, audience: 'public' as const, locale: 'en' as const };
+    const sharedSignature = answerPatternSignature({ ...scope, ...missedContext });
+    assert.equal(sharedSignature, answerPatternSignature({ ...scope, ...changedCorrect }));
+    const sharedClaims = await Promise.all([missedContext, changedCorrect].map(c => db.claimProvisionalInsight(quiz.id, 'public', 'en', sharedSignature, c)));
+    assert.equal(sharedClaims.filter(Boolean).length, 1);
+    const sharedClaim = sharedClaims.find(Boolean)!;
+    const reviewedWording = { headline: 'Review the check', body: 'You skipped the check. Review the authored explanation.', suggestion: null };
+    await db.finishProvisionalInsight(sharedClaim.id, sharedClaim.claim_token, reviewedWording, 'qa-test');
+    const sharedDraft = await db.getProvisionalInsight(quiz.id, 'public', 'en', sharedSignature);
+    const sharedApproved = await db.reviewProvisionalInsight(sharedClaim.id, 'approved', 'qa', { expectedRevision: sharedDraft!.revision });
+    assert.ok(sharedApproved);
+    const noModel = { ...db, generateText: async () => { throw new Error('Same mistake must not call AI'); }, geminiModel: () => 'qa-test', isGeminiConfigured: () => true };
+    for (let repeat = 0; repeat < 3; repeat++) {
+      const result = await prepareProvisionalInsight({ ...scope, userId: 'qa-same-mistake', context: changedCorrect, allowGeneration: true }, noModel);
+      assert.equal(result.state, 'approved'); assert.equal(result.generate, undefined); assert.deepEqual(result.insight?.summary, reviewedWording);
+    }
+    await db.reviewProvisionalInsight(sharedClaim.id, 'rejected', 'qa', { expectedRevision: sharedApproved.revision, disposition: 'delete' });
+    assert.equal(await db.isAnswerPatternRejected(quiz.id, 'public', 'en', 'another-legacy-signature', changedCorrect), true);
+
     assert.equal(await db.getSimilarReusableInsight(quiz.id, 'public', 'th', context), null);
     const rejected = await db.reviewProvisionalInsight(row.id, 'rejected', 'qa', { expectedRevision: approved.revision, disposition: 'keep' }); assert.ok(rejected); assert.equal(rejected.headline, saved.headline);
     assert.equal(await db.getProvisionalInsight(quiz.id, 'public', 'en', signature), null);
@@ -93,7 +121,7 @@ test('insight drafts and review lifecycle preserve scope, share pending text, an
     }
     const history = await templates.getUserHistory(historyUid);
     assert.equal(history[0].completed_at, cutoff);
-    const completedAnswers = await templates.getUserHistoryAnswers(historyUid, run.id, history[0].completed_at);
+    let completedAnswers = await templates.getUserHistoryAnswers(historyUid, run.id, history[0].completed_at);
     assert.equal(completedAnswers.length, 1); assert.equal(completedAnswers[0].selectedAligned, true);
     assert.equal((await templates.getUserHistoryAnswers(historyUid, run.id))[0].selectedAligned, false);
     assert.equal((await templates.getUserHistoryAnswers(`other-${historyUid}`, run.id, cutoff)).length, 0);
@@ -115,6 +143,12 @@ test('insight drafts and review lifecycle preserve scope, share pending text, an
       return JSON.stringify(recap);
     }, geminiModel: () => 'qa-flash-lite', isGeminiConfigured: () => true };
     const session = history[0] as import('../../analytics/history').UserHistoryRow;
+    // Consent/generation applies to missed answers; fully correct attempts use standard feedback.
+    const missed = (await client.query('SELECT label FROM choices WHERE question_id=$1 AND score_impact<=0 LIMIT 1', [source.id])).rows[0];
+    assert.ok(missed);
+    await client.query('UPDATE user_answers SET chosen_label=$4,utility_score=0 WHERE session_id=$1 AND user_id=$2 AND answered_at=$3::timestamptz', [run.id,historyUid,cutoff,missed.label]);
+    completedAnswers = await templates.getUserHistoryAnswers(historyUid, run.id, cutoff);
+    assert.equal(completedAnswers[0].selectedAligned, false);
     const blocked = await preparePersonalRecap(historyUid, session, completedAnswers, 'en', dependencies);
     assert.equal(blocked.state, 'consent-required'); assert.equal(blocked.generate, undefined); assert.equal(modelCalls, 0);
     await templates.upsertUserConsent({ ...consent, privacy_version: PRIVACY_VERSION });
@@ -134,6 +168,16 @@ test('insight drafts and review lifecycle preserve scope, share pending text, an
     const reviewedRecap = await preparePersonalRecap(historyUid, session, completedAnswers, 'en', dependencies);
     assert.equal(reviewedRecap.state, 'approved'); assert.equal(modelCalls, 1);
     assert.deepEqual(reviewedRecap.insight?.summary, pendingRecap.insight?.summary);
+    const sourceQuiz = await templates.getQuizById(source.quiz_id);
+    const audience = sourceQuiz?.intended_audience === 'hcp' ? 'hcp' : 'public';
+    const approvedTemplate = await templates.upsertInsightTemplate({ quizId: source.quiz_id, clinicalTag: tag, audience, locale: 'en', headline: 'Reviewed CMS guidance', body: 'Read the author-approved label guidance.', suggestion: null, source: 'manual', model: null, createdBy: 'qa-transaction' });
+    await templates.reviewInsightTemplate(approvedTemplate.id, 'approved', 'qa-transaction');
+    const approvedDependencies = { ...dependencies, getApprovedInsightSummary: templates.getApprovedInsightSummary };
+    for (let refresh=0; refresh<3; refresh++) {
+      const cms = await preparePersonalRecap(historyUid, session, completedAnswers.map(answer=>({...answer,tags:[tag]})), 'en', approvedDependencies);
+      assert.equal(cms.state, 'approved'); assert.equal(cms.insight?.summary.headline, 'Reviewed CMS guidance'); assert.equal(cms.generate, undefined);
+    }
+    assert.equal(modelCalls, 1, 'Approved CMS must avoid any additional model calls');
     await withDbClient(client, async () => {
       await assert.rejects(withDbSavepoint(async () => { await client.query('SELECT nonexistent_recap_column'); }));
       assert.equal((await templates.getUserHistory(historyUid)).length, 1, 'A failed recap must not abort the completed result transaction');

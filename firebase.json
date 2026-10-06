@@ -8,7 +8,15 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "functions"
+        "functions",
+        ".env*",
+        "*-adminsdk-*.json",
+        "*.json.key",
+        ".next",
+        "*.tsbuildinfo",
+        "db/backups",
+        ".agents",
+        ".claude"
       ]
     }
   ],

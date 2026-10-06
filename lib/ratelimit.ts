@@ -10,6 +10,7 @@ const ROUTE_LIMITS: Array<[string, number]> = [
   ['/api/auth/rehydrate', 5],
   ['/api/auth/consent', 10],   // L1: consent writes are low-frequency by design
   ['/api/upload', 5],
+  ['/api/video-processing', 60],
   ['/api/join', 20],
   ['/api/play', 60],
   ['/api/account', 5],         // L2: destructive — conservative cap on deletion attempts

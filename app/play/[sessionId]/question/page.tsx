@@ -19,26 +19,18 @@ import { attachVideoSource, disposeVideoSource } from '@/lib/video/playback';
 import { useQuizExitGuard } from '@/lib/hooks/useQuizExitGuard';
 
 
-type VideoQuality = 'auto' | 'hd' | 'sd';
 type QuestionWithPoster = Question & {
   poster_url?: string | null;
   thumbnail_url?: string | null;
 };
-function useVideoQuality(): VideoQuality {
-  if (typeof window === 'undefined') return 'auto';
-  return (localStorage.getItem('novarquiz-video-quality') as VideoQuality) ?? 'auto';
-}
-
 function isSafariBrowser() {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent;
   return /safari/i.test(ua) && !/chrome|chromium|crios|fxios|android/i.test(ua);
 }
 
-function resolvePreload(quality: VideoQuality): 'auto' | 'metadata' {
+function resolvePreload(): 'auto' | 'metadata' {
   if (typeof navigator !== 'undefined' && (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return 'metadata';
-  if (quality === 'hd') return 'auto';
-  if (quality === 'sd') return 'metadata';
   if (isSafariBrowser()) return 'auto';
   // auto: only preload aggressively when the browser exposes a clearly good network.
   if (typeof navigator === 'undefined') return 'metadata';
@@ -82,7 +74,6 @@ function QuestionVisual({ question, totalQuestions, preparedVideo, th, children 
   question: Question; totalQuestions?: number; preparedVideo?: HTMLVideoElement | null; th: boolean; children?: ReactNode;
 }) {
   const [failedMediaQuestionId, setFailedMediaQuestionId] = useState<string | null>(null);
-  const quality = useVideoQuality();
   const mediaError = failedMediaQuestionId === question.id;
   const mediaQuestion = question as QuestionWithPoster;
   const copy = (en: string, thai: string) => th ? thai : en;
@@ -95,7 +86,7 @@ function QuestionVisual({ question, totalQuestions, preparedVideo, th, children 
   >
     {question.media_url && <div className={styles.media}>
       {mediaError ? <div className={styles.mediaError}>{copy('Media unavailable', 'ไม่สามารถโหลดสื่อได้')}</div> : question.media_type === 'video' ?
-        <QuestionMediaPlayer key={question.id} src={question.media_url} preload={resolvePreload(quality)} poster={mediaQuestion.poster_url ?? mediaQuestion.thumbnail_url ?? undefined} preparedVideo={preparedVideo} onError={() => setFailedMediaQuestionId(question.id)} /> :
+        <QuestionMediaPlayer key={question.id} src={question.media_url} preload={resolvePreload()} poster={mediaQuestion.poster_url ?? mediaQuestion.thumbnail_url ?? undefined} preparedVideo={preparedVideo} onError={() => setFailedMediaQuestionId(question.id)} /> :
         <img src={question.media_url} alt="" onError={() => setFailedMediaQuestionId(question.id)} />}
       {mediaExplanation && <div className={styles.mediaExplanation}>
         {isScenario && <span className={styles.eyebrow}>{copy('SCENARIO', 'สถานการณ์')}</span>}
@@ -119,7 +110,6 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const copy = useCallback((en: string, thai: string) => th ? thai : en, [th]);
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const videoQuality = useVideoQuality();
 
   const [question, setQuestion] = useState<Question | null>(null);
   const [preparedVideo, setPreparedVideo] = useState<HTMLVideoElement | null>(null);
@@ -154,17 +144,18 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   const prefetchPromiseRef = useRef<Promise<void> | null>(null);
   const prefetchAbortRef = useRef<AbortController | null>(null);
   const answeringRef = useRef(false);
-  const videoQualityRef = useRef(videoQuality);
 
   const playRequest = useCallback(async (url: string, init?: RequestInit) => {
     if (user?.isAnonymous && url.includes('/answer?')) {
-      guestAttemptRef.current ??= crypto.randomUUID();
+      const key = `novarquiz-attempt:${user.uid}:${sessionId}`;
+      guestAttemptRef.current ??= sessionStorage.getItem(key) ?? crypto.randomUUID();
+      sessionStorage.setItem(key, guestAttemptRef.current);
       url += `&attempt=${encodeURIComponent(guestAttemptRef.current)}`;
     }
     const headers = new Headers(init?.headers);
     if (user?.isAnonymous) headers.set('Authorization', `Bearer ${await user.getIdToken()}`);
     return fetch(url, { ...init, headers });
-  }, [user]);
+  }, [user, sessionId]);
 
   useEffect(() => {
     fetch(`/api/sessions/${sessionId}`)
@@ -176,10 +167,6 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   useEffect(() => {
     userRef.current = user;
   }, [user]);
-
-  useEffect(() => {
-    videoQualityRef.current = videoQuality;
-  }, [videoQuality]);
 
   useEffect(() => {
     if (!user || user.isAnonymous || finished) return;
@@ -205,8 +192,8 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   }, [sessionId]);
 
   useQuizExitGuard(!finished && !!question, copy(
-    'Leave this quiz? Your current progress may be lost. Choose Cancel to keep playing.',
-    'ต้องการออกจากแบบทดสอบหรือไม่? ความคืบหน้าปัจจุบันอาจสูญหาย เลือกยกเลิกเพื่อเล่นต่อ',
+    'Leave this quiz? Your progress is saved. Choose Cancel to keep playing.',
+    'ต้องการออกจากแบบทดสอบหรือไม่? บันทึกความคืบหน้าไว้แล้ว เลือกยกเลิกเพื่อเล่นต่อ',
   ));
 
   const isSituation = question?.node_type === 'situation';
@@ -260,6 +247,10 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
         }
 
         const data = await response.json();
+        if (data?.completed) {
+          if (!cancelled) { completedRef.current = true; setScore(data.score); setStreak(data.streak); setElapsed(Math.floor(data.elapsed_ms / 1000)); setCompletionSaving(false); setFinished(true); }
+          return;
+        }
         if (!data?.id) {
           if (!cancelled) setRequestError(copy('Could not load the first question. Please try again.', 'โหลดคำถามไม่สำเร็จ กรุณาลองอีกครั้ง'));
           return;
@@ -268,6 +259,17 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
         if (!cancelled) {
           sessionStartRef.current = typeof performance !== 'undefined' ? performance.now() : 0;
           applyQuestion(data);
+          if (data.resume) {
+            setScore(data.resume.score); setStreak(data.resume.streak);
+            sessionStartRef.current = performance.now() - data.resume.elapsed_ms;
+            setElapsed(Math.floor(data.resume.elapsed_ms / 1000));
+            setQuestionStartTime(performance.now() - data.resume.question_elapsed_ms);
+            if (data.resume.answer) {
+              setSelectedLabel(data.resume.answer.chosen_label);
+              setAnswerFeedback(data.resume.answer);
+              setShowExplanationModal(true);
+            }
+          }
         }
       } catch {
         if (!cancelled) setRequestError(copy('Could not load the first question. Please try again.', 'โหลดคำถามไม่สำเร็จ กรุณาลองอีกครั้ง'));
@@ -335,6 +337,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: user.uid,
+          attempt: guestAttemptRef.current ?? undefined,
           question_id: question.id,
           question_token: question.question_token,
           chosen_label: label,
@@ -390,13 +393,13 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       prefetchAbortRef.current = controller;
       const timeout = window.setTimeout(() => controller.abort(), 8_000);
       try {
-        const r = await playRequest(`/api/play/${sessionId}/answer?fromQuestionId=${encodeURIComponent(question.id)}&choiceLabel=${encodeURIComponent(acceptedLabel)}&questionToken=${encodeURIComponent(question.question_token ?? '')}`, { cache: 'no-store', signal: controller.signal });
+        const r = await playRequest(`/api/play/${sessionId}/answer?fromQuestionId=${encodeURIComponent(question.id)}&choiceLabel=${encodeURIComponent(acceptedLabel)}&questionToken=${encodeURIComponent(question.question_token ?? '')}&prefetch=true`, { cache: 'no-store', signal: controller.signal });
         if (!r.ok || r.status === 204) return;
         const next: Question = await r.json();
         if (!next?.id || controller.signal.aborted) return;
         prefetchedNextRef.current = next;
-        if (next.media_type === 'video' && next.media_url && resolvePreload(videoQualityRef.current) === 'auto') {
-          prefetchVideoRef.current = prepareInlineVideo(next.media_url, resolvePreload(videoQualityRef.current));
+        if (next.media_type === 'video' && next.media_url && resolvePreload() === 'auto') {
+          prefetchVideoRef.current = prepareInlineVideo(next.media_url, resolvePreload());
         }
       } catch { /* non-fatal */ }
       finally {
@@ -421,7 +424,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
         releaseVideo(currentVideoWarmupRef.current);
         currentVideoWarmupRef.current = prefetchVideo;
       }
-      applyQuestion(prefetched);
+      await goToNext(question.id, selectedLabel);
       setNextLoading(false);
     } else {
       releaseVideo(prefetchVideo);
@@ -465,7 +468,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
     void (async () => {
       let finalScore = score;
       try {
-        const response = await fetch(`/api/play/${sessionId}/complete`, {
+        const response = await playRequest(`/api/play/${sessionId}/complete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -506,7 +509,7 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       setCompletionSaving(false);
       await refreshLeaderboard();
     })();
-  }, [copy, finished, refreshLeaderboard, score, sessionId, th, user]);
+  }, [copy, finished, refreshLeaderboard, score, sessionId, th, user, playRequest]);
 
   if (finished) {
     return <FinishedQuiz uid={user?.uid ?? null} sessionId={sessionId} score={score} elapsed={elapsed} quizName={sessionMeta?.quiz_name || sessionMeta?.name} leaderboard={leaderboard} error={leaderboardError} saving={completionSaving} guest={!!user?.isAnonymous} th={th}

@@ -10,7 +10,7 @@
  *                buttons are clicked. The page is responsible for the API calls.
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -26,8 +26,6 @@ import {
   type OnEdgesChange,
   type OnNodesChange,
 } from '@xyflow/react';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/lib/firebase/config';
 import type { Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -175,68 +173,73 @@ export function EditorCanvas({
     setInspectedNode(prev => prev?.id === id ? { ...prev, data: { ...data } } as AppNode : prev);
   }, [setNodes]);
 
+  const latestUploads = useRef(new Map<string, string>());
+  const applyMedia = useCallback((nodeId: string, media: { media_type: string; media_url: string | null; media_path: string }) => {
+    setNodes(ns => ns.map(n => n.id === nodeId ? { ...n, data: { ...n.data, ...media } } as AppNode : n));
+    setInspectedNode(prev => prev?.id === nodeId ? { ...prev, data: { ...prev.data, ...media } } as AppNode : prev);
+  }, [setNodes]);
   const handleFileUpload = useCallback(async (nodeId: string, file: File) => {
-    const isVideo = file.type.startsWith('video/');
-    const isGif = file.type === 'image/gif';
-    const isImage = file.type.startsWith('image/');
-    if (!isVideo && !isImage) return;
-    if (isVideo && file.type !== 'video/mp4') {
-      showToast('Use MP4 video for iOS Safari autoplay', 'error');
-      return;
-    }
-
-    const MAX_IMAGE = 5 * 1024 * 1024;  // 5 MB
-    const MAX_VIDEO = 50 * 1024 * 1024; // 50 MB
-    if (isVideo && file.size > MAX_VIDEO) {
-      showToast('Video must be under 50 MB', 'error');
-      return;
-    }
-    if (!isVideo && file.size > MAX_IMAGE) {
-      showToast('Image must be under 5 MB', 'error');
-      return;
-    }
-
-    const mediaType = isVideo ? 'video' : isGif ? 'gif' : 'image';
-    const folder = isVideo ? 'video' : isGif ? 'gif' : 'image';
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? (isVideo ? 'mp4' : 'bin');
-    const storageBucket = quizId ?? sessionId;
-    const path = `question-sessions/${storageBucket}/${folder}/${nodeId}_${Date.now()}.${ext}`;
-    const storageRef = ref(storage, path);
-
+    const requestId = crypto.randomUUID();
+    latestUploads.current.set(nodeId, requestId);
     setUploadStatus({ nodeId, uploading: true, progress: 0 });
+    try {
+      let data;
+      if (file.type.startsWith('video/')) {
+        const init = await fetch('/api/upload/video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'init', type: file.type, size: file.size }) });
+        const session = await init.json();
+        if (!init.ok) throw new Error(session.error || 'Upload failed');
+        await new Promise<void>((resolve, reject) => {
+          const upload = new XMLHttpRequest(); upload.open('PUT', session.uploadUrl);
+          upload.setRequestHeader('Content-Type', file.type);
+          upload.upload.onprogress = event => { if (event.lengthComputable && latestUploads.current.get(nodeId) === requestId) setUploadStatus({ nodeId, uploading: true, progress: Math.round(event.loaded / event.total * 100) }); };
+          upload.onload = () => upload.status >= 200 && upload.status < 300 ? resolve() : reject(new Error('Upload failed. Please retry.'));
+          upload.onerror = () => reject(new Error('Upload failed. Check your connection.'));
+          upload.send(file);
+        });
+        const finish = await fetch('/api/upload/video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'finish', id: session.id, ext: session.ext }) });
+        data = await finish.json();
+        if (!finish.ok) throw new Error(data.error || 'Upload failed');
+      } else {
+        const form = new FormData(); form.set('file', file);
+        const response = await fetch('/api/upload', { method: 'POST', body: form });
+        data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Upload failed');
+      }
+      if (latestUploads.current.get(nodeId) !== requestId) return;
+      applyMedia(nodeId, { media_type: file.type.startsWith('video/') ? 'video' : file.type === 'image/gif' ? 'gif' : 'image', media_url: data.url, media_path: data.path });
+      setUploadStatus(null);
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Upload failed', 'error'); setUploadStatus(null); }
+  }, [applyMedia, showToast]);
 
-    const safeFileName = file.name.replace(/[^\w.-]/g, '_');
-    const task = uploadBytesResumable(storageRef, file, {
-      contentType: file.type,
-      cacheControl: 'public,max-age=31536000',
-      contentDisposition: `inline; filename="${safeFileName}"`,
+  // A saved draft retains the source path, so processing resumes after closing
+  // and reopening the editor. Only update nodes still pointing at that source.
+  useEffect(() => {
+    let stopped = false;
+    const pending = nodes.flatMap(node => {
+      const path = (node.data as AppNodeData).media_path;
+      const id = path?.match(/^quiz-media\/original-([a-f0-9-]+)\.(mp4|mov)$/)?.[1];
+      return id ? [{ nodeId: node.id, id, path }] : [];
     });
-    task.on(
-      'state_changed',
-      snap => setUploadStatus({ nodeId, uploading: true, progress: Math.round((snap.bytesTransferred / snap.totalBytes) * 100) }),
-      () => setUploadStatus(null),
-      async () => {
-        const url = await getDownloadURL(task.snapshot.ref);
-        const updateData = {
-          media_type: mediaType,
-          media_url: url,
-          media_path: path
-        };
-
-        setNodes(ns => ns.map(n => n.id === nodeId ? {
-          ...n,
-          data: { ...n.data, ...updateData }
-        } as AppNode : n));
-
-        setInspectedNode(prev => prev?.id === nodeId ? {
-          ...prev,
-          data: { ...prev.data, ...updateData }
-        } as AppNode : prev);
-
-        setUploadStatus(null);
-      },
-    );
-  }, [sessionId, quizId, setNodes, showToast]);
+    if (!pending.length) return;
+    const poll = async () => {
+      for (const item of pending) {
+        try {
+          const response = await fetch(`/api/video-processing/${item.id}`, { cache: 'no-store' });
+          if (!response.ok) continue;
+          const job = await response.json();
+          if (stopped) return;
+          if (job.status === 'ready') {
+            setNodes(ns => ns.map(n => n.id === item.nodeId && (n.data as AppNodeData).media_path === item.path
+              ? { ...n, data: { ...n.data, media_url: job.url, media_path: job.path } } as AppNode : n));
+            setInspectedNode(prev => prev?.id === item.nodeId && prev.data.media_path === item.path
+              ? { ...prev, data: { ...prev.data, media_url: job.url, media_path: job.path } } as AppNode : prev);
+          }
+        } catch { /* Retry on the next poll; the worker continues independently. */ }
+      }
+    };
+    void poll(); const timer = setInterval(() => void poll(), 3000);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [nodes, setNodes]);
 
   const handleConnectionChange = useCallback((choiceLabel: string, toQuestionId: string | null) => {
     if (!inspectedNode) return;

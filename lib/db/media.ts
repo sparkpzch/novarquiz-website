@@ -34,6 +34,9 @@ export async function decrementMediaUsage(client: IDbClient, path: string | null
   );
 
   if (result.rows.length > 0 && result.rows[0].usage_count <= 0) {
+    // Processing sources and whole immutable HLS bundles are retained for rollback.
+    const managed = await client.query('SELECT 1 FROM video_processing_jobs WHERE source_path=$1 OR output_path=$1 LIMIT 1', [path]);
+    if (managed.rowCount) return;
     // Delete from Storage
     try {
       const bucket = adminStorage.bucket();

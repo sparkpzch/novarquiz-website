@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { adminRtdb } from '@/lib/firebase/admin';
-import { getSessionById } from '@/lib/db/queries';
+import { getSessionById, withPlayerAnswerLock } from '@/lib/db/queries';
+import { resetProgress } from '@/lib/db/play-progress';
 import { getPlayUser } from '@/lib/play-auth';
 import { ROOM_STATUS } from '@/lib/constants/session';
 import { sanitizePhotoUrl } from '@/lib/security/photo-url';
@@ -67,6 +68,10 @@ export async function POST(
       mode: 'lobby',
       joinedAt: Date.now(),
     });
+
+    // An explicit join starts another attempt after a completed game. Refreshing
+    // gameplay only reads progress, and rejoining an unfinished game preserves it.
+    await withPlayerAnswerLock(sessionId, user.uid, () => resetProgress(sessionId, user.uid));
 
     return NextResponse.json({
       success: true,

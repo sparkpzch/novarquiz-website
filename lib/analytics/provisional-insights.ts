@@ -24,13 +24,21 @@ export function answerPatternSignature(input: AnswerReviewContext & {
     readingStyle: input.readingStyle,
     quizName: input.quizName,
     quizDescription: input.quizDescription,
-    answers: canonicalAnswers(input.answers),
+    // Mistake feedback shares one generation lease even when correct choices differ.
+    answers: canonicalAnswers(input.answers.some(answer => !answer.selectedAligned)
+      ? input.answers.filter(answer => !answer.selectedAligned) : input.answers),
   })).digest('hex');
 }
 
 export function sameAnswerPattern(source: AnswerReviewContext, target: AnswerReviewContext): boolean {
   return source.quizName === target.quizName && source.quizDescription === target.quizDescription &&
     JSON.stringify(canonicalAnswers(source.answers)) === JSON.stringify(canonicalAnswers(target.answers));
+}
+
+export function sameMissedAnswerPattern(source: AnswerReviewContext, target: AnswerReviewContext): boolean {
+  const missed = source.answers.filter(answer => !answer.selectedAligned);
+  return missed.length > 0 && source.quizName === target.quizName && source.quizDescription === target.quizDescription &&
+    JSON.stringify(canonicalAnswers(missed)) === JSON.stringify(canonicalAnswers(target.answers.filter(answer => !answer.selectedAligned)));
 }
 
 function canonicalAnswers(answers: AnswerReviewContext['answers']) {
@@ -43,13 +51,21 @@ function canonicalAnswers(answers: AnswerReviewContext['answers']) {
   })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
 }
 
-/** Reuse only when every recorded selection behind the cached wording also
- * exists in the new answers. Up to 20% additional answers are allowed, but a
- * changed selection or explanation is never treated as a match. */
-export function approvedAnswerCoverage(source: AnswerReviewContext, target: AnswerReviewContext): number {
+/** Identical missed evidence reuses feedback despite different correct options.
+ * Other nearby paths require every source selection and at least 80% coverage;
+ * changed selections or authored explanations are never treated as matches. */
+export function approvedAnswerCoverage(source: AnswerReviewContext, target: AnswerReviewContext, wording?: InsightSummary): number {
   if (source.quizName !== target.quizName || source.quizDescription !== target.quizDescription || !source.answers.length || !target.answers.length) return 0;
   // Praise for a fully correct path must not cover a nearby path with a miss.
   if (source.answers.every(answer => answer.selectedAligned) !== target.answers.every(answer => answer.selectedAligned)) return 0;
+  // Older wording may mention a correct selection. Never reuse that claim when
+  // the new player chose another correct option; new mistake drafts omit strengths.
+  if (wording) {
+    const text = [wording.headline, wording.body, wording.suggestion ?? ''].join(' ');
+    if (source.answers.some(answer => answer.selectedAligned && answer.selected.trim() && text.includes(answer.selected) &&
+      !target.answers.some(next => next.question === answer.question && next.selected === answer.selected))) return 0;
+  }
+  if (sameMissedAnswerPattern(source, target)) return 1;
   // A derived focus can change with question order; identical evidence still reuses wording.
   if (sameAnswerPattern(source, target)) return 1;
   if (source.learningFocus && target.learningFocus) {
@@ -76,12 +92,12 @@ export function buildProvisionalInsightPrompt(context: AnswerReviewContext & {
 }): string {
   const language = context.locale === 'th' ? 'Thai' : 'English';
   const reader = context.readingStyle === 'everyday' ? 'an everyday reader with no medical training' : context.audience === 'hcp' ? 'a healthcare professional' : 'a general reader';
-  // Keep the request small: the focus question, up to six missed answers,
-  // and at most two strengths. The stored review context retains all answers.
-  const focus = context.answers.find((answer) => answer.question === context.learningFocus?.question);
+  // Mistake drafts use only missed answers so correct-option differences cannot
+  // change the wording. Fully correct paths use at most two strengths.
   const missed = context.answers.filter((answer) => !answer.selectedAligned);
   const allCorrect = context.answers.length > 0 && missed.length === 0;
-  const strengths = context.answers.filter((answer) => answer.selectedAligned).slice(0, 2);
+  const focus = context.answers.find((answer) => answer.question === context.learningFocus?.question && (allCorrect || !answer.selectedAligned));
+  const strengths = missed.length ? [] : context.answers.filter((answer) => answer.selectedAligned).slice(0, 2);
   const sources = [...new Set([...(focus ? [focus] : []), ...missed.slice(0, 6), ...strengths])].slice(0, 8);
   const answers = sources.map((answer, index) => [
     `${index + 1}. Question: ${answer.question}`,
@@ -105,7 +121,7 @@ export function buildProvisionalInsightPrompt(context: AnswerReviewContext & {
     allCorrect
       ? 'Outcome across ALL recorded answers: every answer is correct. Acknowledge the correct answers in this quiz; do not suggest the reader made mistakes or needs remedial practice.'
       : 'Outcome: some recorded answers need another look. Give kind, specific feedback on those selections; do not claim every answer is correct.',
-    ...(context.learningFocus ? [allCorrect
+    ...(context.learningFocus && focus ? [allCorrect
       ? `Acknowledge correct answers on this topic: ${context.learningFocus.topic}. Use this recorded question as the example: ${context.learningFocus.question}.`
       : `Prioritise this learning topic: ${context.learningFocus.topic}. Use this recorded question for the hint: ${context.learningFocus.question}.`] : []),
     'Mention one or two specific selections and explain the learning point using the matching author explanations.',

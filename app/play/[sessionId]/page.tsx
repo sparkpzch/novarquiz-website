@@ -36,7 +36,7 @@ export default function PlayLobbyPage({ params }: { params: Promise<{ sessionId:
 
     void (async () => {
       try {
-        await fetch(`/api/play/${sessionId}/answer`, {
+        const response = await fetch(`/api/play/${sessionId}/answer`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -45,7 +45,9 @@ export default function PlayLobbyPage({ params }: { params: Promise<{ sessionId:
             is_guest: user.isAnonymous,
           }),
         });
-        if (!cancelled) router.push(`/play/${sessionId}/question`);
+        if (!response.ok) throw new Error('Could not start quiz');
+        const started = await response.json();
+        if (!cancelled) router.push(`/play/${started.id}/question`);
       } catch {
         if (!cancelled) setStatus('error');
       }

@@ -4,6 +4,8 @@ import { completeSession, getAttemptBoundary, getExistingAnswer, getUserHistory,
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
 import { verifyQuestionToken } from '@/lib/security/question-token';
+import { getPlayUser } from '@/lib/play-auth';
+import { completeProgress, getProgress } from '@/lib/db/play-progress';
 
 import { preparePersonalRecap } from '@/lib/ai/personal-recap';
 import type { UserHistoryRow } from '@/lib/analytics/history';
@@ -51,7 +53,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
   try {
     const body = CompletionBody.safeParse(await request.json());
     if (!body.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
-    if (body.data.is_guest) return NextResponse.json({ is_guest: true });
+    const playUser = await getPlayUser(request);
+    if (playUser?.isGuest) {
+      const progress = await getProgress(sessionId, playUser.uid);
+      if (!progress || progress.question_id !== body.data.final_question_id ||
+        !verifyQuestionToken(body.data.final_question_token, sessionId, playUser.uid, progress.question_id, 'guest')) return NextResponse.json({ error: 'Invalid progress' }, { status: 403 });
+      const question = await getQuestionById(progress.question_id);
+      const label = question?.node_type === 'situation' ? 'continue' : progress.answer?.chosen_label;
+      if (!question || (question.node_type !== 'end' && (!label || await getNextQuestion(question.id, label)))) return NextResponse.json({ error: 'Quiz is not complete' }, { status: 403 });
+      await completeProgress(sessionId, playUser.uid);
+      return NextResponse.json({ is_guest: true, total_score: progress.score, total_time_ms: Date.now() - Number(progress.started_at) });
+    }
 
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -83,6 +95,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
         user_display_name: sanitizeDisplayName(body.data.user_display_name),
         user_photo_url: sanitizePhotoUrl(body.data.user_photo_url),
       });
+      await completeProgress(sessionId, user.uid);
       // Persist the shared generation claim before returning completion. Capture
       // the exact finished attempt while the player's answer lock is still held.
       try {

@@ -195,7 +195,7 @@ export default function InsightsAdminPage() {
 
   if (authLoading || !isAdmin) return null;
 
-  return <div className="insights-desk">
+  return <div className="insights-desk nq-admin-panel">
     <header className="insights-header">
       <div><p className="insights-eyebrow"><Icon name="spark" /> {text("ANSWER INSIGHTS", "สรุปจากคำตอบ")}</p>
         <h1>{text("Insight Summaries", "สรุปผลแบบทดสอบ")}</h1>

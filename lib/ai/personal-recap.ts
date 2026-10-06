@@ -13,9 +13,14 @@ export async function preparePersonalRecap(
   if (!session.quiz_id || !answers.length) return { state: 'unavailable' };
   const [quiz, consent] = await Promise.all([getQuizById(session.quiz_id), options.readOnly ? Promise.resolve(null) : getUserConsent(uid)]);
   const coaching = historyCoaching({ session, answers, topics: [], feedback: null }, locale);
+  const missedTags = new Map<string, number>();
+  for (const answer of answers.filter(answer => !answer.selectedAligned)) {
+    for (const tag of new Set(answer.tags)) missedTags.set(tag, (missedTags.get(tag) ?? 0) + 1);
+  }
   return prepareProvisionalInsight({
     userId: uid, quizId: session.quiz_id, audience: quiz?.intended_audience === 'hcp' ? 'hcp' : 'public',
     locale, readingStyle: 'everyday', allowGeneration: consent?.privacy_version === PRIVACY_VERSION, readOnly: options.readOnly,
+    tags: [...missedTags].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([tag]) => tag),
     context: {
       quizName: quiz?.name ?? session.session_name, quizDescription: quiz?.description ?? session.session_description,
       answers: answers.map(({ question, selected, selectedExplanation, selectedAligned, alignedChoices }) => ({ question, selected, selectedExplanation, selectedAligned, alignedChoices })),

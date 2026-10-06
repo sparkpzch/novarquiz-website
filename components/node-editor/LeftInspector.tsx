@@ -11,11 +11,8 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ref, deleteObject } from 'firebase/storage';
-import { storage } from '@/lib/firebase/config';
-import { useFFmpeg } from '@/lib/hooks/useFFmpeg';
-import { useToast } from '@/components/ui/Toast';
 import { getVideoSourceType } from '@/lib/video/source';
+import VideoProcessingStatus from './VideoProcessingStatus';
 import AutoPlayVideo from '@/components/ui/AutoPlayVideo';
 import type { NormalNodeData } from './NormalNode';
 import type { SituationNodeData } from './SituationNode';
@@ -155,38 +152,10 @@ export function LeftInspector({
   const [panelWidth, setPanelWidth] = useState(340);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [imgLoadError, setImgLoadError] = useState(false);
-  const [compressing, setCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { load: loadFFmpeg, progress: ffmpegProgress, compressVideo } = useFFmpeg();
-  const { showToast } = useToast();
 
-  const handleFileUpload = async (file: File) => {
-    if (!file || !selectedNode) return;
-
-    if (file.type.startsWith('video/')) {
-      setCompressing(true);
-      try {
-        await loadFFmpeg();
-        const blob = await compressVideo(file);
-        onUpload(new File([blob], file.name.replace(/\.[^.]+$/, '.mp4'), { type: 'video/mp4' }));
-      } catch {
-        // Falling back to the raw file uploads a video that was never run
-        // through `-movflags +faststart`, so its moov atom may sit at the end
-        // of the container. Safari then spends extra round trips seeking the
-        // tail before it can start playback. Upload it anyway — blocking the
-        // admin is worse — but never let this pass silently.
-        showToast(
-          'Video compression failed — uploading the original. It may load slowly on Safari; consider compressing it before upload.',
-          'error',
-        );
-        onUpload(file);
-      } finally {
-        setCompressing(false);
-      }
-      return;
-    }
-
-    onUpload(file);
+  const handleFileUpload = (file: File) => {
+    if (file && selectedNode) onUpload(file);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -200,14 +169,11 @@ export function LeftInspector({
   const handleRemoveMedia = async () => {
     if (!draft || !selectedNode) return;
     setImgLoadError(false);
-    const path = draft.media_path;
     const next = { ...draft, media_type: null, media_url: null, media_path: null } as NodeData;
     setDraft(next);
     onChange(selectedNode.id, next);
 
-    if (path) {
-      deleteObject(ref(storage, path)).catch(() => {});
-    }
+
   };
 
   const startResizing = useCallback((e: React.MouseEvent) => {
@@ -342,12 +308,12 @@ export function LeftInspector({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,video/mp4"
+            accept="image/*,video/mp4,video/quicktime"
             style={{ display: 'none' }}
             onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ''; }}
           />
 
-          {!draft.media_url && !uploadStatus?.uploading && !compressing && (
+          {!draft.media_url && !uploadStatus?.uploading && (
             <button
               onClick={() => fileInputRef.current?.click()}
               style={{
@@ -362,17 +328,8 @@ export function LeftInspector({
             </button>
           )}
 
-          {compressing && (
-            <div style={{ padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(112,162,249,0.18)', marginTop: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#35527e', marginBottom: 6, fontWeight: 600 }}>
-                <span>{ffmpegProgress === 0 ? 'Loading FFmpeg…' : 'Compressing…'}</span>
-                <span>{ffmpegProgress > 0 ? `${ffmpegProgress}%` : ''}</span>
-              </div>
-              <div style={{ height: 4, background: 'rgba(112,162,249,0.12)', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${ffmpegProgress}%`, background: '#22c55e', transition: 'width 0.2s' }} />
-              </div>
-            </div>
-          )}
+          {draft.media_path?.match(/^quiz-media\/original-([a-f0-9-]+)\.(mp4|mov)$/) &&
+            <VideoProcessingStatus id={draft.media_path.match(/^quiz-media\/original-([a-f0-9-]+)\.(mp4|mov)$/)![1]} />}
 
           {uploadStatus?.uploading && (
             <div style={{ padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(112,162,249,0.18)', marginTop: 6 }}>

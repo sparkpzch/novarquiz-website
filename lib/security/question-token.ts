@@ -8,8 +8,7 @@ function signature(sessionId: string, userId: string, questionId: string, attemp
     .digest('hex');
 }
 
-export function createQuestionToken(sessionId: string, userId: string, questionId: string, attemptBoundary: string) {
-  const issuedAt = Date.now();
+export function createQuestionToken(sessionId: string, userId: string, questionId: string, attemptBoundary: string, issuedAt = Date.now()) {
   return `${issuedAt}.${signature(sessionId, userId, questionId, attemptBoundary, issuedAt)}`;
 }
 

@@ -1,6 +1,6 @@
 import pool, { queryWithRetry } from './postgres';
 import type { InsightLocale, InsightSummary } from '../analytics/insights';
-import { approvedAnswerCoverage, sameAnswerPattern } from '../analytics/provisional-insights';
+import { approvedAnswerCoverage, sameAnswerPattern, sameMissedAnswerPattern } from '../analytics/provisional-insights';
 
 export type AnswerReviewItem = {
   question: string;
@@ -64,7 +64,7 @@ export async function getSimilarReusableInsight(
        AND p.headline IS NOT NULL AND p.body IS NOT NULL
      ORDER BY (p.status = 'approved') DESC, p.reviewed_at DESC NULLS LAST, p.updated_at DESC`, [quizId, audience, locale],
   );
-  return result.rows.map((row) => ({ row, coverage: approvedAnswerCoverage(row.answer_context!, context) }))
+  return result.rows.map((row) => ({ row, coverage: approvedAnswerCoverage(row.answer_context!, context, row) }))
     .filter(({ coverage }) => coverage > 0)
     .sort((a, b) => Number(b.row.status === 'approved') - Number(a.row.status === 'approved') || b.coverage - a.coverage)[0]?.row ?? null;
 }
@@ -83,7 +83,7 @@ export async function isAnswerPatternRejected(
     [quizId, audience, locale, signature, !!context],
   );
   return result.rows.some((row) => row.answer_signature === signature ||
-    (context && row.answer_context && sameAnswerPattern(row.answer_context, context)));
+    (context && row.answer_context && (sameAnswerPattern(row.answer_context, context) || sameMissedAnswerPattern(row.answer_context, context))));
 }
 
 /** Authenticated caller supplies the user ID; only authored choice text and

@@ -1,3 +1,4 @@
+import QuizThumbnail from '@/components/ui/QuizThumbnail';
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -700,14 +701,7 @@ export default function QuizzesManager({
                               className="object-cover transition duration-500 group-hover:scale-[1.03]"
                             />
                           ) : (
-                            <div className="absolute inset-0 flex items-center justify-center px-8 text-center">
-                              <div className="absolute inset-0 opacity-40 [background-image:radial-gradient(circle_at_20%_20%,rgba(255,255,255,.35),transparent_28%),radial-gradient(circle_at_85%_75%,rgba(255,255,255,.22),transparent_24%)]" />
-                              <div className="relative">
-                                <span className="text-4xl" aria-hidden="true">✦</span>
-                                <p className="mt-2 line-clamp-2 text-base font-bold text-white">{q.name}</p>
-                                <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/65">Add quiz thumbnail</p>
-                              </div>
-                            </div>
+          <QuizThumbnail />
                           )}
                           <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-center justify-end gap-2 bg-gradient-to-t from-[#060b26]/95 via-[#060b26]/55 to-transparent p-3 pt-10">
                             {canEditQuiz && (

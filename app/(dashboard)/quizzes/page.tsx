@@ -1,5 +1,6 @@
 "use client";
 
+import QuizThumbnail from '@/components/ui/QuizThumbnail';
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -65,13 +66,7 @@ function SessionCard({
             className="object-cover transition duration-300 group-hover:scale-105"
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
-            <div className="absolute inset-0 opacity-40 [background-image:radial-gradient(circle_at_20%_20%,rgba(255,255,255,.35),transparent_28%),radial-gradient(circle_at_85%_75%,rgba(255,255,255,.22),transparent_24%)]" />
-            <div className="relative">
-              <span className="text-4xl text-white" aria-hidden="true">✦</span>
-              <p className="mt-2 line-clamp-2 text-base font-bold text-white">{session.name}</p>
-            </div>
-          </div>
+          <QuizThumbnail />
         )}
       </div>
       <div className="flex flex-1 flex-col p-5">

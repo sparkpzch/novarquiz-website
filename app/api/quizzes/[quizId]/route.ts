@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getQuizById, updateQuiz, deleteQuiz } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
+import { UnpreparedVideoError } from '@/lib/video/jobs';
 
 const ALLOWED_MEDIA_ORIGINS = new Set([
   'storage.googleapis.com',
@@ -77,6 +78,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const updated = await updateQuiz(quizId, parsed.data as Parameters<typeof updateQuiz>[1]);
     return NextResponse.json(updated);
   } catch (err) {
+    if (err instanceof UnpreparedVideoError) return NextResponse.json({ error: err.message }, { status: 409 });
     console.error(`Failed to update quiz ${quizId}:`, err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }

@@ -251,10 +251,10 @@ test('large quizzes keep the highest-priority missed question and cap model sour
 
 
 test('approved wording covers a nearby path with an extra answer and requires no model call', async () => {
-  const f = fixture();
   const source = { ...food, answers: [food.answers[0], ...Array.from({ length: 3 }, (_, i) => ({ ...food.answers[0], question: `Food label example ${i}` }))] };
   const target = { ...source, answers: [...source.answers, { ...food.answers[0], question: 'Another part of the quiz', selectedAligned: true }] };
-  assert.equal(approvedAnswerCoverage(source, target), 0.8);
+  const f = fixture(source);
+  assert.equal(approvedAnswerCoverage(source, target), 1);
   f.setStatus('approved');
   const approved = await f.dependencies.getSimilarReusableInsight('quiz', 'public', 'en', source);
   f.dependencies.getSimilarReusableInsight = async (_quiz, _audience, _locale, context) => approvedAnswerCoverage(source, context) ? approved : null;
@@ -302,4 +302,47 @@ test('identical answers reuse approved wording despite derived focus and automat
   assert.deepEqual(result.insight?.summary, reviewed);
   assert.equal(result.generate, undefined);
   assert.equal(f.calls, 0); assert.equal(f.saves, 0);
+});
+
+test('approved CMS wording takes precedence over pending/rejected patterns without model calls', async () => {
+  const reviewed = { headline: 'Approved label guidance', body: 'Check serving sizes when comparing labels.', suggestion: null };
+  for (const cachedStatus of ['provisional', 'rejected', 'generating'] as const) {
+    const f = fixture(); f.setStatus(cachedStatus);
+    f.dependencies.getApprovedInsightSummary = async (scope) => {
+      assert.deepEqual(scope, { quizId: input.quizId, tags: ['nutrition'], audience: input.audience, locale: input.locale });
+      return reviewed;
+    };
+    const forbidden = async () => { throw new Error('Approved wording must be returned before draft lookup or generation'); };
+    f.dependencies.claimProvisionalInsight = forbidden;
+    f.dependencies.getSimilarReusableInsight = forbidden;
+    f.dependencies.getProvisionalInsight = forbidden;
+    f.dependencies.isAnswerPatternRejected = forbidden;
+    for (let refresh = 0; refresh < 3; refresh++) {
+      const result = await prepareProvisionalInsight({ ...input, tags: ['nutrition'], allowGeneration: false }, f.dependencies);
+      assert.equal(result.state, 'approved'); assert.deepEqual(result.insight?.summary, reviewed);
+      assert.equal(result.generate, undefined);
+    }
+    assert.equal(f.calls, 0); assert.equal(f.saves, 0);
+  }
+});
+
+test('the same missed answer reuses approved or pending feedback despite different correct choices', async () => {
+  const correct = { ...perfectFood.answers[0], question: 'A different question', selected: 'First correct option' };
+  const source = { ...food, answers: [...food.answers, correct] };
+  const target = { ...source, answers: [...food.answers, { ...correct, selected: 'Second correct option' }] };
+  assert.equal(answerPatternSignature({ ...input, ...source }), answerPatternSignature({ ...input, ...target }));
+  assert.equal(approvedAnswerCoverage(source, target, summary), 1);
+  assert.equal(approvedAnswerCoverage(source, target, { ...summary, body: 'You selected First correct option.' }), 0);
+  assert.equal(approvedAnswerCoverage(source, { ...target, answers: [{ ...food.answers[0], selected: 'Another wrong option' }, target.answers[1]] }), 0);
+  const prompt = buildProvisionalInsightPrompt({ ...source, audience: 'public', locale: 'en', readingStyle: 'everyday' });
+  assert.doesNotMatch(prompt, /First correct option/);
+  for (const status of ['approved', 'provisional'] as const) {
+    const f = fixture(source); f.setStatus(status);
+    for (let repeat = 0; repeat < 3; repeat++) {
+      const result = await prepareProvisionalInsight({ ...input, context: target, userId: 'another-user' }, f.dependencies);
+      assert.equal(result.state, status === 'approved' ? 'approved' : 'pending');
+      assert.deepEqual(result.insight?.summary, summary); assert.equal(result.generate, undefined);
+    }
+    assert.equal(f.calls, 0); assert.equal(f.saves, 0);
+  }
 });
