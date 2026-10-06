@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import QRCode from "react-qr-code";
-import Button from "./ui/Button";
 
 interface InvitationModalProps {
   isOpen: boolean;
@@ -93,15 +92,6 @@ export default function InvitationModal({ isOpen, onClose, sessionName, joinToke
               </div>
             </div>
 
-            <div className="flex w-full gap-3">
-              <Button
-                variant="primary"
-                className="flex-1 justify-center py-4 rounded-2xl bg-linear-to-r from-[#055A9E] to-[#0460A9] shadow-lg shadow-[#0460A9]/30"
-                onClick={onClose}
-              >
-                Done
-              </Button>
-            </div>
           </motion.div>
         </motion.div>
       )}
