@@ -153,8 +153,10 @@ export default function QuizzesManager({
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("quizId", quizId);
       const uploadResponse = await fetch("/api/upload", {
         method: "POST",
+        headers: {"X-Quiz-Id":quizId},
         body: formData,
       });
       const uploaded = await uploadResponse.json().catch(() => null);
@@ -270,7 +272,8 @@ export default function QuizzesManager({
 
   const handleToggleJoin = async (sessionId: string, isPrivate: boolean) => {
     const room = rooms[sessionId];
-    const isOpen = room && (room.status === ROOM_STATUS.WAITING || room.status === ROOM_STATUS.STARTED);
+    const status = room?.status ?? allSessions.find(session => session.id===sessionId)?.status;
+    const isOpen = status===ROOM_STATUS.WAITING || status===ROOM_STATUS.STARTED || status===SESSION_STATUS.OPENED;
 
     setItemLoading(sessionId, true);
     try {

@@ -1,3 +1,4 @@
+import { adminRtdb } from '@/lib/firebase/admin';
 import { NextResponse } from 'next/server';
 import { getSessionByToken } from '@/lib/db/queries';
 import { getPlayUser } from '@/lib/play-auth';
@@ -23,7 +24,13 @@ export async function GET(
 
   const { token } = await params;
   try {
-    const session = await getSessionByToken(token);
+    const invitation = (await adminRtdb.ref(`joinTokens/${token}`).get()).val();
+    const session = invitation?.sessionId
+      ? await getSessionByToken(invitation.sessionId) : await getSessionByToken(token);
+    if (session?.is_private) {
+      const room = (await adminRtdb.ref(`sessions/${session.id}`).get()).val();
+      if (!invitation || room?.joinToken !== token || room.status === 'ended') return NextResponse.json({ error: 'Invitation unavailable' }, { status: 404 });
+    }
     if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     return NextResponse.json({
       id: session.id,

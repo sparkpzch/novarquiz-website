@@ -2,7 +2,7 @@ import pg from 'pg';
 import { Storage } from '@google-cloud/storage';
 import { OAuth2Client } from 'google-auth-library';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -70,6 +70,8 @@ try {
       }).join('\n');
       await writeFile(join(output,name),rewritten);
     }
+    const outputBytes = (await Promise.all(files.map(name => stat(join(output,name))))).reduce((total,file)=>total+file.size,0);
+    if (outputBytes > 150 * 1024 * 1024) throw new Error('Prepared video exceeds its reserved storage allowance');
     // Segments first, rendition playlists next, master last; publish only a complete set.
     files.sort((a,b) => Number(a.endsWith('.m3u8'))-Number(b.endsWith('.m3u8')) || Number(a==='master.m3u8')-Number(b==='master.m3u8'));
     for (const name of files) {

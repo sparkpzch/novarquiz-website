@@ -77,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Recovery is for initial startup only, never a later sign-out event.
         rehydrateTriedRef.current = true;
         try {
+          let currentIsAdmin: boolean | undefined;
           if (checkExistingSession && !firebaseUser.isAnonymous) {
             const response = await fetch('/api/auth/session', { cache: 'no-store' });
             if (!isCurrent()) return;
@@ -87,11 +88,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
             if (!response.ok) throw new Error('Session check unavailable');
             const session = await response.json();
+            currentIsAdmin = session.isAdmin === true;
             if (session.uid !== firebaseUser.uid) { await signOut(auth); clearLocalSession(); return; }
           }
           const tokenResult = await firebaseUser.getIdTokenResult();
           if (!isCurrent()) return;
-          setIsAdmin(tokenResult.claims.admin === true);
+          setIsAdmin(currentIsAdmin ?? tokenResult.claims.admin === true);
           setUser(firebaseUser);
           saveProfileCache(firebaseUser);
           setCachedProfile({ displayName: firebaseUser.displayName, photoURL: firebaseUser.photoURL, email: firebaseUser.email });

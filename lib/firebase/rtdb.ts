@@ -11,9 +11,14 @@ import {
   type DataSnapshot,
 } from 'firebase/database';
 import app from './config';
+import { readLobbyConnection, lobbyHeaders } from '@/lib/client/lobby-connection';
 import { ROOM_STATUS, RoomStatus } from '../constants/session';
 
 export const rtdb = getDatabase(app);
+
+export function watchRealtimeConnection(callback: (connected: boolean) => void): () => void {
+  return onValue(ref(rtdb, '.info/connected'), snapshot => callback(snapshot.val() === true));
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,6 +26,10 @@ export type WaitingPlayer = {
   displayName: string;
   photoURL: string | null;
   joinedAt: number;
+  connectionId?: string;
+  roundId?: string;
+  lastActiveAt?: number;
+  left?: boolean;
 };
 
 // export type RoomStatus = 'waiting' | 'started' | 'ended'; // Moved to constants/session.ts
@@ -28,6 +37,8 @@ export type WaitingPlayer = {
 export type SessionRoom = {
   status: RoomStatus;
   hostId: string;
+  roundId?: string;
+  connections?: Record<string, Record<string, Record<string, boolean>>>;
   leaderId?: string;
   joinToken?: string | null;
   players?: Record<string, WaitingPlayer>;
@@ -37,7 +48,7 @@ export type SessionRoom = {
 export type TeamRoom = {
   sessionId: string;
   hostId: string;
-  pin: string;
+  pin?: string;
   status: RoomStatus;
   players?: Record<string, WaitingPlayer>;
 };
@@ -49,42 +60,18 @@ export async function getRoom(sessionId: string): Promise<SessionRoom | null> {
 
 // ─── Host operations ─────────────────────────────────────────────────────────
 
-// Legacy: preserved for callers that just want to ensure a room exists in 'waiting'
-// without disturbing live state. Admin lobby should call `reopenLobby` instead.
-export async function initRoom(sessionId: string, hostId: string) {
-  await runTransaction(ref(rtdb, `sessions/${sessionId}`), (current) => {
-    if (current?.status === 'started' || current?.status === 'ended') return;
-    return { ...(current ?? {}), status: ROOM_STATUS.WAITING, hostId };
-  });
+async function changeHostedLobby(sessionId: string, action: 'open' | 'start' | 'close' | 'remove') {
+  const response = await fetch(`/api/admin/sessions/${sessionId}/lobby`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Could not update lobby');
+  return data as { joinToken?: string };
 }
 
-// Fully reset a session room when the admin (re-)opens the lobby. Wipes any
-// stale players/scores from a previous game and forces status back to 'waiting',
-// so new joiners don't auto-route to /question because of a leftover 'started' status.
-export async function reopenLobby(sessionId: string, hostId: string): Promise<void> {
-  await runTransaction(ref(rtdb, `sessions/${sessionId}`), (current) => {
-    // First time: create fresh
-    if (!current) return { status: ROOM_STATUS.WAITING, hostId };
-    // Previous game finished — start clean (drop old players, scores, leaderId, joinToken)
-    if (current.status === 'started' || current.status === 'ended') {
-      return {
-        status: ROOM_STATUS.WAITING,
-        hostId,
-        joinToken: current.joinToken ?? null,
-      };
-    }
-    // Live waiting room — keep players, just refresh hostId
-    return { ...current, hostId, status: ROOM_STATUS.WAITING };
-  });
-}
-
-export async function startRoom(sessionId: string) {
-  await set(ref(rtdb, `sessions/${sessionId}/status`), ROOM_STATUS.STARTED);
-}
-
-export async function endRoom(sessionId: string) {
-  await set(ref(rtdb, `sessions/${sessionId}/status`), ROOM_STATUS.ENDED);
-}
+export async function initRoom(sessionId: string, _hostId: string) { await changeHostedLobby(sessionId, 'open'); }
+export async function reopenLobby(sessionId: string, _hostId: string) { await changeHostedLobby(sessionId, 'open'); }
+export async function startRoom(sessionId: string) { await changeHostedLobby(sessionId, 'start'); }
+export async function endRoom(sessionId: string) { await changeHostedLobby(sessionId, 'close'); }
 
 // ─── Player operations ────────────────────────────────────────────────────────
 
@@ -123,7 +110,7 @@ export function watchRoom(
 ): () => void {
   const roomRef = ref(rtdb, `sessions/${sessionId}`);
   const handler = (snap: DataSnapshot) => callback(snap.val() as SessionRoom | null);
-  onValue(roomRef, handler);
+  onValue(roomRef, handler, () => callback(null));
   return () => off(roomRef, 'value', handler);
 }
 
@@ -150,6 +137,21 @@ export function watchRoomPlayers(
     callback((snap.val() as Record<string, WaitingPlayer>) ?? {});
   onValue(playersRef, handler);
   return () => off(playersRef, 'value', handler);
+}
+
+export function watchLobbyMembership(sessionId: string, uid: string, callback: (room: {
+  status: RoomStatus | null; roundId: string | null; joinToken: string | null; member: WaitingPlayer | null;
+}) => void): () => void {
+  const state = { status: null as RoomStatus | null, roundId: null as string | null,
+    joinToken: null as string | null, member: null as WaitingPlayer | null };
+  const received = new Set<string>();
+  const subscriptions = (['status', 'roundId', 'joinToken', 'member'] as const).map(field =>
+    onValue(ref(rtdb, `sessions/${sessionId}/${field === 'member' ? `players/${uid}` : field}`), snapshot => {
+      Object.assign(state, { [field]: snapshot.val() });
+      received.add(field);
+      if (received.size === 4) callback({ ...state });
+    }, () => callback({ status: null, roundId: null, joinToken: null, member: null })));
+  return () => subscriptions.forEach(stop => stop());
 }
 
 export function watchSessionRooms(
@@ -182,6 +184,7 @@ export type PlayerScore = {
   // grid to render a "✓ done" badge instead of the current question.
   finished?: boolean;
   updatedAt: number;
+  roundId?: string;
 };
 
 export async function updateScore(
@@ -210,6 +213,14 @@ export async function updatePlayerMetadata(
     finished?: boolean;
   },
 ): Promise<void> {
+  if (readLobbyConnection(sessionId, uid)) {
+    const response = await fetch(`/api/play/${sessionId}/presence`, {
+      method: 'POST', headers: lobbyHeaders(sessionId, uid, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ currentQuestionId: metadata.currentQuestionId, currentQuestionLabel: metadata.currentQuestionLabel }),
+    });
+    if (!response.ok) throw new Error('Connection is no longer active');
+    return;
+  }
   await update(ref(rtdb, `sessions/${sessionId}/scores/${uid}`), {
     ...metadata,
     updatedAt: Date.now(),
@@ -222,7 +233,7 @@ export function watchScores(
 ): () => void {
   const scoresRef = ref(rtdb, `sessions/${sessionId}/scores`);
   const handler = (snap: DataSnapshot) => callback((snap.val() as Record<string, PlayerScore>) ?? {});
-  onValue(scoresRef, handler);
+  onValue(scoresRef, handler, () => callback({}));
   return () => off(scoresRef, 'value', handler);
 }
 
@@ -233,39 +244,17 @@ export function watchScores(
 // mirrored at `sessions/{sessionId}/joinToken` for convenience. When the lobby
 // closes (or the game ends) the token is deleted so the shared URL stops working.
 
-function generateJoinToken(length = 12): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const arr = new Uint8Array(length);
-  crypto.getRandomValues(arr);
-  return Array.from(arr, (b) => chars[b % chars.length]).join('');
-}
-
-// Mints a new join token (or reuses the existing one if the lobby is already open).
 export async function openLobby(sessionId: string): Promise<string> {
-  const existing = (await get(ref(rtdb, `sessions/${sessionId}/joinToken`))).val() as string | null;
-  if (existing) return existing;
-
-  const token = generateJoinToken();
-  await set(ref(rtdb, `joinTokens/${token}`), { sessionId, createdAt: Date.now() });
-  await set(ref(rtdb, `sessions/${sessionId}/joinToken`), token);
-  return token;
+  const response = await fetch(`/api/admin/sessions/${sessionId}/lobby`, {cache:'no-store'});
+  if (!response.ok) throw new Error('Could not load invitation');
+  const room = await response.json();
+  if (room?.joinToken) return room.joinToken as string;
+  const result = await changeHostedLobby(sessionId, 'open');
+  if (!result.joinToken) throw new Error('No invitation available');
+  return result.joinToken;
 }
-
-// Invalidates the current join token for a session, if any.
-export async function closeLobby(sessionId: string): Promise<void> {
-  const token = (await get(ref(rtdb, `sessions/${sessionId}/joinToken`))).val() as string | null;
-  if (!token) return;
-  await set(ref(rtdb, `joinTokens/${token}`), null);
-  await set(ref(rtdb, `sessions/${sessionId}/joinToken`), null);
-}
-
-// Completely removes a session's data from RTDB.
-export async function removeRoom(sessionId: string): Promise<void> {
-  // 1. Clear any associated join token
-  await closeLobby(sessionId);
-  // 2. Remove the session data itself
-  await set(ref(rtdb, `sessions/${sessionId}`), null);
-}
+export async function closeLobby(sessionId: string) { await changeHostedLobby(sessionId, 'close'); }
+export async function removeRoom(sessionId: string) { await changeHostedLobby(sessionId, 'remove'); }
 
 // Resolves a join token to a session id. Returns null if the token doesn't exist
 // (i.e. the lobby was never opened or was closed).
@@ -313,6 +302,7 @@ export async function untrackUserSession(
   sessionId: string,
   roomId?: string,
 ): Promise<void> {
+  if (readLobbyConnection(sessionId, uid)) return;
   const id = userSessionEntryId(sessionId, roomId);
   await set(ref(rtdb, `userSessions/${uid}/${id}`), null);
 }
@@ -329,7 +319,7 @@ export async function untrackAllUserSessionsFor(
   const entries = (snap.val() as Record<string, UserSessionEntry> | null) ?? {};
   const updates: Record<string, null> = {};
   for (const [id, entry] of Object.entries(entries)) {
-    if (entry.sessionId === sessionId) updates[id] = null;
+    if (entry.sessionId === sessionId && !(entry as UserSessionEntry & { connectionId?: string }).connectionId) updates[id] = null;
   }
   if (Object.keys(updates).length > 0) {
     await update(ref(rtdb, `userSessions/${uid}`), updates);
@@ -352,28 +342,10 @@ export async function createTeamRoom(
   sessionId: string,
   host: { uid: string; displayName: string | null; photoURL: string | null },
 ): Promise<{ roomId: string; pin: string }> {
-  const randBytes = new Uint8Array(6);
-  crypto.getRandomValues(randBytes);
-  const roomId = Array.from(randBytes, (b) => b.toString(16).padStart(2, '0')).join('');
-  const pinArr = new Uint32Array(1);
-  crypto.getRandomValues(pinArr);
-  const pin = (100000 + (pinArr[0] % 900000)).toString();
-  const playerRef = ref(rtdb, `teamRooms/${roomId}/players/${host.uid}`);
-  onDisconnect(playerRef).remove();
-  await set(ref(rtdb, `teamRooms/${roomId}`), {
-    sessionId,
-    hostId: host.uid,
-    pin,
-    status: ROOM_STATUS.WAITING,
-    players: {
-      [host.uid]: {
-        displayName: host.displayName || 'Anonymous',
-        photoURL: host.photoURL,
-        joinedAt: Date.now(),
-      },
-    },
-  } satisfies TeamRoom);
-  return { roomId, pin };
+  const response = await fetch('/api/team-rooms', {method:'POST',headers:lobbyHeaders(sessionId,host.uid,{'Content-Type':'application/json'}),body:JSON.stringify({sessionId})});
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Could not create team room');
+  return data as {roomId:string;pin:string};
 }
 
 // PIN is validated server-side; the API writes the player entry via Admin SDK.
@@ -392,18 +364,17 @@ export async function joinTeamRoom(
     }),
   });
   if (!res.ok) return false;
-  // Register disconnect cleanup so the player is removed if the tab closes
-  const playerRef = ref(rtdb, `teamRooms/${roomId}/players/${user.uid}`);
-  onDisconnect(playerRef).remove();
   return true;
 }
 
 export async function leaveTeamRoom(roomId: string, uid: string) {
-  await set(ref(rtdb, `teamRooms/${roomId}/players/${uid}`), null);
+  const response = await fetch(`/api/team-rooms/${roomId}`, {method:'DELETE'});
+  if (!response.ok) throw new Error('Could not leave team room');
 }
 
 export async function startTeamRoom(roomId: string) {
-  await set(ref(rtdb, `teamRooms/${roomId}/status`), ROOM_STATUS.STARTED);
+  const response = await fetch(`/api/team-rooms/${roomId}`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'start'})});
+  if (!response.ok) throw new Error('Could not start team room');
 }
 
 export function watchTeamRoom(
@@ -412,13 +383,30 @@ export function watchTeamRoom(
 ): () => void {
   const roomRef = ref(rtdb, `teamRooms/${roomId}`);
   const handler = (snap: DataSnapshot) => callback(snap.val() as TeamRoom | null);
-  onValue(roomRef, handler);
+  onValue(roomRef, handler, () => callback(null));
   return () => off(roomRef, 'value', handler);
 }
 
 // A play layout survives lobby → question navigation. Refresh only existing
 // index entries so completed/removed entries cannot be resurrected by a timer.
 export function maintainSessionPresence(uid: string, sessionId: string): () => void {
+  const connection = readLobbyConnection(sessionId, uid);
+  if (connection) {
+    let stopped = false;
+    const transportId = crypto.randomUUID();
+    const presenceRef = ref(rtdb, `sessions/${sessionId}/connections/${uid}/${connection.connectionId}/${transportId}`);
+    const heartbeat = () => fetch(`/api/play/${sessionId}/presence`, {
+      method: 'POST', headers: lobbyHeaders(sessionId, uid, { 'Content-Type': 'application/json' }), body: '{}',
+    }).catch(() => {});
+    const unsubscribe = onValue(ref(rtdb, '.info/connected'), snapshot => {
+      if (snapshot.val() === true) void (async () => {
+        await onDisconnect(presenceRef).remove();
+        if (!stopped) { await set(presenceRef, true); void heartbeat(); }
+      })().catch(() => {});
+    });
+    const timer = setInterval(() => { if (!stopped) void heartbeat(); }, 30_000);
+    return () => { stopped = true; clearInterval(timer); unsubscribe(); void set(presenceRef, null).catch(() => {}); };
+  }
   let stopped = false;
   let updating = false;
   const refresh = async () => {
@@ -427,13 +415,14 @@ export function maintainSessionPresence(uid: string, sessionId: string): () => v
     try {
       const snapshot = await get(ref(rtdb, `userSessions/${uid}`));
       const entries = (snapshot.val() ?? {}) as Record<string, UserSessionEntry>;
-      await Promise.all(Object.entries(entries).filter(([, entry]) => entry.sessionId === sessionId).map(async ([id, entry]) => {
+      await Promise.all(Object.entries(entries).filter(([, entry]) => entry.sessionId === sessionId && !(entry as UserSessionEntry & { connectionId?: string }).connectionId).map(async ([id, entry]) => {
         if (stopped) return;
         const entryRef = ref(rtdb, `userSessions/${uid}/${id}`);
         const playerRef = ref(rtdb, entry.roomId
           ? `teamRooms/${entry.roomId}/players/${uid}`
           : `sessions/${sessionId}/players/${uid}`);
-        await Promise.all([onDisconnect(entryRef).remove(), onDisconnect(playerRef).remove()]);
+        await onDisconnect(entryRef).remove();
+        if (!entry.roomId) await onDisconnect(playerRef).remove();
         if (stopped) return;
         await runTransaction(entryRef, current => current ? { ...current, lastActiveAt: Date.now() } : undefined);
       }));

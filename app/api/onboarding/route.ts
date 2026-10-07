@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionUser } from '@/lib/auth';
+import { getSessionUser, getVerifiedFirebaseIdentity } from '@/lib/auth';
 import { adminAuth } from '@/lib/firebase/admin';
 import { checkRateLimit } from '@/lib/ratelimit';
 import { getParticipantSurvey, saveParticipantSurvey } from '@/lib/db/participant-surveys';
@@ -9,7 +9,7 @@ import { SurveySchema, SURVEY_VERSION } from '@/lib/onboarding/survey';
 async function identity(request: NextRequest) {
   return surveyIdentity(request.headers.get('authorization'), {
     session: getSessionUser,
-    verify: token => adminAuth.verifyIdToken(token, true),
+    verify: getVerifiedFirebaseIdentity,
   });
 }
 export async function GET(request: NextRequest) {

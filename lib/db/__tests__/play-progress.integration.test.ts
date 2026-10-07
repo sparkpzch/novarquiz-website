@@ -42,5 +42,13 @@ test('refresh preserves question/timer/feedback, retries score once, stale trans
     const replay = await progress.startProgress(session, uid, 'attempt-two', first);
     assert.equal(replay?.score, 0); assert.equal(replay?.answer, null); assert.equal(replay?.completed, false);
     assert.equal(await progress.getProgress(session, uid, 'attempt-one'), null);
+    const waitingSession=randomUUID();
+    const waiting=await progress.startProgress(waitingSession,uid,'lobby:round:attempt',first,true);
+    assert.equal(Number(waiting?.started_at),0);
+    assert.equal(Number(waiting?.question_started_at),0);
+    const activated=await progress.activateProgress(waitingSession,uid,'lobby:round:attempt',second);
+    assert.ok(Number(activated?.started_at)>0);assert.equal(activated?.question_id,second);
+    const again=await progress.activateProgress(waitingSession,uid,'lobby:round:attempt',third);
+    assert.equal(again?.started_at,activated?.started_at);assert.equal(again?.question_id,second);
   } finally { await client.query('ROLLBACK'); client.release(); await db.end(); }
 });

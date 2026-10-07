@@ -1,6 +1,7 @@
+import { LobbyAccessError, withLobbyPlayerLock, requestConnectionId } from '@/lib/play/lobby-access';
 import { after, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { completeSession, getAttemptBoundary, getExistingAnswer, getUserHistory, getUserHistoryAnswers, getNextQuestion, getQuestionById, getQuizForQuestion, resolveSessionToQuizId, withPlayerAnswerLock } from '@/lib/db/queries';
+import { completeSession, getLeaderboard, getAttemptBoundary, getExistingAnswer, getUserHistory, getUserHistoryAnswers, getNextQuestion, getQuestionById, getQuizForQuestion, resolveSessionToQuizId } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { adminRtdb } from '@/lib/firebase/admin';
 import { verifyQuestionToken } from '@/lib/security/question-token';
@@ -69,9 +70,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     let prepared: PreparedInsight = { state: 'unavailable' };
-    const result = await withPlayerAnswerLock(sessionId, user.uid, async () => {
+    const result = await withLobbyPlayerLock(request, sessionId, user.uid, async () => {
       const boundary = await getAttemptBoundary(sessionId, user.uid);
       if (!verifyQuestionToken(body.data.final_question_token, sessionId, user.uid, body.data.final_question_id, boundary)) return null;
+      const checkpoint = await getProgress(sessionId,user.uid);
+      if (checkpoint?.completed) {
+        const saved = (await getLeaderboard(sessionId,user.uid)).find(entry => entry.is_me);
+        return saved ? {total_score:saved.total_score,streak:saved.streak,total_time_ms:saved.total_time_ms} : null;
+      }
       const [question, access, quizId] = await Promise.all([
         getQuestionById(body.data.final_question_id),
         getQuizForQuestion(body.data.final_question_id),
@@ -109,15 +115,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       } catch (error) {
         console.error('completion recap preparation failed:', error instanceof Error ? error.message : 'unknown error');
       }
+      await adminRtdb.ref(`sessions/${sessionId}`).transaction(room => {
+        if (!room && requestConnectionId(request)) return room;
+        const member = room?.players?.[user.uid];
+        if (requestConnectionId(request) && (member?.connectionId !== requestConnectionId(request) || member?.left || member?.roundId !== room?.roundId || (room?.status !== 'started' && room?.status !== 'ended'))) return;
+        return { ...room, ...(!room?.hostId ? {hostId:user.uid,isSolo:true} : {}), scores: { ...room?.scores, [user.uid]: {
+          ...room?.scores?.[user.uid], score: completed.total_score, finished: true,
+          currentQuestionId: null, currentQuestionLabel: null, updatedAt: Date.now(),
+        } } };
+      });
+      await adminRtdb.ref(`userSessions/${user.uid}/${sessionId}`).transaction(current =>
+        !current ? current : current.connectionId === requestConnectionId(request) ? null : undefined);
       return completed;
     });
     if (!result) return NextResponse.json({ error: 'Quiz is not complete' }, { status: 403 });
-
-    void adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).update({
-      finished: true,
-      currentQuestionId: null,
-      updatedAt: Date.now(),
-    }).catch(() => {});
 
     // Gemini runs after the response; matching players reuse this persisted
     // lease. Its completed text appears in Insight Summaries without a click.
@@ -132,6 +143,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       insight_state: prepared.state,
     });
   } catch (err) {
+    if (err instanceof LobbyAccessError) return err.response;
     console.error('complete failed:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }

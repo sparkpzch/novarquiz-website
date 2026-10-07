@@ -1,88 +1,71 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { adminRtdb } from '@/lib/firebase/admin';
-import { getSessionById, withPlayerAnswerLock } from '@/lib/db/queries';
-import { resetProgress } from '@/lib/db/play-progress';
+import { adminAuth, adminRtdb } from '@/lib/firebase/admin';
+import { getSessionById, getEntryQuestion, withPlayerAnswerLock } from '@/lib/db/queries';
+import { getProgress, startProgress, resetProgress } from '@/lib/db/play-progress';
 import { getPlayUser } from '@/lib/play-auth';
-import { ROOM_STATUS } from '@/lib/constants/session';
 import { sanitizePhotoUrl } from '@/lib/security/photo-url';
+import { canJoinLobby } from '@/lib/play/lobby-policy';
+import { connectionIdFor, LobbyAccessError } from '@/lib/play/lobby-access';
 
-const JoinBody = z.object({
-  displayName: z.string().max(100).optional(),
-  photoURL: z.string().url().max(500).optional().nullable(),
-});
+const JoinBody = z.object({ invitationToken: z.string().max(64).optional() });
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
-) {
-  const { sessionId } = await params;
-  
+export async function POST(request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
   try {
-    // 1. Authenticate user
     const user = await getPlayUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // 2. Validate session in DB
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { sessionId } = await params;
     const session = await getSessionById(sessionId);
-    if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    }
+    if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    const body = JoinBody.safeParse(await request.json().catch(() => ({})));
+    if (!body.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+    const profile = await adminAuth.getUser(user.uid);
 
-    // 3. Check RTDB status
-    const roomRef = adminRtdb.ref(`sessions/${sessionId}`);
-    const roomSnap = await roomRef.once('value');
-    const room = roomSnap.val();
-
-    if (!room) {
-      return NextResponse.json({ error: 'Room not initialized' }, { status: 400 });
-    }
-
-    if (room.status === ROOM_STATUS.ENDED) {
-      return NextResponse.json({ error: 'Session has already ended' }, { status: 400 });
-    }
-
-    // 4. Join the room (Admin SDK write)
-    const rawBody = await request.json().catch(() => ({}));
-    const { data: body } = JoinBody.safeParse(rawBody);
-
-    const playerRef = adminRtdb.ref(`sessions/${sessionId}/players/${user.uid}`);
-    await playerRef.set({
-      displayName: body?.displayName?.trim() || 'Anonymous',
-      photoURL: sanitizePhotoUrl(body?.photoURL),
-      joinedAt: Date.now(),
+    return await withPlayerAnswerLock(session.id, user.uid, async () => {
+      const roomRef = adminRtdb.ref(`sessions/${session.id}`);
+      const room = (await roomRef.get()).val();
+      if (!canJoinLobby(room, session.is_private, body.data.invitationToken)) {
+        return NextResponse.json({ error: 'This invitation is unavailable. Ask the host for a new link.' }, { status: 403 });
+      }
+      // Taking over an unfinished attempt keeps its question and score.
+      await resetProgress(session.id, user.uid);
+      let progress = await getProgress(session.id, user.uid);
+      const token = randomBytes(32).toString('hex');
+      const connectionId = connectionIdFor(token);
+      const roundId = room.roundId ?? randomUUID();
+      if (!progress?.attempt_boundary.startsWith(`lobby:${roundId}:`)) {
+        const entry = await getEntryQuestion(session.id);
+        if (!entry) return NextResponse.json({ error: 'This quiz has no entry question.' }, { status: 400 });
+        progress = await startProgress(session.id, user.uid, `lobby:${roundId}:${randomUUID()}`, entry.id, true);
+      }
+      const now = Date.now();
+      const identity = { displayName: profile.displayName || 'Player', photoURL: sanitizePhotoUrl(profile.photoURL) };
+      const previous = room.players?.[user.uid];
+      const joined = await roomRef.transaction(current => {
+        // RTDB transactions can first receive null before the server value is
+        // cached. Return null to retry the compare-and-set, rather than abort.
+        if (!current) return current;
+        if (!canJoinLobby(current, session.is_private, body.data.invitationToken) || current.roundId !== room.roundId) return;
+        return { ...current, roundId, players: { ...current.players, [user.uid]: {
+          ...identity, joinedAt: previous?.joinedAt ?? now, lastActiveAt: now, connectionId, roundId,
+        } }, scores: { ...current.scores, [user.uid]: {
+          ...identity, score: progress?.score ?? 0, finished: false, roundId,
+          currentQuestionId: progress?.question_id ?? null,
+          currentQuestionLabel: progress ? current.scores?.[user.uid]?.currentQuestionLabel ?? null : null,
+          updatedAt: now, authorityVersion: progress ? new Date(progress.updated_at).getTime() : now,
+        } } };
+      });
+      if (!joined.committed || joined.snapshot.val()?.players?.[user.uid]?.connectionId !== connectionId) throw new LobbyAccessError(NextResponse.json({ error: 'The lobby changed. Open the invitation again.' }, { status: 409 }));
+      await adminRtdb.ref(`userSessions/${user.uid}/${session.id}`).set({
+        sessionId: session.id, sessionName: session.name, mode: 'lobby', joinedAt: now,
+        lastActiveAt: now, connectionId,
+      });
+      return NextResponse.json({ success: true, sessionId: session.id, roomStatus: joined.snapshot.val().status, token, connectionId });
     });
-
-    // First joiner becomes the leader. This must be server-side because
-    // normal players are not allowed to write session-level fields in RTDB.
-    const leaderRef = adminRtdb.ref(`sessions/${sessionId}/leaderId`);
-    await leaderRef.transaction((current) => current ?? user.uid);
-
-    // 5. Track user session (Fan-out index)
-    const userSessionRef = adminRtdb.ref(`userSessions/${user.uid}/${sessionId}`);
-    await userSessionRef.set({
-      sessionId,
-      sessionName: session.name,
-      mode: 'lobby',
-      joinedAt: Date.now(),
-    });
-
-    // An explicit join starts another attempt after a completed game. Refreshing
-    // gameplay only reads progress, and rejoining an unfinished game preserves it.
-    await withPlayerAnswerLock(sessionId, user.uid, () => resetProgress(sessionId, user.uid));
-
-    return NextResponse.json({
-      success: true,
-      sessionId,
-      roomStatus: room.status,
-      sessionName: session.name,
-      description: session.description
-    });
-
   } catch (error) {
-    console.error('Error in Join API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    if (error instanceof LobbyAccessError) return error.response;
+    console.error('Could not join lobby:', error);
+    return NextResponse.json({ error: 'Could not join the quiz. Please try again.' }, { status: 500 });
   }
 }

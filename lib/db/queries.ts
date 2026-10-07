@@ -230,21 +230,19 @@ export async function getExistingAnswer(
          FROM user_answers ua
          LEFT JOIN choices c ON c.question_id = ua.question_id AND c.label = ua.chosen_label
          WHERE ua.session_id = $1 AND ua.user_id = $2 AND ua.question_id = $3
-           AND ua.answered_at > COALESCE(
-             (SELECT le.completed_at FROM leaderboard_entries le
-              WHERE le.session_id = $1 AND le.user_id = $2),
-             '-infinity'::timestamptz
-           )
+           AND ua.answered_at > GREATEST(
+           COALESCE((SELECT le.completed_at FROM leaderboard_entries le WHERE le.session_id = $1 AND le.user_id = $2), '-infinity'::timestamptz),
+           COALESCE((SELECT to_timestamp(started_at::double precision / 1000) FROM play_progress WHERE session_id = $1 AND user_id = $2 AND attempt_boundary LIKE 'lobby:%'), '-infinity'::timestamptz)
+         )
          ORDER BY ua.answered_at ASC, ua.id ASC LIMIT 1`
       : `SELECT ua.id, ua.chosen_label, ua.utility_score, c.explanation
          FROM user_answers ua
          LEFT JOIN choices c ON c.question_id = ua.question_id AND c.label = ua.chosen_label
          WHERE ua.session_id = $1 AND ua.user_id = $2 AND ua.question_id = $3
-           AND ua.answered_at > COALESCE(
-             (SELECT le.completed_at FROM leaderboard_entries le
-              WHERE le.session_id = $1 AND le.user_id = $2),
-             '-infinity'::timestamptz
-           )
+           AND ua.answered_at > GREATEST(
+           COALESCE((SELECT le.completed_at FROM leaderboard_entries le WHERE le.session_id = $1 AND le.user_id = $2), '-infinity'::timestamptz),
+           COALESCE((SELECT to_timestamp(started_at::double precision / 1000) FROM play_progress WHERE session_id = $1 AND user_id = $2 AND attempt_boundary LIKE 'lobby:%'), '-infinity'::timestamptz)
+         )
          ORDER BY ua.answered_at ASC, ua.id ASC LIMIT 1`,
     [sessionId, userId, questionId],
   );
@@ -281,6 +279,8 @@ export async function withPlayerAnswerLock<T>(sessionId: string, userId: string,
 // A completed run changes this value, invalidating question proofs from that
 // run before the next run starts.
 export async function getAttemptBoundary(sessionId: string, userId: string): Promise<string> {
+  const lobby = await pool.query("SELECT attempt_boundary FROM play_progress WHERE session_id=$1 AND user_id=$2 AND attempt_boundary LIKE 'lobby:%'", [sessionId, userId]);
+  if (lobby.rows[0]) return String(lobby.rows[0].attempt_boundary);
   const result = await pool.query(
     'SELECT completed_at FROM leaderboard_entries WHERE session_id = $1 AND user_id = $2',
     [sessionId, userId],
@@ -1271,9 +1271,9 @@ export async function getUserCumulativeScore(sessionId: string, userId: string):
        SELECT DISTINCT ON (question_id) utility_score
        FROM user_answers
        WHERE session_id = $1 AND user_id = $2
-         AND answered_at > COALESCE(
-           (SELECT le.completed_at FROM leaderboard_entries le WHERE le.session_id = $1 AND le.user_id = $2),
-           '-infinity'::timestamptz
+         AND answered_at > GREATEST(
+           COALESCE((SELECT le.completed_at FROM leaderboard_entries le WHERE le.session_id = $1 AND le.user_id = $2), '-infinity'::timestamptz),
+           COALESCE((SELECT to_timestamp(started_at::double precision / 1000) FROM play_progress WHERE session_id = $1 AND user_id = $2 AND attempt_boundary LIKE 'lobby:%'), '-infinity'::timestamptz)
          )
        ORDER BY question_id, answered_at ASC, id ASC
      ) first_answers`,
@@ -1301,9 +1301,9 @@ export async function completeSession(data: {
        SELECT DISTINCT ON (question_id) utility_score, time_taken_ms
        FROM user_answers
        WHERE session_id = $1 AND user_id = $2
-         AND answered_at > COALESCE(
-           (SELECT le.completed_at FROM leaderboard_entries le WHERE le.session_id = $1 AND le.user_id = $2),
-           '-infinity'::timestamptz
+         AND answered_at > GREATEST(
+           COALESCE((SELECT le.completed_at FROM leaderboard_entries le WHERE le.session_id = $1 AND le.user_id = $2), '-infinity'::timestamptz),
+           COALESCE((SELECT to_timestamp(started_at::double precision / 1000) FROM play_progress WHERE session_id = $1 AND user_id = $2 AND attempt_boundary LIKE 'lobby:%'), '-infinity'::timestamptz)
          )
        ORDER BY question_id, answered_at ASC, id ASC
      ) latest_answers`,
@@ -1319,9 +1319,9 @@ export async function completeSession(data: {
        SELECT DISTINCT ON (question_id) utility_score, answered_at
        FROM user_answers
        WHERE session_id = $1 AND user_id = $2
-         AND answered_at > COALESCE(
-           (SELECT le.completed_at FROM leaderboard_entries le WHERE le.session_id = $1 AND le.user_id = $2),
-           '-infinity'::timestamptz
+         AND answered_at > GREATEST(
+           COALESCE((SELECT le.completed_at FROM leaderboard_entries le WHERE le.session_id = $1 AND le.user_id = $2), '-infinity'::timestamptz),
+           COALESCE((SELECT to_timestamp(started_at::double precision / 1000) FROM play_progress WHERE session_id = $1 AND user_id = $2 AND attempt_boundary LIKE 'lobby:%'), '-infinity'::timestamptz)
          )
        ORDER BY question_id, answered_at ASC, id ASC
      ) latest_answers
@@ -2005,7 +2005,7 @@ export async function getQuizDraftContext(
 export async function getOrCreateSession(quizId: string, userId: string, isPrivate: boolean = true, name?: string) {
   // Try to get existing
   let result = await pool.query(
-    'SELECT * FROM sessions WHERE session_id = $1 AND user_id = $2',
+    'SELECT * FROM sessions WHERE session_id = $1 AND user_id = $2 AND slug IS NULL',
     [quizId, userId]
   );
   if (result.rows[0]) return result.rows[0];
@@ -2109,10 +2109,11 @@ export async function upsertUserConsent(data: UserConsentRecord & {
 
 // ===================== Leaderboard =====================
 
-export async function getLeaderboard(sessionId: string, viewerUid?: string) {
+export async function getLeaderboard(sessionId: string, viewerUid?: string, currentParticipants?: string[]) {
   const result = await pool.query(
-    `SELECT * FROM leaderboard_entries WHERE session_id = $1 ORDER BY total_score DESC`,
-    [sessionId]
+    `SELECT * FROM leaderboard_entries WHERE session_id = $1
+       AND ($2::text[] IS NULL OR user_id::text = ANY($2::text[])) ORDER BY total_score DESC`,
+    [sessionId, currentParticipants ?? null]
   );
 
   // This feeds the public (no admin gate) leaderboard routes. Enforce the

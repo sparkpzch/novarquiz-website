@@ -173,19 +173,21 @@ export function EditorCanvas({
     setInspectedNode(prev => prev?.id === id ? { ...prev, data: { ...data } } as AppNode : prev);
   }, [setNodes]);
 
+  const [uploadDraftId] = useState(() => crypto.randomUUID());
   const latestUploads = useRef(new Map<string, string>());
   const applyMedia = useCallback((nodeId: string, media: { media_type: string; media_url: string | null; media_path: string }) => {
     setNodes(ns => ns.map(n => n.id === nodeId ? { ...n, data: { ...n.data, ...media } } as AppNode : n));
     setInspectedNode(prev => prev?.id === nodeId ? { ...prev, data: { ...prev.data, ...media } } as AppNode : prev);
   }, [setNodes]);
   const handleFileUpload = useCallback(async (nodeId: string, file: File) => {
+    const scope = quizId ? {quizId} : {draftId:uploadDraftId};
     const requestId = crypto.randomUUID();
     latestUploads.current.set(nodeId, requestId);
     setUploadStatus({ nodeId, uploading: true, progress: 0 });
     try {
       let data;
       if (file.type.startsWith('video/')) {
-        const init = await fetch('/api/upload/video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'init', type: file.type, size: file.size }) });
+        const init = await fetch('/api/upload/video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'init', type: file.type, size: file.size, ...scope }) });
         const session = await init.json();
         if (!init.ok) throw new Error(session.error || 'Upload failed');
         await new Promise<void>((resolve, reject) => {
@@ -196,12 +198,13 @@ export function EditorCanvas({
           upload.onerror = () => reject(new Error('Upload failed. Check your connection.'));
           upload.send(file);
         });
-        const finish = await fetch('/api/upload/video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'finish', id: session.id, ext: session.ext }) });
+        const finish = await fetch('/api/upload/video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'finish', id: session.id, ext: session.ext, ...scope }) });
         data = await finish.json();
         if (!finish.ok) throw new Error(data.error || 'Upload failed');
       } else {
         const form = new FormData(); form.set('file', file);
-        const response = await fetch('/api/upload', { method: 'POST', body: form });
+        form.set(quizId ? 'quizId' : 'draftId', quizId ?? uploadDraftId);
+        const response = await fetch('/api/upload', { method: 'POST', headers:quizId?{'X-Quiz-Id':quizId}:{'X-Upload-Draft-Id':uploadDraftId}, body: form });
         data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Upload failed');
       }
@@ -209,7 +212,7 @@ export function EditorCanvas({
       applyMedia(nodeId, { media_type: file.type.startsWith('video/') ? 'video' : file.type === 'image/gif' ? 'gif' : 'image', media_url: data.url, media_path: data.path });
       setUploadStatus(null);
     } catch (error) { showToast(error instanceof Error ? error.message : 'Upload failed', 'error'); setUploadStatus(null); }
-  }, [applyMedia, showToast]);
+  }, [applyMedia, showToast, quizId, uploadDraftId]);
 
   // A saved draft retains the source path, so processing resumes after closing
   // and reopening the editor. Only update nodes still pointing at that source.

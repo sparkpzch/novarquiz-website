@@ -1,5 +1,6 @@
 'use client';
 
+import { lobbyHeaders } from '@/lib/client/lobby-connection';
 import { use, useEffect, useState, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -152,17 +153,17 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
       sessionStorage.setItem(key, guestAttemptRef.current);
       url += `&attempt=${encodeURIComponent(guestAttemptRef.current)}`;
     }
-    const headers = new Headers(init?.headers);
+    const headers = user ? lobbyHeaders(sessionId, user.uid, init?.headers) : new Headers(init?.headers);
     if (user?.isAnonymous) headers.set('Authorization', `Bearer ${await user.getIdToken()}`);
     return fetch(url, { ...init, headers });
   }, [user, sessionId]);
 
   useEffect(() => {
-    fetch(`/api/sessions/${sessionId}`)
+    fetch(`/api/sessions/${sessionId}`, { headers: user ? lobbyHeaders(sessionId, user.uid) : undefined })
       .then((response) => (response.ok ? response.json() : null))
       .then(setSessionMeta)
       .catch(() => {});
-  }, [sessionId]);
+  }, [sessionId, user]);
 
   useEffect(() => {
     userRef.current = user;

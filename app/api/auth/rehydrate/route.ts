@@ -1,3 +1,4 @@
+import { authorizeCurrentSession } from '@/lib/security/live-session';
 // Mints a short-lived Firebase custom token from a valid HTTP-only session
 // cookie. Used by the client AuthProvider to re-establish a Firebase session
 // when IndexedDB has been cleared (private mode, new browser) but the server
@@ -47,11 +48,16 @@ export async function POST(request: NextRequest) {
     const uid = verified.uid;
     // Re-check live Firebase claims so a revoked admin loses access within one rehydrate cycle
     const firebaseUser = await adminAuth.getUser(uid);
+    try { authorizeCurrentSession(verified, firebaseUser); }
+    catch {
+      cookieStore.delete(COOKIE_NAME);
+      return NextResponse.json({ error: 'Session revoked' }, { status: 401 });
+    }
     if (firebaseUser.disabled) {
       cookieStore.delete(COOKIE_NAME);
       return NextResponse.json({ error: 'Account disabled' }, { status: 401 });
     }
-    const currentIsAdmin = firebaseUser.customClaims?.admin === true;
+    const currentIsAdmin = verified.isAdmin && firebaseUser.customClaims?.admin === true;
     const tokenIsAdmin = verified.isAdmin;
 
     if (currentIsAdmin !== tokenIsAdmin) {
@@ -63,7 +69,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Session expired' }, { status: 401 });
       }
 
-      const newToken = await new SignJWT({ uid, isAdmin: currentIsAdmin, sessionVersion: SESSION_VERSION })
+      const newToken = await new SignJWT({ uid, isAdmin: currentIsAdmin, sessionVersion: SESSION_VERSION, authTime: verified.authTime, userSessionVersion: verified.userSessionVersion })
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()
         .setExpirationTime(`${maxAge}s`)
@@ -78,7 +84,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const customToken = await adminAuth.createCustomToken(uid);
+    const customToken = await adminAuth.createCustomToken(uid, { applicationAuthTime: verified.authTime, applicationSessionVersion: verified.userSessionVersion });
     return NextResponse.json({ customToken });
   } catch {
     return NextResponse.json({ error: 'Invalid session' }, { status: 401 });

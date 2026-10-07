@@ -13,7 +13,7 @@ after(() => {
 
 async function token(claims: Record<string, unknown> = {}, alg = 'HS256') {
   const now = Math.floor(Date.now() / 1000);
-  return new SignJWT({ uid: 'player-1', isAdmin: false, sessionVersion: SESSION_VERSION, iat: now, exp: now + 60, ...claims })
+  return new SignJWT({ uid: 'player-1', isAdmin: false, sessionVersion: SESSION_VERSION, authTime: Math.floor(Date.now() / 1000), userSessionVersion: '0', iat: now, exp: now + 60, ...claims })
     .setProtectedHeader({ alg }).sign(secret);
 }
 

@@ -1,208 +1,75 @@
-'use client';
+"use client";
 
-import { use, useEffect, useState, useCallback, useRef } from 'react';
+import { use, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { watchRoomStatus, watchRoomPlayers, leaveWaitingRoom, untrackUserSession, type WaitingPlayer } from '@/lib/firebase/rtdb';
-import { motion, AnimatePresence } from 'motion/react';
-import type { Quiz } from '@/lib/types';
+import { watchRoom, watchRealtimeConnection, type SessionRoom } from '@/lib/firebase/rtdb';
+import { lobbyHeaders, readLobbyConnection } from '@/lib/client/lobby-connection';
+import { lobbyStandings } from '@/lib/play/lobby-standings';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
-
-function PlayerChip({
-  displayName,
-  photoURL,
-  highlighted,
-}: {
-  displayName: string;
-  photoURL: string | null;
-  highlighted?: boolean;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.88 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col items-center gap-2"
-    >
-      <div className={`relative rounded-full ${highlighted ? 'ring-4 ring-[#92BFFF]' : ''}`}>
-        <ProfileAvatar displayName={displayName} photoURL={photoURL} size={64} />
-      </div>
-      <p className="nq-on-dark max-w-[88px] truncate text-center text-sm font-semibold">{displayName}</p>
-    </motion.div>
-  );
-}
+import { useTranslation } from 'react-i18next';
+import '@/lib/i18n';
+import type { Quiz } from '@/lib/types';
+import Link from 'next/link';
+import styles from '@/components/play/lobby.module.css';
 
 export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = use(params);
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [players, setPlayers] = useState<Record<string, WaitingPlayer>>({});
+  const { i18n } = useTranslation();
+  const th = i18n.language.startsWith('th');
+  const copy = (en: string, thai: string) => th ? thai : en;
+  const [connected, setConnected] = useState<boolean | null>(null);
+  const [room, setRoom] = useState<SessionRoom | null>(null);
   const [session, setSession] = useState<Quiz | null>(null);
-  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
-  const joinedUserIdRef = useRef<string | null>(null);
-  const shouldLeaveOnUnmountRef = useRef(true);
-
+  const [error, setError] = useState('');
+  const [leaving, setLeaving] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    fetch(`/api/sessions/${sessionId}`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => { if (data) setSession(data); });
-  }, [sessionId]);
-
-  // Only watch status for navigation — players don't need the full room object
+    const controller = new AbortController();
+    fetch(`/api/sessions/${sessionId}`, { signal: controller.signal, headers: user ? lobbyHeaders(sessionId, user.uid) : undefined }).then(async response => {
+      if (!response.ok) throw new Error('Could not load quiz');
+      setSession(await response.json());
+    }).catch(error => { if (error.name !== 'AbortError') setError('Could not load the lobby. Please try again.'); });
+    return () => controller.abort();
+  }, [sessionId, user]);
   useEffect(() => {
-    if (!session?.id) return;
-    return watchRoomStatus(session.id, (status) => {
-      if (status === 'started') {
-        shouldLeaveOnUnmountRef.current = false;
-        router.push(`/play/${session.id}/question`);
+    if (!user || !session?.id) return;
+    const connection = readLobbyConnection(session.id, user.uid);
+    return watchRoom(session.id, next => {
+      setRoom(next);
+      if (next?.status === 'started' && next.players?.[user.uid]?.connectionId === connection?.connectionId) {
+        router.replace(`/play/${session.id}/question`);
       }
     });
-  }, [router, session?.id]);
-
-  // Separate scoped listener for the player grid
-  useEffect(() => {
-    if (!session?.id) return;
-    return watchRoomPlayers(session.id, setPlayers);
-  }, [session?.id]);
-
-  useEffect(() => {
-    joinedUserIdRef.current = user?.uid ?? null;
-  }, [user?.uid]);
-
-  useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      const uid = joinedUserIdRef.current;
-      if (shouldLeaveOnUnmountRef.current && uid && session?.id) {
-        void leaveWaitingRoom(session.id, uid).catch(console.error);
-        void untrackUserSession(uid, session.id).catch(console.error);
-      }
-    };
-  }, [session?.id]);
-
-  const handleLeave = useCallback(async () => {
-    if (!session) return;
-    shouldLeaveOnUnmountRef.current = false;
-    if (user) await Promise.all([leaveWaitingRoom(session.id, user.uid), untrackUserSession(user.uid, session.id)]);
-    router.push('/');
-  }, [router, session, user]);
-
+  }, [router, session?.id, user]);
+  useEffect(() => watchRealtimeConnection(setConnected), []);
+  const leave = async () => {
+    if (!user || !session || leaving) return;
+    setLeaving(true); setError('');
+    try {
+      const response = await fetch(`/api/play/${session.id}/presence`, { method: 'DELETE', headers: lobbyHeaders(session.id, user.uid) });
+      if (!response.ok) throw new Error('Leave failed');
+      router.replace('/');
+    } catch { setError(copy('Could not leave. Please try again.', 'ออกจากห้องไม่สำเร็จ กรุณาลองอีกครั้ง')); setLeaving(false); }
+  };
   if (loading || !user) return null;
-
-  const playerEntries = Object.entries(players);
-
-  return (
-    <div className="nq-sky min-h-screen">
-      <div className="nq-content flex min-h-screen items-center justify-center p-4">
-        <div className="w-full max-w-3xl space-y-6">
-          <AnimatePresence>
-            {showLeaveConfirm && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-center justify-center bg-[#03305A]/40 p-4 backdrop-blur-md"
-              >
-                <motion.div
-                  initial={{ opacity: 0, y: 18, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 18, scale: 0.98 }}
-                  className="w-full max-w-sm nq-card-dark rounded-[30px] p-8 text-center"
-                >
-                  <div className="text-4xl">🚪</div>
-                  <h2 className="nq-on-dark mt-4 text-2xl font-bold">Leave this lobby?</h2>
-                  <p className="mt-2 text-sm nq-on-dark-soft">You&apos;ll be removed before the host starts the game.</p>
-                  <div className="mt-8 flex gap-3">
-                    <button
-                      onClick={() => setShowLeaveConfirm(false)}
-                      className="flex-1 rounded-[22px] border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-white/20"
-                    >
-                      Stay
-                    </button>
-                    <button
-                      onClick={handleLeave}
-                      className="flex-1 rounded-[22px] bg-linear-to-r from-[#D84D63] to-[#BA2F54] px-4 py-3 text-sm font-bold text-white transition-colors hover:brightness-110 shadow-lg shadow-rose-900/20"
-                    >
-                      Leave
-                    </button>
-                  </div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center"
-          >
-            <p className="nq-details nq-on-dark opacity-80">Waiting Lobby</p>
-            <h1 className="nq-on-dark mt-2 text-4xl font-bold tracking-tight">{session?.name || 'Loading…'}</h1>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="nq-card-dark rounded-[40px] p-8 md:p-10"
-          >
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
-              <div>
-                <p className="nq-on-dark-soft text-sm">
-                  <span className="font-bold nq-on-dark text-lg">{playerEntries.length}</span> players joined
-                </p>
-                <p className="nq-on-dark-soft text-xs mt-0.5 opacity-70">The host will start the quiz when ready.</p>
-              </div>
-              <button
-                onClick={() => setShowLeaveConfirm(true)}
-                className="rounded-[18px] border border-white/15 bg-white/10 px-6 py-2.5 text-sm font-bold nq-on-dark transition-colors hover:bg-white/20"
-              >
-                Leave
-              </button>
-            </div>
-
-            <div className="rounded-[32px] bg-white/5 border border-white/10 p-6 md:p-8">
-              {playerEntries.length === 0 ? (
-                <div className="flex min-h-48 flex-col items-center justify-center text-center">
-                  <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-4xl mb-4">👥</div>
-                  <p className="text-xl font-bold nq-on-dark">Waiting for players…</p>
-                  <p className="mt-2 text-sm nq-on-dark-soft opacity-60">Share the invite link to get started</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4">
-                  {playerEntries.map(([uid, player]) => (
-                    <PlayerChip
-                      key={uid}
-                      displayName={uid === user.uid ? 'You' : player.displayName}
-                      photoURL={player.photoURL}
-                      highlighted={uid === user.uid}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="mt-8 flex items-center justify-center gap-4 rounded-[24px] bg-white/10 border border-white/20 px-6 py-5 shadow-xl shadow-blue-900/20">
-              <div className="flex gap-1.5">
-                {[0, 1, 2].map((index) => (
-                  <div
-                    key={index}
-                    className="h-3 w-3 animate-bounce rounded-full bg-white"
-                    style={{ animationDelay: `${index * 0.15}s` }}
-                  />
-                ))}
-              </div>
-              <span className="font-bold nq-on-dark text-base">Waiting for the host to start…</span>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-    </div>
-  );
+  if (!readLobbyConnection(sessionId, user.uid)) return <main className={styles.page}><section className={styles.panel}><h1>{copy('Invitation required', 'เข้าร่วมผ่านคำเชิญ')}</h1><p className={styles.muted}>{copy('Open the invitation link or scan the QR code to join.', 'เปิดลิงก์คำเชิญหรือสแกน QR เพื่อเข้าร่วม')}</p><Link className={styles.button} href="/">{copy('Back to home', 'กลับหน้าหลัก')}</Link></section></main>;
+  const players = lobbyStandings(room);
+  return <main className={styles.page}><div className={styles.container}>
+    <header className={styles.panel}>
+      <div className={styles.header}><div><p className={styles.eyebrow}>{copy('Private lobby', 'ห้องส่วนตัว')}</p><h1>{session?.name || copy('Loading quiz…', 'กำลังโหลดแบบทดสอบ…')}</h1></div>
+        <button className={styles.button} onClick={() => dialog.current?.showModal()}>{copy('Leave lobby', 'ออกจากห้อง')}</button></div>
+      <div className={styles.player}><ProfileAvatar displayName={user.displayName || 'Player'} photoURL={user.photoURL} size={40} /><div className={styles.name}>{user.displayName || 'Player'}<small>{copy('Joined with your account', 'เข้าร่วมด้วยบัญชีของคุณแล้ว')}</small></div></div>
+      <div className={styles.waiting} role="status"><strong>{copy('Waiting for the host', 'รอผู้จัดเริ่มแบบทดสอบ')}</strong><p className={styles.muted}>{copy('The quiz will open here when the host starts. Keep this page open.', 'เมื่อผู้จัดเริ่ม คำถามจะเปิดที่หน้านี้ กรุณาเปิดหน้านี้ไว้')}</p></div>
+      {connected === false && <p role="status" className={styles.muted}>{copy('Reconnecting to the lobby…', 'กำลังเชื่อมต่อห้องอีกครั้ง…')}</p>}
+      {error && <p role="alert" className={styles.error}>{error}</p>}
+    </header>
+    <section className={styles.panel}><div className={styles.sectionHead}><h2>{copy('Players', 'ผู้เล่น')}</h2><span className={styles.muted}>{players.length} {copy('joined', 'คนเข้าร่วม')}</span></div>
+      {players.length ? <div className={styles.players}>{players.map(player => <div key={player.uid} className={styles.player}><ProfileAvatar displayName={player.displayName} photoURL={player.photoURL} size={36} /><div className={styles.name}>{player.displayName}<small>{player.uid === user.uid ? copy('You', 'คุณ') : player.connected ? copy('Connected', 'เชื่อมต่ออยู่') : copy('Offline', 'ออฟไลน์')}</small></div></div>)}</div>
+        : <p className={styles.empty}>{copy('Connecting to the lobby…', 'กำลังเชื่อมต่อห้อง…')}</p>}
+    </section>
+    <dialog ref={dialog} className={styles.dialog}><h2>{copy('Leave this lobby?', 'ออกจากห้องนี้หรือไม่?')}</h2><p className={styles.muted}>{copy('You can join again using the invitation link or QR code while the lobby is open.', 'คุณสามารถเข้าร่วมอีกครั้งด้วยลิงก์คำเชิญหรือ QR ขณะที่ห้องยังเปิดอยู่')}</p><div className={styles.actions}><button className={styles.button} disabled={leaving} onClick={() => dialog.current?.close()}>{copy('Stay', 'อยู่ต่อ')}</button><button className={styles.danger} disabled={leaving} onClick={leave}>{leaving ? copy('Leaving…', 'กำลังออก…') : copy('Leave lobby', 'ออกจากห้อง')}</button></div>{error && <p role="alert" className={styles.error}>{error}</p>}</dialog>
+  </div></main>;
 }

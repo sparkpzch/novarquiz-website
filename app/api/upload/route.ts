@@ -1,3 +1,4 @@
+import { authorizeUpload, reserveUpload, releaseUpload, reserveVideoRetry, UploadAccessError } from '@/lib/security/upload-access';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { createVideoJob, dispatchVideoJob, videoJobResult } from '@/lib/video/jobs';
@@ -45,8 +46,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  let reservedId: string | undefined;
+  let savedFile = false;
   try {
+    // Authorize before reading a potentially large multipart body.
+    const scope = await authorizeUpload(user, {quizId:req.headers.get('X-Quiz-Id') || undefined,draftId:req.headers.get('X-Upload-Draft-Id') || undefined});
+    const declaredLength = Number(req.headers.get('Content-Length'));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_BYTES + 64 * 1024) return NextResponse.json({error:'File too large'}, {status:413});
     const form = await req.formData();
+    const bodyScope = await authorizeUpload(user, {quizId:form.get('quizId') || undefined,draftId:form.get('draftId') || undefined});
+    if (bodyScope !== scope) return NextResponse.json({error:'Upload scope does not match'}, {status:400});
     const file = form.get('file');
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -54,7 +63,7 @@ export async function POST(req: NextRequest) {
     if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json({ error: 'File type not allowed' }, { status: 400 });
     }
-    if (file.size > MAX_BYTES) {
+    if (!file.size || file.size > MAX_BYTES) {
       return NextResponse.json({ error: 'File too large (max 50 MB)' }, { status: 400 });
     }
 
@@ -71,6 +80,8 @@ export async function POST(req: NextRequest) {
     const video = file.type.startsWith('video/');
     if (video && !process.env.VIDEO_PROCESSING_JOB) return NextResponse.json({ error: 'Video processing is not configured yet' }, { status: 503 });
     const id = randomUUID();
+    await reserveUpload(user.uid,id,scope,file.size,video);
+    reservedId = id;
     const dest = video ? `quiz-media/original-${id}.${ext}` : `quiz-media/${id}.${ext}`;
 
     const bucket = adminStorage.bucket();
@@ -80,10 +91,13 @@ export async function POST(req: NextRequest) {
         contentType: file.type,
         cacheControl: 'public,max-age=31536000',
         contentDisposition: 'inline',
+        metadata: {upload_owner:user.uid,upload_scope:scope,expected_size:String(file.size)},
       },
     });
+    savedFile = true;
     if (video) {
       const [metadata] = await fileRef.getMetadata();
+      await reserveVideoRetry(user.uid);
       const job = await createVideoJob(user.uid, dest, String(metadata.generation), id);
       after(async () => {
         try { await dispatchVideoJob(job.id); }
@@ -96,6 +110,8 @@ export async function POST(req: NextRequest) {
     const url = `https://storage.googleapis.com/${bucket.name}/${dest}`;
     return NextResponse.json({ url, path: dest });
   } catch (err) {
+    if (reservedId && !savedFile) await releaseUpload(user.uid,reservedId).catch(() => {});
+    if (err instanceof UploadAccessError) return NextResponse.json({error:err.message},{status:err.status});
     console.error('Upload failed:', err);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }

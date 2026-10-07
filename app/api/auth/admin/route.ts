@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await adminAuth.getUserByEmail(email);
-    await adminAuth.setCustomUserClaims(user.uid, { admin: true });
+    await adminAuth.setCustomUserClaims(user.uid, { ...user.customClaims, admin: true });
     return NextResponse.json({ success: true, uid: user.uid });
   } catch (err) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

@@ -1,3 +1,4 @@
+import { LobbyAccessError, requireLobbyAccess, withLobbyPlayerLock, requestConnectionId } from '@/lib/play/lobby-access';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getQuizForQuestion, getQuizById, resolveSessionToQuizId, getExistingAnswer, getSessionById, getAttemptBoundary, withPlayerAnswerLock } from '@/lib/db/queries';
@@ -7,7 +8,7 @@ import type { Choice } from '@/lib/types';
 import { createQuestionToken, readQuestionToken, verifyQuestionToken } from '@/lib/security/question-token';
 import { getPlayUser } from '@/lib/play-auth';
 import { shuffleChoices } from '@/lib/play/choice-order';
-import { getProgress, startProgress, advanceProgress, answerProgress, resetProgress } from '@/lib/db/play-progress';
+import { getProgress, startProgress, activateProgress, advanceProgress, answerProgress, resetProgress } from '@/lib/db/play-progress';
 
 const StartBody = z.object({
   action: z.literal('start'),
@@ -66,6 +67,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const searchParams = request.nextUrl.searchParams;
 
   try {
+    const denied = await requireLobbyAccess(request, sessionId, user.uid);
+    if (denied) return denied;
     const attemptBoundary = user.isGuest ? 'guest' : await getAttemptBoundary(sessionId, user.uid);
     const shuffleAttempt = user.isGuest ? (searchParams.get('attempt') ?? 'guest').slice(0, 64) : attemptBoundary;
     const progressBoundary = user.isGuest ? `guest:${shuffleAttempt}` : attemptBoundary;
@@ -76,14 +79,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       if (!quiz || (!quiz.is_published && !user.isAdmin && quiz.created_by !== user.uid)) {
         return NextResponse.json(null, { status: 404 });
       }
-      return withPlayerAnswerLock(sessionId, user.uid, async () => {
+      return withLobbyPlayerLock(request, sessionId, user.uid, async () => {
         const latest = await getProgress(sessionId, user.uid);
         if (latest?.completed && (!user.isGuest || latest.attempt_boundary === progressBoundary)) {
           return NextResponse.json({ completed: true, score: latest.score, streak: latest.streak, elapsed_ms: new Date(latest.updated_at).getTime() - Number(latest.started_at) });
         }
         let progress = await getProgress(sessionId, user.uid, progressBoundary);
-        let question = progress ? await getQuestionById(progress.question_id) : await getEntryQuestion(sessionId);
+        const deferred = progress && Number(progress.started_at) === 0;
+        let question = !progress || deferred ? await getEntryQuestion(sessionId) : await getQuestionById(progress.question_id);
         if (!question) return NextResponse.json(null, { status: 404 });
+        if (deferred) progress = await activateProgress(sessionId,user.uid,progressBoundary,question.id);
         if (!progress) progress = await startProgress(sessionId, user.uid, progressBoundary, question.id);
         if (progress && progress.question_id !== question.id) question = await getQuestionById(progress.question_id);
         if (!question || !progress) return NextResponse.json(null, { status: 404 });
@@ -127,7 +132,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       const next = await getNextQuestion(fromQuestionId, choiceLabel);
       if (!next) return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
       // `next` is reachable only via a connection, so it shares fromQuestionId's quiz.
-      const progress = searchParams.get('prefetch') === 'true' ? null : await withPlayerAnswerLock(sessionId, user.uid,
+      const progress = searchParams.get('prefetch') === 'true' ? null : await withLobbyPlayerLock(request, sessionId, user.uid,
         () => advanceProgress(sessionId, user.uid, progressBoundary, fromQuestionId, next.id));
       if (progress && progress.question_id !== next.id) return NextResponse.json({ error: 'Progress changed; reload to resume' }, { status: 409 });
       return NextResponse.json(
@@ -138,7 +143,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     return NextResponse.json({ error: 'Missing params' }, { status: 400 });
-  } catch {
+  } catch (error) {
+    if (error instanceof LobbyAccessError) return error.response;
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
@@ -158,7 +164,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       if (!quiz || (!quiz.is_published && !user.isAdmin && quiz.created_by !== user.uid)) return NextResponse.json({ error: 'Not found' }, { status: 404 });
       const existingSession = await getSessionById(sessionId);
       const playSession = existingSession ?? await getOrCreateSession(quiz.id, user.uid);
-      await withPlayerAnswerLock(playSession.id, user.uid, () => resetProgress(playSession.id, user.uid));
+      await withLobbyPlayerLock(request, playSession.id, user.uid, () => resetProgress(playSession.id, user.uid));
       return NextResponse.json({ id: playSession.id });
     }
 
@@ -190,7 +196,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       if (!selectedChoice || question?.node_type !== 'normal') {
         return NextResponse.json({ error: 'Invalid answer' }, { status: 400 });
       }
-      return withPlayerAnswerLock(sessionId, user.uid, async () => {
+      return withLobbyPlayerLock(request, sessionId, user.uid, async () => {
         const boundary = `guest:${parsed.data.attempt ?? 'guest'}`;
         const progress = await getProgress(sessionId, user.uid, boundary);
         if (!progress || progress.question_id !== question.id || progress.completed) return NextResponse.json({ error: 'Invalid progress' }, { status: 409 });
@@ -220,7 +226,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     // takes the LATEST row per question, so without this guard a player can
     // probe every label, observe points_earned, and resubmit the best label
     // last to walk away with a perfect score.
-    const saved = await withPlayerAnswerLock(sessionId, user.uid, async () => {
+    const saved = await withLobbyPlayerLock(request, sessionId, user.uid, async () => {
       const boundary = await getAttemptBoundary(sessionId, user.uid);
       if (readQuestionToken(parsed.data.question_token ?? '', sessionId, user.uid, parsed.data.question_id, boundary) === null) {
         return { invalidToken: true } as const;
@@ -263,11 +269,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
           return { score: progress?.score ?? await getUserCumulativeScore(sessionId, user.uid),
             version: progress ? new Date(progress.updated_at).getTime() : Date.now() };
         });
-        await adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).transaction(current => {
+        await adminRtdb.ref(`sessions/${sessionId}`).transaction(room => {
+          if (!room && requestConnectionId(request)) return room;
+          const member = room?.players?.[user.uid];
+          if (requestConnectionId(request) && (member?.connectionId !== requestConnectionId(request) || member?.left || member?.roundId !== room?.roundId || (room?.status !== 'started' && room?.status !== 'ended'))) return;
+          const current = room?.scores?.[user.uid];
           if (current?.authorityVersion > snapshot.version) return;
-          return { ...current, score: snapshot.score, authorityVersion: snapshot.version,
+          return { ...room, ...(!room?.hostId ? {hostId:user.uid,isSolo:true} : {}), scores: { ...room?.scores, [user.uid]: { ...current, score: snapshot.score, authorityVersion: snapshot.version,
             ...(profile ? { displayName: profile.displayName || 'Player', photoURL: profile.photoURL || null } : {}),
-            updatedAt: Date.now() };
+            updatedAt: Date.now() } } };
         });
       } catch { /* non-fatal — live leaderboard degrades gracefully */ }
     });
@@ -278,6 +288,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       explanation: result.explanation,
     });
   } catch (error) {
+    if (error instanceof LobbyAccessError) return error.response;
     console.error('Could not save quiz answer:', error instanceof Error ? error.message : 'unknown error');
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }

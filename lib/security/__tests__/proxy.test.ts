@@ -75,7 +75,7 @@ test('verified player sessions cannot open admin pages, and admins land in Quiz 
   process.env.SESSION_SECRET = 'proxy-security-test-secret';
   try {
     for (const isAdmin of [false, true]) {
-      const token = await new SignJWT({ uid: 'player-1', isAdmin, sessionVersion: SESSION_VERSION })
+      const token = await new SignJWT({ uid: 'player-1', isAdmin, sessionVersion: SESSION_VERSION, authTime: Math.floor(Date.now() / 1000), userSessionVersion: '0' })
         .setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime('60s')
         .sign(new TextEncoder().encode(process.env.SESSION_SECRET));
       const adminResponse = await proxy(new NextRequest('https://quiz.example/admin', {
@@ -118,7 +118,7 @@ test('already signed-in players return to the invitation from sign-in', async ()
   const originalSecret = process.env.SESSION_SECRET;
   process.env.SESSION_SECRET = 'invitation-return-test-secret';
   try {
-    const token = await new SignJWT({ uid: 'player-1', isAdmin: false, sessionVersion: SESSION_VERSION })
+    const token = await new SignJWT({ uid: 'player-1', isAdmin: false, sessionVersion: SESSION_VERSION, authTime: Math.floor(Date.now() / 1000), userSessionVersion: '0' })
       .setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime('60s')
       .sign(new TextEncoder().encode(process.env.SESSION_SECRET));
     const response = await proxy(new NextRequest('https://quiz.example/sign-in?next=%2Fjoin%2FyOSlr1fnBp2d', {

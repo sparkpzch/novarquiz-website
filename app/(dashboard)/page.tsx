@@ -1,6 +1,7 @@
 "use client";
 
 import QuizThumbnail from '@/components/ui/QuizThumbnail';
+import { readLobbyConnection, lobbyHeaders } from '@/lib/client/lobby-connection';
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -121,7 +122,7 @@ function LiveSessionsWidget() {
   if (!entry) return null;
 
   const resume = async () => {
-    if (resuming) return;
+    if (resuming || !user) return;
     setResuming(true);
 
     if (entry.mode === "team" && entry.roomId) {
@@ -130,10 +131,13 @@ function LiveSessionsWidget() {
     }
 
     try {
-      const [sessionResponse, room] = await Promise.all([
-        fetch(`/api/sessions/${entry.sessionId}`),
-        getRoom(entry.sessionId),
-      ]);
+      const room = await getRoom(entry.sessionId);
+      const connection = readLobbyConnection(entry.sessionId, user.uid);
+      if (room?.joinToken && room.players?.[user.uid]?.connectionId !== connection?.connectionId) {
+        router.push(`/join/${room.joinToken}`);
+        return;
+      }
+      const sessionResponse = await fetch(`/api/sessions/${entry.sessionId}`, {headers:lobbyHeaders(entry.sessionId,user.uid)});
       const session = sessionResponse.ok
         ? ((await sessionResponse.json()) as SessionResumeSnapshot)
         : null;
@@ -143,7 +147,7 @@ function LiveSessionsWidget() {
         return;
       }
 
-      if (room?.status === ROOM_STATUS.STARTED || entry.mode === "solo" || session.is_private) {
+      if (room?.status === ROOM_STATUS.STARTED || entry.mode === "solo") {
         router.push(`/play/${entry.sessionId}/question`);
         return;
       }

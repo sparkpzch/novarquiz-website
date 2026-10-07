@@ -12,6 +12,7 @@ const ROUTE_LIMITS: Array<[string, number]> = [
   ['/api/upload', 5],
   ['/api/video-processing', 60],
   ['/api/join', 20],
+  ['/api/team-rooms', 20],
   ['/api/play', 60],
   ['/api/account', 5],         // L2: destructive — conservative cap on deletion attempts
   // Each call spends Gemini free-tier quota. Must stay above the '/api/admin'

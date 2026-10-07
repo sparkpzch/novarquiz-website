@@ -1,3 +1,4 @@
+import { idTokenSessionContext } from '@/lib/security/live-session';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebase/admin';
 import { SignJWT } from 'jose';
@@ -57,13 +58,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const account = await adminAuth.getUser(decoded.uid);
+    const authentication = idTokenSessionContext(decoded, account);
+
     // Sync profile to Postgres
     await syncUserProfile(decoded.uid, decoded.name || null, decoded.picture || null);
 
-    const isAdmin = decoded.admin === true;
+    const isAdmin = account.customClaims?.admin === true;
     const maxAge = isAdmin ? ADMIN_MAX_AGE : (rememberMe ? REMEMBER_MAX_AGE : DEFAULT_MAX_AGE);
 
-    const token = await new SignJWT({ uid: decoded.uid, isAdmin, sessionVersion: SESSION_VERSION })
+    const token = await new SignJWT({ uid: decoded.uid, isAdmin, sessionVersion: SESSION_VERSION, ...authentication })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime(`${maxAge}s`)
@@ -94,7 +98,7 @@ export async function DELETE() {
 
 export async function GET() {
   const user = await getSessionUser();
-  return NextResponse.json(user ? { uid: user.uid } : { error: 'Session expired' }, {
+  return NextResponse.json(user ? { uid: user.uid, isAdmin: user.isAdmin } : { error: 'Session expired' }, {
     status: user ? 200 : 401, headers: { 'Cache-Control': 'private, no-store' },
   });
 }

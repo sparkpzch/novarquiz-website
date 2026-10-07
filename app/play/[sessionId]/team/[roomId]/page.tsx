@@ -82,25 +82,31 @@ function TeamLobbyPageContent({
   }, [authLoading, inviteNextPath, router, user]);
 
   useEffect(() => {
-    const unsubscribe = watchTeamRoom(roomId, (data) => {
-      setRoom(data);
-      if (data?.status === 'started') {
-        router.push(`/play/${sessionId}/question`);
-        return;
+    if (!user) return;
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+    const acceptRoom = (data: TeamRoom | null) => {
+      if (cancelled) return;
+      setRoom(previous => data ? {...data,pin:previous?.pin ?? data.pin} : null);
+      if (!data || data.sessionId !== sessionId) { router.replace('/'); return; }
+      const inRoom = data.hostId === user.uid || !!data.players?.[user.uid];
+      if (inRoom && data.status === 'started') {
+        shouldLeaveOnUnmountRef.current = false;
+        router.replace(`/play/${sessionId}/question`); return;
       }
-      if (data && user) {
-        const isHost = data.hostId === user.uid;
-        const inRoom = !!data.players?.[user.uid];
-        if (isHost && !inRoom && data.status === 'waiting') {
-          joinTeamRoom(roomId, data.pin, user).catch(() => {});
-        }
-        setPhase(isHost || inRoom ? 'lobby' : 'join');
-      } else if (data === null) {
-        router.push('/');
-      }
-    });
-    return unsubscribe;
-  }, [roomId, router, sessionId, user]);
+      setPhase(inRoom ? 'lobby' : 'join');
+    };
+    // Non-members use the server summary; only admitted members may subscribe
+    // to private live room data. The host's PIN arrives through this API only.
+    fetch(`/api/team-rooms/${roomId}`).then(async response => {
+      if (!response.ok) throw new Error('Room unavailable');
+      const data = await response.json();
+      if (cancelled) return;
+      acceptRoom(data);
+      if (data.hostId === user.uid || data.players?.[user.uid]) unsubscribe = watchTeamRoom(roomId, acceptRoom);
+    }).catch(() => { if (!cancelled) router.replace('/'); });
+    return () => { cancelled = true; unsubscribe?.(); };
+  }, [roomId, router, sessionId, user, joining]);
 
   useEffect(() => {
     joinedUserIdRef.current = user?.uid ?? null;
@@ -142,6 +148,7 @@ function TeamLobbyPageContent({
         joinedAt: Date.now(),
       });
       setPhase('lobby');
+      setJoining(false);
     } catch (error) {
       console.error('joinTeamRoom failed:', error);
       setPinError(`Could not join: ${(error as Error).message || 'unknown error'}`);

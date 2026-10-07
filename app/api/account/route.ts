@@ -1,3 +1,4 @@
+import { getVerifiedFirebaseIdentity } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { deleteUserData } from '@/lib/db/queries';
@@ -114,7 +115,7 @@ export async function DELETE(request: NextRequest) {
     // H1 FIX: checkRevoked=true rejects tokens that have been revoked via
     // Firebase console or after a password reset — prevents stale tokens
     // from triggering the deletion cascade.
-    const decoded = await adminAuth.verifyIdToken(idToken, true);
+    const decoded = await getVerifiedFirebaseIdentity(idToken);
     uid = decoded.uid;
   } catch {
     return NextResponse.json({ error: 'Invalid auth token' }, { status: 401 });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebase/admin';
+import { getVerifiedFirebaseIdentity } from '@/lib/auth';
 import { deleteUserData } from '@/lib/db/queries';
 
 // Deletes all analytics rows tied to a Firebase UID. Requires a valid ID token
@@ -15,8 +15,10 @@ export async function DELETE(
     return NextResponse.json({ error: 'Missing auth token' }, { status: 401 });
   }
 
+  let decoded;
+  try { decoded = await getVerifiedFirebaseIdentity(idToken); }
+  catch { return NextResponse.json({error:'Invalid auth token'}, {status:401}); }
   try {
-    const decoded = await adminAuth.verifyIdToken(idToken);
     if (decoded.uid !== uid && !decoded.admin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

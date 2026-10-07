@@ -27,7 +27,7 @@ admin.initializeApp({
 async function setAdmin() {
   try {
     const user = await admin.auth().getUserByEmail(email);
-    await admin.auth().setCustomUserClaims(user.uid, { admin: true });
+    await admin.auth().setCustomUserClaims(user.uid, { ...user.customClaims, admin: true });
     console.log(`✅ Successfully set admin claims for ${email} (UID: ${user.uid})`);
     console.log('The user needs to sign out and sign back in for changes to take effect.');
   } catch (error: unknown) {

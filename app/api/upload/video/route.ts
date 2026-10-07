@@ -1,8 +1,9 @@
+import { authorizeUpload, reserveUpload, readUploadReservation, releaseUpload, reserveVideoRetry, UploadAccessError } from '@/lib/security/upload-access';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { getSessionUser } from '@/lib/auth';
-import { adminStorage } from '@/lib/firebase/admin';
+import { adminStorage, adminRtdb } from '@/lib/firebase/admin';
 import { checkRateLimit } from '@/lib/ratelimit';
 import { createVideoJob, dispatchVideoJob, getVideoJob, videoJobResult } from '@/lib/video/jobs';
 
@@ -20,35 +21,56 @@ export async function POST(request: NextRequest) {
   const start = Start.safeParse(raw);
   const finish = Finish.safeParse(raw);
   if (!start.success && !finish.success) return NextResponse.json({ error: 'Invalid upload' }, { status: 400 });
+  let initializedId: string | undefined;
+  let claimedId: string | undefined;
+  let uploadUrlIssued = false;
   try {
+    const scope = await authorizeUpload(user, raw);
     const bucket = adminStorage.bucket();
     if (start.success) {
       const id = randomUUID();
+      await reserveUpload(user.uid,id,scope,start.data.size,true);
+      initializedId = id;
       const ext = start.data.type === 'video/quicktime' ? 'mov' : 'mp4';
       const file = bucket.file(`quiz-media/original-${id}.${ext}`);
       const [uploadUrl] = await file.createResumableUpload({ origin: process.env.APP_ORIGIN ?? new URL(request.url).origin,
-        metadata: { contentType: start.data.type, contentLength: start.data.size, metadata: { upload_owner: user.uid, expected_size: String(start.data.size) } } });
+        metadata: { contentType: start.data.type, contentLength: start.data.size, metadata: { upload_owner: user.uid, expected_size: String(start.data.size), upload_scope:scope } } });
+      uploadUrlIssued = true;
       return NextResponse.json({ id, ext, uploadUrl }, { headers: { 'Cache-Control': 'no-store' } });
     }
     const { id, ext } = finish.data!;
+    const reservation = await readUploadReservation(user.uid,id,scope);
+    if (!reservation.video) throw new UploadAccessError('Not a video upload.',400);
     const existing = await getVideoJob(id);
     if (existing) return existing.owner_uid === user.uid
       ? NextResponse.json({ ...videoJobResult(existing), processing: true }) : NextResponse.json({ error: 'Not found' }, { status: 404 });
     const path = `quiz-media/original-${id}.${ext}`;
     const file = bucket.file(path);
     const [metadata] = await file.getMetadata();
-    if (metadata.metadata?.upload_owner !== user.uid) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (metadata.metadata?.upload_owner !== user.uid || metadata.metadata?.upload_scope !== scope) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const size = Number(metadata.size);
     const [header] = await file.download({ start: 0, end: 31 });
     const type = header.toString('ascii', 4, 8) === 'ftyp' ? (header.toString('ascii', 8, 12) === 'qt  ' ? 'video/quicktime' : 'video/mp4') : null;
-    if (!size || size > 50 * 1024 * 1024 || size !== Number(metadata.metadata?.expected_size) || type !== metadata.contentType) {
+    if (!size || size > 50 * 1024 * 1024 || size !== reservation.size || size !== Number(metadata.metadata?.expected_size) || type !== metadata.contentType) {
       await file.delete();
+      await releaseUpload(user.uid,id);
       return NextResponse.json({ error: 'Use an MP4 or MOV video up to 50 MB' }, { status: 400 });
     }
+    const claim = await adminRtdb.ref(`uploadReservations/${id}`).transaction(current => {
+      if (!current) return current;
+      return current.uid===user.uid && current.scope===scope && current.status==='reserved' ? {...current,status:'processing'} : undefined;
+    });
+    if (!claim.committed || !claim.snapshot.val()) return NextResponse.json({error:'Upload is already being processed. Try again shortly.'},{status:409});
+    claimedId = id;
+    await reserveVideoRetry(user.uid);
     const job = await createVideoJob(user.uid, path, String(metadata.generation), id);
     after(async () => { try { await dispatchVideoJob(job.id); } catch { console.error('Video job retained for retry'); } });
     return NextResponse.json({ ...videoJobResult(job), processing: true }, { status: 202 });
-  } catch {
+  } catch (error) {
+    if (claimedId) await adminRtdb.ref(`uploadReservations/${claimedId}`).transaction(current =>
+      !current ? current : current.uid===user.uid && current.status==='processing' ? {...current,status:'reserved'} : undefined).catch(() => {});
+    if (initializedId && !uploadUrlIssued) await releaseUpload(user.uid,initializedId).catch(() => {});
+    if (error instanceof UploadAccessError) return NextResponse.json({error:error.message},{status:error.status});
     return NextResponse.json({ error: 'Could not complete upload. Please retry.' }, { status: 503 });
   }
 }

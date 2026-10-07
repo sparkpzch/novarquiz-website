@@ -1,3 +1,5 @@
+import { requireLobbyAccess } from '@/lib/play/lobby-access';
+import { adminRtdb } from '@/lib/firebase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { deleteSession, getSessionById, updateSession } from '@/lib/db/queries';
@@ -22,7 +24,7 @@ const SessionPatchSchema = z.object({
   name: z.string().max(200).nullable().optional(),
 });
 
-export async function GET(_request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
   try {
     const session = await getSessionById(sessionId);
@@ -31,7 +33,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ses
     const user = await getSessionUser();
     const isOwnerOrAdmin = user && (user.isAdmin || session.user_id === user.uid);
     if (!isOwnerOrAdmin) {
-      const { pin_code: _pin, user_id: _uid, ...publicFields } = session;
+      if (session.is_private) {
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const invitation = request.headers.get('X-Lobby-Invitation');
+        const room = (await adminRtdb.ref(`sessions/${session.id}`).get()).val();
+        if (!invitation || invitation !== room?.joinToken || room.status === 'ended') {
+          const denied = await requireLobbyAccess(request, session.id, user.uid, false);
+          if (denied) return denied;
+        }
+      }
+      const { pin_code: _pin, user_id: _uid, share_token: _share, ...publicFields } = session;
       return NextResponse.json(publicFields);
     }
 
