@@ -62,7 +62,7 @@ export default function ObservePage({ params }: { params: Promise<{ sessionId: s
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-[1500px] mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>

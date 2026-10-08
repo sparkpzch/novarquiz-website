@@ -350,7 +350,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-[1500px]">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_1fr]">
       <motion.section
         initial={{ opacity: 0, y: 14 }}

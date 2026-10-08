@@ -184,7 +184,7 @@
 .empty svg { color: var(--amber); width: 56px; height: 56px; margin: 0 auto 16px; }
 .empty h3 { font-size: 17px; margin: 0 0 10px; }
 .empty p { font-size: 13px; line-height: 1.8; color: var(--quiz-muted); margin: 0; }
-.dashboard { display: flex; flex-direction: column; gap: 20px; max-width: 900px; margin: 0 auto; }
+.dashboard { display: flex; flex-direction: column; gap: 20px; max-width: 1500px; margin: 0 auto; }
 .pageHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .pageHeading h1 { font-size: 28px; margin: 8px 0; }
 .pageHeading p { color: var(--quiz-muted); font-size: 13px; line-height: 1.8; }
@@ -243,7 +243,7 @@
 
 /* The score and recap share the left half; completed standings fill the right. */
 .resultScreen { display: flex; align-items: center; min-height: 100dvh; padding-block: 24px; }
-.resultContainer, .resultsDashboard { max-width: 1080px; }
+.resultContainer { max-width: 1080px; }
 .resultsDashboard { gap: 16px; }
 .resultsDashboard > .surface { padding: 16px 24px; }
 .resultsGrid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); grid-template-areas: "score standings" "insight standings"; gap: 16px; align-items: stretch; }

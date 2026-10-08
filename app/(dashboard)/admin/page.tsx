@@ -141,7 +141,7 @@ export default function AdminQuizzesPage() {
   if (authLoading || !isAdmin) return null;
 
   return (
-    <div className="nq-admin-panel mx-auto w-full max-w-[1600px] space-y-6">
+    <div className="nq-admin-panel mx-auto w-full max-w-[1500px] space-y-6">
       {dataError && (
         <div role="alert" className="rounded-2xl border border-red-300 bg-red-50 p-4 text-red-800">
           {dataError}

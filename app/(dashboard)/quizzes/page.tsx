@@ -215,7 +215,7 @@ function QuizzesContent() {
 
   return (
     <>
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="mx-auto max-w-[1500px] space-y-6">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -385,7 +385,7 @@ export default function QuizzesPage() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto max-w-6xl space-y-6">
+        <div className="mx-auto max-w-[1500px] space-y-6">
           <div className="h-9 w-56 animate-pulse rounded-full bg-[#70A2F9]/20" />
           <div className="nq-card-soft animate-pulse rounded-[28px] p-5 h-32" />
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
