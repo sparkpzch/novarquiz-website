@@ -60,6 +60,12 @@
 .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .invitationStatus { width: 100%; max-width: 600px; }
+.invitationPage { position: relative; }
+.invitationBackdrop { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; padding: 0; background: transparent; cursor: pointer; }
+.invitationBackdrop:focus-visible { outline: 3px solid var(--primary); outline-offset: -6px; }
+.invitationBackdrop:disabled { cursor: default; }
+.invitationPage > .invitationLayout, .invitationPage > .invitationStatus { position: relative; pointer-events: none; }
+.invitationPage > div > section { pointer-events: auto; }
 .invitationLayout { width: 100%; max-width: 1120px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
 .invitationLayout .invitationInfo { padding: 0; overflow: hidden; }
 .invitationCover { position: relative; min-height: 300px; background: radial-gradient(circle at 75% 20%, #43898566, transparent 50%), linear-gradient(135deg, #22334c, #255956); display: flex; align-items: flex-end; }

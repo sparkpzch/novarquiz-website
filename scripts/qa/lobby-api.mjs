@@ -320,7 +320,7 @@ async function buildFrontend(temp) {
     '@/lib/hooks/useAuth': `const user={uid:location.pathname.startsWith('/admin')?'qa-host':'qa-player',displayName:'Jordan Lee',photoURL:null,isAnonymous:false};export const useAuth=()=>({user,isAdmin:location.pathname.startsWith('/admin'),loading:false});`,
     '@/components/ui/Toast': `export const useToast=()=>({showToast:(message)=>console.info(message)});`,
     '@/lib/firebase/analytics': `export const trackEvent=()=>{};`,
-    'next/navigation': `const router={push:url=>location.assign(url),replace:url=>location.replace(url)};export const useRouter=()=>router;`,
+    'next/navigation': `const router={push:url=>location.assign(url),replace:url=>location.replace(url),back:()=>history.back()};export const useRouter=()=>router;`,
     'next/link': `import React from '${root}/node_modules/react/index.js';export default function Link(props){return React.createElement('a',props);}`,
     'qa-firebase': `import {initializeApp} from '${root}/node_modules/firebase/app/dist/esm/index.esm.js';
       import {getDatabase,connectDatabaseEmulator} from '${root}/node_modules/firebase/database/dist/esm/index.esm.js';

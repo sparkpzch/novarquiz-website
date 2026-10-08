@@ -79,7 +79,15 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
       router.replace(`/play/${data.sessionId}/${data.roomStatus === 'started' ? 'question' : 'lobby'}`);
     } catch { setJoining(false); setJoinFailed(true); }
   };
-  return <main className={styles.page}><div className={quiz && !unavailable && user && !loading && !user.isAnonymous ? styles.invitationLayout : styles.invitationStatus}>
+  const goBack = () => {
+    if (joining) return;
+    if (window.history.length > 1) router.back();
+    else router.replace('/');
+  };
+  return <main className={`${styles.page} ${styles.invitationPage}`}>
+    <button type="button" className={styles.invitationBackdrop} onClick={goBack} disabled={joining}
+      aria-label={copy('Back to previous page', 'ย้อนกลับหน้าก่อนหน้า')} />
+    <div className={quiz && !unavailable && user && !loading && !user.isAnonymous ? styles.invitationLayout : styles.invitationStatus}>
     <section className={`${styles.panel} ${styles.invitationInfo}`}>
     {loading || !user || user.isAnonymous ? <p role="status" className={styles.muted}>{copy('Checking your account…', 'กำลังตรวจสอบบัญชี…')}</p>
       : unavailable ? <><p className={styles.eyebrow}>NovarQuiz</p><h1>{copy('Invitation unavailable', 'คำเชิญนี้ใช้งานไม่ได้')}</h1><p role="alert" className={styles.muted}>{copy('The lobby may be closed or the link has expired. Ask the host for a new invitation.', 'ห้องอาจปิดแล้วหรือลิงก์หมดอายุ กรุณาขอคำเชิญใหม่จากผู้จัด')}</p><Link className={styles.button} href="/">{copy('Back to home', 'กลับหน้าหลัก')}</Link></>
