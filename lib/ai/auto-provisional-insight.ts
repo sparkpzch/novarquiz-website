@@ -1,4 +1,4 @@
-import { answerPatternSignature, personalDraftSignature, approvedAnswerCoverage, buildProvisionalInsightPrompt, hasSpecificInsightHeadline, parseProvisionalInsight } from '../analytics/provisional-insights';
+import { answerPatternSignature, approvedAnswerCoverage, buildProvisionalInsightPrompt, hasSpecificInsightHeadline, parseProvisionalInsight } from '../analytics/provisional-insights';
 import type { InsightLocale, InsightSummary } from '../analytics/insights';
 import { isEverydayInsight } from '../analytics/history-coaching';
 import { validateInsightLanguage } from '../analytics/insights';
@@ -13,7 +13,7 @@ export type AutoProvisionalInsight = {
 };
 
 /** Sends recorded selections and authored explanations, but never a UID or
- * clinical profile. Each account keeps its own draft and generation lease until approval. */
+ * clinical profile. Matching answers share one draft and generation lease. */
 type ProvisionalInput = {
   userId: string;
   quizId: string;
@@ -90,12 +90,21 @@ export async function prepareProvisionalInsight(input: ProvisionalInput, depende
     ...(input.readingStyle ? { readingStyle: input.readingStyle } : {}),
   });
 
-  const answerSignature = personalDraftSignature(patternSignature, input.userId);
-  // Only approved wording can cross account boundaries. It takes precedence
-  // over this user's pending draft, including drafts under older cache keys.
+  const answerSignature = patternSignature;
+  // Approved wording first, then a compatible draft awaiting review (shared
+  // across accounts, including drafts stored under older keys). Only when
+  // neither exists is a new draft generated. A rejected draft is never reused,
+  // so a rejection leads to a replacement being generated.
   const reusable = await getSimilarReusableInsight(input.quizId, input.audience, input.locale, context);
   if (reusable?.status === 'approved') {
     return { state: 'approved', insight: { status: 'approved', summary: { headline: reusable.headline, body: reusable.body, suggestion: reusable.suggestion }, context: reusable.answer_context } };
+  }
+  if (reusable) {
+    const summary = { headline: reusable.headline, body: reusable.body, suggestion: reusable.suggestion };
+    if (usable(summary, reusable.status)) {
+      return { state: 'pending', insight: { summary, status: 'provisional', context: reusable.answer_context } };
+    }
+    if (!input.readOnly && reusable.status === 'provisional') await invalidateProvisionalLanguage(reusable.id);
   }
 
   const existing = await getProvisionalInsight(input.quizId, input.audience, input.locale, answerSignature);

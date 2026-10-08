@@ -30,11 +30,6 @@ export function answerPatternSignature(input: AnswerReviewContext & {
   })).digest('hex');
 }
 
-/** Pending drafts belong to one account; identity stays out of model input. */
-export function personalDraftSignature(patternSignature: string, userId: string): string {
-  return createHash('sha256').update(JSON.stringify(['personal-draft-v1', patternSignature, userId])).digest('hex');
-}
-
 export function sameAnswerPattern(source: AnswerReviewContext, target: AnswerReviewContext): boolean {
   return source.quizName === target.quizName && source.quizDescription === target.quizDescription &&
     JSON.stringify(canonicalAnswers(source.answers)) === JSON.stringify(canonicalAnswers(target.answers));

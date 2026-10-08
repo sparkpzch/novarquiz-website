@@ -62,7 +62,7 @@ export async function getSimilarReusableInsight(
     `SELECT p.*, p.claim_token AS revision FROM provisional_insight_summaries p
      JOIN quizzes q ON q.id = p.quiz_id AND q.is_published = TRUE
      WHERE p.quiz_id = $1 AND p.audience = $2 AND p.locale = $3
-       AND p.status = 'approved' AND p.answer_context IS NOT NULL
+       AND p.status IN ('approved', 'provisional') AND p.answer_context IS NOT NULL
        AND p.headline IS NOT NULL AND p.body IS NOT NULL
      ORDER BY (p.status = 'approved') DESC, p.reviewed_at DESC NULLS LAST, p.updated_at DESC`, [quizId, audience, locale],
   );
@@ -169,7 +169,7 @@ export async function invalidateProvisionalLanguage(id: string): Promise<void> {
   );
 }
 
-/** Claim one model call per account and pattern; deleted drafts retry immediately. */
+/** Claim one model call per answer pattern; deleted drafts retry immediately. */
 export async function claimProvisionalInsight(
   quizId: string,
   audience: 'public' | 'hcp',

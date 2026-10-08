@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 
 const databaseUrl = process.env.INSIGHTS_TEST_DATABASE_URL;
 
-test('insight drafts and review lifecycle preserve scope, share approved text, and regenerate deleted patterns', { skip: !databaseUrl }, async () => {
+test('insight drafts and review lifecycle preserve scope, share pending text, and regenerate deleted patterns', { skip: !databaseUrl }, async () => {
   process.env.DATABASE_URL = databaseUrl!;
   process.env.DB_PROVIDER = databaseUrl!.includes('neon.tech') ? 'neon' : 'docker';
   const pool = new Pool({ connectionString: databaseUrl, ssl: databaseUrl!.includes('neon.tech') ? { rejectUnauthorized: true } : false });
@@ -40,7 +40,7 @@ test('insight drafts and review lifecycle preserve scope, share approved text, a
     assert.equal(await db.getInsightGenerationState(quiz.id, 'public', 'en', signature), 'provisional');
     const row = (await db.listProvisionalInsights()).find(r => r.id === claim.id)!; assert.ok(row.revision);
     const pending = await db.getSimilarReusableInsight(quiz.id, 'public', 'en', context);
-    assert.equal(pending, null, 'Pending wording must not be reused across accounts');
+    assert.equal(pending?.id, claim.id); assert.equal(pending?.status, 'provisional', 'Pending wording is reusable before review');
     assert.equal(await db.getSimilarReusableInsight(quiz.id, 'hcp', 'en', context), null);
     assert.equal(await db.getSimilarReusableInsight(quiz.id, 'public', 'en', { ...context, answers: [{ ...context.answers[0], selected: 'Different answer' }] }), null);
     const saved = await db.saveProvisionalDraft(row.id, { headline: 'A helpful label check', body: 'You chose to check the serving size.', suggestion: null }, row.revision); assert.ok(saved); assert.notEqual(saved.revision, row.revision);
