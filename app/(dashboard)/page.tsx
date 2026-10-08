@@ -16,7 +16,7 @@ import {
   watchUserSessions,
   type UserSessionEntry,
 } from "@/lib/firebase/rtdb";
-import { canResumeRoom, hasRecentSessionPresence } from "@/lib/session-resume";
+import { canResumeRoom, canResumeSession, sessionResumeExpiresAt } from "@/lib/session-resume";
 import { ROOM_STATUS } from "@/lib/constants/session";
 import { useToast } from "@/components/ui/Toast";
 import WelcomeBackdrop from "@/components/ui/WelcomeBackdrop";
@@ -85,14 +85,18 @@ function LiveSessionsWidget() {
     if (!user) return;
     return watchUserSessions(user.uid, (data) => {
       setEntries(data);
+      setNow(Date.now());
       setValidRooms({});
     });
   }, [user]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 15000);
-    return () => window.clearInterval(timer);
-  }, []);
+    const currentTime = Date.now();
+    const expirations = Object.values(entries).map(sessionResumeExpiresAt).filter((time) => Number.isFinite(time) && time > currentTime);
+    if (!expirations.length) return;
+    const timer = window.setTimeout(() => setNow(Date.now()), Math.min(...expirations) - currentTime);
+    return () => window.clearTimeout(timer);
+  }, [entries, now]);
 
   useEffect(() => {
     if (!user) return;
@@ -115,14 +119,14 @@ function LiveSessionsWidget() {
   }, [entries, user]);
 
   const entry = Object.entries(entries)
-    .filter(([id, item]) => validRooms[id] && hasRecentSessionPresence(item, now))
+    .filter(([id, item]) => validRooms[id] && canResumeSession(item, now))
     .map(([, item]) => item)
     .sort((a, b) => b.joinedAt - a.joinedAt)[0];
 
   if (!entry) return null;
 
   const resume = async () => {
-    if (resuming || !user) return;
+    if (resuming || !user || !canResumeSession(entry, Date.now())) return;
     setResuming(true);
 
     if (entry.mode === "team" && entry.roomId) {
@@ -172,10 +176,6 @@ function LiveSessionsWidget() {
       animate={{ opacity: 1, y: 0 }}
       className="nq-dashboard-panel group flex w-full items-center gap-3 rounded-xl border border-[#557cff]/35 bg-[#101b49] px-4 py-3 text-left shadow-[0_14px_36px_rgba(0,0,0,0.18)] transition hover:border-[#7898ff]/70 hover:bg-[#142153] disabled:cursor-wait disabled:opacity-70"
     >
-      <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#4f76ff] text-white">
-        <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[#68f0b0]" />
-        ▶
-      </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[10px] font-semibold uppercase tracking-[0.15em] text-[#7898ff]">
           Continue playing

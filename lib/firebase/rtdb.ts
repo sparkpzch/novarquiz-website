@@ -8,6 +8,7 @@ import {
   off,
   onDisconnect,
   runTransaction,
+  serverTimestamp,
   type DataSnapshot,
 } from 'firebase/database';
 import app from './config';
@@ -267,8 +268,8 @@ export async function resolveJoinToken(token: string): Promise<string | null> {
 // ─── Per-user active-session index ────────────────────────────────────────────
 //
 // Fan-out index so we can answer "which live sessions is THIS user in?" without
-// scanning every session. Written at join time, removed when the user leaves or
-// finishes. Each entry is auto-pruned if the tab disconnects (onDisconnect).
+// scanning every session. Completed/explicitly abandoned games are removed;
+// interrupted games retain their last exit time for the resume window.
 //
 // Path: userSessions/{uid}/{entryId}
 //   entryId = sessionId for public lobbies,
@@ -279,6 +280,8 @@ export type UserSessionEntry = {
   sessionName: string;
   mode: 'lobby' | 'team' | 'solo';
   lastActiveAt?: number;
+  lastLeftAt?: number;
+  lastInteractionAt?: number;
   roomId?: string;
   joinedAt: number;
 };
@@ -293,7 +296,7 @@ export async function trackUserSession(
 ): Promise<void> {
   const id = userSessionEntryId(entry.sessionId, entry.roomId);
   const entryRef = ref(rtdb, `userSessions/${uid}/${id}`);
-  await onDisconnect(entryRef).remove();
+  await onDisconnect(entryRef).update({ lastLeftAt: serverTimestamp() });
   await set(entryRef, entry);
 }
 
@@ -304,7 +307,9 @@ export async function untrackUserSession(
 ): Promise<void> {
   if (readLobbyConnection(sessionId, uid)) return;
   const id = userSessionEntryId(sessionId, roomId);
-  await set(ref(rtdb, `userSessions/${uid}/${id}`), null);
+  const entryRef = ref(rtdb, `userSessions/${uid}/${id}`);
+  await onDisconnect(entryRef).cancel();
+  await set(entryRef, null);
 }
 
 // Removes every userSessions entry for this uid that references `sessionId`
@@ -322,6 +327,7 @@ export async function untrackAllUserSessionsFor(
     if (entry.sessionId === sessionId && !(entry as UserSessionEntry & { connectionId?: string }).connectionId) updates[id] = null;
   }
   if (Object.keys(updates).length > 0) {
+    await Promise.all(Object.keys(updates).map(id => onDisconnect(ref(rtdb, `userSessions/${uid}/${id}`)).cancel()));
     await update(ref(rtdb, `userSessions/${uid}`), updates);
   }
 }
@@ -390,14 +396,40 @@ export function watchTeamRoom(
 // A play layout survives lobby → question navigation. Refresh only existing
 // index entries so completed/removed entries cannot be resurrected by a timer.
 export function maintainSessionPresence(uid: string, sessionId: string): () => void {
+  let lastInteractionAt = Date.now();
+  let lastInteractionSyncAt = 0;
+  const activityEvents = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'] as const;
+  const listenForActivity = (sync: () => void) => {
+    const onActivity = () => {
+      lastInteractionAt = Date.now();
+      if (lastInteractionAt - lastInteractionSyncAt >= 1000) {
+        lastInteractionSyncAt = lastInteractionAt;
+        sync();
+      }
+    };
+    activityEvents.forEach(event => window.addEventListener(event, onActivity, { passive: true }));
+    return () => activityEvents.forEach(event => window.removeEventListener(event, onActivity));
+  };
   const connection = readLobbyConnection(sessionId, uid);
   if (connection) {
     let stopped = false;
     const transportId = crypto.randomUUID();
     const presenceRef = ref(rtdb, `sessions/${sessionId}/connections/${uid}/${connection.connectionId}/${transportId}`);
     const heartbeat = () => fetch(`/api/play/${sessionId}/presence`, {
-      method: 'POST', headers: lobbyHeaders(sessionId, uid, { 'Content-Type': 'application/json' }), body: '{}',
+      method: 'POST', headers: lobbyHeaders(sessionId, uid, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ transportId, lastInteractionAt }),
     }).catch(() => {});
+    const markDeparture = () => {
+      void fetch(`/api/play/${sessionId}/presence`, {
+        method: 'POST', headers: lobbyHeaders(sessionId, uid, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ departingTransportId: transportId }), keepalive: true,
+      }).catch(() => {});
+    };
+    const restorePresence = () => {
+      if (!stopped) void set(presenceRef, true).then(heartbeat).catch(() => {});
+    };
+    window.addEventListener('pagehide', markDeparture);
+    window.addEventListener('pageshow', restorePresence);
     const unsubscribe = onValue(ref(rtdb, '.info/connected'), snapshot => {
       if (snapshot.val() === true) void (async () => {
         await onDisconnect(presenceRef).remove();
@@ -405,26 +437,43 @@ export function maintainSessionPresence(uid: string, sessionId: string): () => v
       })().catch(() => {});
     });
     const timer = setInterval(() => { if (!stopped) void heartbeat(); }, 30_000);
-    return () => { stopped = true; clearInterval(timer); unsubscribe(); void set(presenceRef, null).catch(() => {}); };
+    const stopActivity = listenForActivity(() => { if (!stopped) void heartbeat(); });
+    return () => {
+      stopped = true; clearInterval(timer); unsubscribe(); stopActivity();
+      window.removeEventListener('pagehide', markDeparture);
+      window.removeEventListener('pageshow', restorePresence);
+      markDeparture();
+      void set(presenceRef, null).catch(() => {});
+    };
   }
   let stopped = false;
   let updating = false;
+  const trackedEntries = new Set<string>();
+  const markDeparture = () => {
+    for (const id of trackedEntries) {
+      void runTransaction(ref(rtdb, `userSessions/${uid}/${id}`), current =>
+        current ? { ...current, lastLeftAt: Date.now() } : undefined).catch(() => {});
+    }
+  };
   const refresh = async () => {
     if (stopped || updating) return;
     updating = true;
     try {
       const snapshot = await get(ref(rtdb, `userSessions/${uid}`));
       const entries = (snapshot.val() ?? {}) as Record<string, UserSessionEntry>;
-      await Promise.all(Object.entries(entries).filter(([, entry]) => entry.sessionId === sessionId && !(entry as UserSessionEntry & { connectionId?: string }).connectionId).map(async ([id, entry]) => {
+      await Promise.all(Object.entries(entries).filter(([, entry]) => entry.sessionId === sessionId && !(entry as UserSessionEntry & { connectionId?: string }).connectionId).map(async ([id]) => {
         if (stopped) return;
         const entryRef = ref(rtdb, `userSessions/${uid}/${id}`);
-        const playerRef = ref(rtdb, entry.roomId
-          ? `teamRooms/${entry.roomId}/players/${uid}`
-          : `sessions/${sessionId}/players/${uid}`);
-        await onDisconnect(entryRef).remove();
-        if (!entry.roomId) await onDisconnect(playerRef).remove();
-        if (stopped) return;
-        await runTransaction(entryRef, current => current ? { ...current, lastActiveAt: Date.now() } : undefined);
+        trackedEntries.add(id);
+        await onDisconnect(entryRef).update({ lastLeftAt: serverTimestamp() });
+        if (stopped) {
+          await onDisconnect(entryRef).cancel();
+          return;
+        }
+        await runTransaction(entryRef, current => current ? {
+          ...current, lastActiveAt: Date.now(), lastLeftAt: null,
+          lastInteractionAt: Math.max(current.lastInteractionAt ?? 0, lastInteractionAt),
+        } : undefined);
       }));
     } catch (error) {
       console.error('Could not refresh session presence:', error);
@@ -436,5 +485,16 @@ export function maintainSessionPresence(uid: string, sessionId: string): () => v
     if (snapshot.val() === true) void refresh();
   });
   const timer = setInterval(() => void refresh(), 30_000);
-  return () => { stopped = true; clearInterval(timer); unsubscribe(); };
+  const stopActivity = listenForActivity(() => void refresh());
+  window.addEventListener('pagehide', markDeparture);
+  window.addEventListener('pageshow', refresh);
+  return () => {
+    stopped = true; clearInterval(timer); unsubscribe(); stopActivity();
+    window.removeEventListener('pagehide', markDeparture);
+    window.removeEventListener('pageshow', refresh);
+    markDeparture();
+    for (const id of trackedEntries) {
+      void onDisconnect(ref(rtdb, `userSessions/${uid}/${id}`)).cancel().catch(() => {});
+    }
+  };
 }

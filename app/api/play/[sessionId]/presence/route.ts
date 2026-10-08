@@ -8,6 +8,9 @@ import { requireLobbyAccess, requestConnectionId } from '@/lib/play/lobby-access
 import { ownsLobbyMember } from '@/lib/play/lobby-policy';
 
 const Metadata = z.object({
+  transportId: z.string().uuid().optional(),
+  departingTransportId: z.string().uuid().optional(),
+  lastInteractionAt: z.number().finite().nonnegative().optional(),
   currentQuestionId: z.string().uuid().nullable().optional(),
   currentQuestionLabel: z.string().max(100).nullable().optional(),
 });
@@ -25,9 +28,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       const connectionId = requestConnectionId(request);
       const player = adminRtdb.ref(`sessions/${sessionId}/players/${user.uid}`);
       const now = Date.now();
+      if (body.data.departingTransportId) {
+        const transports = adminRtdb.ref(`sessions/${sessionId}/connections/${user.uid}/${connectionId}`);
+        await transports.child(body.data.departingTransportId).remove();
+        if (!Object.values((await transports.get()).val() ?? {}).some(Boolean)) {
+          await adminRtdb.ref(`userSessions/${user.uid}/${sessionId}`).transaction(current =>
+            !current ? current : current.connectionId === connectionId ? { ...current, lastLeftAt: now } : undefined);
+        }
+        return NextResponse.json({ ok: true });
+      }
+      if (body.data.transportId && !(await adminRtdb.ref(
+        `sessions/${sessionId}/connections/${user.uid}/${connectionId}/${body.data.transportId}`,
+      ).get()).val()) return NextResponse.json({ ok: true });
       const changed = await player.transaction(current => !current ? current : ownsLobbyMember(current, connectionId) ? { ...current, lastActiveAt: now } : undefined);
       if (!changed.committed || !changed.snapshot.val()) return NextResponse.json({ ok: true });
-      if (Object.keys(body.data).length) {
+      if (body.data.currentQuestionId !== undefined || body.data.currentQuestionLabel !== undefined) {
         const progress = await getProgress(sessionId,user.uid);
         const question = progress && !progress.completed ? await getQuestionById(progress.question_id) : null;
         await adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).update({
@@ -36,7 +51,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
         });
       }
       await adminRtdb.ref(`userSessions/${user.uid}/${sessionId}`).transaction(current =>
-        !current ? current : current.connectionId === connectionId ? { ...current, lastActiveAt: now } : undefined);
+        !current ? current : current.connectionId === connectionId ? {
+          ...current, lastActiveAt: now,
+          ...(body.data.lastInteractionAt !== undefined ? {
+            lastLeftAt: null,
+            lastInteractionAt: Math.max(current.lastInteractionAt ?? 0, Math.min(body.data.lastInteractionAt, now)),
+          } : {}),
+        } : undefined);
       return NextResponse.json({ ok: true });
     });
   } catch {
