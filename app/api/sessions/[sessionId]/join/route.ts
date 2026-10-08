@@ -8,6 +8,7 @@ import { getPlayUser } from '@/lib/play-auth';
 import { sanitizePhotoUrl } from '@/lib/security/photo-url';
 import { canJoinLobby } from '@/lib/play/lobby-policy';
 import { connectionIdFor, LobbyAccessError } from '@/lib/play/lobby-access';
+import { canResumeSession } from '@/lib/session-resume';
 
 const JoinBody = z.object({ invitationToken: z.string().max(64).optional() });
 
@@ -28,13 +29,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       if (!canJoinLobby(room, session.is_private, body.data.invitationToken)) {
         return NextResponse.json({ error: 'This invitation is unavailable. Ask the host for a new link.' }, { status: 403 });
       }
-      // Taking over an unfinished attempt keeps its question and score.
+      // Taking over an unfinished attempt keeps its question and score, but
+      // only within the resume window. Once it lapses (the Home "Continue
+      // playing" card is gone), joining again starts a fresh attempt: a new
+      // boundary excludes the old answers and restarts score and clocks.
       await resetProgress(session.id, user.uid);
       let progress = await getProgress(session.id, user.uid);
+      const resumeEntry = (await adminRtdb.ref(`userSessions/${user.uid}/${session.id}`).get()).val();
+      const resumable = !!resumeEntry && canResumeSession(resumeEntry, Date.now());
       const token = randomBytes(32).toString('hex');
       const connectionId = connectionIdFor(token);
       const roundId = room.roundId ?? randomUUID();
-      if (!progress?.attempt_boundary.startsWith(`lobby:${roundId}:`)) {
+      if (!progress?.attempt_boundary.startsWith(`lobby:${roundId}:`) || !resumable) {
         const entry = await getEntryQuestion(session.id);
         if (!entry) return NextResponse.json({ error: 'This quiz has no entry question.' }, { status: 400 });
         progress = await startProgress(session.id, user.uid, `lobby:${roundId}:${randomUUID()}`, entry.id, true);

@@ -125,7 +125,7 @@ function LiveSessionsWidget() {
   if (!entry) return null;
 
   const resume = async () => {
-    if (resuming || !user || !canResumeSession(entry, Date.now())) return;
+    if (resuming || !user || !isResumableNow(entry)) return;
     setResuming(true);
 
     if (entry.mode === "team" && entry.roomId) {
@@ -182,12 +182,30 @@ function LiveSessionsWidget() {
         <span className="mt-0.5 block truncate text-sm font-semibold text-white">
           {entry.sessionName}
         </span>
+        <span className="mt-0.5 block text-xs text-[#9aabda]">
+          Expires in <ResumeCountdown expiresAt={sessionResumeExpiresAt(entry)} />
+        </span>
       </span>
       <span className="text-sm font-semibold text-[#9aabda] transition group-hover:translate-x-0.5 group-hover:text-white">
         {resuming ? "Checking…" : "Resume →"}
       </span>
     </motion.button>
   );
+}
+
+// Click-time check; kept outside components so it isn't read as render work.
+const isResumableNow = (entry: UserSessionEntry) => canResumeSession(entry, Date.now());
+
+// Ticks on its own so the dashboard doesn't re-render every second. The
+// parent hides the card when the window closes.
+function ResumeCountdown({ expiresAt }: { expiresAt: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const seconds = Math.max(0, Math.ceil((expiresAt - now) / 1000));
+  return <span className="font-semibold tabular-nums text-white">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</span>;
 }
 
 function JoinByCodeCard() {

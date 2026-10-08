@@ -101,14 +101,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       if (!verifyQuestionToken(fromToken, sessionId, user.uid, fromQuestionId, attemptBoundary)) {
         return NextResponse.json({ error: 'Invalid question' }, { status: 403 });
       }
-      const access = await getQuizForQuestion(fromQuestionId);
+      const [access, sessionQuizId, fromQuestion] = await Promise.all([
+        getQuizForQuestion(fromQuestionId), resolveSessionToQuizId(sessionId), getQuestionById(fromQuestionId),
+      ]);
       if (!access) return NextResponse.json(null, { status: 404 });
-      const sessionQuizId = await resolveSessionToQuizId(sessionId);
       if (sessionQuizId !== access.quiz_id) return NextResponse.json(null, { status: 404 });
       if (!access.is_published && !user.isAdmin && access.created_by !== user.uid) {
         return NextResponse.json(null, { status: 404 });
       }
-      const fromQuestion = await getQuestionById(fromQuestionId);
       if (fromQuestion?.node_type === 'situation') {
         if (choiceLabel !== 'continue') return NextResponse.json({ error: 'Invalid path' }, { status: 403 });
       } else if (!user.isGuest) {
@@ -206,11 +206,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     // is for. Without this, an authenticated user could inject answers from
     // unrelated (or draft) quizzes into their session_id row and inflate
     // their leaderboard score.
-    const access = await getQuizForQuestion(parsed.data.question_id);
+    const [access, sessionQuizId] = await Promise.all([
+      getQuizForQuestion(parsed.data.question_id), resolveSessionToQuizId(sessionId),
+    ]);
     if (!access) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-    const sessionQuizId = await resolveSessionToQuizId(sessionId);
     if (!sessionQuizId || sessionQuizId !== access.quiz_id) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
@@ -227,7 +228,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       const existing = await getExistingAnswer(sessionId, user.uid, parsed.data.question_id);
       if (existing) {
         await answerProgress(sessionId, user.uid, boundary, parsed.data.question_id, existing);
-        return { answer: existing, score: await getUserCumulativeScore(sessionId, user.uid) };
+        return { answer: existing };
       }
       const progress = await getProgress(sessionId, user.uid, boundary);
       if (!progress || progress.completed || progress.question_id !== parsed.data.question_id) return { invalidProgress: true } as const;
@@ -244,7 +245,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
         time_taken_ms: Math.max(parsed.data.time_taken_ms, Date.now() - readQuestionToken(parsed.data.question_token!, sessionId, user.uid, parsed.data.question_id, boundary)!),
       });
       await answerProgress(sessionId, user.uid, boundary, question.id, { chosen_label: parsed.data.chosen_label, points_earned: answer.points_earned, explanation: answer.explanation });
-      return { answer, score: await getUserCumulativeScore(sessionId, user.uid) };
+      return { answer };
     });
     if (saved && 'invalidProgress' in saved) return NextResponse.json({ error: 'Progress changed; reload to resume' }, { status: 409 });
     if (saved && 'invalidToken' in saved) return NextResponse.json({ error: 'Invalid question' }, { status: 403 });

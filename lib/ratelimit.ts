@@ -80,6 +80,9 @@ function getLimiter(limit: number): Ratelimit {
         redis: getRedis(),
         limiter: Ratelimit.slidingWindow(limit, WINDOW),
         prefix: 'nq_rl',
+        // On timeout the SDK resolves success:true instead of throwing; the
+        // caller treats that as an outage (see checkRateLimit).
+        timeout: 1_000,
       }),
     );
   }
@@ -160,7 +163,10 @@ export async function checkRateLimit(
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
     if (Date.now() >= redisDownUntil) {
       try {
-        const { success, reset } = await getLimiter(limit).limit(key);
+        const { success, reset, reason } = await getLimiter(limit).limit(key);
+        // A timed-out check fails open and never throws, so without this the
+        // breaker never trips and every request waits out the timeout.
+        if (reason === 'timeout') throw new Error('Redis request timed out');
         redisDownUntil = 0;
         return {
           allowed: success,

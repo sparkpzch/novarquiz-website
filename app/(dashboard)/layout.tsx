@@ -106,9 +106,13 @@ function matchesNavItem(
   return pathname === href || (!exact && href !== '/' && pathname.startsWith(`${href}/`));
 }
 
-function DashboardLayoutContent({ children }: { children: ReactNode }) {
+function DashboardLayoutContent({ children, modal }: { children: ReactNode; modal: ReactNode }) {
   const { t, i18n } = useTranslation();
-  const pathname = usePathname();
+  const routePathname = usePathname();
+  // An invitation modal (/join/...) sits over the page behind it, so keep
+  // that page's path for navigation state and the page transition key.
+  const [pathname, setPathname] = useState(() => routePathname.startsWith('/join/') ? '/' : routePathname);
+  if (!routePathname.startsWith('/join/') && routePathname !== pathname) setPathname(routePathname);
   const searchParams = useSearchParams();
   const router = useRouter();
   const { theme } = useTheme();
@@ -405,11 +409,12 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
           </motion.div>
         )}
       </AnimatePresence>
+      {modal}
     </div>
   );
 }
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+export default function DashboardLayout({ children, modal }: { children: ReactNode; modal: ReactNode }) {
   return (
     <Suspense
       fallback={
@@ -418,7 +423,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       }
     >
-      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      <DashboardLayoutContent modal={modal}>{children}</DashboardLayoutContent>
     </Suspense>
   );
 }

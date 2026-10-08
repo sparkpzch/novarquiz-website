@@ -22,7 +22,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
   try {
     const body = Metadata.safeParse(await request.json().catch(() => ({})));
     if (!body.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
-    return await withPlayerAnswerLock(sessionId, user.uid, async () => {
+    // No per-player DB lock here: activity heartbeats fire on every click, and
+    // holding the answer lock across these RTDB round-trips stalled answers.
+    // Each write below is an RTDB transaction gated on connection ownership.
+    {
       const denied = await requireLobbyAccess(request, sessionId, user.uid, false);
       if (denied) return denied;
       const connectionId = requestConnectionId(request);
@@ -59,7 +62,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
           } : {}),
         } : undefined);
       return NextResponse.json({ ok: true });
-    });
+    }
   } catch {
     return NextResponse.json({ error: 'Could not update connection' }, { status: 500 });
   }

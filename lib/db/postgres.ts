@@ -74,7 +74,7 @@ function createPool(): IDbPool {
   if (provider === 'neon') {
     const pool = new NeonPool({
       connectionString: opts.connectionString,
-      max: 3,
+      max: 10,
       idleTimeoutMillis: POOL_IDLE_TIMEOUT_MS,
     });
     pool.on('error', (err: Error) => console.error('Postgres pool error:', err));

@@ -1,6 +1,7 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { saveLobbyConnection } from '@/lib/client/lobby-connection';
@@ -17,8 +18,10 @@ type InvitationQuiz = {
   leaderboard: InvitationStanding[];
 };
 
-export default function JoinPage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = use(params);
+const subscribeNothing = () => () => {};
+
+// Invitation modal shown over a dashboard page (Home when opened from a link).
+export default function JoinInvitation({ token }: { token: string }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const { i18n } = useTranslation();
@@ -79,14 +82,32 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
       router.replace(`/play/${data.sessionId}/${data.roomStatus === 'started' ? 'question' : 'lobby'}`);
     } catch { setJoining(false); setJoinFailed(true); }
   };
+  const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
   const goBack = () => {
     if (joining) return;
     if (window.history.length > 1) router.back();
     else router.replace('/');
   };
-  return <main className={`${styles.page} ${styles.invitationPage}`}>
+  useEffect(() => {
+    const { overflow } = document.body.style;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = overflow; };
+  }, []);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') goBack(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
+  // Portal to <body> so the modal stacks above the dashboard header and nav
+  // even when it renders inside the page's animated (transformed) container.
+  if (!mounted) return null;
+  return createPortal(<div className={`${styles.page} ${styles.invitationPage}`} role="dialog" aria-modal="true" aria-label={copy('Quiz invitation', 'คำเชิญเข้าร่วมแบบทดสอบ')}>
     <button type="button" className={styles.invitationBackdrop} onClick={goBack} disabled={joining}
       aria-label={copy('Back to previous page', 'ย้อนกลับหน้าก่อนหน้า')} />
+    <button type="button" className={styles.invitationClose} onClick={goBack} disabled={joining}
+      aria-label={copy('Close', 'ปิด')}>
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+    </button>
     <div className={quiz && !unavailable && user && !loading && !user.isAnonymous ? styles.invitationLayout : styles.invitationStatus}>
     <section className={`${styles.panel} ${styles.invitationInfo}`}>
     {loading || !user || user.isAnonymous ? <p role="status" className={styles.muted}>{copy('Checking your account…', 'กำลังตรวจสอบบัญชี…')}</p>
@@ -111,5 +132,5 @@ export default function JoinPage({ params }: { params: Promise<{ token: string }
       </>}
     </section>
     {quiz && !unavailable && user && !loading && !user.isAnonymous && <InvitationLeaderboard entries={quiz.leaderboard ?? []} th={th} refreshFailed={refreshFailed} />}
-  </div></main>;
+  </div></div>, document.body);
 }
