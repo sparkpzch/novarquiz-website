@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { useAuth } from '@/lib/hooks/useAuth';
+import IconRefreshButton from '@/components/ui/IconRefreshButton';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 import TopicScoreHistogram from '@/components/stats/TopicScoreHistogram';
 import { learningTopic, personalLearningAreas } from '@/lib/analytics/history-coaching';
@@ -63,7 +64,7 @@ function HistoryContent() {
       <header className="pr-card pr-header">
         <div className="pr-header-top">
           <div className="pr-header-title"><Link className="pr-button pr-home" href="/">← {copy('Home', 'หน้าหลัก')}</Link><div><p className="pr-eyebrow">{copy('Your quiz history', 'ประวัติแบบทดสอบของคุณ')}</p><h1>{selected?.session_name ?? copy('History', 'ประวัติ')}</h1><p className="pr-muted">{copy('Review your answers and explanations.', 'ดูคำตอบที่เลือกและเฉลย')}</p></div></div>
-          <div className="pr-header-actions">{selected && <Link className="pr-button" href={`/stats?session=${encodeURIComponent(selected.session_id)}`}>{copy('Quiz summary', 'ดูสรุปผล')}</Link>}<button className="pr-button" onClick={retry} type="button">↻ {copy('Refresh', 'โหลดใหม่')}</button></div>
+          <div className="pr-header-actions">{selected && <Link className="pr-button" href={`/stats?session=${encodeURIComponent(selected.session_id)}`}>{copy('Quiz summary', 'ดูสรุปผล')}</Link>}<IconRefreshButton onRefresh={retry} label={copy('Refresh your history', 'โหลดประวัติของคุณอีกครั้ง')} /></div>
         </div>
         {report && <div className="pr-overview">
           <div className="pr-profile"><ProfileAvatar displayName={user?.displayName} photoURL={user?.photoURL} size={42} /><div><strong>{user?.displayName || copy('Your results', 'ผลของคุณ')}</strong><span>{date(selected?.completed_at ?? null)}</span></div></div>

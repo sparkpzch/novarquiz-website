@@ -15,6 +15,8 @@ export type AnswerReviewContext = {
   quizDescription: string | null;
   answers: AnswerReviewItem[];
   learningFocus?: { topic: string; question: string };
+  /** Explicit linkage for translating legacy summaries without recorded answers. */
+  translationOf?: string;
 };
 
 export type ProvisionalStatus = 'generating' | 'provisional' | 'approved' | 'rejected' | 'failed';

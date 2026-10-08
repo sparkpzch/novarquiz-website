@@ -7,11 +7,13 @@ import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { usePersonalRecapReport } from '@/lib/hooks/usePersonalRecapReport';
 import { useAuth } from '@/lib/hooks/useAuth';
+import IconRefreshButton from '@/components/ui/IconRefreshButton';
+import LucideIcon from '@/components/ui/icons/LucideIcon';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 import PersonalRecapCard from '@/components/stats/PersonalRecapCard';
 import { historyCoaching, isEverydayInsight, learningTopic, type LearningArea } from '@/lib/analytics/history-coaching';
 import type { PersonalHistoryReport, UserHistoryRow } from '@/lib/analytics/history';
-import './stats.css';
+import styles from './stats.module.css';
 
 type IconName = LearningArea['icon'] | 'spark' | 'arrow' | 'book' | 'check';
 function Icon({ name, className = '' }: { name: IconName; className?: string }) {
@@ -69,16 +71,15 @@ function StatsPageContent() {
   const openQuestion = (id: string) => setFocus((previous) => ({ key: reportKey, id, version: (previous?.version ?? 0) + 1 }));
 
   return (
-    <div className="nq-history">
+    <div className={styles.page}>
       <div className="history-wrap">
-        <div className="history-topbar">
-          <Link href="/" className="history-back">← {copy('Home', 'หน้าหลัก')}</Link>
-          <div className="history-person"><ProfileAvatar displayName={user?.displayName} photoURL={user?.photoURL} size={32} /></div>
-        </div>
+        <nav className="history-breadcrumb" aria-label={copy('Breadcrumb', 'เส้นทางหน้า')}><Link href="/">{copy('Home', 'หน้าหลัก')}</Link><span aria-hidden="true">/</span><span aria-current="page">{copy('Stats', 'สถิติ')}</span></nav>
         <header className="history-heading">
-          <p className="history-eyebrow">{copy('Quiz results', 'ผลแบบทดสอบ')}</p>
-          <h1>{copy('Your quiz results', 'ผลแบบทดสอบของคุณ')}</h1>
-          <p>{copy('See your results and review the answers.', 'ดูผลและทบทวนคำตอบจากแบบทดสอบ')}</p>
+          <div className="history-heading-copy"><p className="history-eyebrow">{copy('Your learning overview', 'ภาพรวมการเรียนรู้ของคุณ')}</p>
+            <h1>{copy('Your quiz stats', 'สถิติแบบทดสอบของคุณ')}</h1>
+            <p>{copy('See your results, explore your strengths and review at your own pace.', 'ดูผลแบบทดสอบ หัวข้อที่ทำได้ดี และทบทวนคำตอบในจังหวะของคุณ')}</p>
+          </div>
+          <Link href="/history" className="history-secondary">{copy('View quiz history', 'ดูประวัติแบบทดสอบ')}<Icon name="arrow" /></Link>
         </header>
 
         {authLoading || (uid && !history) ? <Loading label={copy('Finding your completed quizzes…', 'กำลังค้นหาแบบทดสอบที่คุณทำเสร็จ…')} /> : !uid ? (
@@ -86,15 +87,26 @@ function StatsPageContent() {
         ) : history?.error ? <ErrorPanel onRetry={() => setVersion((v) => v + 1)} message={copy('We couldn’t find your quizzes. Please try again.', 'ยังโหลดแบบทดสอบของคุณไม่ได้ กรุณาลองอีกครั้ง')} label={copy('Try again', 'ลองอีกครั้ง')} /> : !rows.length ? (
           <section className="history-card history-empty"><Icon name="book" /><h2>{copy('Start with something you’re curious about', 'เริ่มจากเรื่องที่คุณอยากรู้')}</h2><p>{copy('Complete a health quiz, then come back for a simple recap and a next step just for you.', 'ทำแบบทดสอบสุขภาพ แล้วกลับมาดูสรุปและคำแนะนำสำหรับคุณ')}</p><Link href="/quizzes" className="history-primary">{copy('Choose a quiz', 'เลือกแบบทดสอบสุขภาพ')} <Icon name="arrow" /></Link></section>
         ) : <>
-          <div className="history-quiz-picker">
+          <div className="history-card history-quiz-picker">
             <label htmlFor="history-quiz">{copy('Your completed quizzes', 'แบบทดสอบที่คุณทำแล้ว')}</label>
-            <div className="history-picker-controls"><select id="history-quiz" value={selectedId ?? ''} onChange={(event) => router.push(`/stats?session=${encodeURIComponent(event.target.value)}`, { scroll: false })}>
+            <div className="history-picker-controls"><div className="history-select-field"><select id="history-quiz" value={selectedId ?? ''} onChange={(event) => router.push(`/stats?session=${encodeURIComponent(event.target.value)}`, { scroll: false })}>
               {!selected && <option value={selectedId ?? ''}>{copy('Choose a quiz', 'เลือกแบบทดสอบ')}</option>}
               {rows.map((row) => <option key={row.session_id} value={row.session_id}>{row.session_name} · {date(row.completed_at)}</option>)}
-            </select><button type="button" className="history-refresh" onClick={() => setVersion((v) => v + 1)} aria-label={copy('Refresh your recap', 'โหลดสรุปของคุณอีกครั้ง')} title={copy('Refresh your recap', 'โหลดสรุปของคุณอีกครั้ง')}>↻</button></div>
+            </select><LucideIcon name="chevron-down" className="history-select-chevron" /></div><IconRefreshButton onRefresh={() => setVersion((v) => v + 1)} label={copy('Refresh your recap', 'โหลดสรุปของคุณอีกครั้ง')} /></div>
           </div>
           {!selected ? <section className="history-card history-empty"><h2>{copy('Choose one of your completed quizzes', 'เลือกแบบทดสอบที่คุณทำเสร็จแล้ว')}</h2><p>{copy('This quiz isn’t in your history.', 'ไม่พบแบบทดสอบนี้ในประวัติของคุณ')}</p><Link href="/stats" className="history-primary">{copy('See my latest quiz', 'ดูแบบทดสอบล่าสุด')}</Link></section> : !reportResult ? <Loading label={copy('Loading summary…', 'กำลังเตรียมสรุปผลแบบทดสอบ…')} /> : reportResult.error ? <ErrorPanel onRetry={() => setVersion((v) => v + 1)} message={copy('Your recap couldn’t load. Give it another try.', 'ยังโหลดสรุปของคุณไม่ได้ กรุณาลองอีกครั้ง')} label={copy('Try again', 'ลองอีกครั้ง')} /> : report && coaching && <>
-            <PersonalRecapCard report={report} locale={locale} />
+            <section className="history-card history-session" aria-labelledby="session-title">
+              <div className="history-session-heading"><div><p className="history-eyebrow">{copy('Selected quiz', 'แบบทดสอบที่เลือก')}</p><h2 id="session-title">{report.session.session_name}</h2>{report.session.session_description && <p className="history-session-description">{report.session.session_description}</p>}<p className="history-session-date">{copy('Completed', 'ทำเสร็จเมื่อ')} · {date(report.session.completed_at)}</p></div><div className="history-person"><ProfileAvatar displayName={user?.displayName} photoURL={user?.photoURL} size={36} /><span>{user?.displayName ?? copy('Player', 'ผู้เล่น')}</span></div></div>
+              <dl className="history-metrics">
+                <div><dt>{copy('Total score', 'คะแนนรวม')}</dt><dd>{report.session.total_score.toLocaleString(locale)}</dd></div>
+                <div className="history-metric-good"><dt>{copy('Correct answers', 'ตอบถูก')}</dt><dd>{report.session.correct_count.toLocaleString(locale)}<small>{copy('questions', 'ข้อ')}</small></dd></div>
+                <div className="history-metric-review"><dt>{copy('Incorrect answers', 'ตอบผิด')}</dt><dd>{report.session.incorrect_count.toLocaleString(locale)}<small>{copy('questions', 'ข้อ')}</small></dd></div>
+                <div><dt>{copy('Rank', 'อันดับ')}</dt><dd>{report.session.rank > 0 ? report.session.rank.toLocaleString(locale) : '—'}<small>{copy(`of ${report.session.total_players.toLocaleString(locale)} players`, `จาก ${report.session.total_players.toLocaleString(locale)} คน`)}</small></dd></div>
+                <div><dt>{copy('Answer streak', 'ตอบถูกต่อเนื่อง')}</dt><dd>{report.session.streak.toLocaleString(locale)}<small>{copy('questions', 'ข้อ')}</small></dd></div>
+                <div><dt>{copy('Time spent', 'เวลาที่ใช้')}</dt><dd>{formatDuration(report.session.total_time_ms, locale)}</dd></div>
+              </dl>
+            </section>
+            <PersonalRecapCard report={report} locale={locale} fullDetails />
 
             {coaching.total > 0 && <>
               <section className="history-card history-next-step" aria-labelledby="next-step-title">
@@ -145,19 +157,26 @@ function AnswerReview({ report, locale, focusedId, focusVersion }: { report: Per
       question.querySelector('summary')?.focus({ preventScroll: true });
     }
   }, [focusedId, focusVersion]);
-  return <details ref={sectionRef} className="history-card history-review-section">
-    <summary className="history-review-heading"><div><h2>{copy('Understand your answers', 'ทำความเข้าใจคำตอบของคุณ')}</h2><p>{copy('A closer look, whenever you’re ready.', 'ดูรายละเอียดเมื่อคุณพร้อม')}</p></div><span className="history-review-plus" aria-hidden="true">+</span></summary>
+  return <details ref={sectionRef} className="history-card history-review-section" open>
+    <summary className="history-review-heading"><div><h2>{copy('Understand your answers', 'ทำความเข้าใจคำตอบของคุณ')}</h2><p>{copy(`${report.answers.length} questions · Your answers, answer keys and explanations.`, `${report.answers.length} ข้อ · คำตอบของคุณ เฉลย และคำอธิบาย`)}</p></div><span className="history-review-plus" aria-hidden="true">+</span></summary>
     <div className="history-review-content">{report.answers.some((answer) => !answer.selectedAligned) && <label className="history-review-filter"><input type="checkbox" checked={onlyReview} onChange={(event) => setOnlyReview(event.target.checked)} />{copy('Only questions to revisit', 'เฉพาะข้อที่ควรทบทวน')}</label>}
       {onlyReview && report.answers.every((answer) => answer.selectedAligned) && <p>{copy('You answered every question correctly.', 'คุณตอบถูกครบทุกข้อ')}</p>}
       {report.answers.map((answer, index) => <details key={answer.id} ref={(element) => { if (element) answerRefs.current.set(answer.id, element); else answerRefs.current.delete(answer.id); }} className="history-question" hidden={onlyReview && answer.selectedAligned && answer.id !== focusedId}>
-        <summary><span className={`history-question-mark ${answer.selectedAligned ? 'history-mark-good' : ''}`}><Icon name={answer.selectedAligned ? 'check' : 'book'} /></span><span><small>{copy(`Question ${index + 1}`, `ข้อ ${index + 1}`)} · {answer.selectedAligned ? copy('Answered correctly', 'ตอบถูก') : copy('Review answer', 'ทบทวนคำตอบ')}</small><strong>{answer.tags.map((tag) => learningTopic(tag, locale)).find(Boolean)?.title ?? copy('A question from your quiz', 'คำถามจากแบบทดสอบของคุณ')}</strong></span><span className="history-question-chevron" aria-hidden="true">⌄</span></summary>
-        <div className="history-answer-detail"><h3>{answer.question}</h3><div className="history-your-choice"><p className="history-answer-label">{copy('What you chose', 'คำตอบที่คุณเลือก')}</p><p>{answer.selected}</p>{answer.selectedExplanation && <p className="history-answer-explanation">{answer.selectedExplanation}</p>}</div>
+        <summary><span className={`history-question-mark ${answer.selectedAligned ? 'history-mark-good' : ''}`}><Icon name={answer.selectedAligned ? 'check' : 'book'} /></span><span><small>{copy(`Question ${index + 1}`, `ข้อ ${index + 1}`)} · {answer.selectedAligned ? copy('Answered correctly', 'ตอบถูก') : copy('Review answer', 'ทบทวนคำตอบ')}</small><strong>{answer.question}</strong><span className="history-question-topic">{answer.tags.map((tag) => learningTopic(tag, locale)?.title ?? tag.replace(/^#/, '').replaceAll('_', ' ')).join(' · ')}</span></span><span className="history-question-chevron" aria-hidden="true">⌄</span></summary>
+        <div className="history-answer-detail"><div className="history-your-choice"><p className="history-answer-label">{copy('What you chose', 'คำตอบที่คุณเลือก')}</p><p>{answer.selected}</p>{answer.selectedExplanation && <p className="history-answer-explanation">{answer.selectedExplanation}</p>}</div>
           {answer.alignedChoices.map((choice, choiceIndex) => <div className="history-explained-choice" key={choiceIndex}><p className="history-answer-label">{copy('Answer key', 'เฉลย')}</p><p>{choice.text}</p>{choice.explanation && <p className="history-answer-explanation">{choice.explanation}</p>}</div>)}
           {!answer.selectedExplanation && !answer.alignedChoices.some((choice) => choice.explanation) && <p className="history-answer-explanation">{copy('There isn’t an explanation for this question yet.', 'คำถามนี้ยังไม่มีคำอธิบาย')}</p>}
         </div>
       </details>)}
     </div>
   </details>;
+}
+
+function formatDuration(value: number | null, locale: 'en' | 'th') {
+  if (value === null) return '—';
+  const seconds = Math.max(0, Math.round(value / 1000));
+  const minutes = Math.floor(seconds / 60);
+  return locale === 'th' ? `${minutes} น. ${seconds % 60} วิ.` : `${minutes}m ${seconds % 60}s`;
 }
 
 function Loading({ label }: { label: string }) {
@@ -167,5 +186,5 @@ function ErrorPanel({ message, label, onRetry }: { message: string; label: strin
   return <section role="alert" className="history-card history-empty"><p>{message}</p><button type="button" onClick={onRetry} className="history-primary">{label}</button></section>;
 }
 export default function StatsPage() {
-  return <Suspense fallback={<div className="history-loading" />}><StatsPageContent /></Suspense>;
+  return <Suspense fallback={<div className={styles.page}><Loading label="Loading…" /></div>}><StatsPageContent /></Suspense>;
 }

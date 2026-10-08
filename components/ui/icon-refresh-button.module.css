@@ -1,0 +1,17 @@
+.button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  flex-shrink: 0;
+  border: 1px solid var(--history-line, var(--report-border, var(--desk-line)));
+  border-radius: 10px;
+  background: var(--history-page, var(--report-subtle, var(--desk-page)));
+  color: var(--history-purple, var(--report-accent, var(--desk-accent)));
+  cursor: pointer;
+}
+.button:hover:not(:disabled) { background: var(--history-purple-soft, var(--report-tint, var(--desk-accent-soft))); }
+.button:focus-visible { outline: 2px solid var(--history-purple, var(--report-accent, var(--desk-accent))); outline-offset: 4px; }
+.button:disabled { cursor: not-allowed; opacity: .5; }
+.button > svg[aria-hidden] { display: block; width: 18px; height: 18px; }
