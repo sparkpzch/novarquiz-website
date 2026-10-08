@@ -59,6 +59,41 @@
 .dialog .actions { justify-content: flex-end; margin-top: 24px; }
 .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.invitationStatus { width: 100%; max-width: 600px; }
+.invitationLayout { width: 100%; max-width: 1120px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+.invitationLayout .invitationInfo { padding: 0; overflow: hidden; }
+.invitationCover { position: relative; min-height: 300px; background: radial-gradient(circle at 75% 20%, #43898566, transparent 50%), linear-gradient(135deg, #22334c, #255956); display: flex; align-items: flex-end; }
+.invitationCover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.invitationCover::after { content: ''; position: absolute; inset: 0; background: linear-gradient(0deg, #10294af2, #10294a40 65%, transparent); }
+.invitationCoverText { position: relative; z-index: 1; padding: 28px; color: #fff; width: 100%; }
+.invitationCoverText p { font-size: 12px; margin: 0 0 8px; }
+.invitationCoverText h1 { margin: 0; line-height: 1.2; }
+.invitationDetails { padding: 24px; }
+.invitationDetails > .muted:first-child { margin-top: 0; white-space: pre-line; overflow-wrap: anywhere; }
+.invitationFacts { display: flex; flex-wrap: wrap; gap: 8px; }
+.invitationFacts span { border-radius: 8px; padding: 6px 10px; background: var(--soft); color: var(--lobby-muted); font-size: 12px; }
+.invitationBoard { display: flex; flex-direction: column; }
+.invitationBoard h2 { font-size: 24px; margin-top: 6px; }
+.invitationBoard .empty { margin: auto 0; }
+.invitationPodium { display: flex; align-items: flex-end; justify-content: center; gap: 12px; margin: 20px 0; }
+.invitationPodiumPlayer { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.invitationPodiumPlayer > strong { display: block; max-width: 100%; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-size: 13px; }
+.invitationPodiumPlayer > span { font-weight: 650; font-variant-numeric: tabular-nums; }
+.invitationPodiumPlayer small { font-size: 11px; font-weight: 400; color: var(--lobby-muted); }
+.invitationPodiumStep { width: 100%; min-height: 64px; border-radius: 12px 12px 0 0; padding: 14px 8px; background: var(--soft); font-size: 20px; font-weight: 650; border: 1px solid var(--line); }
+.invitationWinner { min-height: 96px; background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+.invitationRankings { max-height: 360px; overflow: auto; scrollbar-gutter: stable; }
+.invitationRankings:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; border-radius: 8px; }
+.invitationTable { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 14px; }
+.invitationTable th { position: sticky; top: 0; z-index: 1; background: var(--paper); text-align: left; color: var(--lobby-muted); font-size: 12px; font-weight: 500; }
+.invitationTable th, .invitationTable td { padding: 12px 8px; border-bottom: 1px solid var(--line); }
+.invitationTable th:first-child { width: 56px; }
+.invitationTable th:last-child { width: 80px; }
+.invitationTable th:last-child, .invitationTable td:last-child { text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; }
+.invitationTable .identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.invitationPlayerName { overflow-wrap: anywhere; min-width: 0; }
+.invitationPlayerName small { color: var(--lobby-muted); }
+@media (max-width: 767px) { .invitationLayout { grid-template-columns: minmax(0, 1fr); max-width: 600px; } .invitationCover { min-height: 240px; } .invitationCoverText { padding: 24px; } .invitationDetails { padding: 20px; } }
 @media (max-width: 850px) { .columns { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 560px) { .page { padding: 20px 12px; } .panel { padding: 18px; border-radius: 16px; } .table .name { max-width: 130px; } .progress { max-width: 100px; } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

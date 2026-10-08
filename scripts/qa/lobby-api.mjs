@@ -107,6 +107,40 @@ try {
     const lookup = token => routes.invitation.GET(request('GET'), {params:Promise.resolve({token})});
     assert.equal((await lookup('invite-one')).status,200);
     assert.equal((await lookup(sessionId)).status,404);
+    const anonymous = new Request('http://localhost/api/join/invite-one');
+    assert.equal((await routes.invitation.GET(anonymous,{params:Promise.resolve({token:'invite-one'})})).status,401);
+  });
+  await check('Invitation preview maps quiz information and live profile/name/score without exposing lobby credentials', async () => {
+    session.question_count = 8; session.timer_seconds = 30;
+    session.description = 'Quiz information preview'; session.cover_image_url = 'https://example.com/quiz-cover.png';
+    await database.ref(`sessions/${sessionId}`).update({players:{
+      'preview-player':{displayName:'Preview Player',photoURL:'https://example.com/avatar.png',joinedAt:1,connectionId:'private-connection',roundId:'one'},
+      'previous-player':{displayName:'Previous round',joinedAt:2,roundId:'one'},
+      'left-player':{displayName:'Left Player',joinedAt:3,left:true},
+    },scores:{
+      'preview-player':{displayName:'Player',score:25,updatedAt:1,roundId:'one'},
+      'previous-player':{score:999,updatedAt:1,roundId:'old-round'},
+      'orphan':{score:1000,updatedAt:1,roundId:'one'},
+    }});
+    const response = await routes.invitation.GET(request('GET'),{params:Promise.resolve({token:'invite-one'})});
+    assert.equal(response.status,200); assert.equal(response.headers.get('Cache-Control'),'no-store');
+    const preview = await response.json();
+    assert.equal(preview.name,session.name); assert.equal(preview.description,session.description);
+    assert.equal(preview.cover_image_url,session.cover_image_url);
+    assert.equal(preview.question_count,8); assert.equal(preview.timer_seconds,30);
+    assert.equal(preview.leaderboard.length,2);
+    assert.equal(preview.leaderboard[0].user_display_name,'Preview Player');
+    assert.equal(preview.leaderboard[0].user_photo_url,'https://example.com/avatar.png');
+    assert.equal(preview.leaderboard[0].total_score,25);
+    assert.equal(preview.leaderboard[1].total_score,0);
+    assert.match(preview.leaderboard[0].user_id,/^[a-f0-9]{16}$/);
+    for (const row of preview.leaderboard) {
+      assert.deepEqual(Object.keys(row).sort(),['is_me','rank','total_score','user_display_name','user_id','user_photo_url'].sort());
+      assert.equal(row.connectionId,undefined);
+    }
+    assert.equal(preview.joinToken,undefined); assert.equal(progress.size,0);
+    delete session.description; delete session.cover_image_url;
+    await seed('one');
   });
   await check('Private join without QR/URL proof is refused', async () => assert.equal((await routes.join.POST(request('POST',{}),context)).status,403));
   const a = await (await routes.join.POST(request('POST',{invitationToken:'invite-one'}),context)).json();
@@ -135,6 +169,17 @@ try {
     assert.equal((await routes.answer.GET(request('GET',null,b.token,'/answer?entry=true'),context)).status,200);
     assert.ok(progress.get('qa-player').started_at>0);
     assert.equal((await routes.answer.GET(request('GET',null,a.token,'/answer?entry=true'),context)).status,409);
+  });
+  await check('Late join after host start returns the started room and allows immediate gameplay', async () => {
+    const lateRequest = request('POST',{invitationToken:'invite-one'});
+    lateRequest.headers.set('X-QA-User','qa-late-player');
+    const joined = await routes.join.POST(lateRequest,context);
+    assert.equal(joined.status,200);
+    const late = await joined.json();
+    assert.equal(late.roomStatus,'started');
+    const questionRequest = request('GET',null,late.token,'/answer?entry=true');
+    questionRequest.headers.set('X-QA-User','qa-late-player');
+    assert.equal((await routes.answer.GET(questionRequest,context)).status,200);
   });
   await check('Old answer and completion requests are refused before writes', async () => {
     const answer = {question_id:questionId,chosen_label:'A',question_token:'expired',time_taken_ms:100};
