@@ -4,9 +4,9 @@ import en from './locales/en.json';
 import th from './locales/th.json';
 
 const getInitialLanguage = () => {
-  if (typeof window === 'undefined') return 'en';
+  if (typeof window === 'undefined') return 'th';
   const savedLanguage = window.localStorage.getItem('novarquiz-language');
-  return savedLanguage === 'th' || savedLanguage === 'en' ? savedLanguage : 'en';
+  return savedLanguage === 'th' || savedLanguage === 'en' ? savedLanguage : 'th';
 };
 
 i18n.use(initReactI18next).init({

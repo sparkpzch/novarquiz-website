@@ -44,7 +44,7 @@ export default async function RootLayout({
   const initialTheme = resolveTheme((await cookies()).get(THEME_KEY)?.value);
   return (
     <html
-      lang="en"
+      lang="th"
       className={`${inter.variable} ${lexend.variable} ${jakarta.variable} h-full`}
       data-theme={initialTheme}
       style={{ colorScheme: initialTheme }}

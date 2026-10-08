@@ -16,7 +16,6 @@
 .chartSwitcher button:focus-visible { outline: 2px solid var(--chart-accent); outline-offset: 3px; }
 .scoreMetric { width: 144px; flex-shrink: 0; }
 .scoreMetric .ringCenter { width: 100%; height: auto; min-height: 100px; background: var(--chart-track); border-radius: 18px; }
-.overviewHistogram { width: 100%; max-width: 640px; }
 @media (max-width: 640px) { .chartControls { align-items: flex-start; width: 100%; } .chartSwitcher { width: 100%; } .chartSwitcher button { flex: 1; } .scoreMetric { width: 124px; } }
 
 .reportPrimaryAction { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 10px 18px; border: 1px solid var(--nq-button-primary, #0460a9); border-radius: 8px; color: white !important; background: var(--nq-button-primary, #0460a9); font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
