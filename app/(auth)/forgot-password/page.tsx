@@ -118,7 +118,7 @@ export default function ForgotPasswordPage() {
               disabled={sendingCode || codeSent}
               className="flex-shrink-0 px-3 py-2 rounded-xl text-white text-xs font-semibold transition-all"
               style={{
-                background: codeSent ? '#6b7280' : 'linear-gradient(135deg, #4f7fea, #3b5fd4)',
+                background: codeSent ? '#6b7280' : 'var(--nq-primary)',
                 minWidth: '78px',
                 opacity: sendingCode ? 0.7 : 1,
               }}

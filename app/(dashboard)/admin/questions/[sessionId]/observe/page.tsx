@@ -20,7 +20,7 @@ function Avatar({ displayName, photoURL, size = 48 }: { displayName: string; pho
   return (
     <div
       style={{ width: size, height: size, fontSize: size * 0.4 }}
-      className="rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold flex-shrink-0"
+      className="rounded-full bg-[var(--nq-primary)] flex items-center justify-center text-white font-bold flex-shrink-0"
     >
       {displayName?.[0]?.toUpperCase() || '?'}
     </div>
@@ -94,7 +94,7 @@ export default function ObservePage({ params }: { params: Promise<{ sessionId: s
 
       {/* Grid */}
       {total === 0 ? (
-        <div className="rounded-2xl border border-white/5 bg-white/5 p-10 text-center">
+        <div className="rounded-xl border border-white/5 bg-white/5 p-10 text-center">
           <p className="text-gray-400">No players yet. Waiting for them to start answering…</p>
         </div>
       ) : (
@@ -107,7 +107,7 @@ export default function ObservePage({ params }: { params: Promise<{ sessionId: s
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ delay: i * 0.03 }}
-                className={`relative rounded-2xl border p-4 flex items-center gap-4 ${p.finished ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-white/10 bg-white/5'}`}
+                className={`relative rounded-xl border p-4 flex items-center gap-4 ${p.finished ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-white/10 bg-white/5'}`}
               >
                 <Avatar displayName={p.displayName} photoURL={p.photoURL ?? null} size={48} />
                 <div className="flex-1 min-w-0">

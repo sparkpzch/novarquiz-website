@@ -56,8 +56,8 @@ function SessionCompareContent() {
   if (error || !data || !data.quiz) {
     return (
       <div className="mx-auto max-w-xl p-8">
-        <div className="nq-card rounded-[32px] p-10 text-center shadow-lg">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+        <div className="nq-card rounded-xl p-10 text-center shadow-lg">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
             <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
@@ -67,7 +67,7 @@ function SessionCompareContent() {
           <div className="mt-6 flex justify-center gap-3">
             <button
               onClick={() => router.push('/admin?tab=quizzes-manager')}
-              className="rounded-[20px] bg-[#0460A9] px-6 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-[#03508C]"
+              className="rounded-lg bg-[#0460A9] px-6 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-[#03508C]"
             >
               Back to Quizzes Manager
             </button>

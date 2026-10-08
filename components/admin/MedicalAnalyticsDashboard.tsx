@@ -753,7 +753,7 @@ export default function MedicalAnalyticsDashboard({
     return (
       <div className="nq-full-report nq-report-canvas mx-auto w-full max-w-[1600px] text-[#16324F] antialiased">
         <div className="space-y-6">
-          <header className="space-y-5 rounded-3xl border border-[#0460A9]/15 bg-white p-5 shadow-[0_4px_24px_rgba(4,96,169,0.05)] sm:p-6">
+          <header className="space-y-5 rounded-xl border border-[#0460A9]/15 bg-white p-5 shadow-[0_4px_24px_rgba(4,96,169,0.05)] sm:p-6">
             <div className="flex flex-col gap-4 border-b border-[#0460A9]/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
                 {onBack && <button onClick={onBack} className="mt-1 rounded-xl border border-[#0460A9]/15 bg-[#F8FAFC] px-3 py-1.5 text-xs font-semibold text-[#5D7EA1] hover:bg-[#EBF3FA] hover:text-[#0460A9]">← Back</button>}
@@ -776,12 +776,12 @@ export default function MedicalAnalyticsDashboard({
                 { label: 'Participants', value: displayMetrics.totalParticipants, detail: selectedAggregateSession ? 'In selected run' : 'Combined count' },
                 { label: 'Average accuracy', value: displayMetrics.totalParticipants > 0 ? `${displayMetrics.avgAccuracy}%` : '—', detail: displayMetrics.totalParticipants > 0 ? (selectedAggregateSession ? 'Selected session' : `Session spread: ${displayMetrics.accuracySpread}%`) : 'No participant responses' },
                 { label: 'Average score', value: displayMetrics.totalParticipants > 0 ? displayMetrics.avgScore : '—', detail: displayMetrics.totalParticipants > 0 ? `Response time: ${displayMetrics.avgTimeSeconds}s average` : 'No participant responses' },
-              ].map((item) => <div key={item.label} className="rounded-2xl border border-[#0460A9]/10 bg-[#F8FAFC] p-3.5"><p className="text-xs font-bold uppercase tracking-wide text-[#5D7EA1]">{item.label}</p><p className="mt-1 text-2xl font-extrabold text-[#16324F]">{item.value}</p><p className="text-xs text-[#5D7EA1]">{item.detail}</p></div>)}
+              ].map((item) => <div key={item.label} className="rounded-xl border border-[#0460A9]/10 bg-[#F8FAFC] p-3.5"><p className="text-xs font-bold uppercase tracking-wide text-[#5D7EA1]">{item.label}</p><p className="mt-1 text-2xl font-extrabold text-[#16324F]">{item.value}</p><p className="text-xs text-[#5D7EA1]">{item.detail}</p></div>)}
             </div>
           </header>
 
           <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
-            <aside className="space-y-3 rounded-3xl border border-[#0460A9]/15 bg-white p-4 shadow-[0_4px_24px_rgba(4,96,169,0.04)] lg:col-span-3">
+            <aside className="space-y-3 rounded-xl border border-[#0460A9]/15 bg-white p-4 shadow-[0_4px_24px_rgba(4,96,169,0.04)] lg:col-span-3">
               <div className="border-b border-[#0460A9]/10 pb-3"><h2 className="text-sm font-bold text-[#16324F]">Session overview</h2><p className="mt-0.5 text-xs text-[#5D7EA1]">Search sessions or filter them by accuracy.</p></div>
               {selectedAggregateSession && <button onClick={() => setSelectedAggregateSessionId(null)} className="w-full rounded-lg border border-[#0460A9]/20 bg-[#0460A9]/10 px-3 py-2 text-xs font-semibold text-[#0460A9] hover:bg-[#0460A9]/20">Clear session filter · Show all sessions</button>}
               {aggregateSessions.length > 0 && <div className="space-y-2">
@@ -791,7 +791,7 @@ export default function MedicalAnalyticsDashboard({
                 </select>
               </div>}
               {aggregateSessions.length === 0 ? <p className="py-3 text-xs text-[#5D7EA1]">No sessions recorded yet.</p> : visibleAggregateSessions.length === 0 ? <p className="py-3 text-xs text-[#5D7EA1]">No sessions match your search and accuracy filter.</p> : visibleAggregateSessions.map((item, index) => (
-                <button key={item.id} type="button" aria-pressed={selectedAggregateSessionId === item.id} onClick={() => setSelectedAggregateSessionId((current) => current === item.id ? null : item.id)} className={`w-full rounded-2xl border p-3 text-left transition hover:border-[#0460A9]/40 hover:shadow-sm ${selectedAggregateSessionId === item.id ? 'border-[#0460A9] bg-[#EBF3FA] ring-2 ring-[#0460A9]/20' : 'border-[#0460A9]/10 bg-[#F8FAFC]'}`}>
+                <button key={item.id} type="button" aria-pressed={selectedAggregateSessionId === item.id} onClick={() => setSelectedAggregateSessionId((current) => current === item.id ? null : item.id)} className={`w-full rounded-xl border p-3 text-left transition hover:border-[#0460A9]/40 hover:shadow-sm ${selectedAggregateSessionId === item.id ? 'border-[#0460A9] bg-[#EBF3FA] ring-2 ring-[#0460A9]/20' : 'border-[#0460A9]/10 bg-[#F8FAFC]'}`}>
                   <p className="text-xs font-bold uppercase tracking-wide text-[#5D7EA1]">Session {index + 1}</p><h3 className="truncate text-xs font-bold text-[#16324F]">{item.name}</h3>
                   <p className="mt-1 text-xs text-[#5D7EA1]">{new Date(item.started_at).toLocaleDateString()} · {item.participantCount} participants</p>
                   <div className="mt-2 grid grid-cols-2 gap-2"><div className="rounded-lg bg-white p-2"><p className="text-xs uppercase text-[#5D7EA1]">Accuracy</p><p className={`text-sm font-bold ${item.avgAccuracy >= 75 ? 'text-emerald-700' : item.avgAccuracy >= 50 ? 'text-amber-700' : 'text-rose-700'}`}>{item.avgAccuracy}%</p></div><div className="rounded-lg bg-white p-2"><p className="text-xs uppercase text-[#5D7EA1]">Avg score</p><p className="text-sm font-bold text-[#16324F]">{item.avgScore}</p></div></div>
@@ -832,72 +832,43 @@ export default function MedicalAnalyticsDashboard({
   return (
     <div className="nq-full-report nq-report-canvas mx-auto w-full max-w-[1600px] text-[#16324F] antialiased space-y-6">
 
-      {/* =============================================================
-          1. TOP: SESSION OVERVIEW COMPONENT (Merged Single-View Header)
-      ============================================================== */}
-      <header className="w-full rounded-3xl bg-white border border-[#0460A9]/15 p-5 sm:p-6 shadow-[0_4px_24px_rgba(4,96,169,0.05)] space-y-5">
-
-        {/* Row 1: Session Header Bar */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-[#0460A9]/10 pb-4">
-          <div className="flex items-start gap-3">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#0460A9]/15 bg-[#F8FAFC] text-xs font-semibold text-[#5D7EA1] hover:text-[#0460A9] hover:bg-[#EBF3FA] transition"
-              >
-                ← Back
-              </button>
-            )}
-
-            <div>
-              <div className="flex flex-wrap items-center gap-2 mb-1">
-                <span className="text-xs font-mono text-[#5D7EA1] tracking-wider uppercase">
-                  {session?.id ? `SESSION: ${session.id}` : 'SESSION: —'}
-                </span>
-                {selectedCompareSession && (
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-md animate-fadeIn">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
-                    Comparing vs {selectedCompareSession.cohort_label || selectedCompareSession.name}
-                  </span>
-                )}
-              </div>
-
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#16324F]">
-                {sessionTitle}
-              </h1>
-              <p className="text-xs sm:text-sm text-[#5D7EA1] mt-0.5">
-                Results, answers and AI summaries for each participant.
-              </p>
-            </div>
-          </div>
-
-          <div className={`${chartStyles.reportActions} flex flex-wrap items-center gap-2.5 self-start lg:self-auto`}>
-            {session?.session_id && <button type="button" onClick={() => router.push(`/admin/quizzes/${session.session_id}/analytics`)} className={chartStyles.reportPrimaryAction} title={th ? 'ดูผลรวมจากทุกเซสชันของแบบทดสอบนี้' : 'View results across all sessions of this quiz'}>{th ? 'ผลแบบทดสอบทั้งหมด' : 'Quiz results'} <span aria-hidden="true">↗</span></button>}
-            {/* Session Compare Button (Matching QuizManage) */}
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          {onBack && (
             <button
-              onClick={() => {
-                setCompareModal({
-                  isOpen: true,
-                  quizId: session?.session_id || null,
-                  selectedSessionIds: session?.id ? [session.id] : [],
-                });
-              }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all bg-[#0460A9]/10 text-[#0460A9] hover:bg-[#0460A9]/20 border border-[#0460A9]/20 shadow-2xs"
-              title="Compare session with peers"
+              onClick={onBack}
+              className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[#5D7EA1] transition hover:text-[#0460A9]"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              <span>Compare</span>
+              ← {th ? 'ย้อนกลับ' : 'Back'}
             </button>
-
-
-          </div>
+          )}
+          <h1 className="text-2xl font-bold tracking-tight text-[#16324F]">{sessionTitle}</h1>
+          <p className="mt-1 text-sm text-[#5D7EA1]">
+            {th ? 'ผลคะแนน คำตอบ และสรุปจาก AI ของผู้เล่นแต่ละคน' : 'Results, answers and AI summaries for each participant.'}
+          </p>
         </div>
+
+        <div className={`${chartStyles.reportActions} flex flex-wrap items-center gap-2`}>
+          <button
+            onClick={() => {
+              setCompareModal({
+                isOpen: true,
+                quizId: session?.session_id || null,
+                selectedSessionIds: session?.id ? [session.id] : [],
+              });
+            }}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#0460A9]/20 bg-white px-4 text-sm font-semibold text-[#16324F] transition hover:bg-[#F8FAFC]"
+            title="Compare session with peers"
+          >
+            {th ? 'เปรียบเทียบเซสชัน' : 'Compare'}
+          </button>
+          {session?.session_id && <button type="button" onClick={() => router.push(`/admin/quizzes/${session.session_id}/analytics`)} className={chartStyles.reportPrimaryAction} title={th ? 'ดูผลรวมจากทุกเซสชันของแบบทดสอบนี้' : 'View results across all sessions of this quiz'}>{th ? 'ผลแบบทดสอบทั้งหมด' : 'Quiz results'} <span aria-hidden="true">↗</span></button>}
+        </div>
+      </header>
 
         {/* Row 1.5: ACTIVE SESSION BENCHMARK COMPARISON BANNER */}
         {selectedCompareSession && benchmarkComparisonMetrics && (
-          <div className="nq-report-dark-panel rounded-2xl bg-gradient-to-r from-indigo-900 via-indigo-950 to-[#16324F] text-white p-4 sm:p-5 shadow-lg border border-indigo-500/30 space-y-3.5 animate-fadeIn">
+          <div className="nq-report-dark-panel rounded-xl bg-[var(--nq-brand)] text-white p-4 sm:p-5 shadow-lg border border-indigo-500/30 space-y-3.5 animate-fadeIn">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-700/50 pb-3">
               <div className="flex items-center gap-2.5">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-white shadow-sm">
@@ -1007,69 +978,38 @@ export default function MedicalAnalyticsDashboard({
             const response = q.userResponses[selectedPlayer.id];
             return response ? [{ ...q, errorRatePercent: response.isCorrect ? 0 : 100, sampleSize: 1, avgTimeSeconds: response.timeSeconds }] : [];
           }) : effectiveQuestions}
-        ><div id="report-audience"><DemographicsPanel embedded sessionId={session?.id} /></div></ReportOverviewGraphs>
-        <nav className={chartStyles.sections} aria-label="Report sections"><a href="#report-answers">Answers & AI recap</a><a href="#report-audience">Participant information</a></nav>
-        {/* Row 4: Active Filter Chips Bar (With Click-to-Unfilter indicators) */}
-        <div className="rounded-2xl bg-[#EBF3FA] border border-[#0460A9]/20 p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-bold text-[#16324F] text-xs uppercase tracking-wider">
-              Active Filters:
-            </span>
-
-            {/* Player Filter Chip */}
-            {selectedPlayer ? (
+        />
+        {(selectedPlayer || selectedTag) && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-[#5D7EA1]">{th ? 'กำลังกรอง:' : 'Filtered by:'}</span>
+            {selectedPlayer && (
               <button
                 onClick={() => setSelectedPlayer(null)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-[#0460A9]/30 text-[#0460A9] font-semibold hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 transition shadow-2xs group"
-                title="Click again to unfilter player"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#0460A9]/20 bg-white px-2.5 py-1 font-semibold text-[#16324F] transition hover:bg-[#F8FAFC]"
+                aria-label={th ? `เลิกกรอง ${selectedPlayer.displayName}` : `Remove filter ${selectedPlayer.displayName}`}
               >
-                <span>👤 {selectedPlayer.displayName}</span>
-                <span className="text-gray-400 group-hover:text-rose-700 font-mono">✕</span>
+                {selectedPlayer.displayName}<span aria-hidden="true" className="text-[#5D7EA1]">✕</span>
               </button>
-            ) : (
-              <span className="px-2.5 py-1 rounded-lg bg-white/70 border border-[#0460A9]/10 text-[#5D7EA1] font-mono text-xs">
-                All Players View
-              </span>
             )}
-
-            {/* Matrix Cell Filter Chip */}
-            {selectedTag ? (
+            {selectedTag && (
               <button
                 onClick={() => { setSelectedTag(null); setSelectedLevel(null); }}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-[#0460A9]/30 text-[#0460A9] font-semibold hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 transition shadow-2xs group"
-                title="Click again to unfilter tag"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#0460A9]/20 bg-white px-2.5 py-1 font-semibold text-[#16324F] transition hover:bg-[#F8FAFC]"
+                aria-label={th ? `เลิกกรอง ${selectedTag}` : `Remove filter ${selectedTag}`}
               >
-                <span className="font-mono">{selectedTag}{selectedLevel ? ` × ${selectedLevel.toUpperCase()}` : ''}</span>
-                <span className="text-gray-400 group-hover:text-rose-700 font-mono">✕</span>
+                {selectedTag}{selectedLevel ? ` × ${selectedLevel}` : ''}<span aria-hidden="true" className="text-[#5D7EA1]">✕</span>
               </button>
-            ) : (
-              <span className="px-2.5 py-1 rounded-lg bg-white/70 border border-[#0460A9]/10 text-[#5D7EA1] font-mono text-xs">
-                All Topics
-              </span>
             )}
-          </div>
-
-          {/* Quick Clear All & Hint */}
-          <div className="flex items-center gap-2">
-            <span className="text-[#5D7EA1] text-xs hidden sm:inline italic">
-              Click any selected filter item again to unfilter.
-            </span>
-
-            {(selectedPlayer || selectedTag) && (
-              <button
-                onClick={handleClearAllFilters}
-                className="px-2.5 py-1 rounded-lg bg-white border border-[#0460A9]/30 text-[#0460A9] font-bold text-xs hover:bg-[#0460A9] hover:text-white transition shadow-2xs"
-              >
-                Reset All Filters
+            {selectedPlayer && selectedTag && (
+              <button onClick={handleClearAllFilters} className="px-1 font-semibold text-[#0460A9] hover:underline">
+                {th ? 'ล้างทั้งหมด' : 'Clear all'}
               </button>
             )}
           </div>
-        </div>
-
-      </header>
+        )}
 
       {/* =============================================================
-          UNIFIED 2-COLUMN SECTION: (LEFT) LEADERBOARD | (RIGHT) HEATMAP & TABLE
+          UNIFIED 2-COLUMN SECTION: (LEFT) LEADERBOARD | (RIGHT) TOPICS & QUESTIONS
       ============================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
@@ -1079,7 +1019,7 @@ export default function MedicalAnalyticsDashboard({
         {/* -------------------------------------------------------------
             2. LEFT COMPONENT: LEADERBOARD WITH PLAYER SEARCH BAR (COMPACT)
         -------------------------------------------------------------- */}
-        <aside className="lg:col-span-3 xl:col-span-3 rounded-3xl bg-white border border-[#0460A9]/15 p-3.5 sm:p-4 shadow-[0_4px_24px_rgba(4,96,169,0.04)] space-y-3">
+        <aside className="lg:sticky lg:top-6 lg:col-span-4 xl:col-span-3 rounded-xl bg-white border border-[#0460A9]/15 p-4 space-y-3">
 
           <div className="flex items-center justify-between border-b border-[#0460A9]/10 pb-2.5">
             <div>
@@ -1093,6 +1033,7 @@ export default function MedicalAnalyticsDashboard({
                   Leaderboard
                 </h2>
               </div>
+              <p className="mt-1 text-xs text-[#5D7EA1]">{th ? 'เลือกผู้เล่นเพื่อดูสรุปจาก AI' : 'Select a player to see their AI summary.'}</p>
             </div>
 
             <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded-md bg-[#EBF3FA] text-[#0460A9] border border-[#0460A9]/15">
@@ -1187,13 +1128,8 @@ export default function MedicalAnalyticsDashboard({
               : 'bg-white text-[#5D7EA1] border-[#0460A9]/15 hover:bg-[#F8FAFC] hover:text-[#0460A9]'
               }`}
           >
-            <span className="flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${selectedPlayer === null ? 'bg-white animate-pulse' : 'bg-gray-400'}`} />
-              All Players
-            </span>
-            <span className="font-mono text-xs bg-black/10 px-1 py-0.2 rounded">
-              Unfiltered
-            </span>
+            <span>All Players</span>
+            <span className="font-mono text-xs opacity-80">{effectivePlayers.length}</span>
           </button>
 
           {/* Scrollable Player Cards List */}
@@ -1266,9 +1202,9 @@ export default function MedicalAnalyticsDashboard({
         {/* -------------------------------------------------------------
             3. RIGHT COMPONENT: CLINICAL HEATMAP & QUESTION TABLE (EXPANDED)
         -------------------------------------------------------------- */}
-        <main id="report-answers" className="lg:col-span-9 xl:col-span-9 space-y-6">
+        <main id="report-answers" className="lg:col-span-8 xl:col-span-9 space-y-6">
 
-          {session?.id && <PlayerInsightPanel sessionId={session.id} player={selectedPlayer} th={i18n.language?.startsWith('th') ?? false} />}
+          {session?.id && selectedPlayer && <PlayerInsightPanel sessionId={session.id} player={selectedPlayer} th={i18n.language?.startsWith('th') ?? false} />}
 
           <TopicUnderstandingGraph
             items={availableTags.map((tag) => {
@@ -1320,6 +1256,11 @@ export default function MedicalAnalyticsDashboard({
         </main>
 
       </div>
+
+      <section id="report-audience" aria-labelledby="report-audience-title" className="space-y-3">
+        <h2 id="report-audience-title" className="text-lg font-bold text-[#16324F]">{th ? 'ข้อมูลผู้เข้าร่วม' : 'Participant information'}</h2>
+        {session?.id && <DemographicsPanel sessionId={session.id} />}
+      </section>
 
       {/* =============================================================
           MODAL: COMPARE SESSIONS (MATCHING QUIZMANAGE)

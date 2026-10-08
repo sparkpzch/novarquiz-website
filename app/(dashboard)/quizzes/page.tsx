@@ -54,9 +54,9 @@ function SessionCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.04 }}
       onClick={onClick}
-      className="group nq-card-soft flex min-h-[228px] flex-col overflow-hidden rounded-[28px] p-0 text-left transition hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(17,87,145,0.18)]"
+      className="group nq-card-soft flex min-h-[228px] flex-col overflow-hidden rounded-xl p-0 text-left transition hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(17,87,145,0.18)]"
     >
-      <div className="nq-always-dark relative h-40 overflow-hidden bg-[linear-gradient(135deg,#172c6c,#3157c8_58%,#7188f6)]">
+      <div className="nq-always-dark relative h-40 overflow-hidden bg-[var(--nq-brand)]">
         {session.cover_image_url ? (
           <Image
             src={session.cover_image_url}
@@ -216,24 +216,14 @@ function QuizzesContent() {
   return (
     <>
       <div className="mx-auto max-w-[1500px] space-y-6">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-        >
-          <p className="nq-details font-bold uppercase tracking-[0.28em] text-white/80 drop-shadow-sm">
-            {th ? "แบบทดสอบที่เปิดให้ทำ" : "Available quizzes"}
-          </p>
-          <h1 className="mt-1 text-3xl font-bold text-white drop-shadow-md font-display tracking-tight">{th ? "แบบทดสอบ" : "Quizzes"}</h1>
-        </motion.div>
+        <h1 className="sr-only">{th ? "แบบทดสอบ" : "Quizzes"}</h1>
 
         {/* Search + Filters */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08, duration: 0.35 }}
-          className="nq-card rounded-[28px] p-5 space-y-6"
+          className="nq-card rounded-xl p-5 space-y-6"
         >
           {/* Search bar */}
           <div role="search" className="relative">
@@ -258,7 +248,7 @@ function QuizzesContent() {
               value={inputValue}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder={th ? "ค้นหาชื่อหรือคำอธิบายแบบทดสอบ" : "Search by quiz name or description"}
-              className="w-full rounded-[18px] border border-[#0460A9]/14 bg-white/80 py-3 pl-11 pr-4 text-[#16324F] outline-none placeholder:text-[#5D7EA1]/70 focus:border-[#0460A9]/40 focus:ring-2 focus:ring-[#0460A9]/10 transition font-medium"
+              className="w-full rounded-lg border border-[#0460A9]/14 bg-white/80 py-3 pl-11 pr-4 text-[#16324F] outline-none placeholder:text-[#5D7EA1]/70 focus:border-[#0460A9]/40 focus:ring-2 focus:ring-[#0460A9]/10 transition font-medium"
             />
             {inputValue && (
               <button
@@ -330,7 +320,7 @@ function QuizzesContent() {
         {loading ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {[1, 2, 3, 4, 5, 6].map((k) => (
-              <div key={k} className="nq-card-soft animate-pulse rounded-[28px] p-7 min-h-[220px]">
+              <div key={k} className="nq-card-soft animate-pulse rounded-xl p-7 min-h-[220px]">
                 <div className="mb-4 h-5 w-3/4 rounded-full bg-[#70A2F9]/18" />
                 <div className="mb-2 h-3 w-full rounded-full bg-[#70A2F9]/18" />
                 <div className="h-3 w-2/3 rounded-full bg-[#70A2F9]/18" />
@@ -339,16 +329,20 @@ function QuizzesContent() {
           </div>
         ) : filtered.length === 0 ? (
           <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="nq-card rounded-[34px] p-12 text-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center rounded-xl border border-[var(--nq-line)] bg-[var(--nq-panel)] px-6 py-14 text-center"
           >
-            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-[28px] bg-gradient-to-br from-[#92BFFF] to-[#0460A9] text-4xl shadow-lg shadow-[#0460A9]/20">
-              🔍
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--nq-inset)] text-[var(--nq-muted)]">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0Z" />
+              </svg>
             </div>
-            <h2 className="text-xl font-bold text-[#16324F]">{th ? "ไม่พบแบบทดสอบ" : "No quizzes found"}</h2>
-            <p className="mt-2 text-sm text-[#5D7EA1]">
-              {th ? "ลองใช้คำค้นหาอื่น หรือล้างตัวกรอง" : "Try a different search or clear the filters."}
+            <h2 className="text-base font-semibold text-[var(--nq-ink)]">{th ? "ไม่พบแบบทดสอบ" : "No quizzes found"}</h2>
+            <p className="mt-1 max-w-sm text-sm leading-6 text-[var(--nq-muted)]">
+              {qParam
+                ? th ? `ไม่มีแบบทดสอบที่ตรงกับ “${qParam}” ลองคำค้นหาอื่น หรือล้างตัวกรอง` : `No quizzes match “${qParam}”. Try another search or clear the filters.`
+                : th ? "ไม่มีแบบทดสอบที่ตรงกับตัวกรองนี้ ลองเปลี่ยนตัวกรอง หรือล้างตัวกรองทั้งหมด" : "No quizzes match these filters. Change them or clear all filters."}
             </p>
             <button
               onClick={() => {
@@ -356,7 +350,7 @@ function QuizzesContent() {
                 setFilter("sort", null);
                 setFilter("length", null);
               }}
-              className="mt-5 rounded-2xl bg-[#0460A9] px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#055A9E]"
+              className="mt-5 rounded-lg border border-[var(--nq-line)] bg-[var(--nq-panel)] px-4 py-2 text-sm font-semibold text-[var(--nq-ink)] transition hover:bg-[var(--nq-inset)]"
             >
               {th ? "ล้างตัวกรอง" : "Clear filters"}
             </button>
@@ -386,11 +380,10 @@ export default function QuizzesPage() {
     <Suspense
       fallback={
         <div className="mx-auto max-w-[1500px] space-y-6">
-          <div className="h-9 w-56 animate-pulse rounded-full bg-[#70A2F9]/20" />
-          <div className="nq-card-soft animate-pulse rounded-[28px] p-5 h-32" />
+          <div className="nq-card-soft animate-pulse rounded-xl p-5 h-32" />
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {[1, 2, 3, 4, 5, 6].map((k) => (
-              <div key={k} className="nq-card-soft animate-pulse rounded-[28px] p-7 min-h-[220px]" />
+              <div key={k} className="nq-card-soft animate-pulse rounded-xl p-7 min-h-[220px]" />
             ))}
           </div>
         </div>

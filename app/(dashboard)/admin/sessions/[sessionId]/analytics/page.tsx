@@ -92,7 +92,7 @@ export default function SessionAnalyticsPage({ params }: { params: Promise<{ ses
         <p className="mb-6 text-[#5D7EA1]">{error || 'Session not found'}</p>
         <button
           onClick={() => router.back()}
-          className="rounded-[22px] bg-[#0460A9] px-6 py-2.5 font-semibold text-white shadow-md transition-all hover:bg-[#03508C]"
+          className="rounded-lg bg-[#0460A9] px-6 py-2.5 font-semibold text-white shadow-md transition-all hover:bg-[#03508C]"
         >
           Go Back
         </button>

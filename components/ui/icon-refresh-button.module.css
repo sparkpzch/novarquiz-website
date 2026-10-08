@@ -6,7 +6,7 @@
   padding: 0;
   flex-shrink: 0;
   border: 1px solid var(--history-line, var(--report-border, var(--desk-line)));
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--history-page, var(--report-subtle, var(--desk-page)));
   color: var(--history-purple, var(--report-accent, var(--desk-accent)));
   cursor: pointer;

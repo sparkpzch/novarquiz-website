@@ -1,41 +1,32 @@
 .nq-personal-recap {
-  --history-page: #f6f7fb;
-  --history-card: #fff;
-  --history-ink: #20242d;
-  --history-muted: #67717f;
-  --history-line: #e9ecf1;
-  --history-purple: #7562b6;
-  --history-purple-soft: #f1edf9;
+  --history-page: var(--nq-inset);
+  --history-card: var(--nq-panel);
+  --history-ink: var(--nq-ink);
+  --history-muted: var(--nq-muted);
+  --history-line: var(--nq-line);
+  --history-purple: var(--nq-accent-text);
+  --history-purple-soft: var(--nq-accent-soft);
   --history-green: #30765a;
   --history-green-soft: #edf7f0;
   --history-peach: #a76b36;
   --history-peach-soft: #fdf2e8;
-  --history-blue: #3c77a8;
-  --history-blue-soft: #eef4fb;
+  --history-blue: var(--nq-accent-text);
+  --history-blue-soft: var(--nq-accent-soft);
   color: var(--history-ink);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   border: 1px solid var(--history-line);
-  border-radius: 28px;
+  border-radius: 12px;
   box-shadow: 0 5px 24px #16234004;
   min-width: 0;
 }
 .nq-theme-dark .nq-personal-recap {
-  --history-page: #141416;
-  --history-card: #222226;
-  --history-ink: #f3f2f7;
-  --history-muted: #b5b3be;
-  --history-line: #38373f;
-  --history-purple: #c2afea;
-  --history-purple-soft: #343041;
   --history-green: #a0d8b4;
   --history-green-soft: #25372e;
   --history-peach: #efbe8f;
   --history-peach-soft: #3c3027;
-  --history-blue: #a2c8ed;
-  --history-blue-soft: #29333f;
 }
 .nq-personal-recap.history-recap { position: relative; display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: start; gap: 24px; overflow: hidden; padding: 42px; margin-bottom: 20px; background: var(--history-card); }
-.nq-personal-recap .history-recap-art { width: 64px; height: 64px; display: grid; place-items: center; border: 1px solid var(--history-line); border-radius: 14px; background: var(--history-purple-soft); color: var(--history-purple); }
+.nq-personal-recap .history-recap-art { width: 64px; height: 64px; display: grid; place-items: center; border: 1px solid var(--history-line); border-radius: 12px; background: var(--history-purple-soft); color: var(--history-purple); }
 .nq-personal-recap .history-recap-art svg { width: 28px; height: 28px; }
 .nq-personal-recap .history-section-label { color: var(--history-purple); display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; margin: 0 0 12px; }
 .nq-personal-recap .history-section-label svg { width: 16px; height: 16px; }
@@ -47,15 +38,15 @@
 .nq-personal-recap .history-recap-facts svg { width: 15px; height: 15px; }
 .nq-personal-recap * { box-sizing: border-box; }
 .nq-personal-recap { overflow-wrap: anywhere; }
-.nq-personal-recap .personal-recap-details { display: inline-flex; align-items: center; gap: 10px; margin-top: 20px; padding: 10px 16px; min-height: 44px; border: 1px solid var(--history-purple); border-radius: 12px; background: transparent; color: var(--history-purple); font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; }
+.nq-personal-recap .personal-recap-details { display: inline-flex; align-items: center; gap: 10px; margin-top: 20px; padding: 10px 16px; min-height: 44px; border: 1px solid var(--history-purple); border-radius: 8px; background: transparent; color: var(--history-purple); font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; }
 .nq-personal-recap .personal-recap-details:hover { background: var(--history-purple-soft); }
 .nq-personal-recap .personal-recap-details:focus-visible { outline: 3px solid var(--history-purple); outline-offset: 4px; }
 .nq-personal-recap .personal-recap-note { margin: 12px 0 0; font-size: 12px; line-height: 1.6; color: var(--history-muted); }
 .nq-personal-recap .personal-recap-review-badge { display: inline-block; margin: 0 0 12px; padding: 5px 10px; border-radius: 8px; background: var(--history-peach-soft); color: var(--history-peach); font-size: 11px; line-height: 1.7; }
-.nq-personal-recap.personal-recap-compact { display: block; margin-bottom: 0; padding: 20px; height: 100%; border-radius: 16px; }
+.nq-personal-recap.personal-recap-compact { display: block; margin-bottom: 0; padding: 20px; height: 100%; border-radius: 12px; }
 .nq-personal-recap.personal-recap-compact .history-section-label { margin-bottom: 12px; font-size: 13px; }
 .nq-personal-recap.personal-recap-compact h2 { font-size: 22px; letter-spacing: -0.6px; }
-.nq-personal-recap.personal-recap-placeholder { padding: 20px; border-radius: 16px; background: var(--history-card); }
+.nq-personal-recap.personal-recap-placeholder { padding: 20px; border-radius: 12px; background: var(--history-card); }
 .nq-personal-recap.personal-recap-placeholder h2 { font-size: 22px; font-weight: 700; line-height: 1.3; margin: 16px 0 0; }
 @media (max-width: 1000px) {
   .nq-personal-recap.history-recap { padding: 32px; gap: 24px; grid-template-columns: 56px minmax(0, 1fr); }
@@ -63,8 +54,8 @@
   .nq-personal-recap.personal-recap-compact { padding: 20px; }
 }
 @media (max-width: 640px) {
-  .nq-personal-recap.history-recap { border-radius: 24px; grid-template-columns: 1fr; gap: 12px; padding: 20px 24px 28px; background: var(--history-card); }
-  .nq-personal-recap.personal-recap-compact { padding: 20px; border-radius: 16px; }
+  .nq-personal-recap.history-recap { border-radius: 12px; grid-template-columns: 1fr; gap: 12px; padding: 20px 24px 28px; background: var(--history-card); }
+  .nq-personal-recap.personal-recap-compact { padding: 20px; border-radius: 12px; }
   .nq-personal-recap .history-recap-art { width: 48px; height: 48px; }
   .nq-personal-recap h2 { font-size: 26px; }
   .nq-personal-recap .history-recap-body { font-size: 16px; }

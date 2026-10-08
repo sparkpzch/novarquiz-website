@@ -43,7 +43,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className={`nq-card relative ${sizes[size]} w-full rounded-[28px] p-6 shadow-2xl`}
+            className={`nq-card relative ${sizes[size]} w-full rounded-xl p-6 shadow-2xl`}
           >
             {title && (
               <div className="flex items-center justify-between mb-4">

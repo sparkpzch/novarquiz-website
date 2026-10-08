@@ -19,7 +19,6 @@ import {
 import { canResumeRoom, canResumeSession, sessionResumeExpiresAt } from "@/lib/session-resume";
 import { ROOM_STATUS } from "@/lib/constants/session";
 import { useToast } from "@/components/ui/Toast";
-import WelcomeBackdrop from "@/components/ui/WelcomeBackdrop";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
 import HomeGameStats from "@/components/stats/HomeGameStats";
 import LatestPersonalRecap from "@/components/stats/LatestPersonalRecap";
@@ -276,7 +275,7 @@ function QuizCard({ session, onClick, eagerImage = false }: { session: Dashboard
       onClick={onClick}
       className="nq-dashboard-quiz-card group min-w-0 overflow-hidden rounded-xl border border-white/8 bg-[#0a1234] text-left transition hover:-translate-y-0.5 hover:border-[#557cff]/45 hover:shadow-[0_18px_40px_rgba(0,0,0,0.25)]"
     >
-      <div className="nq-always-dark relative h-28 overflow-hidden bg-[linear-gradient(135deg,#2346ae,#101942_55%,#542d8e)] sm:h-32">
+      <div className="nq-always-dark relative h-28 overflow-hidden bg-[var(--nq-brand)] sm:h-32">
         {session.cover_image_url ? (
           <Image
             src={session.cover_image_url}
@@ -344,12 +343,6 @@ function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUi
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-4 lg:space-y-5">
-      <div className="hidden items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-[#5f6e9c] lg:flex">
-        <span>Pages</span>
-        <span>/</span>
-        <span className="text-[#aab6da]">Dashboard</span>
-      </div>
-
       <LiveSessionsWidget key={user?.uid} />
 
       <section className="grid gap-4 xl:grid-cols-[0.72fr_1.28fr]">
@@ -358,7 +351,6 @@ function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUi
           animate={{ opacity: 1, y: 0 }}
           className="nq-welcome-card nq-always-dark relative min-h-[205px] overflow-hidden rounded-xl p-5 sm:min-h-[226px] sm:p-6"
         >
-          <WelcomeBackdrop />
           <div className="relative flex h-full flex-col">
             <div className="flex items-center gap-3">
               <ProfileAvatar

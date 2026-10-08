@@ -76,7 +76,7 @@ export function ContextMenu({
         left: x,
         top: y,
         zIndex: 1000,
-        background: 'linear-gradient(180deg, rgba(246,250,255,0.98) 0%, rgba(232,240,255,0.96) 100%)',
+        background: '#f6faff',
         border: '1px solid rgba(112,162,249,0.2)',
         borderRadius: 10,
         boxShadow: '0 16px 32px rgba(82,114,164,0.2)',

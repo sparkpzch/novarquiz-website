@@ -77,7 +77,7 @@ export const CHOICE_COLORS: Record<string, string> = {
 };
 
 const QUESTION_NODE_ACCENT = '#70A2F9';
-const EDITOR_CANVAS_BG = 'linear-gradient(180deg, rgba(241,247,255,0.96) 0%, rgba(226,238,255,0.92) 100%)';
+const EDITOR_CANVAS_BG = '#eef4ff';
 const EDITOR_PANEL_BG = 'rgba(236,244,255,0.86)';
 const EDITOR_PANEL_BORDER = 'rgba(112,162,249,0.22)';
 

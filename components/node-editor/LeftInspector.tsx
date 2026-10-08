@@ -692,7 +692,7 @@ const panelStyle: React.CSSProperties = {
   height: '100%',
   display: 'flex',
   flexDirection: 'column',
-  background: 'linear-gradient(180deg, rgba(242,247,255,0.94) 0%, rgba(232,240,255,0.92) 100%)',
+  background: '#f2f7ff',
   borderRight: '1px solid rgba(112,162,249,0.2)',
   boxShadow: 'inset -1px 0 0 rgba(255,255,255,0.35)',
   backdropFilter: 'blur(18px)',

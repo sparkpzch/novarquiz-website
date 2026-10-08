@@ -72,7 +72,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
       initial={{ opacity: 0, y: 16, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 16, scale: 0.96 }}
-      className={`relative overflow-hidden flex items-center gap-3 rounded-2xl border px-4 py-3.5 shadow-xl w-full sm:min-w-[320px] sm:max-w-sm ${s.bg}`}
+      className={`relative overflow-hidden flex items-center gap-3 rounded-xl border px-4 py-3.5 shadow-xl w-full sm:min-w-[320px] sm:max-w-sm ${s.bg}`}
     >
       <div className={`absolute left-0 top-0 bottom-0 w-1 ${s.bar}`} />
       <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${s.icon}`}>

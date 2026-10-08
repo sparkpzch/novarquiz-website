@@ -1,13 +1,12 @@
 .page, .panel, .dialog {
-  --ink: #17324d; --lobby-muted: #667b91; --paper: #fff; --soft: #f2f6fb; --line: #dce5ef;
-  --primary: #0460a9; --primary-ink: #fff; --danger: #ba3a42; --success: #167746;
+  --ink: var(--nq-ink); --lobby-muted: var(--nq-muted); --paper: var(--nq-panel); --soft: var(--nq-inset); --line: var(--nq-line);
+  --primary: var(--nq-primary); --primary-ink: var(--nq-on-primary); --danger: #ba3a42; --success: #167746;
   color: var(--ink);
 }
 :global([data-theme="dark"]) .page, :global([data-theme="dark"]) .panel, :global([data-theme="dark"]) .dialog {
-  --ink: var(--foreground); --lobby-muted: var(--muted); --paper: var(--nq-dark-panel); --soft: var(--nq-dark-inset); --line: var(--nq-dark-border);
-  --primary: #e5e5e5; --primary-ink: #171717; --danger: #ffabb0; --success: #85dbac;
+  --danger: #ffabb0; --success: #85dbac;
 }
-.page { min-height: 100dvh; background: #f4f7fb; padding: 28px 20px; display: grid; place-items: center; }
+.page { min-height: 100dvh; background: var(--nq-canvas); padding: 28px 20px; display: grid; place-items: center; }
 :global([data-theme="dark"]) .page { background: var(--nq-dark-canvas); }
 .container { width: 100%; max-width: 760px; display: grid; gap: 20px; }
 .admin { width: 100%; max-width: 1200px; margin: auto; display: grid; gap: 20px; min-width: 0; }
@@ -68,9 +67,9 @@
 .invitationPage > div > section { pointer-events: auto; }
 .invitationLayout { width: 100%; max-width: 1120px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
 .invitationLayout .invitationInfo { padding: 0; overflow: hidden; }
-.invitationCover { position: relative; min-height: 300px; background: radial-gradient(circle at 75% 20%, #43898566, transparent 50%), linear-gradient(135deg, #22334c, #255956); display: flex; align-items: flex-end; }
+.invitationCover { position: relative; min-height: 300px; background: #22334c; display: flex; align-items: flex-end; }
 .invitationCover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.invitationCover::after { content: ''; position: absolute; inset: 0; background: linear-gradient(0deg, #10294af2, #10294a40 65%, transparent); }
+.invitationCover::after { content: ''; position: absolute; inset: 0; background: #10294a99; }
 .invitationCoverText { position: relative; z-index: 1; padding: 28px; color: #fff; width: 100%; }
 .invitationCoverText p { font-size: 12px; margin: 0 0 8px; }
 .invitationCoverText h1 { margin: 0; line-height: 1.2; }

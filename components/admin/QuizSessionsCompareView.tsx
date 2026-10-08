@@ -282,7 +282,7 @@ export default function QuizSessionsCompareView({
           <div className="flex items-center gap-3">
             <button
               onClick={onBack || (() => router.push('/admin?tab=quizzes-manager'))}
-              className="group flex h-10 w-10 items-center justify-center rounded-2xl border border-[#0460A9]/15 bg-white text-[#5D7EA1] shadow-sm transition-all hover:border-[#0460A9] hover:bg-[#F4F9FF] hover:text-[#0460A9]"
+              className="group flex h-10 w-10 items-center justify-center rounded-lg border border-[#0460A9]/15 bg-white text-[#5D7EA1] shadow-sm transition-all hover:border-[#0460A9] hover:bg-[#F4F9FF] hover:text-[#0460A9]"
               title="Return to Quizzes Manager"
             >
               <svg className="h-5 w-5 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -306,7 +306,7 @@ export default function QuizSessionsCompareView({
           <div className="flex items-center gap-2.5">
             <button
               onClick={() => setIsManageModalOpen(true)}
-              className="flex items-center gap-2 rounded-[20px] border border-[#0460A9]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#0460A9] shadow-sm transition-all hover:bg-[#0460A9] hover:text-white"
+              className="flex items-center gap-2 rounded-lg border border-[#0460A9]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#0460A9] shadow-sm transition-all hover:bg-[#0460A9] hover:text-white"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
@@ -316,7 +316,7 @@ export default function QuizSessionsCompareView({
 
             <button
               onClick={() => window.print()}
-              className="nq-report-solid flex items-center gap-2 rounded-[20px] bg-[#16324F] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-[#0d2238]"
+              className="nq-report-solid flex items-center gap-2 rounded-lg bg-[#16324F] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-[#0d2238]"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -331,7 +331,7 @@ export default function QuizSessionsCompareView({
           {cohorts.map((cohort) => (
             <div
               key={cohort.session.id}
-              className={`flex flex-col justify-between rounded-[24px] border border-white/60 bg-white/80 p-4 shadow-sm backdrop-blur-sm transition-all hover:shadow-md`}
+              className={`flex flex-col justify-between rounded-xl border border-white/60 bg-white/80 p-4 shadow-sm backdrop-blur-sm transition-all hover:shadow-md`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -369,7 +369,7 @@ export default function QuizSessionsCompareView({
         </div>
 
         {/* Executive Macro KPI Banner */}
-        <div className="nq-report-dark-panel relative overflow-hidden rounded-[32px] border border-[#0460A9]/20 bg-gradient-to-br from-[#16324F] via-[#0460A9] to-[#03508C] p-6 md:p-8 text-white shadow-xl">
+        <div className="nq-report-dark-panel relative overflow-hidden rounded-xl border border-[#0460A9]/20 bg-[var(--nq-brand)] p-6 md:p-8 text-white shadow-xl">
           <div className="absolute right-0 top-0 -mr-16 -mt-16 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
           <div className="relative z-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
             <div>
@@ -386,19 +386,19 @@ export default function QuizSessionsCompareView({
             </div>
 
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:gap-6">
-              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/10">
+              <div className="rounded-xl bg-white/10 p-4 backdrop-blur-md border border-white/10">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Total participants</p>
                 <p className="mt-1 text-2xl font-black text-white">{macroSummary.totalParticipants} <span className="text-xs font-semibold text-blue-200">players</span></p>
               </div>
-              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/10">
+              <div className="rounded-xl bg-white/10 p-4 backdrop-blur-md border border-white/10">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Average correct answers</p>
                 <p className="mt-1 text-2xl font-black text-white">{macroSummary.avgAccuracy}%</p>
               </div>
-              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/10">
+              <div className="rounded-xl bg-white/10 p-4 backdrop-blur-md border border-white/10">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Response time</p>
                 <p className="mt-1 text-2xl font-black text-white">{macroSummary.avgTimeSeconds}s</p>
               </div>
-              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/10">
+              <div className="rounded-xl bg-white/10 p-4 backdrop-blur-md border border-white/10">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Difference in correct-answer rates</p>
                 <p className="mt-1 text-2xl font-black text-emerald-300">±{macroSummary.accuracySpread}%</p>
               </div>
@@ -410,7 +410,7 @@ export default function QuizSessionsCompareView({
         <div className="flex flex-wrap items-center gap-2 border-b border-[#0460A9]/15 pb-2">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-xs font-bold transition-all ${
               activeTab === 'overview'
                 ? 'bg-[#0460A9] text-white shadow-md shadow-[#0460A9]/20'
                 : 'bg-white/60 text-[#5D7EA1] hover:bg-white hover:text-[#16324F]'
@@ -424,7 +424,7 @@ export default function QuizSessionsCompareView({
 
           <button
             onClick={() => setActiveTab('questions')}
-            className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-xs font-bold transition-all ${
               activeTab === 'questions'
                 ? 'bg-[#0460A9] text-white shadow-md shadow-[#0460A9]/20'
                 : 'bg-white/60 text-[#5D7EA1] hover:bg-white hover:text-[#16324F]'
@@ -461,7 +461,7 @@ export default function QuizSessionsCompareView({
                 <div
                   key={domain.tag}
                   onClick={() => setSelectedTag(selectedTag === domain.tag ? null : domain.tag)}
-                  className={`cursor-pointer rounded-[28px] border bg-white p-6 shadow-sm transition-all hover:shadow-md ${
+                  className={`cursor-pointer rounded-xl border bg-white p-6 shadow-sm transition-all hover:shadow-md ${
                     selectedTag === domain.tag
                       ? 'border-[#0460A9] ring-2 ring-[#0460A9]/20'
                       : 'border-[#0460A9]/10 hover:border-[#0460A9]/30'
@@ -526,7 +526,7 @@ export default function QuizSessionsCompareView({
                   </div>
 
                   {/* Clinical Pedagogical Insight Box */}
-                  <div className="mt-5 rounded-2xl bg-[#F4F9FF] p-3.5 border border-[#0460A9]/10">
+                  <div className="mt-5 rounded-xl bg-[#F4F9FF] p-3.5 border border-[#0460A9]/10">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-[#0460A9]">
                       {t('topic_breakdown.compare.focus')}
                     </p>
@@ -564,7 +564,7 @@ export default function QuizSessionsCompareView({
               {questionsFriction.map((q, idx) => (
                 <div
                   key={q.id}
-                  className="rounded-[28px] border border-[#0460A9]/10 bg-white p-6 shadow-sm transition-all hover:shadow-md"
+                  className="rounded-xl border border-[#0460A9]/10 bg-white p-6 shadow-sm transition-all hover:shadow-md"
                 >
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 flex-1">
@@ -581,7 +581,7 @@ export default function QuizSessionsCompareView({
                       </h4>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-4 rounded-2xl bg-[#F8FAFC] p-3 border border-[#0460A9]/10">
+                    <div className="flex shrink-0 items-center gap-4 rounded-xl bg-[#F8FAFC] p-3 border border-[#0460A9]/10">
                       <div>
                         <p className="text-[9px] font-bold uppercase text-[#5D7EA1]">Avg Error Rate</p>
                         <p className="text-lg font-black text-[#E74C3C]">{q.avgErrorRate}%</p>
@@ -594,7 +594,7 @@ export default function QuizSessionsCompareView({
                     {q.cohortFrictions.map((cf) => (
                       <div
                         key={cf.cohortLabel}
-                        className="rounded-2xl bg-[#F4F9FF] p-3.5 border border-[#0460A9]/10 flex flex-col justify-between"
+                        className="rounded-xl bg-[#F4F9FF] p-3.5 border border-[#0460A9]/10 flex flex-col justify-between"
                       >
                         <div>
                           <div className="flex items-center justify-between text-xs font-bold">

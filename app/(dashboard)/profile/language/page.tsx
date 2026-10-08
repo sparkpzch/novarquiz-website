@@ -63,7 +63,7 @@ export default function LanguagePage() {
       <motion.section
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
-        className="nq-card rounded-[28px] px-6 py-5"
+        className="nq-card rounded-xl px-6 py-5"
       >
         <h1 className="text-[1.7rem] font-semibold text-[#202A3F]">{t("profile.language")}</h1>
 

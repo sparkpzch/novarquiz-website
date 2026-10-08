@@ -223,7 +223,7 @@ function TeamLobbyPageContent({
             animate={{ opacity: 1, y: 0 }}
             className="nq-card w-full max-w-md rounded-[34px] p-7 text-center"
           >
-            <div className="mx-auto flex h-[72px] w-[72px] items-center justify-center rounded-[26px] bg-gradient-to-br from-[#92BFFF] to-[#0460A9] text-4xl text-white shadow-[0_20px_40px_rgba(17,87,145,0.22)]">
+            <div className="mx-auto flex h-[72px] w-[72px] items-center justify-center rounded-[26px] bg-[var(--nq-primary)] text-4xl text-white shadow-[0_20px_40px_rgba(17,87,145,0.22)]">
               🎉
             </div>
             <p className="mt-6 text-xs font-semibold uppercase tracking-[0.28em] text-[#5D7EA1]">Party Mode</p>
@@ -251,7 +251,7 @@ function TeamLobbyPageContent({
             <button
               onClick={handleJoin}
               disabled={joining || pin.length !== 6}
-              className="mt-6 w-full rounded-[24px] bg-linear-to-r from-[#0A6FD6] to-[#0460A9] px-4 py-4 text-sm font-semibold text-[#F8FBFF] shadow-[0_18px_40px_rgba(17,87,145,0.22)] disabled:opacity-60"
+              className="mt-6 w-full rounded-[24px] bg-[var(--nq-primary)] px-4 py-4 text-sm font-semibold text-[#F8FBFF] shadow-[0_18px_40px_rgba(17,87,145,0.22)] disabled:opacity-60"
             >
               {joining ? 'Joining…' : 'Join party'}
             </button>
@@ -279,7 +279,7 @@ function TeamLobbyPageContent({
                   initial={{ opacity: 0, y: 18, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 18, scale: 0.98 }}
-                  className="w-full max-w-sm rounded-[30px] border border-[#92BFFF]/45 bg-linear-to-b from-[#F9FCFF] via-[#EEF6FF] to-[#E3F0FF] p-6 text-center shadow-[0_30px_70px_rgba(17,87,145,0.22)]"
+                  className="w-full max-w-sm rounded-[30px] border border-[#92BFFF]/45 bg-white p-6 text-center shadow-[0_30px_70px_rgba(17,87,145,0.22)]"
                 >
                   <div className="text-4xl">🚪</div>
                   <h2 className="mt-3 text-xl font-bold text-[#16324F]">Leave this party?</h2>
@@ -293,7 +293,7 @@ function TeamLobbyPageContent({
                     </button>
                     <button
                       onClick={handleLeave}
-                      className="flex-1 rounded-2xl bg-linear-to-r from-[#D84D63] to-[#BA2F54] px-4 py-3 text-sm font-semibold text-[#FFF8FA] shadow-[0_14px_30px_rgba(186,47,84,0.28)] transition hover:brightness-105"
+                      className="flex-1 rounded-2xl bg-[#c2364f] px-4 py-3 text-sm font-semibold text-[#FFF8FA] shadow-[0_14px_30px_rgba(186,47,84,0.28)] transition hover:brightness-105"
                     >
                       Leave
                     </button>
@@ -326,12 +326,12 @@ function TeamLobbyPageContent({
                   <p className="nq-on-dark-muted mt-2 text-sm">Share this code with players nearby.</p>
                 </div>
 
-                <div className="rounded-[28px] border border-[#92BFFF]/30 bg-linear-to-b from-white/92 to-[#EAF4FF]/96 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                <div className="rounded-[28px] border border-[#92BFFF]/30 bg-white/95 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                   <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#456786]">Invite Link</p>
                   <p className="mt-3 break-all text-sm text-[#16324F]">{shareUrl}</p>
                   <button
                     onClick={copyLink}
-                    className="mt-4 rounded-2xl bg-linear-to-r from-[#0A6FD6] to-[#0460A9] px-4 py-3 text-sm font-semibold text-[#F8FBFF] shadow-[0_14px_30px_rgba(17,87,145,0.22)] transition hover:brightness-105"
+                    className="mt-4 rounded-2xl bg-[var(--nq-primary)] px-4 py-3 text-sm font-semibold text-[#F8FBFF] shadow-[0_14px_30px_rgba(17,87,145,0.22)] transition hover:brightness-105"
                   >
                     {copied ? 'Copied!' : 'Copy invite URL'}
                   </button>
@@ -339,7 +339,7 @@ function TeamLobbyPageContent({
               </div>
             )}
 
-            <div className="mt-6 rounded-[28px] border border-[#92BFFF]/30 bg-linear-to-b from-white/82 to-[#EAF4FF]/94 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+            <div className="mt-6 rounded-[28px] border border-[#92BFFF]/30 bg-white/95 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
               {players.length === 0 ? (
                 <div className="flex min-h-40 flex-col items-center justify-center text-center">
                   <div className="text-4xl">👥</div>
@@ -364,7 +364,7 @@ function TeamLobbyPageContent({
               <button
                 onClick={handleStart}
                 disabled={starting || players.length === 0}
-                className="mt-6 w-full rounded-[24px] bg-linear-to-r from-[#0A6FD6] via-[#0460A9] to-[#03508E] px-4 py-4 text-base font-semibold text-[#F8FBFF] shadow-[0_20px_42px_rgba(17,87,145,0.24)] transition hover:brightness-105 disabled:opacity-60"
+                className="mt-6 w-full rounded-[24px] bg-[var(--nq-primary)] px-4 py-4 text-base font-semibold text-[#F8FBFF] shadow-[0_20px_42px_rgba(17,87,145,0.24)] transition hover:brightness-105 disabled:opacity-60"
               >
                 {starting ? 'Starting…' : `Start party quiz (${players.length})`}
               </button>

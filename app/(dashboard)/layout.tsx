@@ -367,7 +367,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 18, scale: 0.98 }}
               onClick={(event) => event.stopPropagation()}
-              className="nq-card w-full max-w-sm rounded-[30px] p-7 text-center"
+              className="nq-card w-full max-w-sm rounded-xl p-7 text-center"
             >
               <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#ef6363]/12 text-[#d84d63]">
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
@@ -386,7 +386,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
                   autoFocus
                   disabled={isSigningOut}
                   onClick={() => setShowLogoutConfirm(false)}
-                  className="flex-1 rounded-2xl border border-[#92BFFF]/45 bg-white/70 px-4 py-3 text-sm font-semibold text-[#16324F] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex-1 rounded-lg border border-[#92BFFF]/45 bg-white/70 px-4 py-3 text-sm font-semibold text-[#16324F] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {t('auth.logout_cancel')}
                 </button>
@@ -394,7 +394,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
                   type="button"
                   disabled={isSigningOut}
                   onClick={handleSignOut}
-                  className="nq-always-dark flex-1 rounded-2xl bg-linear-to-r from-[#D84D63] to-[#BA2F54] px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(186,47,84,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="nq-always-dark flex-1 rounded-lg bg-[#c2364f] px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(186,47,84,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <span className="text-white">
                     {isSigningOut ? t('auth.logging_out') : t('auth.logout_confirm')}

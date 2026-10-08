@@ -143,12 +143,11 @@ export default function AdminQuizzesPage() {
   return (
     <div className="nq-admin-panel mx-auto w-full max-w-[1500px] space-y-6">
       {dataError && (
-        <div role="alert" className="rounded-2xl border border-red-300 bg-red-50 p-4 text-red-800">
+        <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">
           {dataError}
           <button type="button" className="ml-4 font-semibold underline" onClick={() => void fetchData()}>Retry</button>
         </div>
       )}
-      {loadingData && <p role="status">Loading quizzes and sessions…</p>}
       <QuizzesManager
         allData={allData}
         allSessions={allSessions}
@@ -159,6 +158,7 @@ export default function AdminQuizzesPage() {
         onDeleteSession={handleDeleteSession}
         onToggleStatus={handleToggleStatus}
         onRefresh={fetchData}
+        loading={loadingData}
       />
     </div>
   );

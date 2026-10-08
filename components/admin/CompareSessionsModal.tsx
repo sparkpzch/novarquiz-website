@@ -126,13 +126,13 @@ export default function CompareSessionsModal({
     ? createPortal(
         <div className="nq-report-compare-modal fixed inset-0 z-[9999] flex items-center justify-center bg-[#0d2238]/60 p-4 backdrop-blur-md animate-in fade-in duration-200">
           <div
-            className="relative flex max-h-[90vh] w-full max-w-3xl flex-col rounded-[32px] border border-white/20 bg-white shadow-[0_25px_60px_-15px_rgba(4,96,169,0.3)] overflow-hidden"
+            className="relative flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border border-white/20 bg-white shadow-[0_25px_60px_-15px_rgba(4,96,169,0.3)] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-[#0460A9]/10 bg-gradient-to-r from-[#F4F9FF] to-[#EBF3FB] p-6">
+            <div className="flex items-start justify-between border-b border-[#0460A9]/10 bg-[#F4F9FF] p-6">
               <div className="flex items-center gap-3.5">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#0460A9] text-white shadow-md shadow-[#0460A9]/25">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#0460A9] text-white shadow-md shadow-[#0460A9]/25">
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
@@ -172,7 +172,7 @@ export default function CompareSessionsModal({
                       setSelectedQuizId(e.target.value);
                       setSelectedSessionIds([]); // Reset session selection on quiz change
                     }}
-                    className="w-full appearance-none rounded-2xl border border-[#0460A9]/20 bg-[#F8FAFC] px-4 py-3.5 pr-10 text-sm font-semibold text-[#16324F] shadow-sm transition-all focus:border-[#0460A9] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0460A9]/20"
+                    className="w-full appearance-none rounded-lg border border-[#0460A9]/20 bg-[#F8FAFC] px-4 py-3.5 pr-10 text-sm font-semibold text-[#16324F] shadow-sm transition-all focus:border-[#0460A9] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0460A9]/20"
                   >
                     <option value="" disabled>
                       Select a Quiz Template
@@ -281,12 +281,12 @@ export default function CompareSessionsModal({
 
                 {/* Sessions Checklist */}
                 {sessionsForQuiz.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-[#0460A9]/20 bg-[#F8FAFC] p-8 text-center">
+                  <div className="rounded-xl border border-dashed border-[#0460A9]/20 bg-[#F8FAFC] p-8 text-center">
                     <p className="text-sm font-bold text-[#16324F]">No sessions found for this quiz template.</p>
                     <p className="mt-1 text-xs text-[#5D7EA1]">At least 2 sessions are needed to compare results.</p>
                   </div>
                 ) : filteredSessions.length === 0 ? (
-                  <div className="rounded-2xl bg-[#F8FAFC] p-6 text-center text-xs text-[#5D7EA1]">
+                  <div className="rounded-xl bg-[#F8FAFC] p-6 text-center text-xs text-[#5D7EA1]">
                     No sessions match your search filter.
                   </div>
                 ) : (
@@ -299,7 +299,7 @@ export default function CompareSessionsModal({
                         <div
                           key={session.id}
                           onClick={() => toggleSession(session.id)}
-                          className={`group flex cursor-pointer items-center justify-between rounded-2xl border p-3.5 transition-all ${
+                          className={`group flex cursor-pointer items-center justify-between rounded-xl border p-3.5 transition-all ${
                             isSelected
                               ? 'border-[#0460A9] bg-[#F4F9FF] shadow-sm shadow-[#0460A9]/10'
                               : 'border-[#0460A9]/10 bg-white hover:border-[#0460A9]/30 hover:bg-[#F8FAFC]'
@@ -395,7 +395,7 @@ export default function CompareSessionsModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-[18px] border border-[#0460A9]/20 bg-white px-5 py-2.5 text-sm font-semibold text-[#5D7EA1] transition-all hover:bg-[#F0F4F8] hover:text-[#16324F]"
+                  className="rounded-lg border border-[#0460A9]/20 bg-white px-5 py-2.5 text-sm font-semibold text-[#5D7EA1] transition-all hover:bg-[#F0F4F8] hover:text-[#16324F]"
                 >
                   Cancel
                 </button>
@@ -403,7 +403,7 @@ export default function CompareSessionsModal({
                   type="button"
                   disabled={selectedSessionIds.length < 2}
                   onClick={handleLaunch}
-                  className={`flex items-center gap-2 rounded-[18px] px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all ${
+                  className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all ${
                     selectedSessionIds.length >= 2
                       ? 'bg-[#0460A9] shadow-[#0460A9]/25 hover:bg-[#03508C] hover:scale-[1.02]'
                       : 'cursor-not-allowed bg-[#8AA4C0] opacity-60'

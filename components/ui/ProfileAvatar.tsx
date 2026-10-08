@@ -40,7 +40,7 @@ export default function ProfileAvatar({
 
   return (
     <div
-      className={`shrink-0 flex items-center justify-center rounded-full bg-gradient-to-br from-[#92BFFF] via-[#4D92E4] to-[#055A9E] font-bold text-white ${ringClassName} ${className} ${textClassName}`}
+      className={`shrink-0 flex items-center justify-center rounded-full bg-[var(--nq-primary)] font-bold text-white ${ringClassName} ${className} ${textClassName}`}
       style={{ width: size, height: size, fontSize: Math.max(14, size * 0.34) }}
     >
       {initial}

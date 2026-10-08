@@ -50,7 +50,7 @@ function ItemCard({
   noBorder?: boolean;
 }) {
   return (
-    <div className={`rounded-[30px] p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(17,87,145,0.08)] flex flex-col ${!noBorder ? 'border' : ''} ${highlighted ? (noBorder ? 'bg-[#F4F9FF]' : 'border-[#0460A9]/30 bg-[#F4F9FF]') : (noBorder ? 'bg-white/60' : 'border-[#0460A9]/10 bg-white/60')}`}>
+    <div className={`rounded-xl p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(17,87,145,0.08)] flex flex-col ${!noBorder ? 'border' : ''} ${highlighted ? (noBorder ? 'bg-[#F4F9FF]' : 'border-[#0460A9]/30 bg-[#F4F9FF]') : (noBorder ? 'bg-white/60' : 'border-[#0460A9]/10 bg-white/60')}`}>
       {media && <div className="mb-4">{media}</div>}
       <div className="min-w-0 flex flex-col">
         <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -77,6 +77,26 @@ interface QuizzesManagerProps {
   onDeleteSession: (id: string) => Promise<void>;
   onToggleStatus: (id: string, currentStatus: boolean) => Promise<void>;
   onRefresh: () => void;
+  loading?: boolean;
+}
+
+function ListSkeleton({ label, withMedia = false }: { label: string; withMedia?: boolean }) {
+  return (
+    <div role="status" className="space-y-4">
+      <span className="sr-only">{label}</span>
+      {[0, 1, 2].map((k) => (
+        <div key={k} aria-hidden="true" className="animate-pulse rounded-xl border border-[var(--nq-line)] bg-[var(--nq-panel)] p-5">
+          {withMedia && <div className="mb-4 aspect-[16/7] rounded-xl bg-[var(--nq-inset)]" />}
+          <div className="h-4 w-2/3 rounded-md bg-[var(--nq-inset)]" />
+          <div className="mt-3 h-3 w-1/2 rounded-md bg-[var(--nq-inset)]" />
+          <div className="mt-5 flex gap-2">
+            <div className="h-8 w-20 rounded-lg bg-[var(--nq-inset)]" />
+            <div className="h-8 w-20 rounded-lg bg-[var(--nq-inset)]" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function QuizzesManager({
@@ -88,6 +108,7 @@ export default function QuizzesManager({
   onDeleteQuiz,
   onDeleteSession,
   onRefresh,
+  loading = false,
 }: QuizzesManagerProps) {
   const router = useRouter();
   const { user, isAdmin } = useAuth();
@@ -365,17 +386,17 @@ export default function QuizzesManager({
   return (
     <div className="nq-quiz-manager flex h-full w-full flex-col gap-6 pb-12 lg:gap-8">
       {/* Control Bar */}
-      <div className="nq-card rounded-[34px] p-4 flex flex-col sm:flex-row sm:flex-wrap items-center gap-4 justify-between">
+      <div className="nq-card rounded-xl p-4 flex flex-col sm:flex-row sm:flex-wrap items-center gap-4 justify-between">
         <div className="flex items-center gap-2">
           <button
             onClick={() => { setFilterMode("owned"); setSessionPage(1); setQuizPage(1); }}
-            className={`px-4 py-2 rounded-[20px] text-sm font-semibold transition-all ${filterMode === "owned" ? "bg-[#0460A9] text-white" : "text-[#5D7EA1] hover:bg-[#0460A9]/10"}`}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${filterMode === "owned" ? "bg-[#0460A9] text-white" : "text-[#5D7EA1] hover:bg-[#0460A9]/10"}`}
           >
             Owned
           </button>
           <button
             onClick={() => { setFilterMode("all"); setSessionPage(1); setQuizPage(1); }}
-            className={`px-4 py-2 rounded-[20px] text-sm font-semibold transition-all ${filterMode === "all" ? "bg-[#0460A9] text-white" : "text-[#5D7EA1] hover:bg-[#0460A9]/10"}`}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${filterMode === "all" ? "bg-[#0460A9] text-white" : "text-[#5D7EA1] hover:bg-[#0460A9]/10"}`}
           >
             All
           </button>
@@ -387,7 +408,7 @@ export default function QuizzesManager({
               quizId: sessionFilterQuizId || (allData[0]?.id ?? null),
               selectedSessionIds: []
             })}
-            className="flex items-center gap-2 rounded-[20px] bg-[#0460A9]/10 hover:bg-[#0460A9] text-[#0460A9] hover:text-white px-4 py-2 text-sm font-bold transition-all shadow-sm shrink-0"
+            className="flex items-center gap-2 rounded-lg bg-[#0460A9]/10 hover:bg-[#0460A9] text-[#0460A9] hover:text-white px-4 py-2 text-sm font-bold transition-all shadow-sm shrink-0"
             title="Compare session results"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -398,7 +419,7 @@ export default function QuizzesManager({
           {sessionFilterQuizId && (
             <button
               onClick={() => { setSessionFilterQuizId(null); setSessionPage(1); setQuizPage(1); }}
-              className="px-3 py-2 rounded-[20px] bg-[#E74C3C]/10 text-[#E74C3C] text-sm font-bold flex items-center gap-1 hover:bg-[#E74C3C]/20 transition-all shrink-0"
+              className="px-3 py-2 rounded-lg bg-[#E74C3C]/10 text-[#E74C3C] text-sm font-bold flex items-center gap-1 hover:bg-[#E74C3C]/20 transition-all shrink-0"
             >
               Clear Template Filter ✕
             </button>
@@ -412,7 +433,7 @@ export default function QuizzesManager({
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setSessionPage(1); setQuizPage(1); }}
-              className="w-full pl-9 pr-4 py-2.5 rounded-[20px] border border-[#0460A9]/10 bg-[#F8FAFC] text-[#16324F] placeholder-[#5D7EA1]/50 focus:outline-none focus:border-[#0460A9]/40 focus:bg-white transition-all text-sm font-medium"
+              className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-[#0460A9]/10 bg-[#F8FAFC] text-[#16324F] placeholder-[#5D7EA1]/50 focus:outline-none focus:border-[#0460A9]/40 focus:bg-white transition-all text-sm font-medium"
             />
           </div>
         </div>
@@ -420,7 +441,7 @@ export default function QuizzesManager({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-stretch flex-1">
         {/* LEFT COLUMN: Sessions */}
-        <div className="nq-card flex min-w-0 flex-col rounded-[34px] p-5 md:p-6 lg:min-h-[calc(100dvh-13rem)] lg:p-8">
+        <div className="nq-card flex min-w-0 flex-col rounded-xl p-5 md:p-6 lg:min-h-[calc(100dvh-13rem)] lg:p-8">
           <div className="mb-6 lg:mb-8">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#5D7EA1]">Live instances</p>
             <h2 className="mt-2 text-2xl md:text-3xl font-bold text-[#16324F]">Sessions</h2>
@@ -428,8 +449,10 @@ export default function QuizzesManager({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            {paginatedSessions.length === 0 ? (
-              <div className="nq-card-soft rounded-[30px] p-10 text-center">
+            {loading && allSessions.length === 0 ? (
+              <ListSkeleton label="Loading sessions…" />
+            ) : paginatedSessions.length === 0 ? (
+              <div className="nq-card-soft rounded-xl p-10 text-center">
                 <p className="text-lg font-semibold text-[#16324F]">No matching sessions.</p>
                 <p className="mt-2 text-sm text-[#5D7EA1]">Try adjusting your search or filters.</p>
               </div>
@@ -483,7 +506,7 @@ export default function QuizzesManager({
                                   setQuizPage(1);
                                   setSessionPage(1);
                                 }}
-                                className="p-1 rounded-[8px] bg-[#0460A9]/5 text-[#0460A9] hover:bg-[#0460A9]/15 transition-colors"
+                                className="p-1 rounded-md bg-[#0460A9]/5 text-[#0460A9] hover:bg-[#0460A9]/15 transition-colors"
                                 title="Filter sessions by this template"
                               >
                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -499,7 +522,7 @@ export default function QuizzesManager({
                         <div className="flex flex-col gap-4 w-full">
                           <button
                             onClick={() => router.push(`/admin/sessions/${s.id}/analytics`)}
-                            className="bg-[#F8FAFC] rounded-[20px] p-4 border border-[#0460A9]/10 hover:bg-[#F1F5F9] transition-colors w-full text-left group"
+                            className="bg-[#F8FAFC] rounded-xl p-4 border border-[#0460A9]/10 hover:bg-[#F1F5F9] transition-colors w-full text-left group"
                           >
                             <div className="flex items-center justify-between mb-3">
                               <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#5D7EA1]">Analytics Preview</span>
@@ -567,7 +590,7 @@ export default function QuizzesManager({
                                   handleToggleJoin(s.id, s.is_private);
                                 }
                               }}
-                              className={`rounded-[20px] px-4 py-2 text-sm font-semibold transition-all ${isJoinOpen && effectiveStatus !== 'started'
+                              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-all ${isJoinOpen && effectiveStatus !== 'started'
                                 ? 'bg-[#0460A9] text-white hover:bg-[#03508C] shadow-md shadow-[#0460A9]/20'
                                 : 'bg-white/70 text-[#16324F] border border-[#0460A9]/15 hover:bg-white'
                                 }`}
@@ -579,7 +602,7 @@ export default function QuizzesManager({
                             <button
                               disabled={loadingIds[s.id]}
                               onClick={() => handleCloseSession(s.id)}
-                              className="rounded-[20px] px-4 py-2 text-sm font-semibold transition-all bg-white/70 text-[#E67E22] border border-[#E67E22]/20 hover:bg-[#FDF3E9]"
+                              className="rounded-lg px-4 py-2 text-sm font-semibold transition-all bg-white/70 text-[#E67E22] border border-[#E67E22]/20 hover:bg-[#FDF3E9]"
                             >
                               {loadingIds[s.id] ? "Closing..." : "Close"}
                             </button>
@@ -595,7 +618,7 @@ export default function QuizzesManager({
                                 type: "session",
                                 action: "archive"
                               })}
-                              className="rounded-[20px] px-4 py-2 text-sm font-semibold transition-all bg-white/50 text-[#5D7EA1] hover:bg-white hover:text-[#16324F]"
+                              className="rounded-lg px-4 py-2 text-sm font-semibold transition-all bg-white/50 text-[#5D7EA1] hover:bg-white hover:text-[#16324F]"
                             >
                               {loadingIds[s.id] ? "Archiving..." : "Archive"}
                             </button>
@@ -607,7 +630,7 @@ export default function QuizzesManager({
                               quizId: s.session_id,
                               selectedSessionIds: [s.id]
                             })}
-                            className="rounded-[20px] px-4 py-2 text-sm font-semibold transition-all bg-[#0460A9]/10 text-[#0460A9] hover:bg-[#0460A9]/20"
+                            className="rounded-lg px-4 py-2 text-sm font-semibold transition-all bg-[#0460A9]/10 text-[#0460A9] hover:bg-[#0460A9]/20"
                             title="Compare session with peers"
                           >
                             Compare
@@ -622,7 +645,7 @@ export default function QuizzesManager({
                               type: "session",
                               action: "delete"
                             })}
-                            className="rounded-[20px] px-4 py-2 text-sm font-semibold transition-all bg-white/50 text-[#E74C3C] hover:bg-[#FDEDEC]"
+                            className="rounded-lg px-4 py-2 text-sm font-semibold transition-all bg-white/50 text-[#E74C3C] hover:bg-[#FDEDEC]"
                           >
                             Delete
                           </button>
@@ -640,7 +663,7 @@ export default function QuizzesManager({
               <button
                 onClick={() => setSessionPage(Math.max(1, safeSessionPage - 1))}
                 disabled={safeSessionPage === 1}
-                className="px-3 py-1.5 rounded-[12px] bg-white border border-[#0460A9]/10 text-[#5D7EA1] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-sm"
+                className="px-3 py-1.5 rounded-md bg-white border border-[#0460A9]/10 text-[#5D7EA1] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-sm"
               >
                 Prev
               </button>
@@ -650,7 +673,7 @@ export default function QuizzesManager({
               <button
                 onClick={() => setSessionPage(Math.min(totalSessionPages, safeSessionPage + 1))}
                 disabled={safeSessionPage === totalSessionPages}
-                className="px-3 py-1.5 rounded-[12px] bg-white border border-[#0460A9]/10 text-[#5D7EA1] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-sm"
+                className="px-3 py-1.5 rounded-md bg-white border border-[#0460A9]/10 text-[#5D7EA1] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-sm"
               >
                 Next
               </button>
@@ -659,7 +682,7 @@ export default function QuizzesManager({
         </div>
 
         {/* RIGHT COLUMN: Quizzes */}
-        <div className="nq-card flex min-w-0 flex-col rounded-[34px] p-5 md:p-6 lg:min-h-[calc(100dvh-13rem)] lg:p-8">
+        <div className="nq-card flex min-w-0 flex-col rounded-xl p-5 md:p-6 lg:min-h-[calc(100dvh-13rem)] lg:p-8">
           <div className="mb-6 lg:mb-8 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#5D7EA1]">Templates</p>
@@ -668,7 +691,7 @@ export default function QuizzesManager({
             </div>
             <button
               onClick={() => router.push('/admin/questions/create')}
-              className="shrink-0 bg-[#0460A9] hover:bg-[#03508C] text-white rounded-[22px] px-6 py-2.5 font-semibold transition-all shadow-md shadow-[#0460A9]/20 flex items-center justify-center gap-2"
+              className="shrink-0 bg-[#0460A9] hover:bg-[#03508C] text-white rounded-lg px-6 py-2.5 font-semibold transition-all shadow-md shadow-[#0460A9]/20 flex items-center justify-center gap-2"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -678,8 +701,10 @@ export default function QuizzesManager({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            {paginatedTemplates.length === 0 ? (
-              <div className="nq-card-soft rounded-[30px] p-10 text-center">
+            {loading && allData.length === 0 ? (
+              <ListSkeleton label="Loading quizzes…" withMedia />
+            ) : paginatedTemplates.length === 0 ? (
+              <div className="nq-card-soft rounded-xl p-10 text-center">
                 <p className="text-lg font-semibold text-[#16324F]">No matching quiz templates found.</p>
                 <p className="mt-2 text-sm text-[#5D7EA1]">Try adjusting your search or filters.</p>
               </div>
@@ -694,7 +719,7 @@ export default function QuizzesManager({
                       key={q.id}
                       title={q.name}
                       media={
-                        <div className="nq-always-dark group relative aspect-[16/7] overflow-hidden rounded-[22px] border border-white/10 bg-[linear-gradient(135deg,#192d70,#2f55c7_58%,#6f84f6)]">
+                        <div className="nq-always-dark group relative aspect-[16/7] overflow-hidden rounded-xl border border-white/10 bg-[var(--nq-brand)]">
                           {q.cover_image_url ? (
                             <Image
                               src={q.cover_image_url}
@@ -706,7 +731,7 @@ export default function QuizzesManager({
                           ) : (
           <QuizThumbnail />
                           )}
-                          <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-center justify-end gap-2 bg-gradient-to-t from-[#060b26]/95 via-[#060b26]/55 to-transparent p-3 pt-10">
+                          <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-center justify-end gap-2 bg-black/60 p-3">
                             {canEditQuiz && (
                               <>
                                 <input
@@ -758,7 +783,7 @@ export default function QuizzesManager({
                                     // Scroll to sessions column for mobile
                                     window.scrollTo({ top: 0, behavior: 'smooth' });
                                   }}
-                                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-[12px] bg-[#0460A9]/5 text-[#0460A9] hover:bg-[#0460A9]/15 transition-colors text-[10px] font-bold uppercase tracking-wide"
+                                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#0460A9]/5 text-[#0460A9] hover:bg-[#0460A9]/15 transition-colors text-[10px] font-bold uppercase tracking-wide"
                                 >
                                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -774,7 +799,7 @@ export default function QuizzesManager({
                                       selectedSessionIds: relatedSessions.slice(0, 2)
                                     });
                                   }}
-                                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-[12px] bg-[#7C3AED]/10 text-[#7C3AED] hover:bg-[#7C3AED]/20 transition-colors text-[10px] font-bold uppercase tracking-wide"
+                                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#7C3AED]/10 text-[#7C3AED] hover:bg-[#7C3AED]/20 transition-colors text-[10px] font-bold uppercase tracking-wide"
                                   title="Compare sessions of this quiz"
                                 >
                                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -784,7 +809,7 @@ export default function QuizzesManager({
                                 </button>
                                 <button
                                   onClick={() => router.push(`/admin/quizzes/${q.id}/analytics`)}
-                                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-[12px] bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors text-[10px] font-bold uppercase tracking-wide border border-emerald-200"
+                                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors text-[10px] font-bold uppercase tracking-wide border border-emerald-200"
                                   title="View overall aggregated analytics across all sessions of this quiz"
                                 >
                                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -831,7 +856,7 @@ export default function QuizzesManager({
                             <button
                               disabled={loadingIds[q.id]}
                               onClick={() => router.push(`/admin/quizzes/${q.id}/analytics`)}
-                              className="rounded-[20px] px-4 py-2 text-sm font-semibold transition-all bg-[#0460A9]/10 text-[#0460A9] hover:bg-[#0460A9]/20"
+                              className="rounded-lg px-4 py-2 text-sm font-semibold transition-all bg-[#0460A9]/10 text-[#0460A9] hover:bg-[#0460A9]/20"
                               title="View overall quiz analytics"
                             >
                               Analytics
@@ -840,14 +865,14 @@ export default function QuizzesManager({
                           <button
                             disabled={loadingIds[q.id]}
                             onClick={() => setCreateSessionModal({ isOpen: true, quizId: q.id, quizName: q.name, isPrivate: true, sessionName: "" })}
-                            className="rounded-[20px] px-4 py-2 text-sm font-semibold transition-all bg-[#0460A9] text-white hover:bg-[#03508C] shadow-md shadow-[#0460A9]/20"
+                            className="rounded-lg px-4 py-2 text-sm font-semibold transition-all bg-[#0460A9] text-white hover:bg-[#03508C] shadow-md shadow-[#0460A9]/20"
                           >
                             Create Session
                           </button>
                           <button
                             disabled={loadingIds[q.id]}
                             onClick={() => router.push(`/admin/questions/${q.slug || q.id}/edit`)}
-                            className="rounded-[20px] px-4 py-2 text-sm font-semibold transition-all bg-white/70 text-[#16324F] border border-[#0460A9]/15 hover:bg-white"
+                            className="rounded-lg px-4 py-2 text-sm font-semibold transition-all bg-white/70 text-[#16324F] border border-[#0460A9]/15 hover:bg-white"
                           >
                             Edit
                           </button>
@@ -864,14 +889,14 @@ export default function QuizzesManager({
                                 setItemLoading(q.id, false);
                               }
                             }}
-                            className="rounded-[20px] px-4 py-2 text-sm font-semibold transition-all bg-white/50 text-[#5D7EA1] hover:bg-white hover:text-[#16324F]"
+                            className="rounded-lg px-4 py-2 text-sm font-semibold transition-all bg-white/50 text-[#5D7EA1] hover:bg-white hover:text-[#16324F]"
                           >
                             {loadingIds[q.id] ? "..." : "Duplicate"}
                           </button>
                           <button
                             disabled={loadingIds[q.id]}
                             onClick={() => setConfirmModal({ isOpen: true, id: q.id, name: q.name, confirmName: "", type: "quiz", action: "delete" })}
-                            className="rounded-[20px] px-4 py-2 text-sm font-semibold transition-all bg-white/50 text-[#E74C3C] hover:bg-[#FDEDEC]"
+                            className="rounded-lg px-4 py-2 text-sm font-semibold transition-all bg-white/50 text-[#E74C3C] hover:bg-[#FDEDEC]"
                           >
                             Delete
                           </button>
@@ -889,7 +914,7 @@ export default function QuizzesManager({
               <button
                 onClick={() => setQuizPage(Math.max(1, safeQuizPage - 1))}
                 disabled={safeQuizPage === 1}
-                className="px-3 py-1.5 rounded-[12px] bg-white border border-[#0460A9]/10 text-[#5D7EA1] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-sm"
+                className="px-3 py-1.5 rounded-md bg-white border border-[#0460A9]/10 text-[#5D7EA1] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-sm"
               >
                 Prev
               </button>
@@ -899,7 +924,7 @@ export default function QuizzesManager({
               <button
                 onClick={() => setQuizPage(Math.min(totalQuizPages, safeQuizPage + 1))}
                 disabled={safeQuizPage === totalQuizPages}
-                className="px-3 py-1.5 rounded-[12px] bg-white border border-[#0460A9]/10 text-[#5D7EA1] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-sm"
+                className="px-3 py-1.5 rounded-md bg-white border border-[#0460A9]/10 text-[#5D7EA1] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-sm"
               >
                 Next
               </button>
@@ -911,7 +936,7 @@ export default function QuizzesManager({
       {/* CREATE SESSION MODAL */}
       {createSessionModal.isOpen && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-[#0460A9]/20 px-4 backdrop-blur-md">
-          <div className="w-full max-w-md nq-card rounded-[34px] p-8 shadow-2xl">
+          <div className="w-full max-w-md nq-card rounded-xl p-8 shadow-2xl">
             <h3 className="text-2xl font-bold text-[#16324F] mb-3">New Session</h3>
             <p className="text-sm text-[#5D7EA1] mb-6">
               Publishing template <strong className="text-[#16324F]">{createSessionModal.quizName}</strong>.
@@ -921,7 +946,7 @@ export default function QuizzesManager({
                 <label className="text-[11px] font-semibold text-[#5D7EA1] uppercase tracking-[0.16em] mb-2 block">Session Name</label>
                 <input
                   type="text"
-                  className="w-full rounded-[22px] border border-[#0460A9]/15 bg-white/80 px-4 py-3 text-[#16324F] placeholder-[#5D7EA1]/60 focus:border-[#0460A9]/40 focus:outline-none focus:ring-4 focus:ring-[#0460A9]/10 transition-all"
+                  className="w-full rounded-lg border border-[#0460A9]/15 bg-white/80 px-4 py-3 text-[#16324F] placeholder-[#5D7EA1]/60 focus:border-[#0460A9]/40 focus:outline-none focus:ring-4 focus:ring-[#0460A9]/10 transition-all"
                   placeholder="Enter a name for this session..."
                   value={createSessionModal.sessionName}
                   onChange={(e) => setCreateSessionModal(prev => ({ ...prev, sessionName: e.target.value }))}
@@ -932,7 +957,7 @@ export default function QuizzesManager({
 
               <div className="flex flex-col gap-3 pt-2">
                 <button
-                  className="w-full rounded-[22px] py-3 text-sm font-bold transition-all bg-[#0460A9] text-white hover:bg-[#03508C] shadow-lg shadow-[#0460A9]/20 flex items-center justify-center gap-2"
+                  className="w-full rounded-lg py-3 text-sm font-bold transition-all bg-[#0460A9] text-white hover:bg-[#03508C] shadow-lg shadow-[#0460A9]/20 flex items-center justify-center gap-2"
                   disabled={isSubmitting}
                   onClick={() => void handleCreateSessionSubmit(true)}
                 >
@@ -942,7 +967,7 @@ export default function QuizzesManager({
                   Create Private Lobby
                 </button>
                 <button
-                  className="w-full rounded-[22px] py-3 text-sm font-bold transition-all bg-[#8E44AD] text-white hover:bg-[#7D3C98] shadow-lg shadow-[#8E44AD]/20 flex items-center justify-center gap-2"
+                  className="w-full rounded-lg py-3 text-sm font-bold transition-all bg-[#8E44AD] text-white hover:bg-[#7D3C98] shadow-lg shadow-[#8E44AD]/20 flex items-center justify-center gap-2"
                   disabled={isSubmitting}
                   onClick={() => void handleCreateSessionSubmit(false)}
                 >
@@ -952,7 +977,7 @@ export default function QuizzesManager({
                   Create Public Session
                 </button>
                 <button
-                  className="w-full rounded-[22px] py-3 text-sm font-bold transition-all bg-white/70 text-[#5D7EA1] border border-[#0460A9]/10 hover:bg-white hover:text-[#16324F]"
+                  className="w-full rounded-lg py-3 text-sm font-bold transition-all bg-white/70 text-[#5D7EA1] border border-[#0460A9]/10 hover:bg-white hover:text-[#16324F]"
                   onClick={() => setCreateSessionModal({ isOpen: false, quizId: null, quizName: "", isPrivate: true, sessionName: "" })}
                 >
                   Cancel
@@ -967,7 +992,7 @@ export default function QuizzesManager({
       {/* SAFETY CONFIRMATION MODAL */}
       {confirmModal.isOpen && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-[#0460A9]/20 px-4 backdrop-blur-md">
-          <div className={`w-full max-w-md nq-card rounded-[34px] p-8 shadow-2xl border-2 ${confirmModal.action === 'delete' ? 'border-[#E74C3C]/30' : 'border-[#E67E22]/30'}`}>
+          <div className={`w-full max-w-md nq-card rounded-xl p-8 shadow-2xl border-2 ${confirmModal.action === 'delete' ? 'border-[#E74C3C]/30' : 'border-[#E67E22]/30'}`}>
             <h3 className="text-2xl font-bold text-[#16324F] mb-3">
               {confirmModal.action === "delete" ? "Delete" : "Archive"} {confirmModal.type === "quiz" ? "Template" : "Session"}
             </h3>
@@ -982,7 +1007,7 @@ export default function QuizzesManager({
                 <div className="mb-6">
                   <input
                     type="text"
-                    className={`w-full rounded-[22px] border bg-white/80 px-4 py-3 text-[#16324F] placeholder-[#5D7EA1]/60 focus:outline-none focus:ring-4 transition-all ${confirmModal.action === 'delete'
+                    className={`w-full rounded-lg border bg-white/80 px-4 py-3 text-[#16324F] placeholder-[#5D7EA1]/60 focus:outline-none focus:ring-4 transition-all ${confirmModal.action === 'delete'
                       ? 'border-[#E74C3C]/30 focus:border-[#E74C3C]/50 focus:ring-[#E74C3C]/10'
                       : 'border-[#E67E22]/30 focus:border-[#E67E22]/50 focus:ring-[#E67E22]/10'
                       }`}
@@ -996,14 +1021,14 @@ export default function QuizzesManager({
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
-                  className="rounded-[22px] px-6 py-2.5 text-sm font-bold transition-all bg-white/70 text-[#5D7EA1] border border-[#0460A9]/10 hover:bg-white hover:text-[#16324F]"
+                  className="rounded-lg px-6 py-2.5 text-sm font-bold transition-all bg-white/70 text-[#5D7EA1] border border-[#0460A9]/10 hover:bg-white hover:text-[#16324F]"
                   onClick={() => setConfirmModal({ ...confirmModal, isOpen: false })}
                   disabled={isSubmitting}
                 >
                   Cancel
                 </button>
                 <button
-                  className={`rounded-[22px] px-6 py-2.5 text-sm font-bold transition-all text-white shadow-lg flex items-center justify-center min-w-[120px] ${confirmModal.action === 'delete'
+                  className={`rounded-lg px-6 py-2.5 text-sm font-bold transition-all text-white shadow-lg flex items-center justify-center min-w-[120px] ${confirmModal.action === 'delete'
                     ? 'bg-[#E74C3C] hover:bg-[#C0392B] shadow-[#E74C3C]/20'
                     : 'bg-[#E67E22] hover:bg-[#D35400] shadow-[#E67E22]/20'
                     } disabled:opacity-50 disabled:cursor-not-allowed`}

@@ -3,16 +3,33 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
-  --nq-button-primary: #0460a9;
+  --nq-button-primary: var(--nq-primary);
   --background: #f8f9fc;
   --foreground: #1a1a2e;
-  --accent: #0460a9;
-  --accent-hover: #055a9e;
+  --accent: var(--nq-accent-text);
+  --accent-hover: var(--nq-primary-hover);
   --surface: rgba(0, 0, 0, 0.04);
   --border: rgba(0, 0, 0, 0.08);
   --sidebar: #eef0f6;
   --sidebar-border: rgba(0, 0, 0, 0.08);
   --muted: #6b7280;
+}
+
+/* Shared solid palette, taken from the Home page. Every page and module
+   palette points at these so both themes stay consistent. */
+:root {
+  --nq-canvas: #f3f7fc;
+  --nq-panel: #ffffff;
+  --nq-inset: #f2f6fb;
+  --nq-line: #dce5ef;
+  --nq-ink: #16324f;
+  --nq-muted: #49647e;
+  --nq-primary: #3d63f0;
+  --nq-primary-hover: #3556e0;
+  --nq-on-primary: #ffffff;
+  --nq-accent-text: #2f4fd0;
+  --nq-accent-soft: #e8eeff;
+  --nq-brand: #2f4fd0;
 }
 
 [data-theme="light"] {
@@ -110,30 +127,7 @@ h1, h2, h3, .nq-header, .nq-topic {
 
 .nq-sky {
   position: relative;
-  background:
-    linear-gradient(180deg, rgba(4, 96, 169, 0.18), transparent 20%),
-    radial-gradient(circle at bottom right, rgba(146, 191, 255, 0.22), transparent 26%),
-    linear-gradient(180deg, #70A2F9 0%, #92BFFF 50%, #c4deff 100%);
-}
-
-.nq-sky::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.45) 1.5px, transparent 1.5px);
-  background-size: 22px 22px;
-  opacity: 0.45;
-  pointer-events: none;
-}
-
-.nq-sky::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(135deg, transparent 0 66%, rgba(255, 255, 255, 0.18) 66%, transparent 82%),
-    radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.16), transparent 20%);
-  pointer-events: none;
+  background: var(--nq-canvas);
 }
 
 .nq-content {
@@ -143,7 +137,7 @@ h1, h2, h3, .nq-header, .nq-topic {
 
 .nq-card {
   border: 1px solid rgba(4, 96, 169, 0.14);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(233, 244, 255, 0.85));
+  background: var(--nq-panel);
   box-shadow:
     0 24px 60px rgba(17, 87, 145, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
@@ -152,16 +146,14 @@ h1, h2, h3, .nq-header, .nq-topic {
 
 .nq-card-soft {
   border: 1px solid rgba(4, 96, 169, 0.1);
-  background: linear-gradient(180deg, rgba(241, 248, 255, 0.72), rgba(255, 255, 255, 0.78));
+  background: var(--nq-panel);
   box-shadow: 0 18px 42px rgba(17, 87, 145, 0.1);
   backdrop-filter: blur(16px);
 }
 
 .nq-card-dark {
   border: 1px solid rgba(146, 191, 255, 0.12);
-  background:
-    linear-gradient(180deg, rgba(112, 162, 249, 0.96), rgba(5, 90, 158, 0.92)),
-    linear-gradient(135deg, rgba(146, 191, 255, 0.22), transparent 58%);
+  background: var(--nq-brand);
   box-shadow: 0 24px 56px rgba(17, 87, 145, 0.26);
   color: #ffffff;
 }
@@ -184,10 +176,7 @@ h1, h2, h3, .nq-header, .nq-topic {
 
 .nq-card-blue {
   border: 1px solid rgba(146, 191, 255, 0.2);
-  background:
-    linear-gradient(135deg, rgba(146, 191, 255, 0.97), rgba(4, 96, 169, 0.94)),
-    linear-gradient(90deg, rgba(5, 90, 158, 0.18), transparent 70%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent);
+  background: var(--nq-brand);
   box-shadow: 0 24px 56px rgba(17, 87, 145, 0.3);
 }
 
@@ -269,7 +258,7 @@ h1, h2, h3, .nq-header, .nq-topic {
 }
 
 .nq-bottom-fade {
-  background: linear-gradient(180deg, rgba(196, 222, 255, 0.24) 0%, rgba(196, 222, 255, 0.72) 100%);
+  background: var(--nq-canvas);
 }
 
 .nq-answer-shadow {
@@ -278,9 +267,7 @@ h1, h2, h3, .nq-header, .nq-topic {
 
 /* ─── Figma "New Design" dashboard + mobile play surfaces ─────────────── */
 .nq-dashboard-shell {
-  background:
-    radial-gradient(circle at 78% 4%, rgba(70, 70, 70, 0.12), transparent 26rem),
-    #0a0a0a;
+  background: var(--nq-canvas);
 }
 
 [data-theme="light"] .nq-dashboard-shell.text-white,
@@ -291,30 +278,7 @@ h1, h2, h3, .nq-header, .nq-topic {
 .nq-play-screen {
   position: relative;
   overflow-x: hidden;
-  background:
-    radial-gradient(circle at 88% 8%, rgba(71, 105, 229, 0.24), transparent 24rem),
-    radial-gradient(circle at 4% 82%, rgba(41, 69, 170, 0.18), transparent 20rem),
-    linear-gradient(180deg, #121212 0%, #0a0a0a 100%);
-}
-
-.nq-play-screen::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background-image: radial-gradient(rgba(158, 178, 255, 0.16) 1px, transparent 1px);
-  background-size: 20px 20px;
-  opacity: 0.48;
-}
-
-.nq-play-screen::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 95% 18%, rgba(104, 130, 255, 0.12), transparent 22rem),
-    radial-gradient(circle at 4% 80%, rgba(58, 91, 214, 0.1), transparent 20rem);
+  background: var(--nq-canvas);
 }
 
 [data-theme="light"] .nq-play-screen .text-white {
@@ -392,12 +356,6 @@ h1, h2, h3, .nq-header, .nq-topic {
   background-color: rgba(255, 255, 255, 0.92) !important;
 }
 
-.nq-admin-panel .bg-linear-to-r,
-.nq-admin-panel .bg-linear-to-t,
-.nq-admin-panel .bg-linear-to-br {
-  color: inherit;
-}
-
 /* React Flow Controls dark theme */
 .react-flow__controls-button {
   background: #262626 !important;
@@ -441,23 +399,32 @@ body {
 
 /* ─── Root background ──────────────────────────────────────────── */
 .nq-root-bg {
-  background:
-    linear-gradient(180deg, rgba(4,96,169,0.18), transparent 20%),
-    radial-gradient(circle at bottom right, rgba(146,191,255,0.22), transparent 26%),
-    linear-gradient(180deg, #70A2F9 0%, #92BFFF 50%, #c4deff 100%);
+  background: var(--nq-canvas);
 }
 
 /* ─── Dark mode ────────────────────────────────────────────────── */
 [data-theme="dark"] {
+  --nq-canvas: #101010;
+  --nq-panel: #262626;
+  --nq-inset: #202020;
+  --nq-line: #3a3a3a;
+  --nq-ink: #f5f5f5;
+  --nq-muted: #b3b3b3;
+  --nq-primary: #3d63f0;
+  --nq-primary-hover: #4f76ff;
+  --nq-on-primary: #ffffff;
+  --nq-accent-text: #9db4ff;
+  --nq-accent-soft: #2b3350;
+  --nq-brand: #333333;
   --nq-dark-canvas: #101010;
   --nq-dark-panel: #262626;
   --nq-dark-inset: #202020;
   --nq-dark-border: #525252;
-  --nq-button-primary: #404040;
+  --nq-button-primary: var(--nq-primary);
   --background: #121212;
   --foreground: #f5f5f5;
-  --accent: #e5e5e5;
-  --accent-hover: #ffffff;
+  --accent: var(--nq-accent-text);
+  --accent-hover: var(--nq-primary-hover);
   --surface: rgba(255, 255, 255, 0.05);
   --border: rgba(255, 255, 255, 0.08);
   --sidebar: #171717;
@@ -469,40 +436,15 @@ html[data-theme="dark"] {
   background-color: #0a0a0a;
 }
 
-[data-theme="dark"] .nq-root-bg {
-  background: linear-gradient(180deg, #0a0a0a 0%, #0a0a0a 50%, #171717 100%);
-}
-
-/* Sky background — dark variant */
-[data-theme="dark"] .nq-sky {
-  background:
-    linear-gradient(180deg, rgba(18, 18, 18, 0.98), rgba(18, 18, 18, 0.98) 100%);
-}
-
-[data-theme="dark"] .nq-sky::before {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1.5px, transparent 1.5px);
-  opacity: 0.35;
-}
-
-[data-theme="dark"] .nq-sky::after {
-  background:
-    linear-gradient(135deg, transparent 0 66%, rgba(255, 255, 255, 0.03) 66%, transparent 82%),
-    radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.05), transparent 20%);
-}
-
-[data-theme="dark"] .nq-bottom-fade {
-  background: linear-gradient(180deg, rgba(18, 18, 18, 0.24) 0%, rgba(18, 18, 18, 0.72) 100%);
-}
-
 /* Cards */
 [data-theme="dark"] .nq-card {
-  background: linear-gradient(180deg, rgba(32, 32, 32, 0.96), rgba(26, 26, 26, 0.98));
+  background: var(--nq-panel);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 [data-theme="dark"] .nq-card-soft {
-  background: linear-gradient(180deg, rgba(32, 32, 32, 0.92), rgba(26, 26, 26, 0.96));
+  background: var(--nq-panel);
   border-color: rgba(255, 255, 255, 0.06);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
 }
@@ -638,9 +580,7 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
 
 /* Darker variant of the blue profile card */
 [data-theme="dark"] .nq-card-blue {
-  background:
-    linear-gradient(135deg, #303030, #171717),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
+  background: var(--nq-brand);
   border-color: rgba(255, 255, 255, 0.1);
   box-shadow: 0 24px 56px rgba(0, 0, 0, 0.55);
 }
@@ -721,8 +661,7 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
 /* Auth: a single responsive form with theme-aware surfaces and controls. */
 .nq-auth-shell {
   --nq-auth-card: #ffffff;
-  --nq-auth-header: linear-gradient(135deg, #3e6bcc, #3b5fd4);
-  --nq-auth-dot: rgba(255, 255, 255, 0.35);
+  --nq-auth-header: var(--nq-brand);
   --nq-auth-text: #171717;
   --nq-auth-muted: #666666;
   --nq-auth-input: #f9fafb;
@@ -731,8 +670,8 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
   --nq-auth-pill: #ffffff;
   --nq-auth-link: #3154ba;
   --nq-auth-focus: #3154ba;
-  --nq-auth-primary: #0460a9;
-  --nq-auth-primary-text: #ffffff;
+  --nq-auth-primary: var(--nq-primary);
+  --nq-auth-primary-text: var(--nq-on-primary);
   --nq-auth-google: #ffffff;
   --nq-auth-google-hover: #f3f4f6;
   --nq-auth-shadow: 0 -6px 32px rgba(0, 0, 0, 0.13);
@@ -744,8 +683,7 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
 }
 [data-theme="dark"] .nq-auth-shell {
   --nq-auth-card: #171717;
-  --nq-auth-header: linear-gradient(135deg, #262626, #171717 45%, #0a0a0a);
-  --nq-auth-dot: rgba(255, 255, 255, 0.12);
+  --nq-auth-header: #171717;
   --nq-auth-text: #f5f5f5;
   --nq-auth-muted: #b3b3b3;
   --nq-auth-input: #202020;
@@ -753,8 +691,6 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
   --nq-auth-pill: #404040;
   --nq-auth-link: #e5e5e5;
   --nq-auth-focus: #d4d4d4;
-  --nq-auth-primary: #e5e5e5;
-  --nq-auth-primary-text: #171717;
   --nq-auth-google: #262626;
   --nq-auth-google-hover: #333333;
   --nq-auth-shadow: 0 -6px 32px rgba(0, 0, 0, 0.45);
@@ -767,13 +703,6 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
   min-height: 180px;
   height: 30svh;
   background: var(--nq-auth-header);
-}
-.nq-auth-header::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(circle, var(--nq-auth-dot) 1.5px, transparent 1.5px);
-  background-size: 26px 26px;
 }
 .nq-auth-language, .nq-auth-theme {
   border: 1px solid rgba(255, 255, 255, 0.4);
@@ -977,9 +906,7 @@ body {
 .nq-dashboard-shell .nq-card,
 .nq-dashboard-shell .nq-card-soft {
   border-color: rgba(156, 173, 255, 0.12) !important;
-  background:
-    radial-gradient(circle at 90% 0%, rgba(73, 101, 217, 0.12), transparent 16rem),
-    linear-gradient(150deg, rgba(32, 32, 32, 0.98), rgba(26, 26, 26, 0.98)) !important;
+  background: var(--nq-panel) !important;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22) !important;
 }
 
@@ -1052,9 +979,7 @@ body {
 [data-theme="light"] .nq-dashboard-shell {
   color-scheme: light;
   color: #16324f;
-  background:
-    radial-gradient(circle at 82% 4%, rgba(112, 162, 249, 0.22), transparent 28rem),
-    linear-gradient(180deg, #eef6ff 0%, #f8fbff 48%, #edf5ff 100%) !important;
+  background: var(--nq-canvas) !important;
 }
 
 [data-theme="light"] .nq-dashboard-sidebar,
@@ -1089,7 +1014,7 @@ body {
 [data-theme="light"] .nq-dashboard-shell .nq-card,
 [data-theme="light"] .nq-dashboard-shell .nq-card-soft {
   border-color: rgba(4, 96, 169, 0.14) !important;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(233, 244, 255, 0.92)) !important;
+  background: var(--nq-panel) !important;
   box-shadow: 0 20px 52px rgba(17, 87, 145, 0.12) !important;
 }
 
@@ -1175,20 +1100,7 @@ body {
    charcoal in dark mode. */
 [data-theme="light"] .nq-play-screen {
   color-scheme: light;
-  background:
-    linear-gradient(180deg, rgba(78, 145, 227, 0.3), transparent 12rem),
-    linear-gradient(180deg, #84bafb 0%, #b7d9ff 55%, #d5e9ff 100%);
-}
-
-[data-theme="light"] .nq-play-screen::before {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.48) 1.25px, transparent 1.25px);
-  opacity: 0.62;
-}
-
-[data-theme="light"] .nq-play-screen::after {
-  background:
-    radial-gradient(circle at 95% 18%, rgba(255, 255, 255, 0.42), transparent 22rem),
-    radial-gradient(circle at 4% 80%, rgba(78, 145, 227, 0.18), transparent 20rem);
+  background: var(--nq-canvas);
 }
 
 [data-theme="light"] .nq-play-screen .nq-play-card {
@@ -1218,9 +1130,7 @@ body {
   color: #16324f;
   --nq-performance-fill: #0460a9;
   --nq-performance-track: #dce9f7;
-  background:
-    radial-gradient(circle at 82% 4%, rgba(112, 162, 249, 0.2), transparent 28rem),
-    linear-gradient(180deg, #eef6ff 0%, #f8fbff 48%, #edf5ff 100%) !important;
+  background: var(--nq-canvas) !important;
 }
 
 .nq-dashboard-shell.nq-theme-light .nq-dashboard-sidebar,
@@ -1240,7 +1150,7 @@ body {
 .nq-dashboard-shell.nq-theme-light .nq-card,
 .nq-dashboard-shell.nq-theme-light .nq-card-soft {
   border-color: rgba(4, 96, 169, 0.14) !important;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(233, 244, 255, 0.93)) !important;
+  background: var(--nq-panel) !important;
   box-shadow: 0 20px 52px rgba(17, 87, 145, 0.11) !important;
 }
 
@@ -1321,18 +1231,14 @@ body {
 .nq-dashboard-sidebar {
   color-scheme: dark;
   border-color: rgba(98, 126, 226, 0.22);
-  background:
-    radial-gradient(circle at 20% 102%, rgba(80, 80, 80, 0.2), transparent 22rem),
-    linear-gradient(180deg, #121212 0%, #0a0a0a 100%);
+  background: #171717;
   box-shadow: 10px 0 32px rgba(0, 0, 0, 0.16);
 }
 
 .nq-dashboard-shell.nq-theme-light .nq-dashboard-sidebar {
   color-scheme: light;
   border-color: rgba(4, 96, 169, 0.12) !important;
-  background:
-    radial-gradient(circle at 20% 102%, rgba(112, 162, 249, 0.16), transparent 22rem),
-    linear-gradient(180deg, #ffffff 0%, #f3f8ff 100%) !important;
+  background: var(--nq-panel) !important;
   box-shadow: 10px 0 32px rgba(17, 87, 145, 0.08) !important;
 }
 
@@ -1353,7 +1259,7 @@ body {
 .nq-sidebar-link:hover { background: rgba(255, 255, 255, 0.045); }
 
 .nq-sidebar-link-active {
-  background: linear-gradient(90deg, rgba(60, 60, 60, 0.72), rgba(48, 48, 48, 0.58));
+  background: #303030;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
 }
 
@@ -1365,7 +1271,7 @@ body {
 
 .nq-sidebar-link-active .nq-sidebar-icon {
   color: #ffffff;
-  background: linear-gradient(135deg, #3078f2, #5458e9);
+  background: var(--nq-primary);
   box-shadow: 0 5px 14px rgba(0, 0, 0, 0.38);
 }
 
@@ -1412,7 +1318,7 @@ body {
 
 .nq-dashboard-shell.nq-theme-light .nq-sidebar-link-active {
   color: #16324f !important;
-  background: linear-gradient(90deg, rgba(112, 162, 249, 0.22), rgba(146, 191, 255, 0.12));
+  background: var(--nq-accent-soft);
   box-shadow: inset 0 0 0 1px rgba(4, 96, 169, 0.08);
 }
 
@@ -1424,7 +1330,7 @@ body {
 
 .nq-dashboard-shell.nq-theme-light .nq-sidebar-link-active .nq-sidebar-icon {
   color: #ffffff;
-  background: linear-gradient(135deg, #3078f2, #5458e9);
+  background: var(--nq-primary);
 }
 
 .nq-dashboard-shell.nq-theme-light .nq-sidebar-logout {
@@ -1627,14 +1533,17 @@ body {
 .nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="text-sky-900"] { color: #a9d5ff !important; }
 
 .nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="from-rose-50/70"] {
-  background-image: linear-gradient(135deg, #34243c, #242e4a) !important;
+  background-image: none !important;
+  background-color: #3b2028 !important;
 }
 .nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="from-amber-50/70"] {
-  background-image: linear-gradient(135deg, #403528, #27334b) !important;
+  background-image: none !important;
+  background-color: #362c20 !important;
 }
 .nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="from-sky-50/70"],
 .nq-dashboard-shell:not(.nq-theme-light) .nq-full-report [class~="from-gray-50/70"] {
-  background-image: linear-gradient(135deg, #213a59, #1b2c49) !important;
+  background-image: none !important;
+  background-color: #203039 !important;
 }
 
 /* Keep text white on the report's solid colour controls and dark panels. */
@@ -1764,12 +1673,12 @@ body {
   outline-offset: 3px;
 }
 .nq-dashboard-shell .nq-report-cta {
-  background: #0460a9 !important;
-  border-color: #0460a9 !important;
-  color: #ffffff !important;
+  background: var(--nq-primary) !important;
+  border-color: var(--nq-primary) !important;
+  color: var(--nq-on-primary) !important;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
 }
-.nq-dashboard-shell .group:hover .nq-report-cta { background: #03508c !important; }
+.nq-dashboard-shell .group:hover .nq-report-cta { background: var(--nq-primary-hover) !important; }
 .nq-dashboard-shell .nq-full-report button { min-height: 36px; }
 .nq-dashboard-shell .nq-full-report button.nq-topic-card { min-height: 112px; }
 .nq-dashboard-shell .nq-full-report button[class~="hover:bg-[#0460A9]"]:hover {
@@ -1792,11 +1701,11 @@ body {
   border-color: #333333 !important;
 }
 [data-theme="dark"] :is(.nq-card-blue, .nq-card-dark, .nq-report-dark-panel) {
-  background: linear-gradient(135deg, #333333, #171717) !important;
+  background: var(--nq-brand) !important;
   border-color: #525252 !important;
 }
 [data-theme="dark"] .nq-sidebar-icon { background: #303030; color: #d4d4d4; }
-[data-theme="dark"] .nq-sidebar-link-active .nq-sidebar-icon { background: #525252; box-shadow: none; }
+[data-theme="dark"] .nq-sidebar-link-active .nq-sidebar-icon { background: var(--nq-primary); color: var(--nq-on-primary); box-shadow: none; }
 [data-theme="dark"] .nq-dashboard-shell [class~="bg-[#17275f]"],
 [data-theme="dark"] .nq-dashboard-shell [class~="bg-[#18255d]"],
 [data-theme="dark"] .nq-dashboard-shell [class~="bg-[#070d2b]"],
@@ -1815,24 +1724,17 @@ body {
   color: #f5f5f5 !important;
 }
 [data-theme="dark"] .nq-dashboard-shell :is(input, textarea)::placeholder { color: #a3a3a3 !important; }
-[data-theme="dark"] .nq-dashboard-shell .nq-report-cta {
-  background: #e5e5e5 !important;
-  border-color: #e5e5e5 !important;
-  color: #171717 !important;
+.nq-dashboard-shell :is(button, a)[class~="bg-[#0460A9]"],
+.nq-dashboard-shell :is(button, a)[class~="bg-[#4f76ff]"],
+.nq-dashboard-shell button[class~="hover:bg-[#0460A9]"]:hover {
+  background-color: var(--nq-primary) !important;
+  color: var(--nq-on-primary) !important;
 }
-[data-theme="dark"] .nq-dashboard-shell .group:hover .nq-report-cta { background: #ffffff !important; }
-[data-theme="dark"] .nq-dashboard-shell :is(button, a)[class~="bg-[#0460A9]"],
-[data-theme="dark"] .nq-dashboard-shell button[class~="hover:bg-[#0460A9]"]:hover {
-  background-color: #404040 !important;
-  color: #ffffff !important;
-}
-[data-theme="dark"] .nq-dashboard-shell .nq-welcome-card,
-[data-theme="dark"] .nq-dashboard-shell .nq-always-dark[class*="bg-[linear-gradient("] {
-  background-image: linear-gradient(135deg, #171717, #525252) !important;
+[data-theme="dark"] .nq-dashboard-shell .nq-welcome-card {
+  background: var(--nq-brand) !important;
+  border-color: var(--nq-line) !important;
 }
 [data-theme="dark"] .nq-button { box-shadow: none; }
-[data-theme="dark"] .nq-play-screen::after { background: none; }
-[data-theme="dark"] .nq-play-screen::before { background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px); }
 @media (prefers-reduced-motion: reduce) {
   .nq-topic-card { transition: none; }
   .nq-topic-card:not(:disabled):hover { transform: none; }
@@ -1840,8 +1742,8 @@ body {
 
 /* Home and Profile share the same welcome-card surface. */
 .nq-welcome-card {
-  border: 1px solid rgba(80, 110, 255, .25);
-  background-image: linear-gradient(135deg, #17246f 0%, #3435b6 45%, #294ee5 100%);
+  border: 1px solid transparent;
+  background: var(--nq-brand);
 }
 .nq-dashboard-shell .nq-welcome-card .nq-profile-stat { background: rgba(20, 28, 66, .38) !important; }
 .nq-dashboard-shell .nq-welcome-card .nq-profile-stat p { color: #fff !important; }

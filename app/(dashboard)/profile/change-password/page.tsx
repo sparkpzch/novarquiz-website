@@ -55,7 +55,7 @@ function PasswordField({
           type={visible ? "text" : "password"}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="w-full rounded-[16px] border border-[#DCE6F3] bg-white px-5 py-4 pr-12 text-lg font-medium text-[#192246] outline-none placeholder:text-[#B3BFCE] focus:border-[#70A2F9]"
+          className="w-full rounded-lg border border-[#DCE6F3] bg-white px-5 py-4 pr-12 text-lg font-medium text-[#192246] outline-none placeholder:text-[#B3BFCE] focus:border-[#70A2F9]"
         />
         <button
           type="button"
@@ -142,14 +142,11 @@ export default function ChangePasswordPage() {
       <motion.section
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
-        className="nq-card rounded-[34px] px-6 py-8"
+        className="nq-card rounded-xl px-6 py-8"
       >
         <h1 className="text-[2.2rem] font-bold leading-tight text-[#111827]">
           {t("profile.change_password")}
         </h1>
-        <p className="mt-4 max-w-md text-[1.05rem] font-medium leading-8 text-[#6A7485]">
-          {copy("Enter your current password, then choose a new one.", "กรอกรหัสผ่านปัจจุบัน แล้วตั้งรหัสผ่านใหม่")}
-        </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           <PasswordField
@@ -173,7 +170,7 @@ export default function ChangePasswordPage() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 w-full rounded-[16px] bg-[#3C5FBA] px-5 py-4 text-xl font-semibold text-white shadow-[0_14px_30px_rgba(17,87,145,0.16)] disabled:opacity-60"
+            className="mt-2 w-full rounded-lg bg-[#3C5FBA] px-5 py-4 text-xl font-semibold text-white shadow-[0_14px_30px_rgba(17,87,145,0.16)] disabled:opacity-60"
           >
             {loading ? t("profile.update_password") + "..." : t("profile.change_password")}
           </button>

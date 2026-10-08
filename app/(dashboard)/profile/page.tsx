@@ -16,7 +16,6 @@ import { useToast } from "@/components/ui/Toast";
 import { motion } from "motion/react";
 import Link from "next/link";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
-import WelcomeBackdrop from "@/components/ui/WelcomeBackdrop";
 
 function ChevronRight() {
   return (
@@ -160,6 +159,15 @@ function DeleteAccountIcon() {
   );
 }
 
+function CameraIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
+    </svg>
+  );
+}
+
 function EditIcon() {
   return (
     <svg
@@ -223,7 +231,7 @@ function GeneralRow({
 }) {
   const content = (
     <div className="flex items-center gap-4 py-1">
-      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F3F8FF] shadow-sm">
+      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#F3F8FF] shadow-sm">
         {icon}
       </div>
       <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
@@ -351,21 +359,36 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-[1500px]">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_1fr]">
+      <h1 className="sr-only">{t("nav.profile")}</h1>
+      <div className="space-y-6">
       <motion.section
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
-        className="nq-welcome-card nq-always-dark relative self-start overflow-hidden rounded-[28px] p-5 text-white"
+        className="nq-welcome-card nq-always-dark relative overflow-hidden rounded-xl p-5 text-white sm:p-6"
       >
-        <WelcomeBackdrop />
-        <div className="relative">
-          <div className="flex items-center gap-4">
-            <ProfileAvatar
-              displayName={user?.displayName}
-              photoURL={user?.photoURL}
-              size={72}
-              ringClassName="ring-2 ring-white/35 shadow-lg shadow-[#1E5FB0]/25"
-            />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              aria-label={copy("Change profile photo", "เปลี่ยนรูปโปรไฟล์")}
+              title={copy("Change profile photo", "เปลี่ยนรูปโปรไฟล์")}
+              className="group relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-wait"
+            >
+              <ProfileAvatar
+                displayName={user?.displayName}
+                photoURL={user?.photoURL}
+                size={72}
+                ringClassName="ring-2 ring-white/35"
+              />
+              <span className={`absolute inset-0 items-center justify-center rounded-full bg-black/45 ${uploading ? "flex" : "hidden"}`}>
+                <span className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              </span>
+              <span aria-hidden="true" className="absolute -bottom-0.5 -right-0.5 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-black/70 text-white transition group-hover:bg-black">
+                <CameraIcon />
+              </span>
+            </button>
             <div className="min-w-0 flex-1">
               <p className="nq-on-dark truncate text-2xl font-bold leading-tight">
                 {user?.displayName || copy("Player", "ผู้เล่น")}
@@ -379,7 +402,7 @@ export default function ProfilePage() {
           <button
             type="button"
             onClick={() => { setNewName(user?.displayName || ""); setEditModal(true); }}
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded-[18px] bg-white px-4 py-3 text-base font-semibold text-[#075b95] shadow-lg shadow-[#113D7A]/15 transition hover:scale-[1.02] active:scale-[0.98]"
+            className="flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-base font-semibold text-[#075b95] transition hover:opacity-90 sm:w-auto sm:px-5 sm:py-2.5 sm:text-sm"
           >
             <EditIcon />
             <span>{t("profile.edit_profile")}</span>
@@ -395,12 +418,11 @@ export default function ProfilePage() {
         />
       </motion.section>
 
-        <div className="space-y-6">
         <motion.section
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="nq-card rounded-[30px] p-6"
+          className="nq-card rounded-xl p-6"
       >
         <h2 className="mb-5 text-2xl font-semibold text-[#202A3F]">{t("profile.general")}</h2>
         <div className="space-y-5">
@@ -452,7 +474,7 @@ export default function ProfilePage() {
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="nq-card rounded-[30px] p-6"
+        className="nq-card rounded-xl p-6"
       >
         <div className="space-y-4">
           <button
@@ -460,7 +482,7 @@ export default function ProfilePage() {
             onClick={handleLogout}
             className="flex w-full items-center gap-4 py-1 transition hover:opacity-85"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 shadow-sm">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 shadow-sm">
               <LogoutIcon />
             </div>
             <span className="text-[1.05rem] font-medium text-[#E85C5C]">{t("nav.logout")}</span>
@@ -471,7 +493,7 @@ export default function ProfilePage() {
             onClick={() => setDeleteModal(true)}
             className="flex w-full items-center gap-4 py-1 transition hover:opacity-85"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 shadow-sm">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-50 shadow-sm">
               <DeleteAccountIcon />
             </div>
             <span className="text-[1.05rem] font-medium text-[#D9485F]">
@@ -480,7 +502,6 @@ export default function ProfilePage() {
           </button>
         </div>
       </motion.section>
-        </div>
       </div>
 
       {termsModal && (
@@ -515,7 +536,7 @@ export default function ProfilePage() {
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="w-full rounded-[14px] border border-[#D9E1EE] bg-[#F3F8FF] px-4 py-3 text-[#202A3F] outline-none focus:border-[#3A66C1]"
+              className="w-full rounded-lg border border-[#D9E1EE] bg-[#F3F8FF] px-4 py-3 text-[#202A3F] outline-none focus:border-[#3A66C1]"
               placeholder={t("profile.your_name")}
             />
           </div>
@@ -536,7 +557,7 @@ export default function ProfilePage() {
         title={t("profile.delete_account")}
       >
         <div className="space-y-5">
-          <div className="rounded-[18px] border border-[#D9485F]/14 bg-rose-50/70 px-4 py-3 text-sm text-[#6A2D38]">
+          <div className="rounded-xl border border-[#D9485F]/14 bg-rose-50/70 px-4 py-3 text-sm text-[#6A2D38]">
             <p className="font-semibold text-[#B43C52]">{t("profile.delete_confirm")}</p>
             <p className="mt-2">
               {t("profile.delete_account_description")}

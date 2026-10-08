@@ -68,7 +68,7 @@ export default function PlayLobbyPage({ params }: { params: Promise<{ sessionId:
           animate={{ opacity: 1, y: 0 }}
           className="nq-card w-full max-w-lg rounded-[34px] p-7 text-center md:p-9"
         >
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[28px] bg-gradient-to-br from-[#92BFFF] to-[#0460A9] text-4xl text-white shadow-[0_22px_48px_rgba(17,87,145,0.24)]">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[28px] bg-[var(--nq-primary)] text-4xl text-white shadow-[0_22px_48px_rgba(17,87,145,0.24)]">
             🚀
           </div>
           <p className="mt-6 text-xs font-semibold uppercase tracking-[0.28em] text-[#5D7EA1]">Solo Mode</p>
