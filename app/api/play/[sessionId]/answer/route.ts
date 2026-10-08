@@ -8,6 +8,7 @@ import type { Choice } from '@/lib/types';
 import { createQuestionToken, readQuestionToken, verifyQuestionToken } from '@/lib/security/question-token';
 import { getPlayUser } from '@/lib/play-auth';
 import { shuffleChoices } from '@/lib/play/choice-order';
+import { AnswerBody } from '@/lib/play/answer-request';
 import { getProgress, startProgress, activateProgress, advanceProgress, answerProgress, resetProgress } from '@/lib/db/play-progress';
 
 const StartBody = z.object({
@@ -16,14 +17,6 @@ const StartBody = z.object({
   attempt: z.string().uuid().optional(),
   display_name: z.string().max(100).optional(),
   photo_url: z.string().url().max(500).optional().nullable(),
-});
-const AnswerBody = z.object({
-  attempt: z.string().uuid().optional(),
-  question_id: z.string().uuid(),
-  chosen_label: z.string().min(1).max(10),
-  question_token: z.string().optional(),
-  time_taken_ms: z.number().int().min(0).max(300_000),
-  is_guest: z.boolean().optional(),
 });
 
 // Strip answer-key fields from player-facing question payloads.
@@ -248,7 +241,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
         user_id: user.uid,
         question_id: parsed.data.question_id,
         chosen_label: parsed.data.chosen_label,
-        time_taken_ms: Math.min(300_000, Math.max(parsed.data.time_taken_ms, Date.now() - readQuestionToken(parsed.data.question_token!, sessionId, user.uid, parsed.data.question_id, boundary)!)),
+        time_taken_ms: Math.max(parsed.data.time_taken_ms, Date.now() - readQuestionToken(parsed.data.question_token!, sessionId, user.uid, parsed.data.question_id, boundary)!),
       });
       await answerProgress(sessionId, user.uid, boundary, question.id, { chosen_label: parsed.data.chosen_label, points_earned: answer.points_earned, explanation: answer.explanation });
       return { answer, score: await getUserCumulativeScore(sessionId, user.uid) };
