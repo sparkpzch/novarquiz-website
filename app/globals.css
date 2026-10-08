@@ -775,6 +775,25 @@ html[data-theme="dark"] [class*="shadow-[inset_0_1px_0_rgba(255"] {
   background-image: radial-gradient(circle, var(--nq-auth-dot) 1.5px, transparent 1.5px);
   background-size: 26px 26px;
 }
+.nq-auth-language, .nq-auth-theme {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.16);
+  color: #ffffff;
+}
+.nq-auth-language { padding: 3px; }
+.nq-auth-language button {
+  min-width: 44px;
+  min-height: 38px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.nq-auth-language button[aria-pressed="true"] { background: #ffffff; color: #171717; }
+.nq-auth-theme { display: grid; place-items: center; width: 46px; height: 46px; cursor: pointer; }
+.nq-auth-theme:hover { background: rgba(0, 0, 0, 0.3); }
+.nq-auth-controls button:focus-visible { outline: 2px solid #ffffff; outline-offset: 3px; }
 .nq-auth-welcome {
   padding: 0 24px 42px;
   color: #ffffff;

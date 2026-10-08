@@ -15,6 +15,10 @@
     "settings": "Settings"
   },
   "auth": {
+    "account_access": "Account access",
+    "health_quizzes": "Health quizzes",
+    "remember_me": "Remember me",
+    "or": "Or",
     "sign_in": "Sign in",
     "sign_up": "Sign up",
     "sign_out": "Sign out",

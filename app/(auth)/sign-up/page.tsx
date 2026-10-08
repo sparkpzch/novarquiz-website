@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import TermsModal from '@/components/ui/TermsModal';
-import { useTranslation } from 'react-i18next';
+import { useAuthTranslation } from '@/lib/hooks/useAuthTranslation';
 import '@/lib/i18n';
 import { motion } from 'motion/react';
 import SurveyFields, { emptySurvey } from '@/components/onboarding/SurveyFields';
@@ -17,7 +17,7 @@ import { SurveySchema } from '@/lib/onboarding/survey';
 
 function SignUpForm() {
   const returnPath = useAuthReturnPath();
-  const { t, i18n } = useTranslation();
+  const { t, language } = useAuthTranslation();
   const [survey, setSurvey] = useState(emptySurvey);
   const [step, setStep] = useState<'survey' | 'account'>('survey');
   const [createdUser, setCreatedUser] = useState<User | null>(null);
@@ -36,7 +36,7 @@ function SignUpForm() {
     e.preventDefault();
     setError('');
     if (step === 'survey') {
-      if (!SurveySchema.safeParse(survey).success) { setError(i18n.language.startsWith('th') ? 'กรุณาตรวจสอบข้อมูลแบบสอบถาม' : 'Please check your questionnaire answers.'); return; }
+      if (!SurveySchema.safeParse(survey).success) { setError(language.startsWith('th') ? 'กรุณาตรวจสอบข้อมูลแบบสอบถาม' : 'Please check your questionnaire answers.'); return; }
       setStep('account');
       return;
     }
@@ -53,7 +53,7 @@ function SignUpForm() {
       setError('You must agree to the Terms of Service.');
       return;
     }
-    if (!SurveySchema.safeParse(survey).success) { setError(i18n.language.startsWith('th') ? 'กรุณาตรวจสอบข้อมูลแบบสอบถาม' : 'Please check your questionnaire answers.'); return; }
+    if (!SurveySchema.safeParse(survey).success) { setError(language.startsWith('th') ? 'กรุณาตรวจสอบข้อมูลแบบสอบถาม' : 'Please check your questionnaire answers.'); return; }
     setLoading(true);
     try {
       const account = createdUser ?? (await createUserWithEmailAndPassword(auth, email, password)).user;
@@ -67,7 +67,7 @@ function SignUpForm() {
     } catch (err: unknown) {
       const firebaseError = err as { code?: string };
       if (err instanceof Error && err.message === 'survey-save-failed') {
-        setError(i18n.language.startsWith('th') ? 'สร้างบัญชีแล้ว แต่ยังบันทึกแบบสอบถามไม่ได้ กดลองอีกครั้งเพื่อบันทึกข้อมูล' : 'Your account was created, but the questionnaire could not save. Submit again to retry.');
+        setError(language.startsWith('th') ? 'สร้างบัญชีแล้ว แต่ยังบันทึกแบบสอบถามไม่ได้ กดลองอีกครั้งเพื่อบันทึกข้อมูล' : 'Your account was created, but the questionnaire could not save. Submit again to retry.');
       } else if (firebaseError.code === 'auth/email-already-in-use') {
         setError('This email is already registered.');
       } else {
@@ -100,8 +100,8 @@ function SignUpForm() {
 
 
       <form onSubmit={handleSignUp} className="space-y-4">
-        <p className="text-sm font-semibold">{i18n.language.startsWith('th') ? (step === 'survey' ? 'ขั้นตอน 1 จาก 2 · ข้อมูลของคุณ' : 'ขั้นตอน 2 จาก 2 · สร้างบัญชี') : (step === 'survey' ? 'Step 1 of 2 · Profile information' : 'Step 2 of 2 · Create your account')}</p>
-        {step === 'survey' ? <SurveyFields value={survey} onChange={setSurvey} th={i18n.language.startsWith('th')} /> : <>
+        <p className="text-sm font-semibold">{language.startsWith('th') ? (step === 'survey' ? 'ขั้นตอน 1 จาก 2 · ข้อมูลของคุณ' : 'ขั้นตอน 2 จาก 2 · สร้างบัญชี') : (step === 'survey' ? 'Step 1 of 2 · Profile information' : 'Step 2 of 2 · Create your account')}</p>
+        {step === 'survey' ? <SurveyFields value={survey} onChange={setSurvey} th={language.startsWith('th')} /> : <>
         <Input
           label={t('auth.email')}
           type="email"
@@ -197,9 +197,9 @@ function SignUpForm() {
         )}
 
         <Button type="submit" loading={loading} className="w-full">
-          {i18n.language.startsWith('th') ? (step === 'survey' ? 'ไปต่อ' : 'สร้างบัญชี') : (step === 'survey' ? 'Continue' : 'Sign Up')}
+          {language.startsWith('th') ? (step === 'survey' ? 'ไปต่อ' : 'สร้างบัญชี') : (step === 'survey' ? 'Continue' : 'Sign Up')}
         </Button>
-        {step === 'account' && <button type="button" className="w-full py-2 text-sm underline underline-offset-4" disabled={loading} onClick={() => { setStep('survey'); setError(''); }}>{i18n.language.startsWith('th') ? 'กลับไปแก้ไขข้อมูล' : 'Back to questionnaire'}</button>}
+        {step === 'account' && <button type="button" className="w-full py-2 text-sm underline underline-offset-4" disabled={loading} onClick={() => { setStep('survey'); setError(''); }}>{language.startsWith('th') ? 'กลับไปแก้ไขข้อมูล' : 'Back to questionnaire'}</button>}
       </form>
 
       {/* Desktop: sign-in link */}
