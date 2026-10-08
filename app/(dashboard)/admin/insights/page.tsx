@@ -215,7 +215,6 @@ export default function InsightsAdminPage() {
 
   return <div className="insights-desk nq-admin-panel">
     <header className="insights-header">
-      <h1>{text("Insight Summaries", "สรุปผลแบบทดสอบ")}</h1>
       <button className="insights-button secondary" disabled={busy} onClick={() => { selectTab("templates"); setCreating(true); }}><Icon name="plus" />{text("Write a summary", "เขียนสรุปเอง")}</button>
     </header>
 
