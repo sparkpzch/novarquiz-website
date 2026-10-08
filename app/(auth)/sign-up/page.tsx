@@ -202,14 +202,6 @@ function SignUpForm() {
         {step === 'account' && <button type="button" className="w-full py-2 text-sm underline underline-offset-4" disabled={loading} onClick={() => { setStep('survey'); setError(''); }}>{language.startsWith('th') ? 'กลับไปแก้ไขข้อมูล' : 'Back to questionnaire'}</button>}
       </form>
 
-      {/* Desktop: sign-in link */}
-      <p className="hidden md:block text-center text-sm text-gray-400 mt-6">
-        {t('auth.have_account')}{' '}
-        <a href={authHref('/sign-in', returnPath)} className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
-          {t('auth.sign_in')}
-        </a>
-      </p>
-
       {showTerms && (
         <TermsModal
           initialTab={showTermsTab}
