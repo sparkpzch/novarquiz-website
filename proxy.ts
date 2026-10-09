@@ -16,7 +16,7 @@ function buildCsp(nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://lh3.googleusercontent.com https://storage.googleapis.com https://firebasestorage.googleapis.com https://*.firebasestorage.app",
     "media-src 'self' blob: https://storage.googleapis.com https://firebasestorage.googleapis.com",
-    "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://*.upstash.io https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.firebaseapp.com",
+    "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://*.upstash.io https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.firebaseapp.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://www.google.com",
     "font-src 'self'",
     "frame-src 'self' https://*.firebaseapp.com https://*.firebaseauth.com",
     "frame-ancestors 'self'",

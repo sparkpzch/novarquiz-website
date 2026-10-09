@@ -78,7 +78,7 @@ function QuestionVisual({ question, totalQuestions, preparedVideo, th, children 
   const mediaError = failedMediaQuestionId === question.id;
   const mediaQuestion = question as QuestionWithPoster;
   const copy = (en: string, thai: string) => th ? thai : en;
-  const isScenario = question.node_type === 'situation' || (question.choices.length === 0 && !!question.media_url);
+  const isScenario = question.node_type === 'situation' || (question.node_type !== 'end' && question.choices.length === 0 && !!question.media_url);
   const isFinal = question.node_type === 'end';
   const mediaExplanation = question.media_explanation || (isScenario ? question.question_text : null);
   return <div
