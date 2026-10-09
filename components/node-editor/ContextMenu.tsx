@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { NodeIcon, type NodeIconName } from './NodeIcon';
 
 interface ContextMenuProps {
   x: number;
   y: number;
   mode: 'canvas' | 'node';
   isEntryPoint?: boolean;
+  /** End nodes can never be the start node. */
+  canBeStart?: boolean;
   onAddNormal: () => void;
   onAddSituation: () => void;
   onAddEnd: () => void;
@@ -17,40 +20,22 @@ interface ContextMenuProps {
 }
 
 const Divider = () => (
-  <div style={{ height: 1, background: 'rgba(112,162,249,0.16)', margin: '4px 0' }} />
+  <div style={{ height: 1, background: 'var(--nq-line)', margin: '4px 2px' }} />
 );
 
 const MenuItem = ({
-  icon, label, danger, onClick,
-}: { icon: string; label: string; danger?: boolean; onClick: () => void }) => (
-  <button
-    onClick={onClick}
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
-      width: '100%',
-      padding: '7px 12px',
-      background: 'none',
-      border: 'none',
-      color: danger ? '#c2415b' : '#223a63',
-      fontSize: 13,
-      fontWeight: 600,
-      cursor: 'pointer',
-      borderRadius: 6,
-      transition: 'background 0.1s',
-      textAlign: 'left',
-    }}
-    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = danger ? 'rgba(244,63,94,0.1)' : 'rgba(112,162,249,0.12)'; }}
-    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
-  >
-    <span style={{ fontSize: 14, width: 18, textAlign: 'center' }}>{icon}</span>
+  icon, label, danger, color, onClick,
+}: { icon: NodeIconName; label: string; danger?: boolean; color?: string; onClick: () => void }) => (
+  <button type="button" role="menuitem" onClick={onClick} className="nq-ne-menu-item" data-danger={danger ? 'true' : undefined}>
+    <span style={{ display: 'flex', color: danger ? 'inherit' : color ?? 'var(--nq-muted)' }}>
+      <NodeIcon name={icon} size={15} />
+    </span>
     {label}
   </button>
 );
 
 export function ContextMenu({
-  x, y, mode, isEntryPoint,
+  x, y, mode, isEntryPoint, canBeStart = true,
   onAddNormal, onAddSituation, onAddEnd, onEdit, onSetEntry, onDelete, onClose,
 }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -71,39 +56,41 @@ export function ContextMenu({
   return (
     <div
       ref={ref}
+      role="menu"
+      className="nq-node-editor"
       style={{
         position: 'fixed',
-        left: x,
-        top: y,
+        // Keep the menu on screen when opened near the right/bottom edge.
+        left: Math.min(x, (typeof window === 'undefined' ? x : window.innerWidth) - 200),
+        top: Math.min(y, (typeof window === 'undefined' ? y : window.innerHeight) - 170),
         zIndex: 1000,
-        background: '#f6faff',
-        border: '1px solid rgba(112,162,249,0.2)',
+        background: 'var(--nq-panel)',
+        border: '1px solid var(--nq-line)',
         borderRadius: 10,
-        boxShadow: '0 16px 32px rgba(82,114,164,0.2)',
-        backdropFilter: 'blur(18px)',
-        padding: '6px',
-        minWidth: 180,
+        boxShadow: '0 6px 16px rgba(22,50,79,0.14)',
+        padding: 4,
+        minWidth: 170,
         userSelect: 'none',
       }}
       onContextMenu={e => e.preventDefault()}
     >
       {mode === 'canvas' ? (
         <>
-          <div style={{ padding: '4px 12px 6px', fontSize: 10, color: '#5f7699', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800 }}>
-            Add Node
+          <div className="nq-ne-eyebrow" style={{ padding: '4px 10px' }}>
+            Add here
           </div>
-          <MenuItem icon="❓" label="Question Node" onClick={() => { onAddNormal(); onClose(); }} />
-          <MenuItem icon="🎬" label="Situation Node" onClick={() => { onAddSituation(); onClose(); }} />
-          <MenuItem icon="🏁" label="End Node" onClick={() => { onAddEnd(); onClose(); }} />
+          <MenuItem icon="question" color="var(--ne-question)" label="Question" onClick={() => { onAddNormal(); onClose(); }} />
+          <MenuItem icon="situation" color="var(--ne-situation)" label="Situation" onClick={() => { onAddSituation(); onClose(); }} />
+          <MenuItem icon="end" color="var(--ne-end)" label="End" onClick={() => { onAddEnd(); onClose(); }} />
         </>
       ) : (
         <>
-          <MenuItem icon="✏️" label="Edit Node" onClick={() => { onEdit(); onClose(); }} />
-          {!isEntryPoint && (
-            <MenuItem icon="🚩" label="Set as Start" onClick={() => { onSetEntry(); onClose(); }} />
+          <MenuItem icon="edit" label="Edit" onClick={() => { onEdit(); onClose(); }} />
+          {!isEntryPoint && canBeStart && (
+            <MenuItem icon="start" color="var(--ne-start)" label="Set as start" onClick={() => { onSetEntry(); onClose(); }} />
           )}
           <Divider />
-          <MenuItem icon="🗑" label="Delete Node" danger onClick={() => { onDelete(); onClose(); }} />
+          <MenuItem icon="trash" label="Delete" danger onClick={() => { onDelete(); onClose(); }} />
         </>
       )}
     </div>

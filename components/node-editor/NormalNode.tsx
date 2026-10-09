@@ -3,6 +3,7 @@
 import { memo } from 'react';
 import { Handle, Position, useNodeConnections, type NodeProps } from '@xyflow/react';
 import { DEFAULT_CHOICE_METADATA } from '@/lib/analytics/quiz-metadata';
+import { NodeIcon } from './NodeIcon';
 
 export type NormalNodeData = {
   node_name: string | null;
@@ -26,15 +27,12 @@ export type NormalNodeData = {
 };
 
 const CHOICE_CFG = {
-  A: { color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
-  B: { color: '#3b82f6', bg: 'rgba(59,130,246,0.12)' },
-  C: { color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
-  D: { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+  A: { color: '#ef4444', bg: 'rgba(239,68,68,0.07)' },
+  B: { color: '#3b82f6', bg: 'rgba(59,130,246,0.07)' },
+  C: { color: '#22c55e', bg: 'rgba(34,197,94,0.07)' },
+  D: { color: '#f59e0b', bg: 'rgba(245,158,11,0.07)' },
 } as const;
 
-const QUESTION_NODE_ACCENT = '#70A2F9';
-const QUESTION_NODE_ACCENT_SOFT = '#92BFFF';
-const QUESTION_NODE_HEADER_BG = 'rgba(112,162,249,0.2)';
 const H_HEADER = 36;
 const H_TEXT = 52;
 const H_MEDIA_EXPLANATION = 42;
@@ -47,12 +45,12 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
     : ['A', 'B', 'C', 'D'].map(l => ({ label: l, choice_text: '', score_impact: 0, explanation: '', ...DEFAULT_CHOICE_METADATA }));
 
   // Track which choice handles already have outgoing connections — used to hide the
-  // white "connect all" handle once every choice is wired up.
+  // "connect all" handle once every choice is wired up.
   const sourceConnections = useNodeConnections({ handleType: 'source' });
   const connectedChoices = new Set(
     sourceConnections.map(c => c.sourceHandle).filter((h): h is string => !!h)
   );
-  const allChoicesConnected = ['A', 'B', 'C', 'D'].every(l => connectedChoices.has(l));
+  const allChoicesConnected = choices.every(c => connectedChoices.has(c.label));
 
   const mediaExplanation = d.media_explanation?.trim() ?? '';
   const mediaExplanationHeight = mediaExplanation ? H_MEDIA_EXPLANATION : 0;
@@ -63,23 +61,22 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
     width: 10,
     height: 10,
     background: color,
-    border: `2px solid ${color}88`,
-    boxShadow: selected ? `0 0 0 3px ${color}30, 0 0 10px ${color}60` : 'none',
-    transition: 'box-shadow 0.15s',
+    border: '2px solid var(--nq-panel)',
+    boxShadow: `0 0 0 1px ${color}`,
   });
 
   return (
     <div
       style={{
         width: 248,
-        borderRadius: 12,
-        border: `2px solid ${selected ? QUESTION_NODE_ACCENT : 'rgba(112,162,249,0.24)'}`,
-        background: 'rgba(251,253,255,0.96)',
+        borderRadius: 10,
+        border: `1.5px solid ${selected ? 'var(--ne-question)' : 'var(--nq-line)'}`,
+        background: 'var(--nq-panel)',
         boxShadow: selected
-            ? '0 0 0 3px rgba(112,162,249,0.24), 0 8px 32px rgba(0,0,0,0.6)'
-            : '0 16px 32px rgba(82,114,164,0.18)',
+          ? '0 0 0 3px color-mix(in srgb, var(--ne-question) 20%, transparent), var(--ne-node-shadow)'
+          : 'var(--ne-node-shadow)',
         position: 'relative',
-        overflow: 'hidden',
+        transition: 'border-color 0.15s, box-shadow 0.15s',
       }}>
 
       {/* Target handle (incoming) */}
@@ -91,18 +88,17 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
           top: H_HEADER / 2,
           width: 12,
           height: 12,
-          background: QUESTION_NODE_ACCENT,
-          border: `2px solid ${QUESTION_NODE_ACCENT_SOFT}`,
-          boxShadow: selected ? '0 0 0 3px rgba(112,162,249,0.3), 0 0 10px rgba(112,162,249,0.5)' : 'none',
-          transition: 'box-shadow 0.15s',
+          background: 'var(--ne-question)',
+          border: '2px solid var(--nq-panel)',
+          boxShadow: '0 0 0 1px var(--ne-question)',
         }}
       />
 
       {/*
-        "Connect All" handle — white dot positioned just above choice A.
-        Drag from this to connect ALL 4 choices to the target node at once.
-        Styled like Unreal Engine's exec pin. Hidden when every choice is
-        already connected, since the action would be a no-op.
+        "Connect All" handle — positioned just above choice A.
+        Drag from this to connect ALL choices to the target node at once.
+        Hidden when every choice is already connected, since the action would
+        be a no-op.
       */}
       {!allChoicesConnected && (
         <Handle
@@ -114,12 +110,8 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
             top: choiceAreaTop - 9,
             width: 13,
             height: 13,
-            background: '#ffffff',
-            border: '2px solid rgba(255,255,255,0.55)',
-            boxShadow: selected
-              ? '0 0 0 3px rgba(255,255,255,0.2), 0 0 12px rgba(255,255,255,0.6)'
-              : '0 0 5px rgba(255,255,255,0.25)',
-            transition: 'box-shadow 0.15s',
+            background: 'var(--nq-panel)',
+            border: '2.5px solid var(--ne-question)',
             zIndex: 10,
           }}
         />
@@ -142,49 +134,40 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
       {/* Header */}
       <div style={{
         height: H_HEADER,
-        background: QUESTION_NODE_HEADER_BG,
-        borderRadius: '10px 10px 0 0',
-        borderBottom: '1px solid rgba(146,191,255,0.2)',
+        boxSizing: 'border-box',
+        background: 'color-mix(in srgb, var(--ne-question) 10%, var(--nq-panel))',
+        borderRadius: '8px 8px 0 0',
+        borderBottom: '1px solid var(--nq-line)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
         padding: '0 10px',
         gap: 6,
+        color: 'var(--ne-question)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 11, flexShrink: 0 }}>❓</span>
-          <span style={{
-            color: '#1e40af', fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {d.node_name || 'Question'}
+        <NodeIcon name="question" size={14} />
+        <span style={{
+          flex: 1, minWidth: 0,
+          color: 'var(--nq-ink)', fontWeight: 700, fontSize: 12,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {d.node_name || 'Question'}
+        </span>
+        {d.media_url && (
+          <span title={d.media_type === 'video' ? 'Has video' : 'Has image'} style={{ color: 'var(--nq-muted)', display: 'flex' }}>
+            <NodeIcon name={d.media_type === 'video' ? 'situation' : 'media'} size={13} />
           </span>
-          {d.media_url && (
-            <span style={{ fontSize: 9, flexShrink: 0 }}>{d.media_type === 'video' ? '🎬' : '🖼'}</span>
-          )}
-          {d.is_entry_point && (
-            <span style={{
-              background: 'rgba(16,185,129,0.18)',
-              color: '#34d399',
-              border: '1px solid rgba(52,211,153,0.35)',
-              borderRadius: 4,
-              padding: '1px 5px',
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: '0.05em',
-              flexShrink: 0,
-            }}>START</span>
-          )}
-        </div>
+        )}
+        {d.is_entry_point && <StartBadge />}
       </div>
 
       {mediaExplanation && (
         <div style={{
           height: H_MEDIA_EXPLANATION,
+          boxSizing: 'border-box',
           padding: '6px 10px',
-          background: 'rgba(240,247,255,0.96)',
-          borderBottom: '1px solid rgba(112,162,249,0.12)',
-          color: '#526b8e',
+          background: 'var(--nq-inset)',
+          borderBottom: '1px solid var(--nq-line)',
+          color: 'var(--nq-muted)',
           fontSize: 10,
           lineHeight: '1.45',
           overflow: 'hidden',
@@ -192,7 +175,7 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical' as const,
         }}>
-          <span style={{ color: '#6d87aa', fontSize: 8, fontWeight: 700, letterSpacing: '0.06em' }}>MEDIA EXPLANATION · </span>
+          <span style={{ fontWeight: 700 }}>Media: </span>
           {mediaExplanation}
         </div>
       )}
@@ -200,64 +183,76 @@ export const NormalNode = memo(({ data, selected }: NodeProps) => {
       {/* Question text */}
       <div style={{
         height: H_TEXT,
+        boxSizing: 'border-box',
         padding: '8px 10px',
-        background: 'rgba(247,251,255,0.96)',
-        borderBottom: '1px solid rgba(112,162,249,0.12)',
-        color: d.question_text ? '#223a63' : '#8aa1c3',
+        borderBottom: '1px solid var(--nq-line)',
+        color: d.question_text ? 'var(--nq-ink)' : 'var(--nq-muted)',
         fontSize: 12,
+        fontWeight: 500,
         lineHeight: '1.5',
         overflow: 'hidden',
         display: '-webkit-box',
         WebkitLineClamp: 2,
         WebkitBoxOrient: 'vertical' as const,
       }}>
-        {d.question_text || 'Double-click to edit…'}
+        {d.question_text || 'No question yet'}
       </div>
 
       {/* Choice rows */}
       {choices.map((c, idx) => {
         const cfg = CHOICE_CFG[c.label as keyof typeof CHOICE_CFG] ?? CHOICE_CFG.A;
+        const s = c.score_impact ?? 0;
         return (
           <div key={c.label} style={{
             height: H_CHOICE,
+            boxSizing: 'border-box',
             display: 'flex',
             alignItems: 'center',
-            padding: '0 10px',
-            gap: 6,
+            padding: '0 12px 0 10px',
+            gap: 7,
             background: cfg.bg,
-            borderBottom: idx < choices.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
-            borderRadius: idx === choices.length - 1 ? '0 0 10px 10px' : 0,
+            borderBottom: idx < choices.length - 1 ? '1px solid var(--nq-line)' : 'none',
+            borderRadius: idx === choices.length - 1 ? '0 0 8px 8px' : 0,
           }}>
             <span style={{
-              width: 16, height: 16,
-              borderRadius: '50%',
+              width: 17, height: 17,
+              borderRadius: 6,
               background: cfg.color,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: '#fff', fontWeight: 800, fontSize: 9, flexShrink: 0,
             }}>{c.label}</span>
             <span style={{
               flex: 1,
-              color: c.choice_text ? '#35527e' : '#8aa1c3',
+              color: c.choice_text ? 'var(--nq-ink)' : 'var(--nq-muted)',
               fontSize: 11,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {c.choice_text || `Choice ${c.label}`}
             </span>
-            {(() => {
-              const s = c.score_impact ?? 0; return s !== 0 && (
-                <span style={{
-                  color: s > 0 ? '#34d399' : '#fb7185',
-                  fontSize: 10, fontWeight: 700,
-                }}>
-                  {s > 0 ? `+${s}` : s}
-                </span>
-              );
-            })()}
+            {s !== 0 && (
+              <span style={{ color: s > 0 ? 'var(--ne-start)' : 'var(--ne-end)', fontSize: 10, fontWeight: 800 }}>
+                {s > 0 ? `+${s}` : s}
+              </span>
+            )}
           </div>
         );
       })}
     </div>
   );
 });
+
+export function StartBadge() {
+  return (
+    <span style={{
+      background: 'color-mix(in srgb, var(--ne-start) 14%, transparent)',
+      color: 'var(--ne-start)',
+      borderRadius: 4,
+      padding: '1px 6px',
+      fontSize: 10,
+      fontWeight: 700,
+      flexShrink: 0,
+    }}>Start</span>
+  );
+}
 
 NormalNode.displayName = 'NormalNode';

@@ -2,6 +2,8 @@
 
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { NodeIcon } from './NodeIcon';
+import { StartBadge } from './NormalNode';
 
 export type SituationNodeData = {
   node_name: string | null;
@@ -14,23 +16,27 @@ export type SituationNodeData = {
 };
 
 const H_HEADER = 36;
+const H_BODY = 52;
+const H_FOOTER = 28;
 
 export const SituationNode = memo(({ data, selected }: NodeProps) => {
   const d = data as SituationNodeData;
   const description = d.media_explanation ?? d.question_text;
 
-  const totalH = H_HEADER + 52 + 28;
+  const totalH = H_HEADER + H_BODY + H_FOOTER;
 
   return (
     <div
       style={{
         width: 220,
-        borderRadius: 12,
-        border: `2px solid ${selected ? '#8b5cf6' : 'rgba(139,92,246,0.3)'}`,
+        borderRadius: 10,
+        border: `1.5px solid ${selected ? 'var(--ne-situation)' : 'var(--nq-line)'}`,
+        background: 'var(--nq-panel)',
         boxShadow: selected
-            ? '0 0 0 3px rgba(139,92,246,0.25), 0 8px 32px rgba(0,0,0,0.6)'
-            : '0 4px 24px rgba(0,0,0,0.5)',
+          ? '0 0 0 3px color-mix(in srgb, var(--ne-situation) 20%, transparent), var(--ne-node-shadow)'
+          : 'var(--ne-node-shadow)',
         position: 'relative',
+        transition: 'border-color 0.15s, box-shadow 0.15s',
       }}>
 
       {/* Target handle */}
@@ -38,7 +44,7 @@ export const SituationNode = memo(({ data, selected }: NodeProps) => {
         type="target"
         position={Position.Left}
         id="input"
-        style={{ top: H_HEADER / 2, width: 12, height: 12, background: '#8b5cf6', border: '2px solid #a78bfa' }}
+        style={{ top: H_HEADER / 2, width: 12, height: 12, background: 'var(--ne-situation)', border: '2px solid var(--nq-panel)', boxShadow: '0 0 0 1px var(--ne-situation)' }}
       />
 
       {/* Single source handle (continue) */}
@@ -46,78 +52,67 @@ export const SituationNode = memo(({ data, selected }: NodeProps) => {
         type="source"
         position={Position.Right}
         id="continue"
-        style={{ top: totalH / 2, width: 12, height: 12, background: '#8b5cf6', border: '2px solid #a78bfa66' }}
+        style={{ top: totalH / 2, width: 12, height: 12, background: 'var(--ne-situation)', border: '2px solid var(--nq-panel)', boxShadow: '0 0 0 1px var(--ne-situation)' }}
       />
 
       {/* Header */}
       <div style={{
         height: H_HEADER,
-        background: 'rgba(139,92,246,0.2)',
-        borderRadius: '10px 10px 0 0',
-        borderBottom: '1px solid rgba(139,92,246,0.2)',
+        background: 'color-mix(in srgb, var(--ne-situation) 10%, var(--nq-panel))',
+        borderRadius: '8px 8px 0 0',
+        borderBottom: '1px solid var(--nq-line)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        gap: 6,
         padding: '0 10px',
+        color: 'var(--ne-situation)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 11, flexShrink: 0 }}>🎬</span>
-          <span style={{
-            color: '#5b21b6', fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {d.node_name || 'Situation'}
+        <NodeIcon name="situation" size={14} />
+        <span style={{
+          flex: 1, minWidth: 0,
+          color: 'var(--nq-ink)', fontWeight: 700, fontSize: 12,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {d.node_name || 'Situation'}
+        </span>
+        {d.media_url && (
+          <span title={d.media_type === 'video' ? 'Has video' : 'Has image'} style={{ color: 'var(--nq-muted)', display: 'flex' }}>
+            <NodeIcon name={d.media_type === 'video' ? 'situation' : 'media'} size={13} />
           </span>
-          {d.media_url && (
-            <span style={{ fontSize: 9, flexShrink: 0 }}>{d.media_type === 'video' ? '🎬' : '🖼'}</span>
-          )}
-          {d.is_entry_point && (
-            <span style={{
-              background: 'rgba(16,185,129,0.18)',
-              color: '#34d399',
-              border: '1px solid rgba(52,211,153,0.35)',
-              borderRadius: 4,
-              padding: '1px 5px',
-              fontSize: 9,
-              fontWeight: 700,
-              flexShrink: 0,
-            }}>START</span>
-          )}
-        </div>
+        )}
+        {d.is_entry_point && <StartBadge />}
       </div>
 
       {/* Description */}
       <div style={{
-        height: 52,
+        height: H_BODY,
         padding: '8px 10px',
-        background: '#0d0d20',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        color: description ? '#e2e8f0' : '#4b5563',
+        borderBottom: '1px solid var(--nq-line)',
+        color: description ? 'var(--nq-ink)' : 'var(--nq-muted)',
         fontSize: 12,
+        fontWeight: 500,
         lineHeight: '1.5',
         overflow: 'hidden',
         display: '-webkit-box',
         WebkitLineClamp: 2,
         WebkitBoxOrient: 'vertical' as const,
       }}>
-        {description || 'Double-click to edit…'}
+        {description || 'No description yet'}
       </div>
 
       {/* Display-only badge */}
       <div style={{
-        height: 28,
-        background: 'rgba(139,92,246,0.08)',
-        borderRadius: '0 0 10px 10px',
+        height: H_FOOTER,
+        background: 'color-mix(in srgb, var(--ne-situation) 6%, var(--nq-panel))',
+        borderRadius: '0 0 8px 8px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 4,
         fontSize: 10,
-        color: '#7c3aed',
-        borderTop: '1px solid rgba(139,92,246,0.15)',
+        fontWeight: 600,
+        color: 'var(--ne-situation)',
       }}>
-        <span>👁</span>
-        <span style={{ color: '#a78bfa' }}>Display only · no choices</span>
+        Shows media, then continues
       </div>
     </div>
   );

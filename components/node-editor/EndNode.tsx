@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { NodeIcon } from './NodeIcon';
 
 // End nodes terminate a branch. They render an optional final message/media
 // to the player, then finish the session. Target handle only — no outgoing
@@ -21,18 +22,18 @@ const H_HEADER = 36;
 export const EndNode = memo(({ data, selected }: NodeProps) => {
   const d = data as EndNodeData;
 
-  const totalH = H_HEADER + 52 + 28;
-
   return (
     <div
       style={{
         width: 220,
-        borderRadius: 12,
-        border: `2px solid ${selected ? '#f43f5e' : 'rgba(244,63,94,0.3)'}`,
+        borderRadius: 10,
+        border: `1.5px solid ${selected ? 'var(--ne-end)' : 'var(--nq-line)'}`,
+        background: 'var(--nq-panel)',
         boxShadow: selected
-            ? '0 0 0 3px rgba(244,63,94,0.25), 0 8px 32px rgba(0,0,0,0.6)'
-            : '0 4px 24px rgba(0,0,0,0.5)',
+          ? '0 0 0 3px color-mix(in srgb, var(--ne-end) 20%, transparent), var(--ne-node-shadow)'
+          : 'var(--ne-node-shadow)',
         position: 'relative',
+        transition: 'border-color 0.15s, box-shadow 0.15s',
       }}>
 
       {/* Target handle — terminal node, no source */}
@@ -40,41 +41,43 @@ export const EndNode = memo(({ data, selected }: NodeProps) => {
         type="target"
         position={Position.Left}
         id="input"
-        style={{ top: H_HEADER / 2, width: 12, height: 12, background: '#f43f5e', border: '2px solid #fb7185' }}
+        style={{ top: H_HEADER / 2, width: 12, height: 12, background: 'var(--ne-end)', border: '2px solid var(--nq-panel)', boxShadow: '0 0 0 1px var(--ne-end)' }}
       />
 
       {/* Header */}
       <div style={{
         height: H_HEADER,
-        background: 'rgba(244,63,94,0.2)',
-        borderRadius: '10px 10px 0 0',
-        borderBottom: '1px solid rgba(244,63,94,0.2)',
+        background: 'color-mix(in srgb, var(--ne-end) 10%, var(--nq-panel))',
+        borderRadius: '8px 8px 0 0',
+        borderBottom: '1px solid var(--nq-line)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        gap: 6,
         padding: '0 10px',
+        color: 'var(--ne-end)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 11, flexShrink: 0 }}>🏁</span>
-          <span style={{
-            color: '#9f1239', fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {d.node_name || 'End'}
+        <NodeIcon name="end" size={14} />
+        <span style={{
+          flex: 1, minWidth: 0,
+          color: 'var(--nq-ink)', fontWeight: 700, fontSize: 12,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {d.node_name || 'End'}
+        </span>
+        {d.media_url && (
+          <span title={d.media_type === 'video' ? 'Has video' : 'Has image'} style={{ color: 'var(--nq-muted)', display: 'flex' }}>
+            <NodeIcon name={d.media_type === 'video' ? 'situation' : 'media'} size={13} />
           </span>
-          {d.media_url && (
-            <span style={{ fontSize: 9, flexShrink: 0 }}>{d.media_type === 'video' ? '🎬' : '🖼'}</span>
-          )}
-        </div>
+        )}
       </div>
 
       {d.media_explanation?.trim() && (
         <div style={{
           minHeight: 42,
           padding: '6px 10px',
-          background: 'rgba(255,245,247,0.96)',
-          borderBottom: '1px solid rgba(244,63,94,0.12)',
-          color: '#7c4755',
+          background: 'var(--nq-inset)',
+          borderBottom: '1px solid var(--nq-line)',
+          color: 'var(--nq-muted)',
           fontSize: 10,
           lineHeight: '1.45',
           overflow: 'hidden',
@@ -82,7 +85,7 @@ export const EndNode = memo(({ data, selected }: NodeProps) => {
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical' as const,
         }}>
-          <span style={{ color: '#9b6472', fontSize: 8, fontWeight: 700, letterSpacing: '0.06em' }}>MEDIA EXPLANATION · </span>
+          <span style={{ fontWeight: 700 }}>Media: </span>
           {d.media_explanation}
         </div>
       )}
@@ -91,38 +94,33 @@ export const EndNode = memo(({ data, selected }: NodeProps) => {
       <div style={{
         height: 52,
         padding: '8px 10px',
-        background: '#0d0d20',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        color: d.question_text ? '#e2e8f0' : '#4b5563',
+        borderBottom: '1px solid var(--nq-line)',
+        color: d.question_text ? 'var(--nq-ink)' : 'var(--nq-muted)',
         fontSize: 12,
+        fontWeight: 500,
         lineHeight: '1.5',
         overflow: 'hidden',
         display: '-webkit-box',
         WebkitLineClamp: 2,
         WebkitBoxOrient: 'vertical' as const,
       }}>
-        {d.question_text || 'Final message (optional)…'}
+        {d.question_text || 'No final message'}
       </div>
 
       {/* Terminal badge */}
       <div style={{
         height: 28,
-        background: 'rgba(244,63,94,0.08)',
-        borderRadius: '0 0 10px 10px',
+        background: 'color-mix(in srgb, var(--ne-end) 6%, var(--nq-panel))',
+        borderRadius: '0 0 8px 8px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 4,
         fontSize: 10,
-        color: '#f43f5e',
-        borderTop: '1px solid rgba(244,63,94,0.15)',
+        fontWeight: 600,
+        color: 'var(--ne-end)',
       }}>
-        <span>🏁</span>
-        <span style={{ color: '#fb7185' }}>Session ends here</span>
+        Session ends here
       </div>
-
-      {/* Invisible spacer so total height calc matches situation card */}
-      <div style={{ height: 0, marginTop: totalH - totalH }} />
     </div>
   );
 });

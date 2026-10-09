@@ -5,21 +5,20 @@
  *
  * Props:
  *   sessionId  — real session UUID on the edit page, or 'draft' on the create page.
- *                Used only by EditNodeModal for Firebase Storage paths.
- *   onSave     — called with `publish: boolean` when the page-level Save/Publish
- *                buttons are clicked. The page is responsible for the API calls.
+ *   quizId     — quiz UUID, used as the upload folder.
+ * Saving lives in the page header (EditorHeader); this component only edits
+ * the in-memory nodes/edges.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Background,
   BackgroundVariant,
   Controls,
   MiniMap,
-  addEdge,
+  SelectionMode,
   useReactFlow,
-  MarkerType,
   type Connection,
   type Node,
   type NodeTypes,
@@ -29,7 +28,6 @@ import {
 import type { Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import Button from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import {
   DEFAULT_CHOICE_METADATA,
@@ -39,6 +37,24 @@ import { SituationNode, type SituationNodeData } from './SituationNode';
 import { EndNode, type EndNodeData } from './EndNode';
 import { ContextMenu } from './ContextMenu';
 import { LeftInspector, type InspectorNode } from './LeftInspector';
+import { NodeIcon } from './NodeIcon';
+import { MAX_ZOOM, MIN_ZOOM, useCanvasGestures } from './useCanvasGestures';
+
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+const MOD = IS_MAC ? '⌘' : 'Ctrl';
+const SHORTCUTS: Array<[string, string]> = [
+  ['Pan', 'Two-finger scroll · Space + drag'],
+  ['Zoom', `Pinch · ${MOD} + scroll`],
+  ['Select several', `Drag on empty canvas · ${MOD} + click`],
+  ['Zoom in / out', `${MOD} + / ${MOD} −`],
+  ['Fit all nodes', 'Shift + 1'],
+  ['Zoom to 100%', `Shift + 0 · ${MOD} 0`],
+  ['Delete selected', 'Delete / Backspace'],
+  ['Add node', 'Right-click the canvas'],
+];
+import { CHOICE_COLORS, setHandleTarget } from '@/lib/quiz-editor/graph';
+
+export { CHOICE_COLORS };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,9 +77,6 @@ export interface EditorCanvasProps {
   setEdges: React.Dispatch<React.SetStateAction<AppEdge[]>>;
   onNodesChange: OnNodesChange<AppNode>;
   onEdgesChange: OnEdgesChange<AppEdge>;
-  /** Called when the Save button is clicked */
-  onSave: () => void;
-  saving: boolean;
   /** Real session UUID (edit page) or 'draft' (create page) */
   sessionId?: string;
   /** Quiz UUID from DB — used as Firebase Storage folder to avoid slug encoding issues */
@@ -71,15 +84,6 @@ export interface EditorCanvasProps {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-export const CHOICE_COLORS: Record<string, string> = {
-  A: '#ef4444', B: '#3b82f6', C: '#22c55e', D: '#f59e0b', continue: '#8b5cf6',
-};
-
-const QUESTION_NODE_ACCENT = '#70A2F9';
-const EDITOR_CANVAS_BG = '#eef4ff';
-const EDITOR_PANEL_BG = 'rgba(236,244,255,0.86)';
-const EDITOR_PANEL_BORDER = 'rgba(112,162,249,0.22)';
 
 const nodeTypes: NodeTypes = {
   normalNode: NormalNode,
@@ -126,38 +130,36 @@ export const defaultEndData = (): EndNodeData => ({
   is_entry_point: false,
 });
 
-// ─── Toolbar button style helper ─────────────────────────────────────────────
-
-export const toolbarBtnStyle = (color: string): React.CSSProperties => ({
-  display: 'flex', alignItems: 'center', gap: 6,
-  padding: '6px 12px',
-  background: `${color}22`, border: `1px solid ${color}44`,
-  borderRadius: 8, color: '#223a63', fontSize: 12, fontWeight: 700,
-  cursor: 'pointer', transition: 'background 0.15s',
-});
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function EditorCanvas({
   nodes, edges, setNodes, setEdges,
   onNodesChange, onEdgesChange,
-  onSave, saving,
   sessionId = 'draft',
   quizId,
 }: EditorCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
   const { showToast } = useToast();
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
-  const [inspectedNode, setInspectedNode] = useState<AppNode | null>(null);
+  // Store only the id and read the node from `nodes`, so the inspector always
+  // shows live data and clears itself when the node is deleted (Del key).
+  const [inspectedId, setInspectedId] = useState<string | null>(null);
+  const inspectedNode = useMemo(() => nodes.find(n => n.id === inspectedId) ?? null, [nodes, inspectedId]);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  useCanvasGestures(canvasRef);
   const [uploadStatus, setUploadStatus] = useState<{ nodeId: string; uploading: boolean; progress: number } | null>(null);
-  const wrapperRef = useRef<HTMLDivElement>(null);
 
   // ── Inspector helpers ──────────────────────────────────────────────────────
 
-  const questionOptions = nodes.map((n, idx) => ({
-    id: n.id,
-    label: `#${idx + 1} ${(n.data as AppNodeData).question_text?.slice(0, 40) || `(${n.type})`}`,
-  }));
+  const questionOptions = nodes.map((n, idx) => {
+    const d = n.data as AppNodeData;
+    const kind = n.type === 'endNode' ? 'End' : n.type === 'situationNode' ? 'Situation' : 'Question';
+    return {
+      id: n.id,
+      label: `#${idx + 1} ${kind} · ${d.node_name || d.question_text?.slice(0, 40) || 'Untitled'}`,
+    };
+  });
 
   const inspectorConnections = (node: AppNode | null): Record<string, string> => {
     if (!node) return {};
@@ -169,15 +171,19 @@ export function EditorCanvas({
   };
 
   const applyInspector = useCallback((id: string, data: AppNodeData) => {
-    setNodes(ns => ns.map(n => n.id === id ? { ...n, data } as AppNode : n));
-    setInspectedNode(prev => prev?.id === id ? { ...prev, data: { ...data } } as AppNode : prev);
+    setNodes(ns => {
+      // Turning on "Start Node" moves the start here; there is only one.
+      const becameStart = data.is_entry_point && !ns.find(n => n.id === id)?.data.is_entry_point;
+      return ns.map(n => n.id === id
+        ? { ...n, data } as AppNode
+        : becameStart && n.data.is_entry_point ? { ...n, data: { ...n.data, is_entry_point: false } } as AppNode : n);
+    });
   }, [setNodes]);
 
   const [uploadDraftId] = useState(() => crypto.randomUUID());
   const latestUploads = useRef(new Map<string, string>());
   const applyMedia = useCallback((nodeId: string, media: { media_type: string; media_url: string | null; media_path: string }) => {
     setNodes(ns => ns.map(n => n.id === nodeId ? { ...n, data: { ...n.data, ...media } } as AppNode : n));
-    setInspectedNode(prev => prev?.id === nodeId ? { ...prev, data: { ...prev.data, ...media } } as AppNode : prev);
   }, [setNodes]);
   const handleFileUpload = useCallback(async (nodeId: string, file: File) => {
     const scope = quizId ? {quizId} : {draftId:uploadDraftId};
@@ -234,8 +240,6 @@ export function EditorCanvas({
           if (job.status === 'ready') {
             setNodes(ns => ns.map(n => n.id === item.nodeId && (n.data as AppNodeData).media_path === item.path
               ? { ...n, data: { ...n.data, media_url: job.url, media_path: job.path } } as AppNode : n));
-            setInspectedNode(prev => prev?.id === item.nodeId && prev.data.media_path === item.path
-              ? { ...prev, data: { ...prev.data, media_url: job.url, media_path: job.path } } as AppNode : prev);
           }
         } catch { /* Retry on the next poll; the worker continues independently. */ }
       }
@@ -245,24 +249,9 @@ export function EditorCanvas({
   }, [nodes, setNodes]);
 
   const handleConnectionChange = useCallback((choiceLabel: string, toQuestionId: string | null) => {
-    if (!inspectedNode) return;
-    const color = CHOICE_COLORS[choiceLabel] ?? QUESTION_NODE_ACCENT;
-    setEdges(es => {
-      const filtered = es.filter(e => !(e.source === inspectedNode.id && e.sourceHandle === choiceLabel));
-      if (!toQuestionId) return filtered;
-      return [
-        ...filtered,
-        {
-          id: `${inspectedNode.id}-${choiceLabel}-${toQuestionId}`,
-          source: inspectedNode.id,
-          sourceHandle: choiceLabel,
-          target: toQuestionId,
-          style: { stroke: color, strokeWidth: 2 },
-          markerEnd: { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },
-        },
-      ];
-    });
-  }, [inspectedNode, setEdges]);
+    if (!inspectedId) return;
+    setEdges(es => setHandleTarget(es, inspectedId, choiceLabel, toQuestionId));
+  }, [inspectedId, setEdges]);
 
   // ── Node operations ────────────────────────────────────────────────────────
 
@@ -276,7 +265,20 @@ export function EditorCanvas({
         type === 'situationNode' ? { ...defaultSituationData(), is_entry_point: isFirst } :
           { ...defaultEndData(), is_entry_point: false };
     setNodes(ns => [...ns, { id, type, position: pos, data } as AppNode]);
+    setInspectedId(id);
   }, [nodes.length, setNodes]);
+
+  // Toolbar adds land in the middle of what is on screen (staggered so
+  // repeated clicks don't stack exactly), not at a fixed spot that may be
+  // scrolled out of view.
+  const addNodeInView = useCallback((type: AppNodeType) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const center = rect
+      ? screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+      : { x: 80, y: 80 };
+    const offset = (nodes.length % 5) * 24;
+    addNode(type, { x: center.x - 124 + offset, y: center.y - 90 + offset });
+  }, [addNode, nodes.length, screenToFlowPosition]);
 
   const deleteNode = useCallback((id: string) => {
     setNodes(ns => ns.filter(n => n.id !== id));
@@ -284,7 +286,7 @@ export function EditorCanvas({
   }, [setNodes, setEdges]);
 
   const setAsEntry = useCallback((id: string) => {
-    setNodes(ns => ns.map(n => ({
+    setNodes(ns => ns.map(n => (n.data.is_entry_point === (n.id === id) ? n : {
       ...n, data: { ...n.data, is_entry_point: n.id === id },
     }) as AppNode));
   }, [setNodes]);
@@ -292,37 +294,28 @@ export function EditorCanvas({
   // ── Edge handlers ──────────────────────────────────────────────────────────
 
   const onConnect = useCallback((params: Connection) => {
-    if (params.sourceHandle === 'all') {
-      // Unreal-Engine-style: connect all 4 choice handles at once
-      setEdges(es => {
-        const filtered = es.filter(
-          e => !(e.source === params.source && ['A', 'B', 'C', 'D'].includes(e.sourceHandle ?? ''))
-        );
-        return [
-          ...filtered,
-          ...['A', 'B', 'C', 'D'].map(label => {
-            const color = CHOICE_COLORS[label];
-            return {
-              id: `${params.source}-${label}-${params.target}`,
-              source: params.source!,
-              sourceHandle: label,
-              target: params.target!,
-              style: { stroke: color, strokeWidth: 2 },
-              markerEnd: { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },
-            };
-          }),
-        ];
-      });
+    const { source, target, sourceHandle } = params;
+    if (!source || !target) return;
+    if (sourceHandle === 'all') {
+      // Unreal-Engine-style: connect every choice handle at once
+      const node = nodes.find(n => n.id === source);
+      const labels = ((node?.data as NormalNodeData | undefined)?.choices ?? []).map(c => c.label);
+      setEdges(es => (labels.length ? labels : ['A', 'B', 'C', 'D'])
+        .reduce((acc, label) => setHandleTarget(acc, source, label, target), es));
       return;
     }
-    const color = CHOICE_COLORS[params.sourceHandle ?? ''] ?? QUESTION_NODE_ACCENT;
-    setEdges(es => addEdge({
-      ...params,
-      style: { stroke: color, strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },
-    }, es));
-  }, [setEdges]);
+    // One target per handle: a new connection replaces the old one.
+    setEdges(es => setHandleTarget(es, source, sourceHandle ?? 'A', target));
+  }, [nodes, setEdges]);
 
+  // Box-select makes deleting many nodes one keypress away, and there is no
+  // undo, so confirm anything beyond a single node.
+  const onBeforeDelete = useCallback(async ({ nodes: doomed }: { nodes: AppNode[]; edges: AppEdge[] }) => (
+    doomed.length <= 1 || window.confirm(`Delete ${doomed.length} nodes and their connections?`)
+  ), []);
+
+  // A node routing to itself would loop the player forever.
+  const isValidConnection = useCallback((c: Connection | AppEdge) => c.source !== c.target, []);
 
   // ── Event handlers ─────────────────────────────────────────────────────────
 
@@ -338,43 +331,38 @@ export function EditorCanvas({
   }, []);
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
-    setInspectedNode(node as AppNode);
-  }, []);
-
-  const onNodeDblClick = useCallback((_: React.MouseEvent, node: Node) => {
-    setInspectedNode(node as AppNode);
+    setInspectedId(node.id);
   }, []);
 
   // A click where the pointer moves even a pixel is a drag to React Flow, so
   // onNodeClick never fires — yet the node still becomes selected. Inspect on
   // drag start too, or the panel keeps showing the previous node.
   const onNodeDragStart = useCallback((_: React.MouseEvent, node: Node) => {
-    setInspectedNode(node as AppNode);
+    setInspectedId(node.id);
   }, []);
 
   const ctxNodeData = ctxMenu?.nodeId
     ? nodes.find(n => n.id === ctxMenu.nodeId)?.data as AppNodeData | undefined
     : undefined;
 
-  const inspectorNode: InspectorNode | null = inspectedNode
+  const inspectorNode: InspectorNode | null = useMemo(() => inspectedNode
     ? {
       id: inspectedNode.id,
       type: inspectedNode.type as 'normalNode' | 'situationNode' | 'endNode',
       data: inspectedNode.data as AppNodeData,
     }
-    : null;
+    : null, [inspectedNode]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div ref={wrapperRef} style={{ width: '100%', height: '100%', display: 'flex', position: 'relative' }}>
+    <div className="nq-node-editor" style={{ width: '100%', height: '100%', display: 'flex', position: 'relative' }}>
 
       {/* ── Left Inspector ── */}
       <LeftInspector
         selectedNode={inspectorNode}
         questionOptions={questionOptions}
         onChange={applyInspector}
-        onSave={applyInspector}
         connections={inspectorConnections(inspectedNode)}
         onConnectionChange={handleConnectionChange}
         sessionId={sessionId}
@@ -383,100 +371,101 @@ export function EditorCanvas({
       />
 
       {/* ── Canvas ── */}
-      <div style={{ flex: 1, position: 'relative', height: '100%' }}>
-        <style>{`
-          .react-flow__handle:hover {
-            transform: scale(1.6) !important;
-            box-shadow: 0 0 0 3px rgba(255,255,255,0.15), 0 0 14px rgba(255,255,255,0.35) !important;
-            transition: transform 0.1s, box-shadow 0.1s !important;
-          }
-          .react-flow__handle[data-handleid="all"]:hover {
-            transform: scale(1.7) !important;
-            box-shadow: 0 0 0 4px rgba(255,255,255,0.25), 0 0 18px rgba(255,255,255,0.6) !important;
-          }
-          .react-flow__handle.connecting {
-            transform: scale(1.5) !important;
-            box-shadow: 0 0 0 4px rgba(112,162,249,0.4), 0 0 16px rgba(112,162,249,0.7) !important;
-          }
-          .react-flow__handle.valid {
-            transform: scale(1.7) !important;
-            box-shadow: 0 0 0 4px rgba(52,211,153,0.4), 0 0 18px rgba(52,211,153,0.7) !important;
-            background: #34d399 !important;
-          }
-          .react-flow__edge.selected .react-flow__edge-path {
-            stroke: #ffffff !important;
-            stroke-width: 3 !important;
-            filter: drop-shadow(0 0 6px rgba(255,255,255,0.55));
-          }
-        `}</style>
-
+      <div ref={canvasRef} style={{ flex: 1, position: 'relative', height: '100%', minWidth: 0 }}>
         <ReactFlow
           nodes={nodes} edges={edges}
           onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          isValidConnection={isValidConnection}
           onNodeClick={onNodeClick}
-          onNodeDoubleClick={onNodeDblClick}
+          onNodeDoubleClick={onNodeClick}
           onNodeDragStart={onNodeDragStart}
-          onPaneClick={() => { closeCtx(); setInspectedNode(null); }}
+          onPaneClick={() => { closeCtx(); setInspectedId(null); setShowShortcuts(false); }}
           onPaneContextMenu={onPaneCtx}
           onNodeContextMenu={onNodeCtx}
           nodeTypes={nodeTypes}
           deleteKeyCode={['Backspace', 'Delete']}
+          onBeforeDelete={onBeforeDelete}
+          // Figma-style navigation: two-finger scroll pans, pinch / ⌘-scroll
+          // zooms, dragging empty canvas box-selects, Space/middle-drag pans.
+          panOnScroll
+          zoomOnScroll={false}
+          zoomOnPinch
+          zoomOnDoubleClick={false}
+          panOnDrag={[1]}
+          selectionOnDrag
+          selectionMode={SelectionMode.Partial}
+          minZoom={MIN_ZOOM}
+          maxZoom={MAX_ZOOM}
           snapToGrid snapGrid={[16, 16]}
           fitView fitViewOptions={{ padding: 0.2 }}
           defaultEdgeOptions={{ type: 'default', animated: false }}
-          style={{ background: EDITOR_CANVAS_BG }}
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} color="rgba(112,162,249,0.18)" gap={24} size={1.5} />
-          <Controls
-            style={{
-              background: EDITOR_PANEL_BG,
-              border: `1px solid ${EDITOR_PANEL_BORDER}`,
-              borderRadius: 10,
-              boxShadow: '0 12px 28px rgba(101,137,195,0.18)',
-              backdropFilter: 'blur(18px)',
-            }}
-            showInteractive={false}
-          />
+          <Background variant={BackgroundVariant.Dots} color="var(--ne-dots)" gap={24} size={1.5} />
+          <Controls showInteractive={false} />
           <MiniMap
-            style={{
-              background: 'rgba(224,236,255,0.88)',
-              border: `1px solid ${EDITOR_PANEL_BORDER}`,
-              borderRadius: 10,
-              boxShadow: '0 12px 28px rgba(101,137,195,0.18)',
-              backdropFilter: 'blur(18px)',
-            }}
-            nodeColor={QUESTION_NODE_ACCENT} maskColor="rgba(8,8,15,0.7)"
+            pannable
+            zoomable
+            nodeColor={(n) => n.type === 'endNode' ? 'var(--ne-end)' : n.type === 'situationNode' ? 'var(--ne-situation)' : 'var(--ne-question)'}
+            nodeBorderRadius={6}
+            maskColor="var(--ne-mask)"
           />
 
           {/* Toolbar */}
-          <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button onClick={() => addNode('normalNode', { x: 80 + nodes.length * 30, y: 80 + nodes.length * 20 })} style={toolbarBtnStyle(QUESTION_NODE_ACCENT)} title="Add Question Node">
-              <span style={{ fontSize: 14 }}>❓</span> Question Node
+          <div className="nq-ne-card" style={{ position: 'absolute', top: 12, left: 12, zIndex: 10, display: 'flex', gap: 6, alignItems: 'center', padding: 5, borderRadius: 10 }}>
+            <span className="nq-ne-eyebrow" style={{ padding: '0 4px 0 6px' }}>Add</span>
+            {([
+              ['normalNode', 'question', 'var(--ne-question)', 'Question'],
+              ['situationNode', 'situation', 'var(--ne-situation)', 'Situation'],
+              ['endNode', 'end', 'var(--ne-end)', 'End'],
+            ] as const).map(([type, icon, color, label]) => (
+              <button key={type} type="button" onClick={() => addNodeInView(type)} className="nq-ne-btn" title={`Add ${label} Node`}>
+                <span style={{ color, display: 'flex' }}><NodeIcon name={icon} size={15} /></span>
+                {label}
+              </button>
+            ))}
+            <span style={{ width: 1, height: 20, background: 'var(--nq-line)', margin: '0 2px' }} />
+            <button
+              type="button"
+              className="nq-ne-btn"
+              aria-expanded={showShortcuts}
+              onClick={() => setShowShortcuts(v => !v)}
+              style={{ border: 'none', color: 'var(--nq-muted)' }}
+            >
+              Shortcuts
             </button>
-            <button onClick={() => addNode('situationNode', { x: 80 + nodes.length * 30, y: 80 + nodes.length * 20 })} style={toolbarBtnStyle('#8b5cf6')} title="Add Situation Node">
-              <span style={{ fontSize: 14 }}>🎬</span> Situation Node
-            </button>
-            <button onClick={() => addNode('endNode', { x: 80 + nodes.length * 30, y: 80 + nodes.length * 20 })} style={toolbarBtnStyle('#f43f5e')} title="Add End Node">
-              <span style={{ fontSize: 14 }}>🏁</span> End Node
-            </button>
-            <div style={{ width: 1, height: 24, background: 'rgba(112,162,249,0.2)' }} />
-            <span style={{ fontSize: 11, color: '#35527e', fontWeight: 600 }}>Right-click canvas · Del to remove</span>
           </div>
 
-          {/* Save button */}
-          <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
-            <Button onClick={onSave} loading={saving} size="sm" style={{ color: '#ffffff', textShadow: '0 1px 1px rgba(0,0,0,0.12)' }}>Save</Button>
-          </div>
+          {showShortcuts && (
+            <div
+              className="nq-ne-card"
+              role="dialog"
+              aria-label="Canvas shortcuts"
+              style={{ position: 'absolute', top: 58, left: 12, zIndex: 11, width: 320, padding: '10px 14px', boxShadow: '0 6px 16px rgba(22,50,79,0.14)' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--nq-ink)' }}>Shortcuts</span>
+                <button type="button" onClick={() => setShowShortcuts(false)} aria-label="Close shortcuts"
+                  style={{ border: 0, background: 'none', color: 'var(--nq-muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>×</button>
+              </div>
+              <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 14px', fontSize: 12 }}>
+                {SHORTCUTS.map(([action, keys]) => (
+                  <div key={action} style={{ display: 'contents' }}>
+                    <dt style={{ color: 'var(--nq-muted)' }}>{action}</dt>
+                    <dd style={{ margin: 0, color: 'var(--nq-ink)', fontWeight: 500 }}>{keys}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
 
           {/* Empty state */}
           {nodes.length === 0 && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 5 }}>
-              <div style={{ textAlign: 'center', color: '#4e6b96', maxWidth: 320 }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>🕸</div>
-                <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, color: '#35527e' }}>Empty canvas</p>
-                <p style={{ fontSize: 13, lineHeight: 1.6, color: '#4e6b96', fontWeight: 500 }}>Right-click anywhere or use the toolbar above to add nodes.</p>
+              <div style={{ textAlign: 'center', maxWidth: 300 }}>
+                <p style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px', color: 'var(--nq-ink)' }}>This quiz has no nodes yet</p>
+                <p style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--nq-muted)', margin: 0 }}>Add a question from the toolbar to get started. Drag from a dot on one node to another to connect them.</p>
               </div>
             </div>
           )}
@@ -488,10 +477,11 @@ export function EditorCanvas({
         <ContextMenu
           x={ctxMenu.x} y={ctxMenu.y} mode={ctxMenu.mode}
           isEntryPoint={(ctxNodeData as AppNodeData | undefined)?.is_entry_point}
+          canBeStart={nodes.find(n => n.id === ctxMenu.nodeId)?.type !== 'endNode'}
           onAddNormal={() => addNode('normalNode', { x: ctxMenu.flowX!, y: ctxMenu.flowY! })}
           onAddSituation={() => addNode('situationNode', { x: ctxMenu.flowX!, y: ctxMenu.flowY! })}
           onAddEnd={() => addNode('endNode', { x: ctxMenu.flowX!, y: ctxMenu.flowY! })}
-          onEdit={() => { const n = nodes.find(n => n.id === ctxMenu.nodeId); if (n) setInspectedNode(n); }}
+          onEdit={() => ctxMenu.nodeId && setInspectedId(ctxMenu.nodeId)}
           onSetEntry={() => ctxMenu.nodeId && setAsEntry(ctxMenu.nodeId)}
           onDelete={() => ctxMenu.nodeId && deleteNode(ctxMenu.nodeId)}
           onClose={closeCtx}
