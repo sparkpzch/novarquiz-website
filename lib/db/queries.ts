@@ -885,17 +885,26 @@ export async function replaceQuizGraph(
     const publication = await client.query('SELECT is_published FROM quizzes WHERE id=$1 FOR UPDATE', [sessionId]);
     questions = await resolveProcessedVideos(questions, client, !!publication.rows[0]?.is_published);
     const { rows: oldRows } = await client.query(
-      'SELECT media_path FROM questions WHERE session_id = $1',
+      'SELECT id, media_path FROM questions WHERE session_id = $1',
       [sessionId],
     );
     const oldMediaPaths = oldRows.map((row) => row.media_path as string | null);
+    // Questions kept in the graph are updated in place: deleting them would
+    // cascade away every player's user_answers and empty their History.
+    const existingIds = new Set(oldRows.map((row) => row.id as string));
+    const keptIds = questions
+      .map((question) => question.id)
+      .filter((id): id is string => !!id && existingIds.has(id));
 
     await client.query('DELETE FROM question_connections WHERE session_id = $1', [sessionId]);
     await client.query(
       'DELETE FROM choices WHERE question_id IN (SELECT id FROM questions WHERE session_id = $1)',
       [sessionId],
     );
-    await client.query('DELETE FROM questions WHERE session_id = $1', [sessionId]);
+    await client.query(
+      'DELETE FROM questions WHERE session_id = $1 AND NOT (id = ANY($2::uuid[]))',
+      [sessionId, keptIds],
+    );
 
     const idMap: Record<string, string> = {};
     const newMediaPaths: Array<string | null> = [];
@@ -905,12 +914,12 @@ export async function replaceQuizGraph(
       const questionId = sourceId && UUID_RE.test(sourceId) ? sourceId : randomUUID();
 
       await client.query(
-        layered
-          ? `INSERT INTO questions (
-               id, session_id, question_order, question_text, node_name,
-               media_type, media_url, media_explanation, media_path, timer_override, is_entry_point, node_x, node_y, node_type
-             )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
+        existingIds.has(questionId)
+          ? `UPDATE questions SET
+               question_order = $3, question_text = $4, node_name = $5, media_type = $6,
+               media_url = $7, media_explanation = $8, media_path = $9, timer_override = $10,
+               is_entry_point = $11, node_x = $12, node_y = $13, node_type = $14
+             WHERE id = $1 AND session_id = $2`
           : `INSERT INTO questions (
                id, session_id, question_order, question_text, node_name,
                media_type, media_url, media_explanation, media_path, timer_override, is_entry_point, node_x, node_y, node_type
