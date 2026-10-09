@@ -1,5 +1,5 @@
 import QuizThumbnail from '@/components/ui/QuizThumbnail';
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -78,6 +78,53 @@ interface QuizzesManagerProps {
   onToggleStatus: (id: string, currentStatus: boolean) => Promise<void>;
   onRefresh: () => void;
   loading?: boolean;
+}
+
+/**
+ * The name the user must type to confirm a delete/archive. Clicking copies it
+ * exactly (Thai names and trailing spaces are easy to mistype). Falls back to
+ * selecting the text when the Clipboard API is unavailable.
+ */
+function CopyableName({ name, className }: { name: string; className: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "manual">("idle");
+  const textRef = useRef<HTMLSpanElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+
+  const copy = async () => {
+    let next: "copied" | "manual" = "copied";
+    try {
+      await navigator.clipboard.writeText(name);
+    } catch {
+      // Clipboard API blocked (no focus, insecure context): select the text
+      // and try the legacy copy command; leave it selected for ⌘C otherwise.
+      const el = textRef.current;
+      if (el) window.getSelection()?.selectAllChildren(el);
+      next = el && document.execCommand("copy") ? "copied" : "manual";
+    }
+    setState(next);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setState("idle"), 2000);
+  };
+
+  return (
+    <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
+      <button
+        type="button"
+        onClick={copy}
+        title="Click to copy"
+        className={`${className} inline-flex items-baseline gap-1 rounded px-0.5 font-bold underline decoration-dotted underline-offset-4 hover:decoration-solid`}
+      >
+        <span ref={textRef}>{name}</span>
+        <svg aria-hidden="true" className="h-3.5 w-3.5 self-center" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 8V5a2 2 0 012-2h9a2 2 0 012 2v9a2 2 0 01-2 2h-3M5 8h9a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2v-9a2 2 0 012-2z" />
+        </svg>
+      </button>
+      <span role="status" aria-live="polite" className="text-xs font-semibold text-emerald-600">
+        {state === "copied" ? "Copied to clipboard" : state === "manual" ? "Press ⌘C / Ctrl+C to copy" : ""}
+      </span>
+    </span>
+  );
 }
 
 function ListSkeleton({ label, withMedia = false }: { label: string; withMedia?: boolean }) {
@@ -998,7 +1045,7 @@ export default function QuizzesManager({
             </h3>
             <p className="text-sm text-[#5D7EA1] mb-6 leading-relaxed">
               {confirmModal.name
-                ? <>This action {confirmModal.action === 'delete' ? 'cannot be undone' : 'will clear all access links'}. To confirm, type <strong className={`${confirmModal.action === 'delete' ? 'text-[#E74C3C]' : 'text-[#E67E22]'} select-all cursor-pointer`}>{confirmModal.name}</strong> below.</>
+                ? <>This action {confirmModal.action === 'delete' ? 'cannot be undone' : 'will clear all access links'}. To confirm, type <CopyableName name={confirmModal.name} className={confirmModal.action === 'delete' ? 'text-[#E74C3C]' : 'text-[#E67E22]'} /> below.</>
                 : <>Are you sure you want to {confirmModal.action} this? This action {confirmModal.action === 'delete' ? 'cannot be undone' : 'will clear all access links'}.</>
               }
             </p>
