@@ -6,6 +6,7 @@ import { withPlayerAnswerLock, getQuestionById } from '@/lib/db/queries';
 import { getProgress } from '@/lib/db/play-progress';
 import { requireLobbyAccess, requestConnectionId } from '@/lib/play/lobby-access';
 import { ownsLobbyMember } from '@/lib/play/lobby-policy';
+import { presenceScore } from '@/lib/play/lobby-progress';
 
 const Metadata = z.object({
   transportId: z.string().uuid().optional(),
@@ -48,10 +49,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       if (body.data.currentQuestionId !== undefined || body.data.currentQuestionLabel !== undefined) {
         const progress = await getProgress(sessionId,user.uid);
         const question = progress && !progress.completed ? await getQuestionById(progress.question_id) : null;
-        await adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).update({
-          currentQuestionId: question?.id ?? null,
-          currentQuestionLabel: question ? `Q${question.question_order+1}` : null, updatedAt: now,
-        });
+        // A transaction, not update(): a plain write here aborts the concurrent
+        // completion transaction on sessions/{id} and loses `finished`.
+        await adminRtdb.ref(`sessions/${sessionId}/scores/${user.uid}`).transaction(current =>
+          presenceScore(current, question as { id: string; question_order: number } | null, !!progress?.completed, now));
       }
       await adminRtdb.ref(`userSessions/${user.uid}/${sessionId}`).transaction(current =>
         !current ? current : current.connectionId === connectionId ? {
