@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SurveySchema, summarizeSurveys, histogram, type SurveyInput } from '../survey';
-const base:SurveyInput={firstName:'Jane',lastName:'Doe',age:30,gender:'female',weightKg:70,heightCm:165,activity:'moderate',analyticsConsent:true};
+import fs from 'node:fs';
+import path from 'node:path';
+import { SurveySchema, summarizeSurveys, histogram, type HealthInput, type SurveyInput } from '../survey';
+import { PROVINCES } from '../provinces';
+const base:SurveyInput={firstName:'Jane',lastName:'Doe',age:30,gender:'female',weightKg:70,heightCm:165,activity:'moderate',analyticsConsent:true,province:'TH-50',healthConsent:false,health:null};
+const health:HealthInput={waistCm:85,smoking:'never',hypertension:'no',diabetes:'unknown',highCholesterol:'yes',lipidCheck:'within_1y',ldlRange:'130_159',lipidMedication:'yes',familyHistory:'no',priorEvent:'no'};
 test('survey validation allows withholding optional data and rejects invalid measurements and identity spoofing',()=>{
   assert.ok(SurveySchema.safeParse({...base,age:null,weightKg:null,heightCm:null,analyticsConsent:false}).success);
   for(const change of [{firstName:' '},{lastName:''},{age:-1},{age:121},{age:1.2},{weightKg:0},{weightKg:501},{heightCm:251},{gender:'unsupported'},{analyticsConsent:'yes'},{uid:'other-account'}])assert.equal(SurveySchema.safeParse({...base,...change}).success,false);
@@ -46,4 +50,31 @@ test('distribution boundaries and unanswered fields are counted exactly once per
   const result=summarizeSurveys(rows.length,rows);
   assert.deepEqual(result.age.map(b=>b.count),[1,2,2,2,1,1]);
   for(const chart of [result.age,result.gender,result.weight,result.height,result.activity])assert.equal(chart.reduce((n,b)=>n+b.count,0),rows.length);
+});
+
+test('province is required and limited to the 77 province codes or an explicit opt-out',()=>{
+  assert.ok(SurveySchema.safeParse({...base,province:'prefer_not_to_say'}).success);
+  assert.ok(SurveySchema.safeParse({...base,province:'TH-96'}).success);
+  const {province:_province,...missing}=base;void _province;
+  assert.equal(SurveySchema.safeParse(missing).success,false);
+  for(const province of ['','TH-99','TH-S','Bangkok',10])assert.equal(SurveySchema.safeParse({...base,province}).success,false);
+});
+
+test('health answers require their own consent and reject unknown or out-of-range values',()=>{
+  assert.ok(SurveySchema.safeParse({...base,healthConsent:true,health}).success);
+  assert.ok(SurveySchema.safeParse({...base,healthConsent:true,health:{...health,waistCm:null}}).success);
+  assert.equal(SurveySchema.safeParse({...base,healthConsent:true,health:null}).success,false);
+  for(const change of [{waistCm:29},{waistCm:251},{smoking:'sometimes'},{ldlRange:'200'},{lipidCheck:'yesterday'},{priorEvent:true},{ldlValue:142}])
+    assert.equal(SurveySchema.safeParse({...base,healthConsent:true,health:{...health,...change}}).success,false);
+  const {smoking:_smoking,...incomplete}=health;void _smoking;
+  assert.equal(SurveySchema.safeParse({...base,healthConsent:true,health:incomplete}).success,false);
+});
+
+test('province list matches ISO 3166-2:TH and the migration seed',()=>{
+  const codes=PROVINCES.map(p=>p.code);
+  assert.equal(codes.length,77);assert.equal(new Set(codes).size,77);
+  for(const p of PROVINCES){assert.match(p.code,/^TH-\d{2}$/);assert.ok(p.th&&p.en);}
+  const sql=fs.readFileSync(path.join(process.cwd(),'db/migrations/020_lscvd_province_health.sql'),'utf8');
+  const seeded=[...sql.matchAll(/\('(TH-\d{2})', '([^']+)', '([^']+)', '([a-z_]+)'\)/g)].map(m=>({code:m[1],th:m[2],en:m[3],region:m[4]}));
+  assert.deepEqual(seeded,PROVINCES.map(p=>({...p})));
 });

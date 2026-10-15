@@ -23,3 +23,21 @@
 :global([data-theme=dark]) .fields select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b3b3b3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
+
+/* Province row and the opt-in heart-health section. */
+.row { margin-bottom: 16px; }
+.section { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--survey-border, #bccbda); }
+.section h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.sectionIntro { margin: 6px 0 0; font-size: 13px; line-height: 1.6; opacity: .75; }
+.fields .section .consent { margin-top: 14px; }
+.healthFields { display: grid; gap: 18px; margin-top: 18px; }
+.groupLabel { margin: 4px 0 -8px; font-size: 13px; font-weight: 700; }
+.choice { min-width: 0; margin: 0; padding: 0; border: 0; }
+.choice legend { padding: 0; margin-bottom: 8px; font-weight: 600; line-height: 1.5; }
+.choice legend small { display: block; font-size: 12px; font-weight: 400; opacity: .7; }
+.segmented { display: flex; flex-wrap: wrap; gap: 8px; }
+.fields .segmented label { position: relative; flex-direction: row; gap: 0; font-weight: 500; }
+.fields .segmented input { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+.segmented span { display: inline-flex; align-items: center; min-height: 40px; padding: 8px 14px; border: 1px solid var(--survey-border, #bccbda); border-radius: 8px; background: var(--survey-field, #fff); line-height: 1.3; cursor: pointer; }
+.segmented input:checked + span { border-color: var(--accent, #0460a9); box-shadow: inset 0 0 0 1px var(--accent, #0460a9); background: color-mix(in srgb, var(--accent, #0460a9) 12%, var(--survey-field, #fff)); font-weight: 650; }
+.segmented input:focus-visible + span { outline: 3px solid var(--accent, #0460a9); outline-offset: 2px; }
