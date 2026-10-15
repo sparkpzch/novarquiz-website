@@ -18,9 +18,9 @@ test('groups below the minimum cell show counts only', () => {
 });
 
 test('health and analytics consent are counted separately', () => {
-  const rows = [...many(MIN_CELL, { health: null }), ...many(3, { analyticsConsent: false })];
+  const rows = [...many(MIN_CELL, { health: null }), ...many(MIN_CELL - 1, { analyticsConsent: false })];
   const s = summarize(rows);
-  assert.equal(s.participants, MIN_CELL); assert.equal(s.healthResponders, 3);
+  assert.equal(s.participants, MIN_CELL); assert.equal(s.healthResponders, MIN_CELL - 1);
   assert.equal(s.suppressed, false); assert.equal(s.healthSuppressed, true);
   assert.equal(s.prevalence, null);
   // Without analytics consent, quiz results never reach the knowledge score.

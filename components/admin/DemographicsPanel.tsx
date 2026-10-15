@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DemographicsReport,ChartBin } from '@/lib/onboarding/survey';
+import { MIN_CELL } from '@/lib/analytics/lscvd';
 import styles from './report-charts.module.css';
 import DemographicHistogram from './DemographicHistogram';
 
@@ -22,7 +23,7 @@ function ChartSkeleton({label}:{label:string}) {
 
 type Report = DemographicsReport | { suppressed: true; total: number; completed: number; consenting: number };
 
-export default function DemographicsPanel({sessionId,quizId,province,minCell=10,embedded=false}:{sessionId?:string;quizId?:string;province?:string;minCell?:number;embedded?:boolean}) {
+export default function DemographicsPanel({sessionId,quizId,province,minCell=MIN_CELL,embedded=false}:{sessionId?:string;quizId?:string;province?:string;minCell?:number;embedded?:boolean}) {
   const {i18n}=useTranslation();const th=i18n.language.startsWith('th');const copy=(en:string,thai:string)=>th?thai:en;
   const [result,setResult]=useState<{key:string;data:Report|null;error:boolean}|null>(null);const [retry,setRetry]=useState(0);
   const query=new URLSearchParams(sessionId?{session:sessionId}:quizId?{quiz:quizId}:province?{province}:{}).toString();const key=`${query}:${retry}`;const current=result?.key===key?result:null;
@@ -39,7 +40,7 @@ export default function DemographicsPanel({sessionId,quizId,province,minCell=10,
         <div><dt>{copy('Completed surveys','ตอบแบบสอบถามแล้ว')}</dt><dd>{data.completed.toLocaleString()}<small>{copy(`${percent(data.completed,data.total)}% of accounts`,`${percent(data.completed,data.total)}% ของบัญชี`)}</small></dd></div>
         <div><dt>{copy('Included with consent','ยินยอมให้วิเคราะห์')}</dt><dd>{data.consenting.toLocaleString()}<small>{copy(`${percent(data.consenting,data.completed)}% of surveys`,`${percent(data.consenting,data.completed)}% ของผู้ตอบ`)}</small></dd></div>
       </dl>
-      {'suppressed' in data?<p className={`${styles.chartCard} ${styles.muted}`}>{copy(`Charts appear once at least ${minCell} people in this province consent.`,`กราฟจะแสดงเมื่อมีผู้ยินยอมในจังหวัดนี้อย่างน้อย ${minCell} คน`)}</p>:data.consenting===0?<p className={`${styles.chartCard} ${styles.muted}`}>{copy('No consented survey data yet. Charts will appear after participants opt in.','ยังไม่มีข้อมูลแบบสอบถามที่ได้รับความยินยอม กราฟจะแสดงเมื่อผู้ใช้เลือกยินยอม')}</p>:<>
+      {data.consenting===0?<p className={`${styles.chartCard} ${styles.muted}`}>{copy('No consented survey data yet. Charts will appear after participants opt in.','ยังไม่มีข้อมูลแบบสอบถามที่ได้รับความยินยอม กราฟจะแสดงเมื่อผู้ใช้เลือกยินยอม')}</p>:'suppressed' in data?<p className={`${styles.chartCard} ${styles.muted}`}>{copy(`Charts appear once at least ${minCell} people consent (now ${data.consenting}).`,`กราฟจะแสดงเมื่อมีผู้ยินยอมอย่างน้อย ${minCell} คน (ตอนนี้ ${data.consenting} คน)`)}</p>:<>
         <div className={styles.chartGrid}>
           <div className={styles.chartCard}><DemographicHistogram data={data.histograms.age} title={copy('Age','อายุ')} unit={copy('years','ปี')} th={th}/></div>
           <div className={styles.chartCard}><h3>{copy('Gender','เพศ')}</h3><CountBars items={data.gender} th={th}/></div>

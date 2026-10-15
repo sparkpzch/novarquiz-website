@@ -8,7 +8,7 @@ export function LegalLanguageSwitch({ language, onChange }: { language: LegalLan
 
 export default function LegalDocumentContent({ document, language, compact = false }: { document: LegalDocument; language: LegalLanguage; compact?: boolean }) {
   const version = document === 'terms' ? TOS_VERSION : PRIVACY_VERSION;
-  const date = document === 'terms' ? (language === 'th' ? '17 กันยายน 2569' : '17 September 2026') : (language === 'th' ? '3 ตุลาคม 2569' : '3 October 2026');
+  const date = document === 'terms' ? (language === 'th' ? '17 กันยายน 2569' : '17 September 2026') : (language === 'th' ? '16 ตุลาคม 2569' : '16 October 2026');
   const Heading = compact ? 'h3' : 'h2';
   return <article className={styles.content} lang={language} aria-label={legalTitles[document][language]}>
     <p className={styles.meta}>{language === 'th' ? 'ปรับปรุงล่าสุด' : 'Last updated'}: {date} · {language === 'th' ? 'ฉบับ' : 'Version'} {version}</p>

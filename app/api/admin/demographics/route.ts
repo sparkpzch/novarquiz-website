@@ -16,8 +16,8 @@ export async function GET(request: NextRequest) {
   if (province && !(PROVINCE_CODES as string[]).includes(province)) return NextResponse.json({error:'Invalid scope'},{status:400});
   try {
     const report=await getDemographics({sessionId,quizId,province});
-    // A province with few consenting people would make individuals recognisable: send counts only.
-    if (province && report.consenting<MIN_CELL) return NextResponse.json({total:report.total,completed:report.completed,consenting:report.consenting,suppressed:true},{headers:{'Cache-Control':'private, no-store'}});
+    // Any scope with few consenting people would make individuals recognisable: send counts only.
+    if (report.consenting<MIN_CELL) return NextResponse.json({total:report.total,completed:report.completed,consenting:report.consenting,suppressed:true},{headers:{'Cache-Control':'private, no-store'}});
     return NextResponse.json(report,{headers:{'Cache-Control':'private, no-store'}});
   }
   catch { return NextResponse.json({error:'Demographics unavailable'},{status:503}); }
