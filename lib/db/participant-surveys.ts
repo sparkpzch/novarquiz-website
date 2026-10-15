@@ -51,12 +51,13 @@ export async function saveParticipantSurvey(uid: string, s: SurveyInput) {
   finally { client.release(); }
 }
 
-export async function getDemographics(scope: { sessionId?: string; quizId?: string } = {}) {
+export async function getDemographics(scope: { sessionId?: string; quizId?: string; province?: string } = {}) {
   // DISTINCT profiles avoid counting the same person repeatedly across quiz attempts.
-  const values = scope.sessionId ? [scope.sessionId] : scope.quizId ? [scope.quizId] : [];
+  const values = scope.sessionId ? [scope.sessionId] : scope.quizId ? [scope.quizId] : scope.province ? [scope.province] : [];
   const filter = scope.sessionId ? 'le.session_id::text=$1' : scope.quizId ? 'sessions.session_id::text=$1' : '';
   const people = filter ? `SELECT DISTINCT p.uid FROM profiles p JOIN leaderboard_entries le ON le.user_id=p.uid
-    JOIN sessions ON sessions.id::text=le.session_id::text WHERE ${filter}` : 'SELECT uid FROM profiles';
+    JOIN sessions ON sessions.id::text=le.session_id::text WHERE ${filter}`
+    : scope.province ? 'SELECT uid FROM participant_surveys WHERE province_code=$1' : 'SELECT uid FROM profiles';
   const result = await pool.query(`WITH people AS (${people}) SELECT s.uid,
     s.age,s.gender,s.weight_kg::float8 AS "weightKg",
     s.height_cm::float8 AS "heightCm",s.activity,s.analytics_consent AS "analyticsConsent"
