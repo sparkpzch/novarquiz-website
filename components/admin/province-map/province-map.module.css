@@ -112,3 +112,18 @@
 .skeleton { min-height: 420px; border-radius: 12px; background: var(--map-inset); animation: pulse 1.4s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } .shape { transition: none; } }
+
+/* Safari keeps native select metrics (ignoring min-height/padding), so drop the
+   native look and give every control the same fixed height, as the survey form does. */
+.field select, .field input:not([type="range"]), .search input { box-sizing: border-box; height: 40px; line-height: 1.4; }
+.field select {
+  appearance: none; -webkit-appearance: none; padding-right: 34px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; background-size: 16px;
+}
+:global([data-theme="dark"]) .field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b3b3b3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+.field input[type="date"] { -webkit-appearance: none; appearance: none; }
+.field input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+.field select option { background: var(--map-card); color: var(--map-ink); }
