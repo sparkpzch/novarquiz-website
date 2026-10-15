@@ -15,14 +15,28 @@ import { historyCoaching, isEverydayInsight, learningTopic, type LearningArea } 
 import type { PersonalHistoryReport, UserHistoryRow } from '@/lib/analytics/history';
 import styles from './stats.module.css';
 
-type IconName = 'arrow' | 'book' | 'check';
+type IconName = 'arrow' | 'book' | 'check' | 'star' | 'trophy' | 'flame' | 'clock' | 'target' | 'list';
+type Tone = 'green' | 'yellow' | 'purple' | 'orange' | 'blue' | 'teal';
 function Icon({ name, className = '' }: { name: IconName; className?: string }) {
+  // Lucide icons: https://lucide.dev — license in components/ui/icons/lucide-LICENSE.
   const paths: Record<IconName, React.ReactNode> = {
     book: <><path d="M3 5h6a4 4 0 0 1 3 2 4 4 0 0 1 3-2h6v15h-6a4 4 0 0 0-3 2 4 4 0 0 0-3-2H3V5ZM12 7v15M6 9h3M15 9h3M6 13h3M15 13h3" /></>,
     arrow: <path d="M5 12h14m-5-5 5 5-5 5" />,
     check: <path d="m5 12 4 4L19 6" />,
+    star: <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />,
+    trophy: <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2Z" />,
+    flame: <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />,
+    clock: <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></>,
+    target: <><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></>,
+    list: <path d="m3 17 2 2 4-4M3 7l2 2 4-4M13 6h8M13 12h8M13 18h8" />,
   };
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
+}
+
+/** Apple Health–style card label: a coloured category name with its icon. */
+function CardLabel({ tone, icon, children, meta, headingId }: { tone: Tone; icon: IconName; children: React.ReactNode; meta?: React.ReactNode; headingId?: string }) {
+  const Label = headingId ? 'h2' : 'p';
+  return <div className="health-label-row"><Label id={headingId} className="health-label" data-tone={tone}><Icon name={icon} />{children}</Label>{meta && <span className="history-card-meta">{meta}</span>}</div>;
 }
 
 function StatsPageContent() {
@@ -85,19 +99,20 @@ function StatsPageContent() {
           {!selected ? <section className="history-card history-empty"><h2>{copy('Choose one of your completed quizzes', 'เลือกแบบทดสอบที่คุณทำเสร็จแล้ว')}</h2><p>{copy('This quiz isn’t in your history.', 'ไม่พบแบบทดสอบนี้ในประวัติของคุณ')}</p><Link href="/stats" className="history-primary">{copy('See my latest quiz', 'ดูแบบทดสอบล่าสุด')}</Link></section> : !reportResult ? <Loading label={copy('Loading summary…', 'กำลังเตรียมสรุปผลแบบทดสอบ…')} /> : reportResult.error ? <ErrorPanel onRetry={() => setVersion((v) => v + 1)} message={copy('Your recap couldn’t load. Give it another try.', 'ยังโหลดสรุปของคุณไม่ได้ กรุณาลองอีกครั้ง')} label={copy('Try again', 'ลองอีกครั้ง')} /> : report && coaching && <>
             <div className="history-layout">
               <section className="history-card history-session" aria-labelledby="session-title">
-              <div className="history-session-heading"><h2 id="session-title">{report.session.session_name}</h2><p className="history-session-date">{copy('Completed', 'ทำเสร็จเมื่อ')} {date(report.session.completed_at)}</p>{report.session.session_description && <p className="history-session-description">{report.session.session_description}</p>}</div>
+              <CardLabel tone="green" icon="check" meta={date(report.session.completed_at)}>{copy('Quiz result', 'ผลแบบทดสอบ')}</CardLabel>
+              <div className="history-session-heading"><h2 id="session-title">{report.session.session_name}</h2>{report.session.session_description && <p className="history-session-description">{report.session.session_description}</p>}</div>
               <ScoreSummary correct={report.session.correct_count} incorrect={report.session.incorrect_count} locale={locale} />
               <dl className="history-metrics">
-                <div><dt>{copy('Total score', 'คะแนนรวม')}</dt><dd>{report.session.total_score.toLocaleString(locale)}</dd></div>
-                <div><dt>{copy('Rank', 'อันดับ')}</dt><dd>{report.session.rank > 0 ? report.session.rank.toLocaleString(locale) : '—'}<small>{copy(`of ${report.session.total_players.toLocaleString(locale)} players`, `จาก ${report.session.total_players.toLocaleString(locale)} คน`)}</small></dd></div>
-                <div><dt>{copy('Answer streak', 'ตอบถูกต่อเนื่อง')}</dt><dd>{report.session.streak.toLocaleString(locale)}<small>{copy('questions', 'ข้อ')}</small></dd></div>
-                <div><dt>{copy('Time spent', 'เวลาที่ใช้')}</dt><dd>{formatDuration(report.session.total_time_ms, locale)}</dd></div>
+                <div data-tone="yellow"><dt><Icon name="star" />{copy('Total score', 'คะแนนรวม')}</dt><dd>{report.session.total_score.toLocaleString(locale)}</dd></div>
+                <div data-tone="purple"><dt><Icon name="trophy" />{copy('Rank', 'อันดับ')}</dt><dd>{report.session.rank > 0 ? report.session.rank.toLocaleString(locale) : '—'}<small>{copy(`of ${report.session.total_players.toLocaleString(locale)} players`, `จาก ${report.session.total_players.toLocaleString(locale)} คน`)}</small></dd></div>
+                <div data-tone="orange"><dt><Icon name="flame" />{copy('Answer streak', 'ตอบถูกต่อเนื่อง')}</dt><dd>{report.session.streak.toLocaleString(locale)}<small>{copy('questions', 'ข้อ')}</small></dd></div>
+                <div data-tone="blue"><dt><Icon name="clock" />{copy('Time spent', 'เวลาที่ใช้')}</dt><dd>{formatDuration(report.session.total_time_ms, locale)}</dd></div>
               </dl>
             </section>
               <aside className="history-side">
                 <PersonalRecapCard report={report} locale={locale} fullDetails />
                 {coaching.total > 0 && <section className="history-card history-area-card" aria-labelledby="topics-title">
-                  <div className="history-card-heading"><h2 id="topics-title">{copy('Topics', 'ผลรายหัวข้อ')}</h2><span className="history-card-meta">{copy(`${coaching.practice.length} to review`, `ควรทบทวน ${coaching.practice.length}`)}</span></div>
+                  <CardLabel tone="teal" icon="target" headingId="topics-title" meta={copy(`${coaching.practice.length} to review`, `ควรทบทวน ${coaching.practice.length}`)}>{copy('Topics', 'ผลรายหัวข้อ')}</CardLabel>
                   {coaching.practice.map((area) => <AreaRow key={area.id} area={area} locale={locale} onOpen={() => openQuestion(area.reviewIds[0])} />)}
                   {coaching.strengths.map((area) => <AreaRow key={area.id} area={area} locale={locale} />)}
                 </section>}
@@ -145,7 +160,7 @@ function AnswerReview({ report, locale, focusedId, focusVersion }: { report: Per
   ] as const;
   const hidden = (aligned: boolean, id: string) => id !== focusedId && (filter === 'review' ? aligned : filter === 'correct' ? !aligned : false);
   return <section className="history-card history-review-section" aria-labelledby="review-title">
-    <div className="history-review-heading"><h2 id="review-title">{copy('Your answers', 'คำตอบของคุณ')}</h2>
+    <div className="history-review-heading"><CardLabel tone="blue" icon="list" headingId="review-title">{copy('Your answers', 'คำตอบของคุณ')}</CardLabel>
       <div className="history-tabs" role="group" aria-label={copy('Filter answers', 'กรองคำตอบ')}>{tabs.map((tab) => <button key={tab.id} type="button" aria-pressed={filter === tab.id} onClick={() => setFilter(tab.id)}>{tab.label}<span>{tab.count}</span></button>)}</div>
     </div>
     <div className="history-review-content">
@@ -166,9 +181,17 @@ function ScoreSummary({ correct, incorrect, locale }: { correct: number; incorre
   const total = correct + incorrect;
   const percent = total ? Math.round((correct / total) * 100) : 0;
   return <div className="history-score">
-    <p className="history-score-main"><strong>{correct.toLocaleString(locale)}</strong><span>{copy(`of ${total.toLocaleString(locale)} correct`, `จาก ${total.toLocaleString(locale)} ข้อที่ตอบถูก`)}</span><em>{percent}%</em></p>
-    <div className="history-score-bar" role="img" aria-label={copy(`${correct} correct, ${incorrect} incorrect`, `ตอบถูก ${correct} ข้อ ตอบผิด ${incorrect} ข้อ`)}><span style={{ width: `${percent}%` }} /></div>
-    <p className="history-score-legend"><span className="history-legend-good">{copy(`Correct ${correct}`, `ตอบถูก ${correct}`)}</span><span className="history-legend-review">{copy(`Incorrect ${incorrect}`, `ตอบผิด ${incorrect}`)}</span></p>
+    <div className="history-ring" role="img" aria-label={copy(`${correct} correct, ${incorrect} incorrect`, `ตอบถูก ${correct} ข้อ ตอบผิด ${incorrect} ข้อ`)}>
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <circle className="history-ring-track" cx="60" cy="60" r="50" />
+        {percent > 0 && <circle className="history-ring-fill" cx="60" cy="60" r="50" pathLength={100} strokeDasharray={`${percent} 100`} transform="rotate(-90 60 60)" />}
+      </svg>
+      <span><strong>{percent}%</strong><small>{copy('correct', 'ตอบถูก')}</small></span>
+    </div>
+    <div className="history-score-text">
+      <p className="history-score-main"><strong>{correct.toLocaleString(locale)}</strong><span>{copy(`of ${total.toLocaleString(locale)} correct`, `จาก ${total.toLocaleString(locale)} ข้อที่ตอบถูก`)}</span></p>
+      <p className="history-score-legend"><span className="history-legend-good">{copy(`Correct ${correct}`, `ตอบถูก ${correct}`)}</span><span className="history-legend-review">{copy(`Incorrect ${incorrect}`, `ตอบผิด ${incorrect}`)}</span></p>
+    </div>
   </div>;
 }
 

@@ -31,7 +31,8 @@ export default function PersonalLscvdCard({ locale }: { locale: 'en' | 'th' }) {
 
   if (state === null || state === 'error') return null;
   const survey = state.survey;
-  const heading = <div className="history-card-heading"><h2 id="lscvd-title">{copy('Your heart health', 'สุขภาพหัวใจของคุณ')}</h2><span className="history-card-meta">LSCVD</span></div>;
+  // Lucide "heart": https://lucide.dev — license in components/ui/icons/lucide-LICENSE.
+  const heading = <div className="health-label-row"><h2 id="lscvd-title" className="health-label" data-tone="pink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>{copy('Your heart health', 'สุขภาพหัวใจของคุณ')}</h2><span className="history-card-meta">LSCVD</span></div>;
 
   if (!survey?.healthConsent || !survey.health) {
     return <section className="history-card lscvd-card" aria-labelledby="lscvd-title">
@@ -52,8 +53,9 @@ export default function PersonalLscvdCard({ locale }: { locale: 'en' | 'th' }) {
   return <section className="history-card lscvd-card" aria-labelledby="lscvd-title">
     {heading}
     <div className="lscvd-summary" data-risk={me.highRisk || undefined}>
-      <strong>{me.riskCount}<small>/{FACTORS.length}</small></strong>
-      <p>{me.highRisk
+      <p className="lscvd-count"><strong>{me.riskCount}</strong><span>{copy(`of ${FACTORS.length} risk factors`, `จาก ${FACTORS.length} ปัจจัยเสี่ยง`)}</span></p>
+      <div className="lscvd-meter" aria-hidden="true">{FACTORS.map(([key], index) => <span key={key} data-on={index < me.riskCount || undefined} />)}</div>
+      <p className="lscvd-message">{me.highRisk
         ? copy('You reported several risk factors or a previous heart attack or stroke. Consider talking to a doctor about your heart risk.', 'คุณรายงานปัจจัยเสี่ยงหลายข้อ หรือเคยเป็นโรคหัวใจ/หลอดเลือดสมอง ควรปรึกษาแพทย์เพื่อประเมินความเสี่ยงโรคหัวใจ')
         : me.riskCount > 0
           ? copy('Risk factors you reported. Keeping these in check lowers heart disease risk.', 'ปัจจัยเสี่ยงที่คุณรายงาน การดูแลปัจจัยเหล่านี้ช่วยลดความเสี่ยงโรคหัวใจ')
@@ -61,7 +63,7 @@ export default function PersonalLscvdCard({ locale }: { locale: 'en' | 'th' }) {
     </div>
     <ul className="lscvd-factors">
       {FACTORS.map(([key, en, th]) => <li key={key} data-state={me.factors[key] === null ? 'unknown' : me.factors[key] ? 'yes' : 'no'}>
-        <span>{copy(en, th)}{key === 'overweight' && me.bmi !== null && <small> · BMI {me.bmi}</small>}</span><strong>{status(me.factors[key])}</strong>
+        <span className="lscvd-dot" aria-hidden="true" /><span>{copy(en, th)}{key === 'overweight' && me.bmi !== null && <small> · BMI {me.bmi}</small>}</span><strong>{status(me.factors[key])}</strong>
       </li>)}
     </ul>
     <dl className="lscvd-lipids">
