@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '@/lib/hooks/useTheme';
 import { PROVINCE_FILTER_KEYS, type ProvinceReport } from '@/lib/analytics/lscvd';
 import { CLASS_COUNT, METRICS, classBreaks, classOf, formatMetric, isSuppressed, metricByKey, type ScaleMode } from '@/lib/analytics/lscvd-metrics';
 import { MAP_ATTRIBUTION } from '@/lib/maps/thailand-provinces';
@@ -20,7 +19,6 @@ const name = (code: string, th: boolean) => { const p = PROVINCES.find(x => x.co
 export default function ProvinceExplorer() {
   const { i18n } = useTranslation(); const th = i18n.language.startsWith('th');
   const copy = (en: string, thai: string) => (th ? thai : en);
-  const { theme, toggleTheme } = useTheme();
   const router = useRouter(); const pathname = usePathname(); const params = useSearchParams();
 
   const get = (key: string) => params.get(key) ?? '';
@@ -113,9 +111,6 @@ export default function ProvinceExplorer() {
           <h2>{copy('Heart and lipid health by province', 'สุขภาพหัวใจและไขมันรายจังหวัด')}</h2>
           <p>{copy('Rest the pointer on a province for its summary, or click for details.', 'ชี้ค้างที่จังหวัดเพื่อดูสรุป หรือคลิกเพื่อดูรายละเอียด')}</p>
         </div>
-        <button type="button" className={styles.button} onClick={toggleTheme} aria-label={copy('Switch light or dark mode', 'สลับโหมดสว่างหรือมืด')}>
-          {theme === 'dark' ? copy('Light mode', 'โหมดสว่าง') : copy('Dark mode', 'โหมดมืด')}
-        </button>
       </div>
       <div className={styles.filterRow}>
         <div className={styles.search}>
@@ -217,7 +212,7 @@ export default function ProvinceExplorer() {
           <p className={styles.attribution}>{MAP_ATTRIBUTION}</p>
         </div>
 
-        <div className={styles.tableWrap}>
+        <div className={styles.tableCol}><div className={styles.tableWrap}>
           <table className={styles.table}>
             <caption>{copy(`${rows.length} provinces · Thailand: ${formatMetric(metric, report.national, false)}`, `${rows.length} จังหวัด · ทั้งประเทศ: ${formatMetric(metric, report.national, true)}`)}</caption>
             <thead><tr>
@@ -234,7 +229,7 @@ export default function ProvinceExplorer() {
               {metric.key !== 'participants' && <td className={styles.num}>{formatMetric(metric, s, th)}</td>}
             </tr>)}</tbody>
           </table>
-        </div>
+        </div></div>
       </div>}
   </section>;
 }

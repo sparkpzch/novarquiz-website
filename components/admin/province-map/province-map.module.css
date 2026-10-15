@@ -9,15 +9,19 @@
   --map-line: var(--nq-line);
   --map-accent: var(--nq-primary);
   --map-ramp-0: #86b6ef; --map-ramp-1: #5598e7; --map-ramp-2: #2a78d6; --map-ramp-3: #1c5cab; --map-ramp-4: #104281;
-  --map-empty: #eef2f7;
-  --map-hatch: #b9c3cf;
+  /* Neutral fills must stand apart from the white panel, or provinces with no
+     data make the country outline disappear. */
+  --map-empty: #d3dbe5;
+  --map-hatch: #9eabbb;
+  --map-edge: #ffffff;
   --map-outline: #16324f;
   display: grid; gap: 16px; min-width: 0; color: var(--map-ink);
 }
 :global([data-theme="dark"]) .root {
   --map-ramp-0: #1c5cab; --map-ramp-1: #2a78d6; --map-ramp-2: #5598e7; --map-ramp-3: #86b6ef; --map-ramp-4: #b7d3f6;
-  --map-empty: #303030;
-  --map-hatch: #5a5a5a;
+  --map-empty: #3d3d3d;
+  --map-hatch: #666666;
+  --map-edge: #262626;
   --map-outline: #f5f5f5;
 }
 
@@ -51,11 +55,14 @@
 .chip button { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent; color: var(--map-muted); cursor: pointer; font-size: 15px; line-height: 1; }
 
 /* Map + table */
-.layout { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-@media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+.layout { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+/* The map panel sets the row height; the table fills it and scrolls inside. */
+.tableCol { position: relative; min-height: 320px; }
+.tableCol > .tableWrap { position: absolute; inset: 0; max-height: none; }
+@media (max-width: 960px) { .layout { grid-template-columns: 1fr; } .tableCol { min-height: 0; } .tableCol > .tableWrap { position: static; max-height: 70vh; } }
 .mapWrap { position: relative; }
 .map { display: block; width: 100%; height: auto; max-height: 78vh; touch-action: manipulation; }
-.shape { stroke: var(--map-card); stroke-width: 0.8; stroke-linejoin: round; cursor: pointer; transition: opacity .15s; }
+.shape { stroke: var(--map-edge); stroke-width: 0.8; stroke-linejoin: round; cursor: pointer; transition: opacity .15s; }
 .shape[data-dim] { opacity: .25; }
 .shape:hover, .shape[data-active] { stroke: var(--map-outline); stroke-width: 1.6; }
 .shape:focus-visible { outline: none; stroke: var(--map-accent); stroke-width: 2.4; }
@@ -88,7 +95,7 @@
 .hint { margin: 10px 0 0; font-size: 11px; color: var(--map-muted); }
 
 /* Table */
-.tableWrap { overflow: auto; max-height: 78vh; border: 1px solid var(--map-line); border-radius: 10px; }
+.tableWrap { overflow: auto; max-height: 78vh; border: 1px solid var(--map-line); border-radius: 10px; background: var(--map-card); }
 .table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .table caption { text-align: left; padding: 10px 12px; font-size: 12px; color: var(--map-muted); }
 .table th { position: sticky; top: 0; background: var(--map-inset); text-align: left; font-weight: 600; z-index: 1; }

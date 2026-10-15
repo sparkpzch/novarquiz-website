@@ -5,7 +5,7 @@ import { PROVINCES } from '@/lib/onboarding/provinces';
 import styles from './province-map.module.css';
 
 /** How long the pointer must rest on a province before its summary appears. */
-export const HOVER_DELAY_MS = 1500;
+export const HOVER_DELAY_MS = 700;
 const CARD_WIDTH = 300;
 const CARD_HEIGHT = 300;
 

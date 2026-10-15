@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '@/lib/hooks/useTheme';
 import { MIN_CELL, PROVINCE_FILTER_KEYS, type LscvdSummary } from '@/lib/analytics/lscvd';
 import { provinceCsv } from '@/lib/analytics/lscvd-export';
 import type { ProvinceActivity } from '@/lib/db/lscvd-analytics';
@@ -21,7 +20,6 @@ const GENDER: Record<string, [string, string]> = { female: ['Female', 'หญิ
 export default function ProvinceDetail({ code }: { code: string }) {
   const { i18n } = useTranslation(); const th = i18n.language.startsWith('th');
   const copy = (en: string, thai: string) => (th ? thai : en);
-  const { theme, toggleTheme } = useTheme();
   const params = useSearchParams();
   const province = PROVINCES.find(p => p.code === code);
   const serverQuery = useMemo(() => { const q = new URLSearchParams(); for (const k of PROVINCE_FILTER_KEYS) if (params.get(k)) q.set(k, params.get(k)!); return q.toString(); }, [params]);
@@ -83,7 +81,6 @@ export default function ProvinceDetail({ code }: { code: string }) {
         </div>
         <div className={styles.actions}>
           {current?.data && <button type="button" className={styles.button} onClick={() => exportCsv(current.data!)}>{copy('Export CSV', 'ส่งออก CSV')}</button>}
-          <button type="button" className={styles.button} onClick={toggleTheme} aria-label={copy('Switch light or dark mode', 'สลับโหมดสว่างหรือมืด')}>{theme === 'dark' ? copy('Light mode', 'โหมดสว่าง') : copy('Dark mode', 'โหมดมืด')}</button>
         </div>
       </div>
       {filterChips.length > 0 && <div className={styles.filters} aria-label={copy('Active filters', 'filter ที่ใช้อยู่')}>{filterChips.map(c => <span key={c}>{c}</span>)}</div>}
