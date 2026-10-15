@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/hooks/useAuth';
 import SurveyFields, { emptySurvey } from './SurveyFields';
-import type { SurveyInput } from '@/lib/onboarding/survey';
+import type { SurveyDraft } from '@/lib/onboarding/survey';
 import styles from './survey.module.css';
 import { PRIVACY_VERSION, TOS_VERSION } from '@/lib/privacy/versions';
 
@@ -17,7 +17,7 @@ export default function SurveyGate({editing=false,renderTrigger}:{editing?:boole
   const copy=(en:string,thai:string)=>th?thai:en;
   const [state,setState]=useState<'loading'|'required'|'complete'|'error'|'consent'>('loading');
   const [open,setOpen]=useState(false);
-  const [value,setValue]=useState<SurveyInput>(emptySurvey);
+  const [value,setValue]=useState<SurveyDraft>(emptySurvey);const [returning,setReturning]=useState(false);
   const [saving,setSaving]=useState(false);const [error,setError]=useState('');const [retry,setRetry]=useState(0);
   const dialog=useRef<HTMLDivElement>(null);
   const uid=user?.uid;const anonymous=user?.isAnonymous;const displayName=user?.displayName;
@@ -26,7 +26,7 @@ export default function SurveyGate({editing=false,renderTrigger}:{editing?:boole
     const abort=new AbortController();
     fetch('/api/onboarding',{signal:abort.signal,cache:'no-store'}).then(async r=>{if(!r.ok)throw new Error();return r.json();}).then(async data=>{
       if (abort.signal.aborted) return;
-      if (data.survey) { const {version: _version,...answers}=data.survey; void _version; setValue(answers); }
+      if (data.survey) { const {version: _version,...answers}=data.survey; void _version; setValue(answers); setReturning(true); }
       else { const parts=(displayName??'').trim().split(/\s+/);setValue({...emptySurvey,firstName:parts[0]??'',lastName:parts.slice(1).join(' ')}); }
       if (data.required && !editing) {
         const response=await fetch('/api/auth/consent',{signal:abort.signal,cache:'no-store'});
@@ -64,7 +64,7 @@ export default function SurveyGate({editing=false,renderTrigger}:{editing?:boole
       if(e.key==='Tab'){const nodes=dialog.current?.querySelectorAll<HTMLElement>('input,select,button,a');if(!nodes?.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}
     }}>
       <p className={styles.eyebrow}>{copy('YOUR PROFILE','ข้อมูลของคุณ')}</p><h2 id={editing?'survey-edit-title':'survey-title'}>{editing?copy('Edit your questionnaire','แก้ไขแบบสอบถาม'):copy('Profile information','ข้อมูลโปรไฟล์')}</h2>
-      <p className={styles.intro}>{editing?copy('Update your details and analytics consent. Only your name is required.','แก้ไขข้อมูลและความยินยอมในการวิเคราะห์ บังคับเฉพาะชื่อและนามสกุล'):copy('A short questionnaire before you continue. Only your name is required.','แบบสอบถามสั้น ๆ ก่อนเริ่มใช้งาน บังคับเฉพาะชื่อและนามสกุล')}</p>
+      <p className={styles.intro}>{editing?copy('Update your details and analytics consent. Only your name and province are required.','แก้ไขข้อมูลและความยินยอมในการวิเคราะห์ บังคับเฉพาะชื่อ นามสกุล และจังหวัด'):returning?copy('We added a few questions. Your earlier answers are filled in, so you only need to choose your province.','มีคำถามเพิ่มเติม คำตอบเดิมของคุณกรอกไว้ให้แล้ว เลือกจังหวัดเพื่อไปต่อ'):copy('A short questionnaire before you continue. Only your name and province are required.','แบบสอบถามสั้น ๆ ก่อนเริ่มใช้งาน บังคับเฉพาะชื่อ นามสกุล และจังหวัด')}</p>
       {state==='loading'?<p role="status">{copy('Loading your profile…','กำลังโหลดข้อมูล…')}</p>:state==='error'?<div role="alert"><p>{copy('Could not load the questionnaire. Please try again.','โหลดแบบสอบถามไม่ได้ กรุณาลองอีกครั้ง')}</p><button className={styles.submit} onClick={()=>{setState('loading');setRetry(n=>n+1);}}>{copy('Try again','ลองอีกครั้ง')}</button></div>:<form onSubmit={async e=>{
         e.preventDefault();setSaving(true);setError('');
         try {const r=await fetch('/api/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)});if(!r.ok)throw new Error();await refreshUser();setState('complete');setOpen(false);}

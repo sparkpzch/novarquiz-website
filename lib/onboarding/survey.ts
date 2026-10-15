@@ -1,7 +1,26 @@
 import { z } from 'zod';
+import { PROVINCE_CODES } from './provinces';
 
-export const SURVEY_VERSION = '2026-10-v1';
-export const SurveySchema = z.object({
+// v2 added province (required) and the opt-in heart and blood-lipid section.
+export const SURVEY_VERSION = '2026-10-v2';
+
+const yesNo = z.enum(['yes', 'no', 'unknown']);
+/** Self-reported LSCVD risk factors. Only stored with healthConsent. */
+export const HealthSchema = z.object({
+  waistCm: z.number().min(30).max(250).nullable(),
+  smoking: z.enum(['never', 'former', 'current', 'unknown']),
+  hypertension: yesNo,
+  diabetes: yesNo,
+  highCholesterol: yesNo,
+  lipidCheck: z.enum(['within_1y', 'within_5y', 'over_5y', 'never', 'unknown']),
+  ldlRange: z.enum(['lt70', '70_99', '100_129', '130_159', '160_189', 'gte190', 'unknown']),
+  lipidMedication: yesNo,
+  familyHistory: yesNo,
+  priorEvent: yesNo,
+}).strict();
+export type HealthInput = z.infer<typeof HealthSchema>;
+
+const SurveyObject = z.object({
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
   age: z.number().int().min(1).max(120).nullable(),
@@ -10,9 +29,18 @@ export const SurveySchema = z.object({
   heightCm: z.number().min(30).max(250).nullable(),
   activity: z.enum(['low', 'moderate', 'high', 'prefer_not_to_say']),
   analyticsConsent: z.boolean(),
+  province: z.enum([...PROVINCE_CODES, 'prefer_not_to_say']),
+  healthConsent: z.boolean(),
+  health: HealthSchema.nullable(),
 }).strict();
+export const SurveySchema = SurveyObject.refine(s => !s.healthConsent || s.health !== null, { path: ['health'] });
+/** The fields the demographic charts read. */
+export const DemographicsSchema = SurveyObject.pick({ age: true, gender: true, weightKg: true, heightCm: true, activity: true, analyticsConsent: true });
 export type SurveyInput = z.infer<typeof SurveySchema>;
-export type SurveyRecord = SurveyInput & { version: string };
+export type DemographicsInput = z.infer<typeof DemographicsSchema>;
+/** Form state; province is '' until the person picks one. */
+export type SurveyDraft = Omit<SurveyInput, 'province'> & { province: SurveyInput['province'] | '' };
+export type SurveyRecord = SurveyDraft & { version: string };
 export type ChartBin = { label: string; count: number };
 export type HistogramBin = ChartBin & { start: number; end: number };
 export type HistogramData = { bins: HistogramBin[]; answered: number; missing: number; binWidth: number };
@@ -41,9 +69,9 @@ export function histogram(values: Array<number | null>, binWidth = 10): Histogra
   return result;
 }
 
-export function summarizeSurveys(total: number, surveys: SurveyInput[]): DemographicsReport {
+export function summarizeSurveys(total: number, surveys: DemographicsInput[]): DemographicsReport {
   const consenting = surveys.filter(s => s.analyticsConsent);
-  const bins = (labels: string[], pick: (s: SurveyInput) => number) => labels.map((label, index) => ({ label, count: consenting.filter(s => pick(s) === index).length }));
+  const bins = (labels: string[], pick: (s: DemographicsInput) => number) => labels.map((label, index) => ({ label, count: consenting.filter(s => pick(s) === index).length }));
   return {
     total, completed: surveys.length, consenting: consenting.length,
     histograms: {
