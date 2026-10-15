@@ -93,6 +93,11 @@ function SignUpForm() {
         <p className="nq-auth-muted text-sm">
           We sent a verification link to <span className="font-medium" style={{ color: 'var(--nq-auth-text)' }}>{email}</span>. Click it to activate your account, then sign in.
         </p>
+        <p className="rounded-lg px-4 py-3 text-sm" style={{ background: 'var(--nq-auth-tabs)', color: 'var(--nq-auth-text)' }}>
+          {language.startsWith('th')
+            ? 'ไม่เจออีเมล? ลองดูในโฟลเดอร์สแปม (Spam) หรืออีเมลขยะ (Junk)'
+            : 'Can’t find the email? Check your Spam or Junk folder.'}
+        </p>
         <Button className="w-full mt-2" onClick={() => router.push(authHref('/sign-in', returnPath))}>Go to Login</Button>
       </motion.div>
     );
