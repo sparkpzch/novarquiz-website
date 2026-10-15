@@ -50,10 +50,10 @@
 .page :global(.history-layout) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); grid-template-areas: "result side" "answers side"; grid-template-rows: auto 1fr; align-items: start; gap: 16px; }
 .page :global(.history-layout) > :global(.history-session) { grid-area: result; }
 .page :global(.history-layout) > :global(.history-review-section) { grid-area: answers; }
+.page :global(.history-layout):not(:has(> :global(.history-side))) { grid-template-columns: minmax(0, 1fr); grid-template-areas: "result" "answers"; }
 .page :global(.history-side) { grid-area: side; display: grid; gap: 16px; position: sticky; top: 24px; min-width: 0; }
-.page :global(.history-side) :global(.nq-personal-recap.history-recap) { margin-bottom: 0; }
 /* The topic list below already shows what to revisit. */
-.page :global(.history-side) :global(.history-recap-facts) { display: none; }
+.page :global(.history-recap) :global(.history-recap-facts) { display: none; }
 .page :global(.history-session) { padding: 22px; }
 .page :global(.history-session-heading) { min-width: 0; margin-bottom: 20px; }
 .page :global(.history-session-heading) h2 { font-size: 20px; font-weight: 650; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }
@@ -169,7 +169,7 @@
 @media (prefers-reduced-motion: reduce) { .page :global(.history-spinner) { animation: none; } }
 
 /* Personal heart-health (LSCVD) card. */
-.page :global(.lscvd-card) { margin-top: 16px; padding: 20px; display: grid; gap: 16px; }
+.page :global(.lscvd-card) { margin-bottom: 16px; padding: 20px; display: grid; gap: 16px; }
 .page :global(.lscvd-summary) { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-radius: 10px; background: var(--history-green-soft); color: var(--history-green); }
 .page :global(.lscvd-summary)[data-risk] { background: var(--history-peach-soft); color: var(--history-peach); }
 .page :global(.lscvd-summary) strong { font-size: 32px; font-weight: 750; line-height: 1; font-variant-numeric: tabular-nums; flex-shrink: 0; }

@@ -91,12 +91,14 @@ function StatsPageContent() {
           <Link href="/history" className="history-secondary">{copy('View quiz history', 'ดูประวัติแบบทดสอบ')}<Icon name="arrow" /></Link>
         </header>
 
+        {uid && <PersonalLscvdCard key={`${uid}:${version}`} locale={locale} />}
         {authLoading || (uid && !history) ? <Loading label={copy('Finding your completed quizzes…', 'กำลังค้นหาแบบทดสอบที่คุณทำเสร็จ…')} /> : !uid ? (
           <section className="history-card history-empty"><Icon name="book" /><h2>{copy('Sign in to see your results', 'เข้าสู่ระบบเพื่อดูผลแบบทดสอบ')}</h2><p>{copy('Sign in to see your completed quizzes and helpful next steps.', 'เข้าสู่ระบบเพื่อดูแบบทดสอบที่คุณทำแล้วและคำแนะนำสำหรับคุณ')}</p><Link href="/sign-in?next=%2Fstats" className="history-primary">{copy('Sign in', 'เข้าสู่ระบบ')}</Link></section>
         ) : history?.error ? <ErrorPanel onRetry={() => setVersion((v) => v + 1)} message={copy('We couldn’t find your quizzes. Please try again.', 'ยังโหลดแบบทดสอบของคุณไม่ได้ กรุณาลองอีกครั้ง')} label={copy('Try again', 'ลองอีกครั้ง')} /> : !rows.length ? (
           <section className="history-card history-empty"><Icon name="book" /><h2>{copy('Start with something you’re curious about', 'เริ่มจากเรื่องที่คุณอยากรู้')}</h2><p>{copy('Complete a health quiz, then come back for a simple recap and a next step just for you.', 'ทำแบบทดสอบสุขภาพ แล้วกลับมาดูสรุปและคำแนะนำสำหรับคุณ')}</p><Link href="/quizzes" className="history-primary">{copy('Choose a quiz', 'เลือกแบบทดสอบสุขภาพ')} <Icon name="arrow" /></Link></section>
         ) : <>
           {!selected ? <section className="history-card history-empty"><h2>{copy('Choose one of your completed quizzes', 'เลือกแบบทดสอบที่คุณทำเสร็จแล้ว')}</h2><p>{copy('This quiz isn’t in your history.', 'ไม่พบแบบทดสอบนี้ในประวัติของคุณ')}</p><Link href="/stats" className="history-primary">{copy('See my latest quiz', 'ดูแบบทดสอบล่าสุด')}</Link></section> : !reportResult ? <Loading label={copy('Loading summary…', 'กำลังเตรียมสรุปผลแบบทดสอบ…')} /> : reportResult.error ? <ErrorPanel onRetry={() => setVersion((v) => v + 1)} message={copy('Your recap couldn’t load. Give it another try.', 'ยังโหลดสรุปของคุณไม่ได้ กรุณาลองอีกครั้ง')} label={copy('Try again', 'ลองอีกครั้ง')} /> : report && coaching && <>
+            <PersonalRecapCard report={report} locale={locale} fullDetails />
             <div className="history-layout">
               <section className="history-card history-session" aria-labelledby="session-title">
               <CardLabel tone="green" icon="check" meta={date(report.session.completed_at)}>{copy('Quiz result', 'ผลแบบทดสอบ')}</CardLabel>
@@ -109,20 +111,18 @@ function StatsPageContent() {
                 <div data-tone="blue"><dt><Icon name="clock" />{copy('Time spent', 'เวลาที่ใช้')}</dt><dd>{formatDuration(report.session.total_time_ms, locale)}</dd></div>
               </dl>
             </section>
-              <aside className="history-side">
-                <PersonalRecapCard report={report} locale={locale} fullDetails />
-                {coaching.total > 0 && <section className="history-card history-area-card" aria-labelledby="topics-title">
+              {coaching.total > 0 && <aside className="history-side">
+                <section className="history-card history-area-card" aria-labelledby="topics-title">
                   <CardLabel tone="teal" icon="target" headingId="topics-title" meta={copy(`${coaching.practice.length} to review`, `ควรทบทวน ${coaching.practice.length}`)}>{copy('Topics', 'ผลรายหัวข้อ')}</CardLabel>
                   {coaching.practice.map((area) => <AreaRow key={area.id} area={area} locale={locale} onOpen={() => openQuestion(area.reviewIds[0])} />)}
                   {coaching.strengths.map((area) => <AreaRow key={area.id} area={area} locale={locale} />)}
-                </section>}
-              </aside>
+                </section>
+              </aside>}
               {coaching.total > 0 && <AnswerReview key={reportKey} report={report} locale={locale} focusedId={focus?.key === reportKey ? focus.id : null} focusVersion={focus?.version ?? 0} />}
             </div>
             <footer className="history-footnote"><p>{everydayFeedback?.reviewStatus === 'provisional' ? copy('AI helped write this recap from your quiz answers. It hasn’t been reviewed yet.', 'AI ช่วยเขียนสรุปนี้จากคำตอบของคุณ โดยยังไม่ได้รับการตรวจทาน') : everydayFeedback && everydayFeedback.reviewStatus !== 'standard' ? copy('This recap uses reviewed quiz feedback.', 'สรุปนี้ใช้คำแนะนำจากแบบทดสอบที่ผ่านการตรวจทาน') : copy('This recap is based on your quiz answers.', 'สรุปนี้อ้างอิงจากคำตอบในแบบทดสอบของคุณ')}</p><p>{copy('Quiz results are not a health assessment or medical advice.', 'ผลแบบทดสอบไม่ใช่การประเมินสุขภาพหรือคำแนะนำทางการแพทย์')}</p></footer>
           </>}
         </>}
-        {uid && <PersonalLscvdCard key={`${uid}:${version}`} locale={locale} />}
       </div>
     </div>
   );
