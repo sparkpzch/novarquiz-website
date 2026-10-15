@@ -1,12 +1,10 @@
 'use client';
 import type { HealthInput, SurveyDraft } from '@/lib/onboarding/survey';
-import { PROVINCES, type ThaiRegion } from '@/lib/onboarding/provinces';
+import { PROVINCES, REGION_LABELS } from '@/lib/onboarding/provinces';
 import styles from './survey.module.css';
 
 export const emptySurvey: SurveyDraft = { firstName:'',lastName:'',age:null,gender:'prefer_not_to_say',weightKg:null,heightCm:null,activity:'prefer_not_to_say',analyticsConsent:false,province:'',healthConsent:false,health:null };
 const emptyHealth: HealthInput = { waistCm:null,smoking:'unknown',hypertension:'unknown',diabetes:'unknown',highCholesterol:'unknown',lipidCheck:'unknown',ldlRange:'unknown',lipidMedication:'unknown',familyHistory:'unknown',priorEvent:'unknown' };
-
-const REGIONS: Array<[ThaiRegion,string,string]> = [['bangkok_metro','Bangkok and vicinity','กรุงเทพฯ และปริมณฑล'],['central','Central','ภาคกลาง'],['north','North','ภาคเหนือ'],['northeast','Northeast','ภาคตะวันออกเฉียงเหนือ'],['east','East','ภาคตะวันออก'],['west','West','ภาคตะวันตก'],['south','South','ภาคใต้']];
 
 type Option<T extends string> = [T,string,string];
 function Choice<T extends string>({name,legend,hint,options,value,onChange,th}:{name:string;legend:string;hint?:string;options:Option<T>[];value:T;onChange:(v:T)=>void;th:boolean}) {
@@ -36,7 +34,7 @@ export default function SurveyFields({value,onChange,th=false}:{value:SurveyDraf
     <label className={styles.row}>{copy('Province you live in','จังหวัดที่อาศัยอยู่')}<select required value={value.province} onChange={e=>change('province',e.target.value as SurveyDraft['province'])}>
       <option value="" disabled>{copy('Choose a province','เลือกจังหวัด')}</option>
       <option value="prefer_not_to_say">{copy('Prefer not to say','ไม่ประสงค์ระบุ')}</option>
-      {REGIONS.map(([region,en,thai])=><optgroup key={region} label={th?thai:en}>{PROVINCES.filter(p=>p.region===region).sort(byName).map(p=><option key={p.code} value={p.code}>{th?p.th:p.en}</option>)}</optgroup>)}
+      {REGION_LABELS.map(({region,en,th:thai})=><optgroup key={region} label={th?thai:en}>{PROVINCES.filter(p=>p.region===region).sort(byName).map(p=><option key={p.code} value={p.code}>{th?p.th:p.en}</option>)}</optgroup>)}
     </select></label>
     <label>{copy('Usual activity level · optional','ระดับกิจกรรมในชีวิตประจำวัน · ไม่บังคับ')}<select value={value.activity} onChange={e=>change('activity',e.target.value as SurveyDraft['activity'])}><option value="prefer_not_to_say">{copy('Prefer not to say','ไม่ประสงค์ระบุ')}</option><option value="low">{copy('Mostly sitting','นั่งเป็นส่วนใหญ่')}</option><option value="moderate">{copy('Some walking or exercise','เดินหรือออกกำลังกายบ้าง')}</option><option value="high">{copy('Frequently active','เคลื่อนไหวหรือออกกำลังกายเป็นประจำ')}</option></select></label>
     <label className={styles.consent}><input type="checkbox" checked={value.analyticsConsent} onChange={e=>change('analyticsConsent',e.target.checked)} /><span>{copy('I agree to include my survey answers in administrator demographic charts. This is optional; I can still use the website without opting in.','ยินยอมให้นำคำตอบไปใช้ในกราฟข้อมูลภาพรวมสำหรับผู้ดูแล การยินยอมนี้เป็นทางเลือกและไม่กระทบการใช้งานเว็บไซต์')}</span></label>

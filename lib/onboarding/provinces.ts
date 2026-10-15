@@ -5,6 +5,17 @@
 export type ThaiRegion = 'bangkok_metro' | 'central' | 'north' | 'northeast' | 'east' | 'west' | 'south';
 export type Province = { code: string; th: string; en: string; region: ThaiRegion };
 
+/** Region names, in the order regions are listed in forms and filters. */
+export const REGION_LABELS: Array<{ region: ThaiRegion; en: string; th: string }> = [
+  { region: 'bangkok_metro', en: 'Bangkok and vicinity', th: 'กรุงเทพฯ และปริมณฑล' },
+  { region: 'central', en: 'Central', th: 'ภาคกลาง' },
+  { region: 'north', en: 'North', th: 'ภาคเหนือ' },
+  { region: 'northeast', en: 'Northeast', th: 'ภาคตะวันออกเฉียงเหนือ' },
+  { region: 'east', en: 'East', th: 'ภาคตะวันออก' },
+  { region: 'west', en: 'West', th: 'ภาคตะวันตก' },
+  { region: 'south', en: 'South', th: 'ภาคใต้' },
+];
+
 export const PROVINCES = [
   { code: 'TH-10', th: 'กรุงเทพมหานคร', en: 'Bangkok', region: 'bangkok_metro' },
   { code: 'TH-11', th: 'สมุทรปราการ', en: 'Samut Prakan', region: 'bangkok_metro' },

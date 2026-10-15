@@ -135,7 +135,7 @@ export function summarizeProvinces(rows: ParticipantRow[], minCell = MIN_CELL) {
   return {
     minCell,
     national: summarize(rows, minCell),
-    provinces: Object.fromEntries([...byProvince].map(([code, list]) => [code, summarize(list, minCell)])) as Record<ProvinceCode, LscvdSummary>,
+    provinces: Object.fromEntries([...byProvince].map(([code, list]) => [code, summarize(list, minCell)])) as Record<string, LscvdSummary>,
   };
 }
 export type ProvinceReport = ReturnType<typeof summarizeProvinces>;
