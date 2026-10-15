@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { answerPatternSignature, approvedAnswerCoverage, buildProvisionalInsightPrompt, parseProvisionalInsight } from '../provisional-insights';
+import { answerPatternSignature, approvedAnswerCoverage, buildProvisionalInsightPrompt, parseProvisionalInsight, sharesApprovedFocus } from '../provisional-insights';
 
 const context = {
   quizName: 'Food labels',
@@ -102,4 +102,25 @@ test('similar scores do not permit reuse of wording about different selections o
 test('duplicate target answers cannot be used to manufacture source coverage', () => {
   const source = { ...context, answers: [context.answers[0], context.answers[0]] };
   assert.equal(approvedAnswerCoverage(source, context), 0);
+});
+
+test('reviewed wording about the same focus mistake is reused despite other different mistakes', () => {
+  const food = { question: 'What should he eat?', selected: 'Skip dinner entirely', selectedExplanation: 'Skipping meals does not balance the diet.', selectedAligned: false, alignedChoices: [{ text: 'Rice with steamed fish', explanation: 'Less saturated fat.' }] };
+  const walk = { question: 'How should he start?', selected: 'Brisk walking 30 minutes', selectedExplanation: null, selectedAligned: true, alignedChoices: [{ text: 'Brisk walking 30 minutes', explanation: null }] };
+  const check = { question: 'Which test?', selected: 'Refuse the test to save money', selectedExplanation: 'Tests find risk early.', selectedAligned: false, alignedChoices: [{ text: 'Blood lipid test', explanation: null }] };
+  const sweets = { question: 'How to manage it?', selected: 'Swap fried food for sweets', selectedExplanation: 'Sugar raises risk too.', selectedAligned: false, alignedChoices: [{ text: 'Cut fat and fried food', explanation: null }] };
+  const focus = { topic: 'Daily food', question: food.question };
+  const source = { quizName: 'Uncle Somchai', quizDescription: 'Health choices', learningFocus: focus, answers: [food, walk, check] };
+  const target = { quizName: 'Uncle Somchai', quizDescription: 'Health choices', learningFocus: focus, answers: [food, walk, { ...check, selected: 'Blood lipid test', selectedAligned: true }, sweets] };
+  const wording = { headline: 'Daily food for heart health', body: 'Skipping dinner entirely instead of rice with steamed fish does not reduce fat build-up.', suggestion: 'Choose balanced meals.' };
+  // The whole missed set differs, so the exact rule refuses...
+  assert.equal(approvedAnswerCoverage(source, target, wording), 0);
+  // ...but the reviewed wording only talks about the shared focus mistake.
+  assert.equal(sharesApprovedFocus(source, target, wording), true);
+  // A different wrong choice on the focus question is a different story.
+  assert.equal(sharesApprovedFocus(source, { ...target, answers: [{ ...food, selected: 'Beef noodles with a sweet drink' }, walk, sweets] }, wording), false);
+  // Wording that quotes another mistake the new player did not make is refused.
+  assert.equal(sharesApprovedFocus(source, target, { ...wording, suggestion: 'Also, refusing the test to save money hides risk.' }), false);
+  // So is a different focus question.
+  assert.equal(sharesApprovedFocus(source, { ...target, learningFocus: { topic: 'Tests', question: sweets.question } }, wording), false);
 });

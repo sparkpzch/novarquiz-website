@@ -1,6 +1,6 @@
 import pool, { queryWithRetry } from './postgres';
 import type { InsightLocale, InsightSummary } from '../analytics/insights';
-import { approvedAnswerCoverage } from '../analytics/provisional-insights';
+import { approvedAnswerCoverage, sharesApprovedFocus } from '../analytics/provisional-insights';
 
 export type AnswerReviewItem = {
   question: string;
@@ -66,7 +66,10 @@ export async function getSimilarReusableInsight(
        AND p.headline IS NOT NULL AND p.body IS NOT NULL
      ORDER BY (p.status = 'approved') DESC, p.reviewed_at DESC NULLS LAST, p.updated_at DESC`, [quizId, audience, locale],
   );
-  return result.rows.map((row) => ({ row, coverage: approvedAnswerCoverage(row.answer_context!, context, row) }))
+  // Exact evidence ranks first; reviewed wording about the same focus mistake
+  // is the fallback, so a reviewed summary wins over generating a new draft.
+  return result.rows.map((row) => ({ row, coverage: approvedAnswerCoverage(row.answer_context!, context, row)
+    || (row.status === 'approved' && sharesApprovedFocus(row.answer_context!, context, row) ? 0.5 : 0) }))
     .filter(({ coverage }) => coverage > 0)
     .sort((a, b) => Number(b.row.status === 'approved') - Number(a.row.status === 'approved') || b.coverage - a.coverage)[0]?.row ?? null;
 }

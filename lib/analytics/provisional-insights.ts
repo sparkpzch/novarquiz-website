@@ -54,6 +54,40 @@ function canonicalAnswers(answers: AnswerReviewContext['answers']) {
 /** Identical missed evidence reuses feedback despite different correct options.
  * Other nearby paths require every source selection and at least 80% coverage;
  * changed selections or authored explanations are never treated as matches. */
+/** True when `text` quotes `selected`: the whole choice when short, otherwise
+ * any 8-character run of it, so a paraphrased quote still counts. Errs towards
+ * "mentioned", which only ever blocks reuse. */
+function quotesSelection(text: string, selected: string): boolean {
+  const compact = (value: string) => value.replace(/\s+/g, '');
+  const haystack = compact(text), needle = compact(selected);
+  if (!needle) return false;
+  if (needle.length <= 8) return haystack.includes(needle);
+  for (let i = 0; i + 8 <= needle.length; i += 1) if (haystack.includes(needle.slice(i, i + 8))) return true;
+  return false;
+}
+
+/**
+ * Reviewed wording is written around one learning-focus question. When the
+ * new player missed that same question with the same choice, the wording still
+ * describes them, even if their other mistakes differ. Refused when the wording
+ * quotes any other missed selection the new player did not make.
+ */
+export function sharesApprovedFocus(source: AnswerReviewContext, target: AnswerReviewContext, wording: InsightSummary): boolean {
+  if (source.quizName !== target.quizName || source.quizDescription !== target.quizDescription) return false;
+  const question = source.learningFocus?.question;
+  if (!question || target.learningFocus?.question !== question) return false;
+  const key = (answer: AnswerReviewContext['answers'][number]) => JSON.stringify(canonicalAnswers([answer])[0]);
+  const sourceFocus = source.answers.find(answer => answer.question === question && !answer.selectedAligned);
+  const targetFocus = target.answers.find(answer => answer.question === question && !answer.selectedAligned);
+  if (!sourceFocus || !targetFocus || key(sourceFocus) !== key(targetFocus)) return false;
+  const targetMissed = new Set(target.answers.filter(answer => !answer.selectedAligned).map(key));
+  const text = [wording.headline, wording.body, wording.suggestion ?? ''].join(' ');
+  return !source.answers.some(answer => answer !== sourceFocus && quotesSelection(text, answer.selected) && (answer.selectedAligned
+    // A quoted correct choice must be the new player's choice too.
+    ? !target.answers.some(next => next.question === answer.question && next.selected === answer.selected)
+    : !targetMissed.has(key(answer))));
+}
+
 export function approvedAnswerCoverage(source: AnswerReviewContext, target: AnswerReviewContext, wording?: InsightSummary): number {
   if (source.quizName !== target.quizName || source.quizDescription !== target.quizDescription || !source.answers.length || !target.answers.length) return 0;
   // Praise for a fully correct path must not cover a nearby path with a miss.
