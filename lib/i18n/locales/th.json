@@ -201,7 +201,7 @@
   "play": {
     "ready": "พร้อมเล่นหรือยัง?",
     "start": "เริ่มแบบทดสอบ",
-    "questions_count": "คำถาม",
+    "max_questions": "สูงสุด {{n}} ข้อ",
     "time_per_question": "วินาทีต่อคำถาม",
     "score": "คะแนน",
     "streak": "สตรีค",

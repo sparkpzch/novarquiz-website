@@ -284,6 +284,10 @@ export default function ProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  // Typing the phrase makes deletion a deliberate act, not a stray tap.
+  const deletePhrase = copy("DELETE", "ลบบัญชี");
+  const [deleteInput, setDeleteInput] = useState("");
+  const closeDeleteModal = () => { if (deletingAccount) return; setDeleteModal(false); setDeleteInput(""); };
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -330,7 +334,7 @@ export default function ProfilePage() {
 
   const handleDeleteAccount = async () => {
     const currentUser = auth.currentUser;
-    if (!currentUser) return;
+    if (!currentUser || deleteInput.trim() !== deletePhrase) return;
 
     setDeletingAccount(true);
     try {
@@ -476,29 +480,38 @@ export default function ProfilePage() {
         transition={{ delay: 0.1 }}
         className="nq-card rounded-xl p-6"
       >
-        <div className="space-y-4">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex w-full items-center gap-4 py-1 transition hover:opacity-85"
-          >
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 shadow-sm">
-              <LogoutIcon />
-            </div>
-            <span className="text-[1.05rem] font-medium text-[#E85C5C]">{t("nav.logout")}</span>
-          </button>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex w-full items-center gap-4 py-1 transition hover:opacity-85"
+        >
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 shadow-sm">
+            <LogoutIcon />
+          </div>
+          <span className="text-[1.05rem] font-medium text-[#E85C5C]">{t("nav.logout")}</span>
+        </button>
+      </motion.section>
 
+      {/* Kept apart from logout so the irreversible action is never a near-miss tap. */}
+      <motion.section
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        aria-labelledby="danger-zone-title"
+        className="mt-10 rounded-xl border border-[#D9485F]/30 p-6"
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 id="danger-zone-title" className="text-base font-semibold text-[#D9485F]">{copy("Danger zone", "โซนอันตราย")}</h2>
+            <p className="mt-1 text-sm text-[#6D7D95]">{t("profile.delete_account_description")}</p>
+          </div>
           <button
             type="button"
             onClick={() => setDeleteModal(true)}
-            className="flex w-full items-center gap-4 py-1 transition hover:opacity-85"
+            className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[#D9485F]/50 px-4 py-2 text-sm font-medium text-[#D9485F] transition hover:bg-[#D9485F]/10"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-50 shadow-sm">
-              <DeleteAccountIcon />
-            </div>
-            <span className="text-[1.05rem] font-medium text-[#D9485F]">
-              {t("profile.delete_account")}
-            </span>
+            <DeleteAccountIcon />
+            {t("profile.delete_account")}
           </button>
         </div>
       </motion.section>
@@ -553,7 +566,7 @@ export default function ProfilePage() {
 
       <Modal
         isOpen={deleteModal}
-        onClose={() => !deletingAccount && setDeleteModal(false)}
+        onClose={closeDeleteModal}
         title={t("profile.delete_account")}
       >
         <div className="space-y-5">
@@ -564,10 +577,28 @@ export default function ProfilePage() {
             </p>
           </div>
 
+          <div>
+            <label htmlFor="delete-confirm" className="mb-1.5 block text-sm font-medium text-[#202A3F]">
+              {copy(`Type "${deletePhrase}" to confirm`, `พิมพ์ "${deletePhrase}" เพื่อยืนยัน`)}
+            </label>
+            <input
+              id="delete-confirm"
+              type="text"
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              value={deleteInput}
+              onChange={(e) => setDeleteInput(e.target.value)}
+              disabled={deletingAccount}
+              placeholder={deletePhrase}
+              className="w-full rounded-lg border border-[#D9E1EE] bg-[#F3F8FF] px-4 py-3 text-[#202A3F] outline-none focus:border-[#D9485F]"
+            />
+          </div>
+
           <div className="flex gap-3">
             <Button
               variant="secondary"
-              onClick={() => setDeleteModal(false)}
+              onClick={closeDeleteModal}
               className="flex-1"
               disabled={deletingAccount}
             >
@@ -577,7 +608,7 @@ export default function ProfilePage() {
               variant="danger"
               onClick={handleDeleteAccount}
               className="flex-1"
-              disabled={deletingAccount}
+              disabled={deletingAccount || deleteInput.trim() !== deletePhrase}
             >
               {deletingAccount
                 ? t("profile.deleting_account")

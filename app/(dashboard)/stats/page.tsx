@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import IconRefreshButton from '@/components/ui/IconRefreshButton';
 import LucideIcon from '@/components/ui/icons/LucideIcon';
 import PersonalRecapCard from '@/components/stats/PersonalRecapCard';
+import PersonalLscvdCard from '@/components/stats/PersonalLscvdCard';
 import { historyCoaching, isEverydayInsight, learningTopic, type LearningArea } from '@/lib/analytics/history-coaching';
 import type { PersonalHistoryReport, UserHistoryRow } from '@/lib/analytics/history';
 import styles from './stats.module.css';
@@ -106,6 +107,7 @@ function StatsPageContent() {
             <footer className="history-footnote"><p>{everydayFeedback?.reviewStatus === 'provisional' ? copy('AI helped write this recap from your quiz answers. It hasn’t been reviewed yet.', 'AI ช่วยเขียนสรุปนี้จากคำตอบของคุณ โดยยังไม่ได้รับการตรวจทาน') : everydayFeedback && everydayFeedback.reviewStatus !== 'standard' ? copy('This recap uses reviewed quiz feedback.', 'สรุปนี้ใช้คำแนะนำจากแบบทดสอบที่ผ่านการตรวจทาน') : copy('This recap is based on your quiz answers.', 'สรุปนี้อ้างอิงจากคำตอบในแบบทดสอบของคุณ')}</p><p>{copy('Quiz results are not a health assessment or medical advice.', 'ผลแบบทดสอบไม่ใช่การประเมินสุขภาพหรือคำแนะนำทางการแพทย์')}</p></footer>
           </>}
         </>}
+        {uid && <PersonalLscvdCard key={`${uid}:${version}`} locale={locale} />}
       </div>
     </div>
   );

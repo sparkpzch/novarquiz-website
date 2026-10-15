@@ -75,7 +75,7 @@ function SessionCard({
             {session.name}
           </h3>
           <span className="shrink-0 whitespace-nowrap rounded-full bg-[#0460A9]/10 px-3 py-1.5 text-sm font-bold text-[#0460A9]">
-            {session.question_count ?? 0} {th ? "ข้อ" : "questions"}
+            {th ? `สูงสุด ${session.question_count ?? 0} ข้อ` : `Up to ${session.question_count ?? 0} questions`}
           </span>
         </div>
         {session.description && (

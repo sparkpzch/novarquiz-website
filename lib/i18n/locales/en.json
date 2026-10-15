@@ -203,7 +203,7 @@
   "play": {
     "ready": "Ready to play?",
     "start": "Start quiz",
-    "questions_count": "questions",
+    "max_questions": "Up to {{n}} questions",
     "time_per_question": "sec per question",
     "score": "Score",
     "streak": "Streak",

@@ -141,3 +141,39 @@ export function summarizeProvinces(rows: ParticipantRow[], minCell = MIN_CELL) {
   };
 }
 export type ProvinceReport = ReturnType<typeof summarizeProvinces>;
+
+export type PersonalFactor = 'smoking' | 'hypertension' | 'diabetes' | 'highCholesterol' | 'familyHistory' | 'overweight';
+export type PersonalLscvd = {
+  /** Same factors, in the same order, that riskFactorCount() counts. */
+  factors: Record<PersonalFactor, boolean | null>;
+  riskCount: number;
+  bmi: number | null;
+  centralObesity: boolean | null;
+  /** Same rule as the province "high risk" metric. */
+  highRisk: boolean;
+  screening: 'recent' | 'overdue' | 'unknown';
+  ldlAtTarget: boolean | null;
+};
+
+/** One person's own answers, read with the same cut-offs as the admin map. */
+export function personalLscvd(p: { gender: ParticipantRow['gender']; weightKg: number | null; heightCm: number | null; health: HealthInput }): PersonalLscvd {
+  const h = p.health;
+  const flag = (v: 'yes' | 'no' | 'unknown') => (v === 'unknown' ? null : v === 'yes');
+  const bmi = p.weightKg && p.heightCm ? Math.round((p.weightKg / (p.heightCm / 100) ** 2) * 10) / 10 : null;
+  const factors: Record<PersonalFactor, boolean | null> = {
+    smoking: h.smoking === 'unknown' ? null : h.smoking === 'current',
+    hypertension: flag(h.hypertension),
+    diabetes: flag(h.diabetes),
+    highCholesterol: flag(h.highCholesterol),
+    familyHistory: flag(h.familyHistory),
+    overweight: bmi === null ? null : bmi >= 25,
+  };
+  const riskCount = Object.values(factors).filter(v => v === true).length;
+  return {
+    factors, riskCount, bmi,
+    centralObesity: !h.waistCm || (p.gender !== 'male' && p.gender !== 'female') ? null : h.waistCm >= (p.gender === 'male' ? 90 : 80),
+    highRisk: riskCount >= 3 || h.priorEvent === 'yes',
+    screening: h.lipidCheck === 'within_1y' || h.lipidCheck === 'within_5y' ? 'recent' : h.lipidCheck === 'unknown' ? 'unknown' : 'overdue',
+    ldlAtTarget: ldlAtTarget(h),
+  };
+}

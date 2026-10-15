@@ -121,7 +121,7 @@ export default function JoinInvitation({ token }: { token: string }) {
         <div className={styles.invitationDetails}>
         {quiz.description && <p className={styles.muted}>{quiz.description}</p>}
         <div className={styles.invitationFacts}>
-          {typeof quiz.question_count === 'number' && <span>{quiz.question_count} {copy('questions', 'คำถาม')}</span>}
+          {typeof quiz.question_count === 'number' && <span>{copy(`Up to ${quiz.question_count} questions`, `สูงสุด ${quiz.question_count} ข้อ`)}</span>}
           {typeof quiz.timer_seconds === 'number' && quiz.timer_seconds > 0 && <span>{quiz.timer_seconds} {copy('seconds per question', 'วินาทีต่อข้อ')}</span>}
         </div>
         <p className={styles.muted}>{copy('Join the quiz with your account. If the host has not started yet, you will wait in the lobby.', 'เข้าร่วมด้วยบัญชีของคุณ หากผู้จัดยังไม่เริ่ม คุณจะรอในห้องรับรอง')}</p>

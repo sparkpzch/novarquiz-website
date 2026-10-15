@@ -25,7 +25,7 @@
 @media (max-width: 640px) { .reportActions { width: 100%; } .reportPrimaryAction { flex: 1; } }
 
 /* Participant information: KPI row + one card per chart. */
-.audience { display: grid; gap: 16px; min-width: 0; color: var(--chart-ink); background: transparent; border: 0; padding: 0; }
+.audience { display: grid; gap: 16px; min-width: 0; color: var(--chart-ink); background: transparent; border: 0; padding: 0; container-type: inline-size; }
 .audience > .note { margin-top: 0; }
 .kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 20px 24px; background: var(--chart-card); border: 1px solid var(--chart-grid); border-radius: 12px; }
 .kpis > div { min-width: 0; padding: 0 24px; border-left: 1px solid var(--chart-grid); }
@@ -34,7 +34,16 @@
 .kpis dd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 6px 0 0; font-size: 26px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .kpis small { font-size: 12px; font-weight: 500; color: var(--chart-muted); }
 .chartGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-.chartGridTwo { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+/* Fixed column counts so a row never ends with an orphan card. */
+.chartGridTwo, .chartGridThree { grid-template-columns: minmax(0, 1fr); }
+@container (min-width: 560px) { .chartGridTwo { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (min-width: 860px) { .chartGridThree { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Stacked histograms would otherwise grow very tall on mid-width screens. */
+.chartGridThree .histogramPlot { max-width: 520px; margin-inline: auto; }
+.subsection { container-type: inline-size; }
+/* Dark mode: the inset token is darker than the card, so tracks and grid
+   lines read as black holes. Lift them above the card instead. */
+:global([data-theme="dark"]) :is(.panel, .audience, .subsection) { --chart-track: #3a3a3a; --chart-grid: #474747; --chart-accent: #5b7cff; }
 .chartCard { min-width: 0; padding: 20px; background: var(--chart-card); border: 1px solid var(--chart-grid); border-radius: 12px; }
 .chartCard h3 { font-size: 15px; font-weight: 650; }
 .chartCard .bars { margin-top: 18px; }
@@ -52,7 +61,7 @@
   .kpis { grid-template-columns: 1fr; padding: 16px; row-gap: 14px; }
   .kpis > div { padding: 14px 0 0; border-left: 0; border-top: 1px solid var(--chart-grid); }
   .kpis > div:first-child { padding-top: 0; border-top: 0; }
-  .chartGridTwo, .chartGrid { grid-template-columns: 1fr; }
+  .chartGrid { grid-template-columns: 1fr; }
   .chartCard { padding: 16px; }
 }
 @media (prefers-reduced-motion: reduce) { .skeleton > div { animation: none; } }

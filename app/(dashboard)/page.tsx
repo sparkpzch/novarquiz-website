@@ -287,6 +287,8 @@ function JoinByCodeCard() {
 }
 
 function QuizCard({ session, onClick, eagerImage = false }: { session: DashboardSession; onClick: () => void; eagerImage?: boolean }) {
+  const { i18n } = useTranslation();
+  const th = !i18n.language?.startsWith("en");
   return (
     <button
       type="button"
@@ -307,7 +309,7 @@ function QuizCard({ session, onClick, eagerImage = false }: { session: Dashboard
           <QuizThumbnail />
         )}
         <span className="absolute right-2 top-2 rounded-full border border-white/15 bg-[#080e2d]/80 px-2 py-1 text-[9px] font-semibold text-white backdrop-blur">
-          {session.question_count ?? 0} questions
+          {th ? `สูงสุด ${session.question_count ?? 0} ข้อ` : `Up to ${session.question_count ?? 0} questions`}
         </span>
       </div>
       <div className="p-3.5">

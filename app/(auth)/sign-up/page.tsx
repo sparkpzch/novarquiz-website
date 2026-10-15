@@ -63,6 +63,9 @@ function SignUpForm() {
       const idToken = await account.getIdToken(true);
       const saved = await fetch('/api/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify(survey) });
       if (!saved.ok) throw new Error('survey-save-failed');
+      // Record the terms accepted above so the first sign-in doesn't ask again.
+      const consent = await fetch('/api/auth/consent', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ consent_purposes: { platform_account: true } }) });
+      if (!consent.ok) throw new Error('survey-save-failed');
       setVerified(true);
     } catch (err: unknown) {
       const firebaseError = err as { code?: string };
@@ -86,9 +89,9 @@ function SignUpForm() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 md:text-white">Check your email</h1>
-        <p className="text-gray-500 md:text-gray-400 text-sm">
-          We sent a verification link to <span className="font-medium text-gray-800 md:text-white">{email}</span>. Click it to activate your account, then sign in.
+        <h1 className="text-2xl font-bold">Check your email</h1>
+        <p className="nq-auth-muted text-sm">
+          We sent a verification link to <span className="font-medium" style={{ color: 'var(--nq-auth-text)' }}>{email}</span>. Click it to activate your account, then sign in.
         </p>
         <Button className="w-full mt-2" onClick={() => router.push(authHref('/sign-in', returnPath))}>Go to Login</Button>
       </motion.div>
@@ -121,7 +124,7 @@ function SignUpForm() {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
-          <p className="mt-1 text-xs text-gray-400" style={{ fontSize: '11px' }}>Must be at least 8 characters.</p>
+          <p className="nq-auth-muted mt-1 text-xs" style={{ fontSize: '11px' }}>Must be at least 8 characters.</p>
         </div>
 
         <Input
@@ -166,7 +169,7 @@ function SignUpForm() {
               </svg>
             )}
           </div>
-          <span className="text-sm text-gray-600 md:text-gray-400">
+          <span className="nq-auth-muted text-sm">
             I have read and agree to the{' '}
             <button
               type="button"

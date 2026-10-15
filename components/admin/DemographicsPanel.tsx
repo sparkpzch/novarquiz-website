@@ -41,12 +41,12 @@ export default function DemographicsPanel({sessionId,quizId,province,minCell=MIN
         <div><dt>{copy('Included with consent','ยินยอมให้วิเคราะห์')}</dt><dd>{data.consenting.toLocaleString()}<small>{copy(`${percent(data.consenting,data.completed)}% of surveys`,`${percent(data.consenting,data.completed)}% ของผู้ตอบ`)}</small></dd></div>
       </dl>
       {data.consenting===0?<p className={`${styles.chartCard} ${styles.muted}`}>{copy('No consented survey data yet. Charts will appear after participants opt in.','ยังไม่มีข้อมูลแบบสอบถามที่ได้รับความยินยอม กราฟจะแสดงเมื่อผู้ใช้เลือกยินยอม')}</p>:'suppressed' in data?<p className={`${styles.chartCard} ${styles.muted}`}>{copy(`Charts appear once at least ${minCell} people consent (now ${data.consenting}).`,`กราฟจะแสดงเมื่อมีผู้ยินยอมอย่างน้อย ${minCell} คน (ตอนนี้ ${data.consenting} คน)`)}</p>:<>
-        <div className={styles.chartGrid}>
-          <div className={styles.chartCard}><DemographicHistogram data={data.histograms.age} title={copy('Age','อายุ')} unit={copy('years','ปี')} th={th}/></div>
+        <div className={`${styles.chartGrid} ${styles.chartGridTwo}`}>
           <div className={styles.chartCard}><h3>{copy('Gender','เพศ')}</h3><CountBars items={data.gender} th={th}/></div>
           <div className={styles.chartCard}><h3>{copy('Activity level','ระดับกิจกรรม')}</h3><CountBars items={data.activity} th={th}/></div>
         </div>
-        <div className={`${styles.chartGrid} ${styles.chartGridTwo}`}>
+        <div className={`${styles.chartGrid} ${styles.chartGridThree}`}>
+          <div className={styles.chartCard}><DemographicHistogram data={data.histograms.age} title={copy('Age','อายุ')} unit={copy('years','ปี')} th={th}/></div>
           <div className={styles.chartCard}><DemographicHistogram data={data.histograms.weight} title={copy('Weight','น้ำหนัก')} unit={copy('kg','กก.')} th={th}/></div>
           <div className={styles.chartCard}><DemographicHistogram data={data.histograms.height} title={copy('Height','ส่วนสูง')} unit={copy('cm','ซม.')} th={th}/></div>
         </div>

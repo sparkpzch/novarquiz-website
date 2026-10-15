@@ -166,3 +166,24 @@
   .page :global(.history-answer-detail) { padding-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .page :global(.history-spinner) { animation: none; } }
+
+/* Personal heart-health (LSCVD) card. */
+.page :global(.lscvd-card) { margin-top: 16px; padding: 20px; display: grid; gap: 16px; }
+.page :global(.lscvd-summary) { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-radius: 10px; background: var(--history-green-soft); color: var(--history-green); }
+.page :global(.lscvd-summary)[data-risk] { background: var(--history-peach-soft); color: var(--history-peach); }
+.page :global(.lscvd-summary) strong { font-size: 32px; font-weight: 750; line-height: 1; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.page :global(.lscvd-summary) strong small { font-size: 14px; font-weight: 600; opacity: .7; }
+.page :global(.lscvd-summary) p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--history-ink); }
+.page :global(.lscvd-factors) { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.page :global(.lscvd-factors) li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 12px; border: 1px solid var(--history-line); border-radius: 8px; font-size: 13px; }
+.page :global(.lscvd-factors) li small { color: var(--history-muted); }
+.page :global(.lscvd-factors) li strong { flex-shrink: 0; font-weight: 650; color: var(--history-muted); }
+.page :global(.lscvd-factors) li[data-state="yes"] strong { color: var(--history-peach); }
+.page :global(.lscvd-factors) li[data-state="no"] strong { color: var(--history-green); }
+.page :global(.lscvd-lipids) { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 0; }
+.page :global(.lscvd-lipids) dt { font-size: 12px; color: var(--history-muted); }
+.page :global(.lscvd-lipids) dd { margin: 4px 0 0; font-size: 15px; font-weight: 650; }
+.page :global(.lscvd-lipids) dd small { display: block; font-size: 12px; font-weight: 500; color: var(--history-muted); }
+.page :global(.lscvd-note) { margin: 0; font-size: 12px; line-height: 1.7; color: var(--history-muted); }
+.page :global(.lscvd-note) a { color: var(--history-purple); text-decoration: underline; text-underline-offset: 3px; }
+.page :global(.lscvd-card) > :global(.history-secondary) { justify-self: start; }

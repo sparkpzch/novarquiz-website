@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { summarize, summarizeProvinces, riskFactorCount, ldlAtTarget, MIN_CELL, type ParticipantRow } from '../lscvd';
+import { summarize, summarizeProvinces, riskFactorCount, ldlAtTarget, personalLscvd, MIN_CELL, type ParticipantRow } from '../lscvd';
 import type { HealthInput } from '../../onboarding/survey';
 
 const health: HealthInput = { waistCm: null, smoking: 'never', hypertension: 'no', diabetes: 'no', highCholesterol: 'no', lipidCheck: 'within_1y', ldlRange: 'lt70', lipidMedication: 'no', familyHistory: 'no', priorEvent: 'no' };
@@ -91,4 +91,19 @@ test('every province is reported, and the national total includes small province
   assert.equal(report.provinces['TH-50'].participants, 0);
   assert.equal(report.national.participants, 5);
   assert.equal(report.minCell, 3);
+});
+
+test('personal view counts the same risk factors as the province summary', () => {
+  const answers = { ...health, smoking: 'current', diabetes: 'yes', familyHistory: 'unknown', lipidCheck: 'never', ldlRange: '70_99' } as const;
+  const mine = personalLscvd({ gender: 'male', weightKg: 80, heightCm: 170, health: answers });
+  assert.equal(mine.riskCount, riskFactorCount(person({ weightKg: 80, health: answers })));
+  assert.equal(mine.riskCount, 3);
+  assert.equal(mine.factors.familyHistory, null);
+  assert.equal(mine.bmi, 27.7);
+  assert.equal(mine.highRisk, true);
+  assert.equal(mine.screening, 'overdue');
+  // Diabetes lowers the LDL goal to below 70.
+  assert.equal(mine.ldlAtTarget, false);
+  const low = personalLscvd({ gender: 'female', weightKg: null, heightCm: null, health: { ...health, priorEvent: 'yes' } });
+  assert.equal(low.riskCount, 0); assert.equal(low.highRisk, true); assert.equal(low.factors.overweight, null);
 });

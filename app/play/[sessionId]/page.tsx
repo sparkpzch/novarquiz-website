@@ -76,7 +76,7 @@ export default function PlayLobbyPage({ params }: { params: Promise<{ sessionId:
           <p className="mt-3 text-sm text-[#5D7EA1]">
             {status === 'error'
               ? 'We could not start this solo run right now.'
-              : `${t('play.questions_count')}: ${session?.question_count || '?'}. Launching the first question now.`}
+              : `${t('play.max_questions', { n: session?.question_count || '?' })}. Launching the first question now.`}
           </p>
 
           {status === 'error' ? (

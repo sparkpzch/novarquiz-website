@@ -96,7 +96,7 @@ function QuestionVisual({ question, totalQuestions, preparedVideo, th, children 
     </div>}
     <div className={styles.promptColumn}>
       {!(isScenario && question.media_url) && <div className={styles.questionMeta}><span className={styles.eyebrow}>{question.node_type === 'situation' ? copy('SCENARIO', 'สถานการณ์') : question.node_type === 'end' ? copy('FINAL REFLECTION', 'ก่อนดูผลของคุณ') : copy(`QUESTION ${question.question_order + 1}`, `คำถามที่ ${question.question_order + 1}`)}</span>
-        {question.node_type === 'normal' && !!totalQuestions && <span className={styles.eyebrow}>{copy(`${totalQuestions} questions`, `ทั้งหมด ${totalQuestions} ข้อ`)}</span>}
+        {question.node_type === 'normal' && !!totalQuestions && <span className={styles.eyebrow}>{copy(`Up to ${totalQuestions} questions`, `สูงสุด ${totalQuestions} ข้อ`)}</span>}
       </div>}
       {!(isScenario && question.media_url) && <h1 className={styles.questionTitle}>{question.question_text}</h1>}
       {children}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSessionUser } from '@/lib/auth';
+import { getSessionUser, getVerifiedFirebaseIdentity } from '@/lib/auth';
+import { surveyIdentity } from '@/lib/onboarding/identity';
 import { getUserConsent, upsertUserConsent } from '@/lib/db/queries';
 import { checkRateLimit } from '@/lib/ratelimit';
 import { PRIVACY_VERSION, TOS_VERSION } from '@/lib/privacy/versions';
@@ -29,15 +30,20 @@ const ConsentBodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const user = await getSessionUser();
-  if (!user) {
+  // Sign-up records consent with the new account's ID token, before any
+  // session cookie exists; everyone else uses the session cookie.
+  const uid = await surveyIdentity(request.headers.get('authorization'), {
+    session: getSessionUser,
+    verify: getVerifiedFirebaseIdentity,
+  });
+  if (!uid) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   // L1 FIX: Rate-limit consent changes keyed on uid — consent writes are
   // low-frequency by design; 10/min matches the session endpoint limit.
   const { allowed, retryAfter } = await checkRateLimit(
-    `uid:${user.uid}`,
+    `uid:${uid}`,
     '/api/auth/consent',
   );
   if (!allowed) {
@@ -60,7 +66,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     // M1 FIX: Log validation detail server-side only — do not echo Zod issue
     // objects to the client (they contain field paths and received values).
-    console.error('Consent schema validation failed for uid:', user.uid, parsed.error.issues);
+    console.error('Consent schema validation failed for uid:', uid, parsed.error.issues);
     return NextResponse.json({ error: 'Invalid consent payload' }, { status: 400 });
   }
 
@@ -74,7 +80,7 @@ export async function POST(request: NextRequest) {
 
   try {
     await upsertUserConsent({
-      uid: user.uid,
+      uid,
       tos_version: TOS_VERSION,
       privacy_version: PRIVACY_VERSION,
       consent_purposes: consentPurposes,
