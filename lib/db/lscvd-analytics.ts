@@ -37,7 +37,7 @@ function scope(filters: ProvinceFilters, province?: ProvinceCode) {
       WHERE ${answers.join(' AND ')}
       ORDER BY ua.user_id, ua.session_id, ua.question_id, ua.answered_at DESC, ua.id DESC
     )`;
-  return { cte, params, activityOnly };
+  return { cte, params, activityOnly, answerWhere: answers.join(' AND ') };
 }
 
 export async function getParticipantRows(filters: ProvinceFilters, province?: ProvinceCode): Promise<ParticipantRow[]> {
@@ -66,6 +66,11 @@ export type ProvinceActivity = {
   /** Asia/Bangkok months, oldest first. */
   trend: Array<{ month: string; people: number; answers: number; accuracy: number }>;
   topQuizzes: Array<{ id: string; name: string; people: number; accuracy: number }>;
+  /**
+   * Questions answered more than once: accuracy of the first answer versus the
+   * latest, as a sign of learning. Null when fewer than MIN_CELL people retook any.
+   */
+  retake: { people: number; questions: number; firstAccuracy: number; latestAccuracy: number } | null;
 };
 
 /**
@@ -74,10 +79,10 @@ export type ProvinceActivity = {
  * out so a small group cannot be singled out.
  */
 export async function getProvinceActivity(province: ProvinceCode, filters: ProvinceFilters): Promise<ProvinceActivity> {
-  const { cte, params } = scope(filters, province);
+  const { cte, params, answerWhere } = scope(filters, province);
   const consenting = `${cte}, scoped AS (SELECT l.* FROM latest l JOIN people p ON p.uid=l.user_id AND p.analytics_consent)`;
   const minCell = params.push(MIN_CELL);
-  const [trend, quizzes] = await Promise.all([
+  const [trend, quizzes, retake] = await Promise.all([
     pool.query(`WITH ${consenting}
       SELECT to_char(date_trunc('month', answered_at AT TIME ZONE 'Asia/Bangkok'), 'YYYY-MM') AS month,
         COUNT(DISTINCT user_id)::int AS people, COUNT(*)::int AS answers,
@@ -90,6 +95,20 @@ export async function getProvinceActivity(province: ProvinceCode, filters: Provi
       FROM scoped sc JOIN quizzes q ON q.id=sc.quiz_id
       GROUP BY q.id, q.name HAVING COUNT(DISTINCT sc.user_id) >= $${minCell}
       ORDER BY people DESC, q.name LIMIT 5`, params),
+    pool.query(`WITH ${cte}, attempts AS (
+        SELECT ua.user_id,
+          (array_agg(ua.utility_score ORDER BY ua.answered_at, ua.id))[1] AS first_score,
+          (array_agg(ua.utility_score ORDER BY ua.answered_at DESC, ua.id DESC))[1] AS latest_score
+        FROM user_answers ua JOIN sessions se ON se.id=ua.session_id
+        JOIN people p ON p.uid=ua.user_id AND p.analytics_consent
+        WHERE ${answerWhere}
+        GROUP BY ua.user_id, ua.session_id, ua.question_id HAVING COUNT(*) > 1
+      )
+      SELECT COUNT(DISTINCT user_id)::int AS people, COUNT(*)::int AS questions,
+        ROUND(100.0 * COUNT(*) FILTER (WHERE first_score > 0) / NULLIF(COUNT(*), 0))::int AS "firstAccuracy",
+        ROUND(100.0 * COUNT(*) FILTER (WHERE latest_score > 0) / NULLIF(COUNT(*), 0))::int AS "latestAccuracy"
+      FROM attempts`, params.slice(0, minCell - 1)),
   ]);
-  return { trend: trend.rows, topQuizzes: quizzes.rows };
+  const r = retake.rows[0];
+  return { trend: trend.rows, topQuizzes: quizzes.rows, retake: r && r.people >= MIN_CELL ? r : null };
 }

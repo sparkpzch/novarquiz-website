@@ -20,6 +20,8 @@ export const ProvinceFiltersSchema = z.object({
   gender: z.enum(['female', 'male', 'other']).optional(),
 }).strict().refine(f => !f.from || !f.to || f.from <= f.to, { path: ['to'] });
 export type ProvinceFilters = z.infer<typeof ProvinceFiltersSchema>;
+/** Query keys the province APIs accept; other page state stays in the browser. */
+export const PROVINCE_FILTER_KEYS = ['from', 'to', 'quiz', 'age', 'gender'] as const;
 
 export type ParticipantRow = {
   province: ProvinceCode;

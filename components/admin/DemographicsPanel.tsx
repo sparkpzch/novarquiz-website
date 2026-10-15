@@ -20,13 +20,15 @@ function ChartSkeleton({label}:{label:string}) {
   </div>;
 }
 
-export default function DemographicsPanel({sessionId,quizId,embedded=false}:{sessionId?:string;quizId?:string;embedded?:boolean}) {
+type Report = DemographicsReport | { suppressed: true; total: number; completed: number; consenting: number };
+
+export default function DemographicsPanel({sessionId,quizId,province,minCell=10,embedded=false}:{sessionId?:string;quizId?:string;province?:string;minCell?:number;embedded?:boolean}) {
   const {i18n}=useTranslation();const th=i18n.language.startsWith('th');const copy=(en:string,thai:string)=>th?thai:en;
-  const [result,setResult]=useState<{key:string;data:DemographicsReport|null;error:boolean}|null>(null);const [retry,setRetry]=useState(0);
-  const query=new URLSearchParams(sessionId?{session:sessionId}:quizId?{quiz:quizId}:{}).toString();const key=`${query}:${retry}`;const current=result?.key===key?result:null;
+  const [result,setResult]=useState<{key:string;data:Report|null;error:boolean}|null>(null);const [retry,setRetry]=useState(0);
+  const query=new URLSearchParams(sessionId?{session:sessionId}:quizId?{quiz:quizId}:province?{province}:{}).toString();const key=`${query}:${retry}`;const current=result?.key===key?result:null;
   useEffect(()=>{const abort=new AbortController();fetch(`/api/admin/demographics?${query}`,{signal:abort.signal,cache:'no-store'}).then(async r=>{if(!r.ok)throw new Error();return r.json();}).then(data=>setResult({key,data,error:false})).catch(()=>{if(!abort.signal.aborted)setResult({key,data:null,error:true});});return()=>abort.abort();},[query,key]);
   const data=current?.data;
-  const scope=sessionId?copy('This session','เซสชันนี้'):quizId?copy('This quiz','แบบทดสอบนี้'):copy('All accounts','ทุกบัญชี');
+  const scope=sessionId?copy('This session','เซสชันนี้'):quizId?copy('This quiz','แบบทดสอบนี้'):province?copy('This province','จังหวัดนี้'):copy('All accounts','ทุกบัญชี');
   return <section className={embedded?styles.subsection:styles.audience} aria-label={copy('Participant demographics','ข้อมูลผู้เข้าร่วม')}>
     {embedded
       ? <div className={styles.heading}><div><h3>{copy('Participant information','ข้อมูลผู้เข้าร่วม')}</h3><p>{scope} · {copy('Each account is counted once.','นับผู้ใช้แต่ละคนครั้งเดียว')}</p></div></div>
@@ -37,7 +39,7 @@ export default function DemographicsPanel({sessionId,quizId,embedded=false}:{ses
         <div><dt>{copy('Completed surveys','ตอบแบบสอบถามแล้ว')}</dt><dd>{data.completed.toLocaleString()}<small>{copy(`${percent(data.completed,data.total)}% of accounts`,`${percent(data.completed,data.total)}% ของบัญชี`)}</small></dd></div>
         <div><dt>{copy('Included with consent','ยินยอมให้วิเคราะห์')}</dt><dd>{data.consenting.toLocaleString()}<small>{copy(`${percent(data.consenting,data.completed)}% of surveys`,`${percent(data.consenting,data.completed)}% ของผู้ตอบ`)}</small></dd></div>
       </dl>
-      {data.consenting===0?<p className={`${styles.chartCard} ${styles.muted}`}>{copy('No consented survey data yet. Charts will appear after participants opt in.','ยังไม่มีข้อมูลแบบสอบถามที่ได้รับความยินยอม กราฟจะแสดงเมื่อผู้ใช้เลือกยินยอม')}</p>:<>
+      {'suppressed' in data?<p className={`${styles.chartCard} ${styles.muted}`}>{copy(`Charts appear once at least ${minCell} people in this province consent.`,`กราฟจะแสดงเมื่อมีผู้ยินยอมในจังหวัดนี้อย่างน้อย ${minCell} คน`)}</p>:data.consenting===0?<p className={`${styles.chartCard} ${styles.muted}`}>{copy('No consented survey data yet. Charts will appear after participants opt in.','ยังไม่มีข้อมูลแบบสอบถามที่ได้รับความยินยอม กราฟจะแสดงเมื่อผู้ใช้เลือกยินยอม')}</p>:<>
         <div className={styles.chartGrid}>
           <div className={styles.chartCard}><DemographicHistogram data={data.histograms.age} title={copy('Age','อายุ')} unit={copy('years','ปี')} th={th}/></div>
           <div className={styles.chartCard}><h3>{copy('Gender','เพศ')}</h3><CountBars items={data.gender} th={th}/></div>

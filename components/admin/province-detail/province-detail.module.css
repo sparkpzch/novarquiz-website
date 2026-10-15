@@ -1,0 +1,95 @@
+/* Province detail. Series colours are the dataviz reference palette, slots 1–2,
+   validated per theme: province = blue, Thailand = orange. Risk groups reuse the
+   map's ordinal ramp so "more risk" looks the same on both pages. */
+.root {
+  --d-ink: var(--nq-ink);
+  --d-muted: var(--nq-muted);
+  --d-card: var(--nq-panel);
+  --d-inset: var(--nq-inset);
+  --d-line: var(--nq-line);
+  --d-accent: var(--nq-primary);
+  --d-province: #2a78d6;
+  --d-national: #eb6834;
+  --d-ramp-0: #86b6ef; --d-ramp-1: #5598e7; --d-ramp-2: #1c5cab; --d-ramp-3: #104281;
+  display: grid; gap: 16px; min-width: 0; color: var(--d-ink);
+}
+:global([data-theme="dark"]) .root {
+  --d-province: #3987e5;
+  --d-national: #d95926;
+  --d-ramp-0: #1c5cab; --d-ramp-1: #2a78d6; --d-ramp-2: #86b6ef; --d-ramp-3: #b7d3f6;
+}
+
+.panel { background: var(--d-card); border: 1px solid var(--d-line); border-radius: 12px; padding: 20px; min-width: 0; }
+.panel h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.panel > p, .sub { margin: 4px 0 0; font-size: 13px; line-height: 1.6; color: var(--d-muted); }
+.top { display: flex; justify-content: space-between; align-items: start; gap: 12px; flex-wrap: wrap; }
+.top h1 { margin: 4px 0 0; font-size: 24px; font-weight: 750; }
+.back { font-size: 13px; font-weight: 600; color: var(--d-muted); text-decoration: none; }
+.back:hover { color: var(--d-ink); }
+.back:focus-visible, .button:focus-visible { outline: 2px solid var(--d-accent); outline-offset: 2px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.button { min-height: 40px; padding: 8px 14px; border: 1px solid var(--d-line); border-radius: 8px; background: var(--d-inset); color: var(--d-ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.filters span { padding: 3px 10px; border-radius: 999px; background: var(--d-inset); border: 1px solid var(--d-line); font-size: 12px; }
+
+.kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; margin: 0; padding: 18px 0; }
+.kpis > div { min-width: 0; padding: 0 18px; border-left: 1px solid var(--d-line); }
+.kpis > div:first-child { border-left: 0; }
+.kpis dt { font-size: 12px; color: var(--d-muted); }
+.kpis dd { margin: 4px 0 0; font-size: 26px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.kpis dd small { display: block; font-size: 12px; font-weight: 500; color: var(--d-muted); margin-top: 2px; }
+@media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 16px; } .kpis > div:nth-child(odd) { border-left: 0; } }
+
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 12px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--d-muted); }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.key { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+/* Paired horizontal bars: thin marks, 4px rounded data end, 2px gap, end labels. */
+.pairs { display: grid; gap: 14px; margin-top: 14px; }
+.pairs h3 { margin: 6px 0 -4px; font-size: 12px; font-weight: 700; color: var(--d-muted); }
+.pair { display: grid; grid-template-columns: minmax(110px, 38%) 1fr; gap: 10px; align-items: center; }
+.pairLabel { font-size: 13px; line-height: 1.4; }
+.pairLabel small { display: block; color: var(--d-muted); font-size: 11px; }
+.bars { display: grid; gap: 2px; }
+.barRow { display: grid; grid-template-columns: minmax(0, 1fr) 48px; align-items: center; gap: 8px; min-width: 0; }
+.track { display: block; min-width: 0; }
+.bar { display: block; height: 12px; border-radius: 0 4px 4px 0; min-width: 2px; }
+.barValue { text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--d-ink); white-space: nowrap; }
+.barValue[data-national] { color: var(--d-muted); }
+
+/* 100% stacked risk groups */
+.stackRow { display: grid; grid-template-columns: 90px 1fr; gap: 10px; align-items: center; margin-top: 12px; font-size: 13px; }
+.stack { display: flex; gap: 2px; height: 22px; }
+.stack span { display: grid; place-items: center; min-width: 0; font-size: 11px; font-weight: 650; color: #fff; overflow: hidden; }
+.stack span:first-child { border-radius: 4px 0 0 4px; }
+.stack span:last-child { border-radius: 0 4px 4px 0; }
+.stack span[data-step="0"] { color: #0b2340; }
+:global([data-theme="dark"]) .stack span[data-step="0"] { color: #fff; }
+:global([data-theme="dark"]) .stack span[data-step="2"], :global([data-theme="dark"]) .stack span[data-step="3"] { color: #0b2340; }
+
+/* Monthly trend: two small charts, one measure each (no dual axis). */
+.trend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 12px; }
+@media (max-width: 640px) { .trend { grid-template-columns: 1fr; } }
+.trend figure { margin: 0; }
+.trend figcaption { font-size: 12px; font-weight: 600; color: var(--d-muted); margin-bottom: 6px; }
+.trend svg { display: block; width: 100%; height: auto; overflow: visible; }
+.axis { fill: var(--d-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.grid line, .gridLine { stroke: var(--d-line); stroke-width: 1; }
+.col { fill: var(--d-province); }
+.line { fill: none; stroke: var(--d-province); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.dot { fill: var(--d-province); stroke: var(--d-card); stroke-width: 2; }
+.pointLabel { fill: var(--d-ink); font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+.table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+.table th { text-align: left; font-weight: 600; color: var(--d-muted); padding: 8px 10px; border-bottom: 1px solid var(--d-line); }
+.table td { padding: 8px 10px; border-bottom: 1px solid var(--d-line); font-variant-numeric: tabular-nums; }
+.table .num { text-align: right; }
+.table a { color: inherit; font-weight: 600; }
+
+.note { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--d-inset); color: var(--d-muted); font-size: 13px; line-height: 1.6; }
+.skeleton { min-height: 360px; border-radius: 12px; background: var(--d-inset); animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }

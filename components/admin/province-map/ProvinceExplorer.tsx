@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/lib/hooks/useTheme';
-import type { ProvinceReport } from '@/lib/analytics/lscvd';
+import { PROVINCE_FILTER_KEYS, type ProvinceReport } from '@/lib/analytics/lscvd';
 import { CLASS_COUNT, METRICS, classBreaks, classOf, formatMetric, isSuppressed, metricByKey, type ScaleMode } from '@/lib/analytics/lscvd-metrics';
 import { MAP_ATTRIBUTION } from '@/lib/maps/thailand-provinces';
 import { PROVINCES, REGION_LABELS, type ThaiRegion } from '@/lib/onboarding/provinces';
@@ -12,7 +12,7 @@ import ProvinceCard from './ProvinceCard';
 import styles from './province-map.module.css';
 
 /** Filters that change who is counted; everything else is applied in the browser. */
-const SERVER_KEYS = ['from', 'to', 'quiz', 'age', 'gender'] as const;
+const SERVER_KEYS = PROVINCE_FILTER_KEYS;
 const CLIENT_KEYS = ['color', 'scale', 'region', 'min', 'top', 'sel'] as const;
 const AGE_OPTIONS: Array<[string, string, string]> = [['under18', 'Under 18', 'ต่ำกว่า 18 ปี'], ['18_29', '18–29', '18–29 ปี'], ['30_44', '30–44', '30–44 ปี'], ['45_59', '45–59', '45–59 ปี'], ['60plus', '60+', '60 ปีขึ้นไป']];
 const name = (code: string, th: boolean) => { const p = PROVINCES.find(x => x.code === code)!; return th ? p.th : p.en; };
@@ -92,7 +92,8 @@ export default function ProvinceExplorer() {
     return list.sort(cmp);
   }, [report, view, selected, metric, sort, th]);
 
-  const detailHref = (code: string) => `/admin/analytics/province/${code}${serverQuery ? `?${serverQuery}` : ''}`;
+  // The full query travels along so "back to map" restores every filter.
+  const detailHref = (code: string) => `/admin/analytics/province/${code}${params.size ? `?${params}` : ''}`;
   const open = (code: string) => router.push(detailHref(code));
 
   // Province search with keyboard-navigable suggestions.
