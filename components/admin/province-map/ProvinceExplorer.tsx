@@ -203,7 +203,7 @@ export default function ProvinceExplorer() {
               <ol aria-hidden="true">{Array.from({ length: CLASS_COUNT }, (_, i) => <li key={i} style={{ background: `var(--map-ramp-${i})` }} />)}</ol>
               <span>{copy('More', 'มาก')} = {th ? metric.strongTh : metric.strongEn}</span>
             </span>
-            <span><span className={styles.swatch} style={{ background: 'repeating-linear-gradient(45deg, var(--map-hatch) 0 2px, var(--map-empty) 2px 5px)' }} />{copy(`Fewer than ${report.minCell} people`, `ข้อมูลไม่พอ (น้อยกว่า ${report.minCell} คน)`)}</span>
+            <span><span className={styles.swatch} style={{ background: 'repeating-linear-gradient(45deg, var(--map-hatch) 0 2px, var(--map-empty) 2px 5px)' }} />{report.minCell > 1 ? copy(`Fewer than ${report.minCell} people`, `ข้อมูลไม่พอ (น้อยกว่า ${report.minCell} คน)`) : copy('No answers for this measure', 'ยังไม่มีผู้ตอบตัวชี้วัดนี้')}</span>
             <span><span className={styles.swatch} style={{ background: 'var(--map-empty)' }} />{copy('No data', 'ไม่มีข้อมูล')}</span>
             <button type="button" className={styles.button} aria-pressed={scale === 'equal'} onClick={() => update({ scale: scale === 'equal' ? null : 'equal' })}>
               {copy('Equal intervals', 'ช่วงเท่ากัน')}

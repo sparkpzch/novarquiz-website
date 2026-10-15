@@ -8,7 +8,7 @@ import type { HealthInput } from '../onboarding/survey';
 import { PROVINCES, type ProvinceCode } from '../onboarding/provinces';
 
 /** Smallest group whose metrics are shown. Smaller groups show only counts. */
-export const MIN_CELL = 3;
+export const MIN_CELL = 1;
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v => !Number.isNaN(Date.parse(`${v}T00:00:00Z`)));
 /** Filters that change who is counted, so the server re-queries. Dates are Asia/Bangkok days. */

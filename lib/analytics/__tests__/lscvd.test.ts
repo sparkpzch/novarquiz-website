@@ -83,11 +83,12 @@ test('screening and the treatment cascade', () => {
 });
 
 test('every province is reported, and the national total includes small provinces', () => {
-  const report = summarizeProvinces([...many(MIN_CELL, { province: 'TH-10' }), ...many(2, { province: 'TH-96' })]);
+  // A threshold above the default keeps the small-province path covered.
+  const report = summarizeProvinces([...many(3, { province: 'TH-10' }), ...many(2, { province: 'TH-96' })], 3);
   assert.equal(Object.keys(report.provinces).length, 77);
   assert.equal(report.provinces['TH-10'].suppressed, false);
   assert.equal(report.provinces['TH-96'].suppressed, true); assert.equal(report.provinces['TH-96'].participants, 2);
   assert.equal(report.provinces['TH-50'].participants, 0);
-  assert.equal(report.national.participants, MIN_CELL + 2);
-  assert.equal(report.minCell, MIN_CELL);
+  assert.equal(report.national.participants, 5);
+  assert.equal(report.minCell, 3);
 });
