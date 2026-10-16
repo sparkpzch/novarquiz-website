@@ -37,7 +37,7 @@ import { historyCoaching, isEverydayInsight, learningTopic, personalLearningArea
 import type { PersonalHistoryReport } from '../history';
 
 const report = (answers: HistoryAnswer[]): PersonalHistoryReport => ({
-  session: { session_id: 'run', quiz_id: 'quiz', session_name: 'Health basics', session_description: null,
+  session: { session_id: 'run', quiz_id: 'quiz', play_id: 'quiz', session_name: 'Health basics', session_description: null,
     total_score: 40, correct_count: 6, incorrect_count: 4, streak: 6, total_time_ms: 71000, completed_at: null, rank: 5, total_players: 13 },
   answers, topics: summarizeHistoryTopics(answers), feedback: null,
 });

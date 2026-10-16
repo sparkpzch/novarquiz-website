@@ -28,8 +28,10 @@ function HistoryContent() {
   const historyKey = `${uid}:${version}`;
   const history = historyState?.key === historyKey ? historyState : null;
   const rows = history?.rows ?? [];
-  const selectedId = params.get('session') ?? rows[0]?.session_id ?? null;
-  const selected = rows.find((row) => row.session_id === selectedId);
+  // ?session= holds a row's play id (quiz id for public quizzes); older links may carry the session id.
+  const urlSession = params.get('session');
+  const selected = urlSession ? rows.find((row) => row.play_id === urlSession || row.session_id === urlSession) : rows[0];
+  const selectedId = selected?.play_id ?? urlSession;
   const reportKey = `${uid}:${selectedId}:${locale}:${version}`;
   const result = reportState?.key === reportKey ? reportState : null;
   const report = result?.data;
@@ -64,7 +66,7 @@ function HistoryContent() {
       <header className="pr-card pr-header">
         <div className="pr-header-top">
           <div className="pr-header-title"><div><h1 className={selected ? undefined : 'sr-only'}>{selected?.session_name ?? copy('History', 'ประวัติ')}</h1></div></div>
-          <div className="pr-header-actions">{selected && <Link className="pr-button" href={`/stats?session=${encodeURIComponent(selected.session_id)}`}>{copy('Quiz summary', 'ดูสรุปผล')}</Link>}<IconRefreshButton onRefresh={retry} label={copy('Refresh your history', 'โหลดประวัติของคุณอีกครั้ง')} /></div>
+          <div className="pr-header-actions">{selected && <Link className="pr-button" href={`/stats?session=${encodeURIComponent(selected.play_id)}`}>{copy('Quiz summary', 'ดูสรุปผล')}</Link>}<IconRefreshButton onRefresh={retry} label={copy('Refresh your history', 'โหลดประวัติของคุณอีกครั้ง')} /></div>
         </div>
         {report && <div className="pr-overview">
           <div className="pr-profile"><ProfileAvatar displayName={user?.displayName} photoURL={user?.photoURL} size={42} /><div><strong>{user?.displayName || copy('Your results', 'ผลของคุณ')}</strong><span>{date(selected?.completed_at ?? null)}</span></div></div>
@@ -77,7 +79,7 @@ function HistoryContent() {
         <aside className="pr-card pr-archive" aria-labelledby="archive-title">
           <div className="pr-section-heading"><h2 id="archive-title">{copy('Your completed quizzes', 'แบบทดสอบที่คุณทำแล้ว')}</h2><span className="pr-count">{rows.length}</span></div>
           <input className="pr-input" type="search" aria-label={copy('Search your quizzes', 'ค้นหาแบบทดสอบของคุณ')} placeholder={copy('Search your quizzes…', 'ค้นหาแบบทดสอบ…')} value={quizSearch} onChange={(event) => setQuizSearch(event.target.value)} />
-          <div className="pr-quiz-list">{rows.filter((row) => row.session_name.toLocaleLowerCase().includes(quizSearch.trim().toLocaleLowerCase())).map((row) => <button type="button" key={row.session_id} className={`pr-quiz ${selectedId === row.session_id ? 'pr-quiz-selected' : ''}`} aria-current={selectedId === row.session_id ? 'page' : undefined} onClick={() => router.push(`/history?session=${encodeURIComponent(row.session_id)}`, { scroll: false })}><strong>{row.session_name}</strong><span>{date(row.completed_at)}</span><small>{copy(`${row.correct_count + row.incorrect_count} questions answered`, `ตอบแล้ว ${row.correct_count + row.incorrect_count} ข้อ`)}</small></button>)}</div>
+          <div className="pr-quiz-list">{rows.filter((row) => row.session_name.toLocaleLowerCase().includes(quizSearch.trim().toLocaleLowerCase())).map((row) => <button type="button" key={row.session_id} className={`pr-quiz ${selected === row ? 'pr-quiz-selected' : ''}`} aria-current={selected === row ? 'page' : undefined} onClick={() => router.push(`/history?session=${encodeURIComponent(row.play_id)}`, { scroll: false })}><strong>{row.session_name}</strong><span>{date(row.completed_at)}</span><small>{copy(`${row.correct_count + row.incorrect_count} questions answered`, `ตอบแล้ว ${row.correct_count + row.incorrect_count} ข้อ`)}</small></button>)}</div>
           {!rows.some((row) => row.session_name.toLocaleLowerCase().includes(quizSearch.trim().toLocaleLowerCase())) && <p className="pr-muted">{copy('No quizzes match your search.', 'ไม่พบแบบทดสอบที่ตรงกับการค้นหา')}</p>}
         </aside>
         <main className="pr-report-content">{!selected ? <StatePanel message={copy('Choose one of your completed quizzes from the list.', 'เลือกแบบทดสอบที่คุณทำแล้วจากรายการ')} /> : !result ? <StatePanel message={copy('Loading your answers…', 'กำลังโหลดคำตอบของคุณ…')} loading /> : result.error ? <StatePanel message={copy('Your answers couldn’t load. Please try again.', 'ยังโหลดคำตอบไม่ได้ กรุณาลองอีกครั้ง')} error><button className="pr-button" onClick={retry}>{copy('Try again', 'ลองอีกครั้ง')}</button></StatePanel> : report && <PersonalReport key={reportKey} report={report} locale={locale} />}</main>

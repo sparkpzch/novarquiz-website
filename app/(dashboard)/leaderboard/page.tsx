@@ -12,6 +12,10 @@ import { ResultInsightCard, ResultScoreCard } from '@/components/play/QuizResult
 import { rankLeaderboard } from '@/lib/analytics/leaderboard';
 import styles from '@/components/play/quiz.module.css';
 
+// public_play_id is the quiz id for a quiz's public session; other sessions keep their id in URLs.
+type LeaderboardSession = Session & { public_play_id?: string | null };
+const playUrlId = (session: LeaderboardSession) => session.public_play_id || session.id;
+
 function LeaderboardPageContent() {
   const { i18n } = useTranslation();
   const th = i18n.language.startsWith('th');
@@ -21,7 +25,7 @@ function LeaderboardPageContent() {
   const searchParams = useSearchParams();
   const urlSession = searchParams.get('session') || '';
   const selectedSession = useResolvedSessionId(urlSession || null) ?? '';
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<LeaderboardSession[]>([]);
   const [sessionsError, setSessionsError] = useState(false);
   const [result, setResult] = useState<{ sessionId: string; entries: LeaderboardEntry[]; error: boolean } | null>(null);
   const [retry, setRetry] = useState(0);
@@ -34,7 +38,7 @@ function LeaderboardPageContent() {
         if (!response.ok) throw new Error('Sessions unavailable');
         return response.json();
       })
-      .then((data: Session[]) => { setSessions(data); setSessionsError(false); })
+      .then((data: LeaderboardSession[]) => { setSessions(data); setSessionsError(false); })
       .catch(() => { if (!controller.signal.aborted) setSessionsError(true); });
     return () => controller.abort();
   }, [authLoading, retry, user]);
@@ -68,17 +72,17 @@ function LeaderboardPageContent() {
   return <div className={`${styles.dashboard} ${styles.resultsDashboard}`}>
     <section className={styles.surface}>
       <div className={styles.pageHeading}><h1>{copy('Leaderboard', 'อันดับผู้เล่น')}</h1>
-        <div className={styles.sessionControl}><label htmlFor="leaderboard-session">{copy('Quiz session', 'เลือกแบบทดสอบ')}</label><select id="leaderboard-session" className={styles.sessionSelect} value={selectedSession} onChange={(event) => router.replace(event.target.value ? `/leaderboard?session=${encodeURIComponent(event.target.value)}` : '/leaderboard')}>
+        <div className={styles.sessionControl}><label htmlFor="leaderboard-session">{copy('Quiz session', 'เลือกแบบทดสอบ')}</label><select id="leaderboard-session" className={styles.sessionSelect} value={selectedSessionMeta ? playUrlId(selectedSessionMeta) : urlSession} onChange={(event) => router.replace(event.target.value ? `/leaderboard?session=${encodeURIComponent(event.target.value)}` : '/leaderboard')}>
           <option value="">{copy('Select a session', 'เลือกแบบทดสอบเพื่อดูอันดับ')}</option>
-          {selectedSession && !selectedSessionMeta && <option value={selectedSession}>{copy('Current quiz session', 'แบบทดสอบปัจจุบัน')}</option>}
-          {sessions.map((session) => <option key={session.id} value={session.id}>{session.name} · {new Date(session.started_at).toLocaleDateString(th ? 'th-TH' : 'en-GB')}</option>)}
+          {urlSession && !selectedSessionMeta && <option value={urlSession}>{copy('Current quiz session', 'แบบทดสอบปัจจุบัน')}</option>}
+          {sessions.map((session) => <option key={session.id} value={playUrlId(session)}>{session.name} · {new Date(session.started_at).toLocaleDateString(th ? 'th-TH' : 'en-GB')}</option>)}
         </select></div>
       </div>
       {sessionsError && <div className={styles.error} role="alert">{copy('Could not load the session list.', 'โหลดรายการแบบทดสอบไม่สำเร็จ')} <button type="button" className={styles.secondaryButton} onClick={() => setRetry((value) => value + 1)}>{copy('Try again', 'ลองอีกครั้ง')}</button></div>}
     </section>
     <div className={me ? styles.resultsGrid : undefined}>
     {me && <><ResultScoreCard score={me.total_score} elapsedMs={me.total_time_ms} rank={myIndex + 1} th={th} headingLevel={2} />
-      <ResultInsightCard key={selectedSession} uid={user?.uid ?? null} sessionId={selectedSession} th={th} onSummary={() => router.push(`/stats?session=${encodeURIComponent(urlSession)}`)} /></>}
+      <ResultInsightCard key={selectedSession} uid={user?.uid ?? null} sessionId={selectedSession} th={th} onSummary={() => router.push(`/stats?session=${encodeURIComponent(selectedSessionMeta ? playUrlId(selectedSessionMeta) : urlSession)}`)} /></>}
     <section className={`${styles.surface} ${me ? styles.standingsPanel : ''}`} aria-busy={!!loading}>
       {!urlSession ? <div className={styles.empty}><h3>{copy('Choose a quiz to see the rankings', 'เลือกแบบทดสอบเพื่อดูอันดับ')}</h3><p>{copy('Your result will be highlighted alongside other completed scores.', 'ผลของคุณจะมีป้ายกำกับเพื่อให้หาได้ง่าย')}</p></div> : loading ? <div className={styles.loading} role="status"><span className={styles.spinner} /><span>{copy('Loading completed results…', 'กำลังโหลดผลและอันดับ…')}</span></div> : <>
         {selectedSessionMeta && !me && <div className={styles.boardSession}><h2>{selectedSessionMeta.name}</h2>{selectedSessionMeta.description && <p>{selectedSessionMeta.description}</p>}</div>}

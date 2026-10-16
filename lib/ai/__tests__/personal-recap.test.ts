@@ -181,7 +181,7 @@ test('a draft finishing during claim is returned as pending, not an unavailable 
 test('food hints and movement hints follow each person’s missed answers, not the total score', () => {
   const answer = (id: string, tags: string[], selectedAligned: boolean): HistoryAnswer => ({ ...food.answers[0], id, tags, selectedAligned, utilityScore: selectedAligned ? 1 : 0, maxUtility: 1, timeMs: null });
   const report = (answers: HistoryAnswer[]): PersonalHistoryReport => ({ session: {
-    session_id: 'run', quiz_id: 'quiz', session_name: 'Everyday choices', session_description: null,
+    session_id: 'run', quiz_id: 'quiz', play_id: 'quiz', session_name: 'Everyday choices', session_description: null,
     total_score: 2, correct_count: 1, incorrect_count: 2, streak: 1, total_time_ms: null,
     completed_at: '2026-10-02T07:00:00Z', rank: 1, total_players: 1,
   }, answers, topics: [], feedback: null });

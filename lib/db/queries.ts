@@ -1417,6 +1417,10 @@ export async function getUserHistory(userId: string) {
     `SELECT
        le.session_id,
        qs.id AS quiz_id,
+       CASE WHEN s.is_private = FALSE AND s.id = (
+         SELECT s2.id FROM sessions s2 WHERE s2.session_id = s.session_id AND s2.is_private = FALSE
+         ORDER BY ${publicSessionOrder('s2')} LIMIT 1
+       ) THEN s.session_id::text ELSE le.session_id::text END AS play_id,
        COALESCE(s.name, qs.name)           AS session_name,
        qs.description                      AS session_description,
        le.total_score,
@@ -1427,7 +1431,8 @@ export async function getUserHistory(userId: string) {
        to_char(le.completed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS completed_at,
        (
          SELECT COUNT(*) FROM leaderboard_entries
-         WHERE session_id = le.session_id AND total_score > le.total_score
+         WHERE session_id = le.session_id AND (total_score > le.total_score
+           OR (total_score = le.total_score AND COALESCE(total_time_ms, 0) < COALESCE(le.total_time_ms, 0)))
        )::int + 1                          AS rank,
        (SELECT COUNT(*) FROM leaderboard_entries WHERE session_id = le.session_id)::int AS total_players
      FROM leaderboard_entries le

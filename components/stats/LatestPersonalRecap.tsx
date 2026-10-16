@@ -46,7 +46,7 @@ export default function LatestPersonalRecap({ uid, locale }: { uid: string | nul
     };
   }, [uid, locale, key]);
 
-  if (detail?.data) return <PersonalRecapCard report={detail.data} locale={locale} compact headingId="home-recap-title" detailsHref={`/stats?session=${encodeURIComponent(detail.data.session.session_id)}`} />;
+  if (detail?.data) return <PersonalRecapCard report={detail.data} locale={locale} compact headingId="home-recap-title" detailsHref={`/stats?session=${encodeURIComponent(detail.data.session.play_id)}`} />;
 
   const error = current?.error || detail?.error;
   const loading = !!uid && (!current || (!!current.sessionId && !detail));

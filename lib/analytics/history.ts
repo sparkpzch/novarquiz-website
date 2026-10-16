@@ -5,6 +5,8 @@ import type { PersonalFeedback } from './personal-feedback';
 export type UserHistoryRow = {
   session_id: string;
   quiz_id: string | null;
+  /** The id for this run's URLs: the quiz id for a quiz's public session, else the session id. */
+  play_id: string;
   session_name: string;
   session_description: string | null;
   total_score: number;
