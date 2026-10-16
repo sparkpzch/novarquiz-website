@@ -24,6 +24,14 @@ export async function activateProgress(sessionId: string, uid: string, boundary:
     WHERE session_id=$1 AND user_id=$2 AND attempt_boundary=$3 AND started_at=0 AND NOT completed`, [sessionId,uid,boundary,questionId,now]);
   return getProgress(sessionId,uid,boundary);
 }
+// Moves a run whose question was deleted back to the entry question. started_at
+// is kept: it bounds which earlier answers still count for a lobby attempt, so
+// moving it would let the player re-answer (and re-score) those questions.
+export async function restartProgress(sessionId: string, uid: string, boundary: string, staleId: string, questionId: string) {
+  await pool.query(`UPDATE play_progress SET question_id=$5,question_started_at=$6,score=0,streak=0,answer=NULL,updated_at=clock_timestamp()
+    WHERE session_id=$1 AND user_id=$2 AND attempt_boundary=$3 AND question_id=$4 AND NOT completed`, [sessionId, uid, boundary, staleId, questionId, Date.now()]);
+  return getProgress(sessionId, uid, boundary);
+}
 export async function advanceProgress(sessionId: string, uid: string, boundary: string, fromId: string, questionId: string) {
   await pool.query(`UPDATE play_progress SET question_id=$5,question_started_at=$6,answer=NULL,updated_at=clock_timestamp()
     WHERE session_id=$1 AND user_id=$2 AND attempt_boundary=$3 AND question_id=$4 AND NOT completed`, [sessionId, uid, boundary, fromId, questionId, Date.now()]);

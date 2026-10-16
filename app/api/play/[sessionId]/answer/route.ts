@@ -9,7 +9,8 @@ import { createQuestionToken, readQuestionToken, verifyQuestionToken } from '@/l
 import { getPlayUser } from '@/lib/play-auth';
 import { shuffleChoices } from '@/lib/play/choice-order';
 import { AnswerBody } from '@/lib/play/answer-request';
-import { getProgress, startProgress, activateProgress, advanceProgress, answerProgress, resetProgress } from '@/lib/db/play-progress';
+import { getProgress, startProgress, activateProgress, advanceProgress, answerProgress, resetProgress, restartProgress } from '@/lib/db/play-progress';
+import { resolveEntryProgress } from '@/lib/play/entry-progress';
 
 const StartBody = z.object({
   action: z.literal('start'),
@@ -77,14 +78,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         if (latest?.completed && (!user.isGuest || latest.attempt_boundary === progressBoundary)) {
           return NextResponse.json({ completed: true, score: latest.score, streak: latest.streak, elapsed_ms: new Date(latest.updated_at).getTime() - Number(latest.started_at) });
         }
-        let progress = await getProgress(sessionId, user.uid, progressBoundary);
-        const deferred = progress && Number(progress.started_at) === 0;
-        let question = !progress || deferred ? await getEntryQuestion(sessionId) : await getQuestionById(progress.question_id);
-        if (!question) return NextResponse.json(null, { status: 404 });
-        if (deferred) progress = await activateProgress(sessionId,user.uid,progressBoundary,question.id);
-        if (!progress) progress = await startProgress(sessionId, user.uid, progressBoundary, question.id);
-        if (progress && progress.question_id !== question.id) question = await getQuestionById(progress.question_id);
-        if (!question || !progress) return NextResponse.json(null, { status: 404 });
+        const resolved = await resolveEntryProgress(await getProgress(sessionId, user.uid, progressBoundary), {
+          getEntryQuestion: () => getEntryQuestion(sessionId),
+          getQuestionById,
+          startProgress: (questionId) => startProgress(sessionId, user.uid, progressBoundary, questionId),
+          activateProgress: (questionId) => activateProgress(sessionId, user.uid, progressBoundary, questionId),
+          restartProgress: (staleId, questionId) => restartProgress(sessionId, user.uid, progressBoundary, staleId, questionId),
+        });
+        if (!resolved) return NextResponse.json(null, { status: 404 });
+        const { question, progress } = resolved;
         return NextResponse.json({
           ...sanitizeQuestion(question, quiz.shuffle_choices ? `${user.uid}:${sessionId}:${shuffleAttempt}:${question.id}` : undefined,
             createQuestionToken(sessionId, user.uid, question.id, attemptBoundary, Number(progress.question_started_at))),
