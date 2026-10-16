@@ -18,6 +18,7 @@ import styles from '@/components/play/quiz.module.css';
 import QuestionMediaPlayer from '@/components/ui/QuestionMediaPlayer';
 import { attachVideoSource, disposeVideoSource } from '@/lib/video/playback';
 import { useQuizExitGuard } from '@/lib/hooks/useQuizExitGuard';
+import { usePlaySessionId } from '@/lib/client/play-session-context';
 
 
 type QuestionWithPoster = Question & {
@@ -105,7 +106,7 @@ function QuestionVisual({ question, totalQuestions, preparedVideo, th, children 
 }
 
 export default function QuestionPage({ params }: { params: Promise<{ sessionId: string }> }) {
-  const { sessionId } = use(params);
+  const sessionId = usePlaySessionId(use(params).sessionId);
   const { i18n } = useTranslation();
   const th = i18n.language.startsWith('th');
   const copy = useCallback((en: string, thai: string) => th ? thai : en, [th]);

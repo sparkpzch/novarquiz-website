@@ -8,22 +8,38 @@ import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import Link from 'next/link';
 import styles from '@/components/play/lobby.module.css';
+import { PlaySessionContext } from '@/lib/client/play-session-context';
 
 export default function PlaySessionLayout({ children, params }: {
   children: React.ReactNode; params: Promise<{ sessionId: string }>;
 }) {
-  const { sessionId } = use(params);
+  const { sessionId: routeId } = use(params);
   const { user, loading } = useAuth();
   const { i18n } = useTranslation();
   const th = i18n.language.startsWith('th');
   const hydrated = useSyncExternalStore(() => () => {}, () => true, () => false);
-  const connection = hydrated && user ? readLobbyConnection(sessionId, user.uid) : null;
+  // A public quiz URL carries the quiz id; the sessions API maps it to the
+  // quiz's public session. Any other id (or a failed lookup) is used as-is.
+  const uid = user?.uid;
+  const [resolved, setResolved] = useState<{ routeId: string; id: string } | null>(null);
   useEffect(() => {
-    if (!loading && user && !connection) return maintainSessionPresence(user.uid, sessionId);
+    if (loading) return;
+    const controller = new AbortController();
+    fetch(`/api/sessions/${routeId}`, { signal: controller.signal, headers: uid ? lobbyHeaders(routeId, uid) : undefined })
+      .then(response => (response.ok ? response.json() : null))
+      .then(session => setResolved({ routeId, id: typeof session?.id === 'string' ? session.id : routeId }))
+      .catch(error => { if (error.name !== 'AbortError') setResolved({ routeId, id: routeId }); });
+    return () => controller.abort();
+  }, [loading, routeId, uid]);
+  const sessionId = resolved?.routeId === routeId ? resolved.id : null;
+  const connection = hydrated && user && sessionId ? readLobbyConnection(sessionId, user.uid) : null;
+  useEffect(() => {
+    if (!loading && user && sessionId && !connection) return maintainSessionPresence(user.uid, sessionId);
   }, [loading, user, sessionId, connection?.connectionId]);
-  if (loading || !hydrated) return <LobbyConnectionNotice state="checking" th={th} />;
-  if (!user || !connection) return children;
-  return <ManagedLobby key={`${sessionId}:${user.uid}:${connection.connectionId}`} sessionId={sessionId} uid={user.uid} connectionId={connection.connectionId} th={th}>{children}</ManagedLobby>;
+  if (loading || !hydrated || !sessionId) return <LobbyConnectionNotice state="checking" th={th} />;
+  const page = <PlaySessionContext.Provider value={sessionId}>{children}</PlaySessionContext.Provider>;
+  if (!user || !connection) return page;
+  return <ManagedLobby key={`${sessionId}:${user.uid}:${connection.connectionId}`} sessionId={sessionId} uid={user.uid} connectionId={connection.connectionId} th={th}>{page}</ManagedLobby>;
 }
 
 function ManagedLobby({ children, sessionId, uid, connectionId, th }: {

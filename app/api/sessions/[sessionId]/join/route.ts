@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { adminAuth, adminRtdb } from '@/lib/firebase/admin';
-import { getSessionById, getEntryQuestion, withPlayerAnswerLock } from '@/lib/db/queries';
+import { getSessionById, getEntryQuestion, getPlayUrlId, withPlayerAnswerLock } from '@/lib/db/queries';
 import { getProgress, startProgress, resetProgress } from '@/lib/db/play-progress';
 import { getPlayUser } from '@/lib/play-auth';
 import { sanitizePhotoUrl } from '@/lib/security/photo-url';
@@ -67,7 +67,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
         sessionId: session.id, sessionName: session.name, mode: 'lobby', joinedAt: now,
         lastActiveAt: now, connectionId,
       });
-      return NextResponse.json({ success: true, sessionId: session.id, roomStatus: joined.snapshot.val().status, token, connectionId });
+      return NextResponse.json({ success: true, sessionId: session.id, playId: await getPlayUrlId(session), roomStatus: joined.snapshot.val().status, token, connectionId });
     });
   } catch (error) {
     if (error instanceof LobbyAccessError) return error.response;

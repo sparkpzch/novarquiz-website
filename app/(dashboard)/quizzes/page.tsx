@@ -8,7 +8,7 @@ import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 import type { Session } from "@/lib/types";
 
-type BrowseSession = Session & { created_at?: string };
+type BrowseSession = Session & { created_at?: string; public_play_id?: string | null };
 
 // ─── Filter Chip ──────────────────────────────────────────────────────────────
 
@@ -362,7 +362,7 @@ function QuizzesContent() {
                 key={session.id}
                 session={session}
                 index={i}
-                onClick={() => router.push(`/join/${session.pin_code || session.id}`)}
+                onClick={() => router.push(`/join/${session.public_play_id || session.pin_code || session.id}`)}
               />
             ))}
           </div>

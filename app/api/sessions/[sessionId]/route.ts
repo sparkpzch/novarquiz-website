@@ -2,7 +2,7 @@ import { requireLobbyAccess } from '@/lib/play/lobby-access';
 import { adminRtdb } from '@/lib/firebase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { deleteSession, getSessionById, updateSession } from '@/lib/db/queries';
+import { deleteSession, getPlayUrlId, getSessionById, resolvePublicSessionId, updateSession } from '@/lib/db/queries';
 import { getSessionUser } from '@/lib/auth';
 import { SESSION_STATUS } from '@/lib/constants/session';
 
@@ -27,7 +27,7 @@ const SessionPatchSchema = z.object({
 export async function GET(request: Request, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
   try {
-    const session = await getSessionById(sessionId);
+    const session = await getSessionById(await resolvePublicSessionId(sessionId));
     if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const user = await getSessionUser();
@@ -43,10 +43,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ sess
         }
       }
       const { pin_code: _pin, user_id: _uid, share_token: _share, ...publicFields } = session;
-      return NextResponse.json(publicFields);
+      return NextResponse.json({ ...publicFields, play_id: await getPlayUrlId(session) });
     }
 
-    return NextResponse.json(session);
+    return NextResponse.json({ ...session, play_id: await getPlayUrlId(session) });
   } catch (err) {
     console.error(`Failed to load session instance ${sessionId}:`, err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

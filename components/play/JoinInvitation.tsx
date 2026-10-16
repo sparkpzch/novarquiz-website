@@ -79,7 +79,7 @@ export default function JoinInvitation({ token }: { token: string }) {
       if (!response.ok) throw new Error('Could not join');
       const data = await response.json();
       saveLobbyConnection(data.sessionId, user.uid, { token: data.token, connectionId: data.connectionId });
-      router.replace(`/play/${data.sessionId}/${data.roomStatus === 'started' ? 'question' : 'lobby'}`);
+      router.replace(`/play/${data.playId ?? data.sessionId}/${data.roomStatus === 'started' ? 'question' : 'lobby'}`);
     } catch { setJoining(false); setJoinFailed(true); }
   };
   const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);

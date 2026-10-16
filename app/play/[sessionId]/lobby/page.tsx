@@ -12,9 +12,11 @@ import '@/lib/i18n';
 import type { Quiz } from '@/lib/types';
 import Link from 'next/link';
 import styles from '@/components/play/lobby.module.css';
+import { usePlaySessionId } from '@/lib/client/play-session-context';
 
 export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionId: string }> }) {
-  const { sessionId } = use(params);
+  const { sessionId: routeId } = use(params);
+  const sessionId = usePlaySessionId(routeId);
   const { user, loading } = useAuth();
   const router = useRouter();
   const { i18n } = useTranslation();
@@ -40,10 +42,10 @@ export default function PlayerLobbyPage({ params }: { params: Promise<{ sessionI
     return watchRoom(session.id, next => {
       setRoom(next);
       if (next?.status === 'started' && next.players?.[user.uid]?.connectionId === connection?.connectionId) {
-        router.replace(`/play/${session.id}/question`);
+        router.replace(`/play/${routeId}/question`);
       }
     });
-  }, [router, session?.id, user]);
+  }, [routeId, router, session?.id, user]);
   useEffect(() => watchRealtimeConnection(setConnected), []);
   const leave = async () => {
     if (!user || !session || leaving) return;

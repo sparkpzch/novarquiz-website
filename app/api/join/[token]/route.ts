@@ -1,6 +1,6 @@
 import { adminRtdb } from '@/lib/firebase/admin';
 import { NextResponse } from 'next/server';
-import { getSessionByToken } from '@/lib/db/queries';
+import { getPlayUrlId, getSessionByToken, resolvePublicSessionId } from '@/lib/db/queries';
 import { getPlayUser } from '@/lib/play-auth';
 import { checkRateLimit } from '@/lib/ratelimit';
 import { lobbyStandings } from '@/lib/play/lobby-standings';
@@ -27,7 +27,7 @@ export async function GET(
   try {
     const invitation = (await adminRtdb.ref(`joinTokens/${token}`).get()).val();
     const session = invitation?.sessionId
-      ? await getSessionByToken(invitation.sessionId) : await getSessionByToken(token);
+      ? await getSessionByToken(invitation.sessionId) : await getSessionByToken(await resolvePublicSessionId(token));
     if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     const room = (await adminRtdb.ref(`sessions/${session.id}`).get()).val();
     if (session.is_private) {
@@ -48,6 +48,7 @@ export async function GET(
     });
     return NextResponse.json({
       id: session.id,
+      play_id: await getPlayUrlId(session),
       name: session.name,
       description: session.description,
       cover_image_url: session.cover_image_url,

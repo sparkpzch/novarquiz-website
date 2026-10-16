@@ -31,6 +31,7 @@ type ParsedJoinInput =
 
 type SessionResumeSnapshot = {
   is_private?: boolean;
+  play_id?: string;
 };
 
 type DashboardSession = {
@@ -43,6 +44,7 @@ type DashboardSession = {
   status?: string;
   is_private?: boolean;
   created_at?: string;
+  public_play_id?: string | null;
 };
 
 function parseJoinInput(input: string): ParsedJoinInput {
@@ -150,13 +152,14 @@ function LiveSessionsWidget() {
         return;
       }
 
+      const playId = session.play_id ?? entry.sessionId;
       if (room?.status === ROOM_STATUS.STARTED || entry.mode === "solo") {
-        router.push(`/play/${entry.sessionId}/question`);
+        router.push(`/play/${playId}/question`);
         return;
       }
 
       if (room?.status === ROOM_STATUS.WAITING) {
-        router.push(`/play/${entry.sessionId}/lobby`);
+        router.push(`/play/${playId}/lobby`);
         return;
       }
     } catch {
@@ -431,7 +434,7 @@ function DashboardContent({ healthStatsUid, healthStatsLocale }: { healthStatsUi
                   key={session.id}
                   session={session}
                   eagerImage={session.id === firstImageSessionId}
-                  onClick={() => router.push(`/join/${session.pin_code || session.id}`)}
+                  onClick={() => router.push(`/join/${session.public_play_id || session.pin_code || session.id}`)}
                 />
               ))}
             </div>

@@ -101,6 +101,31 @@ export async function getAllQuizzes() {
   return result.rows;
 }
 
+// Public quiz URLs (/join/<quizId>, /play/<quizId>) carry the quiz id. It maps
+// to the quiz's shared public session row, so answers, progress and
+// leaderboards keep landing on that existing session. Every lookup below picks
+// the same row with this order.
+const publicSessionOrder = (alias: string) =>
+  `(${alias}.status IN ('opened', 'started')) DESC, ${alias}.started_at DESC NULLS LAST, ${alias}.id`;
+
+// Returns the public session id for a quiz id; any other id is returned as-is.
+export async function resolvePublicSessionId(id: string): Promise<string> {
+  const result = await pool.query(
+    `SELECT s.id FROM sessions s WHERE s.session_id::text = $1 AND s.is_private = FALSE
+     ORDER BY ${publicSessionOrder('s')} LIMIT 1`,
+    [id],
+  );
+  return (result.rows[0]?.id as string | undefined) ?? id;
+}
+
+// The id a player's URL should carry: the quiz id for a quiz's public session,
+// the session id for everything else (private lobbies, extra public sessions).
+export async function getPlayUrlId(session: { id?: unknown; session_id?: unknown; is_private?: unknown }) {
+  const id = String(session.id);
+  const quizId = String(session.session_id);
+  return !session.is_private && (await resolvePublicSessionId(quizId)) === id ? quizId : id;
+}
+
 export async function getAllSessions(visibleToUid?: string) {
   const where = visibleToUid ? `WHERE (s.is_private = FALSE OR s.user_id = $1)` : '';
   const params = visibleToUid ? [visibleToUid] : [];
@@ -119,7 +144,11 @@ export async function getAllSessions(visibleToUid?: string) {
        COALESCE(s.name, q.name) AS name, q.description, q.cover_image_url, q.share_token,
        COALESCE(p.display_name, names.user_display_name) AS user_name,
        COALESCE(qc.question_count, 0) AS question_count,
-       COALESCE(ps.play_count, 0) AS play_count, COALESCE(ps.avg_score, 0) AS avg_score
+       COALESCE(ps.play_count, 0) AS play_count, COALESCE(ps.avg_score, 0) AS avg_score,
+       CASE WHEN s.is_private = FALSE AND s.id = (
+         SELECT s2.id FROM sessions s2 WHERE s2.session_id = s.session_id AND s2.is_private = FALSE
+         ORDER BY ${publicSessionOrder('s2')} LIMIT 1
+       ) THEN q.id END AS public_play_id
      FROM sessions s JOIN quizzes q ON s.session_id = q.id
      LEFT JOIN profiles p ON s.user_id = p.uid
      LEFT JOIN names ON names.user_id = s.user_id
