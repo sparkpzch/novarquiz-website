@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import { usePersonalRecapReport } from '@/lib/hooks/usePersonalRecapReport';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useResolvedSessionId } from '@/lib/hooks/useResolvedSessionId';
 import IconRefreshButton from '@/components/ui/IconRefreshButton';
 import LucideIcon from '@/components/ui/icons/LucideIcon';
 import PersonalRecapCard from '@/components/stats/PersonalRecapCard';
@@ -53,7 +54,9 @@ function StatsPageContent() {
   const historyKey = `${uid}:${version}`;
   const history = historyState?.key === historyKey ? historyState : null;
   const rows = history?.rows ?? [];
-  const selectedId = params.get('session') ?? rows[0]?.session_id ?? null;
+  const urlSession = params.get('session');
+  const resolvedSession = useResolvedSessionId(urlSession);
+  const selectedId = urlSession ? resolvedSession ?? null : rows[0]?.session_id ?? null;
   const selected = rows.find((row) => row.session_id === selectedId);
   const reportKey = `${uid}:${selectedId}:${locale}:${version}`;
   const reportResult = usePersonalRecapReport(uid, selected?.session_id ?? null, locale, version);
@@ -92,7 +95,7 @@ function StatsPageContent() {
         </header>
 
         {uid && <PersonalLscvdCard key={`${uid}:${version}`} locale={locale} />}
-        {authLoading || (uid && !history) ? <Loading label={copy('Finding your completed quizzes…', 'กำลังค้นหาแบบทดสอบที่คุณทำเสร็จ…')} /> : !uid ? (
+        {authLoading || (uid && (!history || resolvedSession === undefined)) ? <Loading label={copy('Finding your completed quizzes…', 'กำลังค้นหาแบบทดสอบที่คุณทำเสร็จ…')} /> : !uid ? (
           <section className="history-card history-empty"><Icon name="book" /><h2>{copy('Sign in to see your results', 'เข้าสู่ระบบเพื่อดูผลแบบทดสอบ')}</h2><p>{copy('Sign in to see your completed quizzes and helpful next steps.', 'เข้าสู่ระบบเพื่อดูแบบทดสอบที่คุณทำแล้วและคำแนะนำสำหรับคุณ')}</p><Link href="/sign-in?next=%2Fstats" className="history-primary">{copy('Sign in', 'เข้าสู่ระบบ')}</Link></section>
         ) : history?.error ? <ErrorPanel onRetry={() => setVersion((v) => v + 1)} message={copy('We couldn’t find your quizzes. Please try again.', 'ยังโหลดแบบทดสอบของคุณไม่ได้ กรุณาลองอีกครั้ง')} label={copy('Try again', 'ลองอีกครั้ง')} /> : !rows.length ? (
           <section className="history-card history-empty"><Icon name="book" /><h2>{copy('Start with something you’re curious about', 'เริ่มจากเรื่องที่คุณอยากรู้')}</h2><p>{copy('Complete a health quiz, then come back for a simple recap and a next step just for you.', 'ทำแบบทดสอบสุขภาพ แล้วกลับมาดูสรุปและคำแนะนำสำหรับคุณ')}</p><Link href="/quizzes" className="history-primary">{copy('Choose a quiz', 'เลือกแบบทดสอบสุขภาพ')} <Icon name="arrow" /></Link></section>

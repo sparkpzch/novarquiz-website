@@ -106,7 +106,9 @@ function QuestionVisual({ question, totalQuestions, preparedVideo, th, children 
 }
 
 export default function QuestionPage({ params }: { params: Promise<{ sessionId: string }> }) {
-  const sessionId = usePlaySessionId(use(params).sessionId);
+  // The URL id: the quiz id for a public quiz, the session id for private lobbies.
+  const routeId = use(params).sessionId;
+  const sessionId = usePlaySessionId(routeId);
   const { i18n } = useTranslation();
   const th = i18n.language.startsWith('th');
   const copy = useCallback((en: string, thai: string) => th ? thai : en, [th]);
@@ -516,8 +518,8 @@ export default function QuestionPage({ params }: { params: Promise<{ sessionId: 
   if (finished) {
     return <FinishedQuiz uid={user?.uid ?? null} sessionId={sessionId} score={score} elapsed={elapsed} quizName={sessionMeta?.quiz_name || sessionMeta?.name} leaderboard={leaderboard} error={leaderboardError} saving={completionSaving} guest={!!user?.isAnonymous} th={th}
       onRetry={() => void refreshLeaderboard()} onHome={() => router.push(user?.isAnonymous ? '/sign-in' : '/')}
-      onLeaderboard={() => router.push(`/leaderboard?session=${encodeURIComponent(sessionId)}`)}
-      onSummary={() => router.push(user?.isAnonymous ? '/sign-in' : `/stats?session=${encodeURIComponent(sessionId)}`)} />;
+      onLeaderboard={() => router.push(`/leaderboard?session=${encodeURIComponent(routeId)}`)}
+      onSummary={() => router.push(user?.isAnonymous ? '/sign-in' : `/stats?session=${encodeURIComponent(routeId)}`)} />;
   }
 
   if (loading || !question) {

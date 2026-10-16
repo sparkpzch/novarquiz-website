@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useResolvedSessionId } from '@/lib/hooks/useResolvedSessionId';
 import { useTranslation } from 'react-i18next';
 import '@/lib/i18n';
 import type { LeaderboardEntry, Session } from '@/lib/types';
@@ -18,7 +19,8 @@ function LeaderboardPageContent() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const selectedSession = searchParams.get('session') || '';
+  const urlSession = searchParams.get('session') || '';
+  const selectedSession = useResolvedSessionId(urlSession || null) ?? '';
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionsError, setSessionsError] = useState(false);
   const [result, setResult] = useState<{ sessionId: string; entries: LeaderboardEntry[]; error: boolean } | null>(null);
@@ -59,7 +61,7 @@ function LeaderboardPageContent() {
 
   const selectedSessionMeta = sessions.find((session) => session.id === selectedSession);
   const current = result?.sessionId === selectedSession ? result : null;
-  const loading = selectedSession && !current;
+  const loading = urlSession && !current;
   const board = rankLeaderboard(current?.entries ?? []);
   const myIndex = board.findIndex(entry => entry.is_me);
   const me = board[myIndex];
@@ -76,9 +78,9 @@ function LeaderboardPageContent() {
     </section>
     <div className={me ? styles.resultsGrid : undefined}>
     {me && <><ResultScoreCard score={me.total_score} elapsedMs={me.total_time_ms} rank={myIndex + 1} th={th} headingLevel={2} />
-      <ResultInsightCard key={selectedSession} uid={user?.uid ?? null} sessionId={selectedSession} th={th} onSummary={() => router.push(`/stats?session=${encodeURIComponent(selectedSession)}`)} /></>}
+      <ResultInsightCard key={selectedSession} uid={user?.uid ?? null} sessionId={selectedSession} th={th} onSummary={() => router.push(`/stats?session=${encodeURIComponent(urlSession)}`)} /></>}
     <section className={`${styles.surface} ${me ? styles.standingsPanel : ''}`} aria-busy={!!loading}>
-      {!selectedSession ? <div className={styles.empty}><h3>{copy('Choose a quiz to see the rankings', 'เลือกแบบทดสอบเพื่อดูอันดับ')}</h3><p>{copy('Your result will be highlighted alongside other completed scores.', 'ผลของคุณจะมีป้ายกำกับเพื่อให้หาได้ง่าย')}</p></div> : loading ? <div className={styles.loading} role="status"><span className={styles.spinner} /><span>{copy('Loading completed results…', 'กำลังโหลดผลและอันดับ…')}</span></div> : <>
+      {!urlSession ? <div className={styles.empty}><h3>{copy('Choose a quiz to see the rankings', 'เลือกแบบทดสอบเพื่อดูอันดับ')}</h3><p>{copy('Your result will be highlighted alongside other completed scores.', 'ผลของคุณจะมีป้ายกำกับเพื่อให้หาได้ง่าย')}</p></div> : loading ? <div className={styles.loading} role="status"><span className={styles.spinner} /><span>{copy('Loading completed results…', 'กำลังโหลดผลและอันดับ…')}</span></div> : <>
         {selectedSessionMeta && !me && <div className={styles.boardSession}><h2>{selectedSessionMeta.name}</h2>{selectedSessionMeta.description && <p>{selectedSessionMeta.description}</p>}</div>}
         {current?.error && <div className={styles.error} role="alert">{copy('Could not refresh the rankings. Please try again.', 'อัปเดตอันดับไม่สำเร็จ กรุณาลองอีกครั้ง')} <button type="button" className={styles.secondaryButton} onClick={() => setRetry((value) => value + 1)}>{copy('Try again', 'ลองอีกครั้ง')}</button></div>}
         {current && (!current.error || current.entries.length > 0) && <LeaderboardStandings key={selectedSession} entries={current.entries} th={th} compact />}
