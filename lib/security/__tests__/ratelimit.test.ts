@@ -79,3 +79,12 @@ test('a fixed window resets exactly at its expiry boundary', async () => {
     Date.now = realNow;
   }
 });
+
+test('session creation has its own cap without limiting session reads', async () => {
+  for (let i = 0; i < 10; i++) {
+    assert.equal((await checkRateLimit('session-creator', '/api/sessions/create')).allowed, true);
+  }
+  assert.equal((await checkRateLimit('session-creator', '/api/sessions/create')).allowed, false);
+  assert.equal((await checkRateLimit('session-creator', '/api/sessions')).allowed, true);
+  assert.equal((await checkRateLimit('session-creator', '/api/sessions/some-session')).allowed, true);
+});

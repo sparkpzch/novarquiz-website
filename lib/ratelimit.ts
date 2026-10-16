@@ -15,6 +15,9 @@ const ROUTE_LIMITS: Array<[string, number]> = [
   ['/api/team-rooms', 20],
   ['/api/play', 60],
   ['/api/account', 5],         // L2: destructive — conservative cap on deletion attempts
+  // Handler-only key for POST /api/sessions, so the cap does not also apply to
+  // GET /api/sessions or the /api/sessions/<id> routes.
+  ['/api/sessions/create', 10],
   // Each call spends Gemini free-tier quota. Must stay above the '/api/admin'
   // entry below it — first match wins.
   ['/api/admin/insight-templates/draft', 5],
@@ -26,7 +29,7 @@ const DEFAULT_LIMIT = 100;
 const STATIC_BUCKETS = new Set([
   '/api/quizzes', '/api/sessions', '/api/auth/admin', '/api/admin/stats',
   '/api/admin/insight-templates', '/api/admin/provisional-insights',
-  '/api/admin/sessions/compare',
+  '/api/admin/sessions/compare', '/api/sessions/create',
 ]);
 
 function resolveLimit(pathname: string): number {
