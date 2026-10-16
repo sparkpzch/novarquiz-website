@@ -24,3 +24,15 @@ export function canJoinLobby(room: LobbyState | null, privateQuiz: boolean, invi
 export function ownsLobbyMember(member: LobbyMember | null | undefined, connectionId: string | null) {
   return !!connectionId && member?.connectionId === connectionId && !member.left;
 }
+
+// Only admins can open a hosted lobby, so a player that lobbyAccess admits
+// through a live invitation connection may play the quiz even while it is a
+// draft. Solo rooms are not hosted and grant nothing.
+export function isAdmittedLobbyPlayer(room: LobbyState | null, uid: string, connectionId: string | null) {
+  return !!room?.hostId && !room.isSolo && lobbyAccess(room, uid, connectionId, true) === null;
+}
+
+export async function canPlayQuiz(quiz: { is_published?: boolean; created_by?: string }, user: { uid: string; isAdmin: boolean },
+  admittedLobbyPlayer: () => Promise<boolean>) {
+  return quiz.is_published || user.isAdmin || quiz.created_by === user.uid || await admittedLobbyPlayer();
+}

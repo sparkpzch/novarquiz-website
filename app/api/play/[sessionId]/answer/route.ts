@@ -1,4 +1,5 @@
-import { LobbyAccessError, requireLobbyAccess, withLobbyPlayerLock, requestConnectionId } from '@/lib/play/lobby-access';
+import { LobbyAccessError, requireLobbyAccess, withLobbyPlayerLock, requestConnectionId, isAdmittedLobbyRequest } from '@/lib/play/lobby-access';
+import { canPlayQuiz } from '@/lib/play/lobby-policy';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getEntryQuestion, getNextQuestion, getQuestionById, saveUserAnswer, getOrCreateSession, getUserCumulativeScore, getQuizForQuestion, getQuizById, resolveSessionToQuizId, getExistingAnswer, getSessionById, getAttemptBoundary, withPlayerAnswerLock } from '@/lib/db/queries';
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       const quizId = await resolveSessionToQuizId(sessionId);
       if (!quizId) return NextResponse.json(null, { status: 404 });
       const quiz = await getQuizById(quizId);
-      if (!quiz || (!quiz.is_published && !user.isAdmin && quiz.created_by !== user.uid)) {
+      if (!quiz || !await canPlayQuiz(quiz, user, () => isAdmittedLobbyRequest(request, sessionId, user.uid))) {
         return NextResponse.json(null, { status: 404 });
       }
       return withLobbyPlayerLock(request, sessionId, user.uid, async () => {
@@ -108,7 +109,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       ]);
       if (!access) return NextResponse.json(null, { status: 404 });
       if (sessionQuizId !== access.quiz_id) return NextResponse.json(null, { status: 404 });
-      if (!access.is_published && !user.isAdmin && access.created_by !== user.uid) {
+      if (!await canPlayQuiz(access, user, () => isAdmittedLobbyRequest(request, sessionId, user.uid))) {
         return NextResponse.json(null, { status: 404 });
       }
       if (fromQuestion?.node_type === 'situation') {

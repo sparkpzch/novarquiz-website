@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getSessionById, withPlayerAnswerLock } from '@/lib/db/queries';
 import { adminRtdb } from '@/lib/firebase/admin';
-import { lobbyAccess, type LobbyState } from './lobby-policy';
+import { isAdmittedLobbyPlayer, lobbyAccess, type LobbyState } from './lobby-policy';
 
 export function connectionIdFor(token: string) {
   return createHash('sha256').update(token).digest('hex');
@@ -28,6 +28,13 @@ export async function requireLobbyAccess(request: Request, sessionId: string, ui
     session_replaced: 'This account is now playing on another device.', waiting: 'Waiting for the host to start the quiz.',
   };
   return NextResponse.json({ error: messages[code], code }, { status: code === 'session_replaced' ? 409 : 403 });
+}
+
+export async function isAdmittedLobbyRequest(request: Request, sessionId: string, uid: string) {
+  const session = await getSessionById(sessionId);
+  if (!session) return false;
+  const room = (await adminRtdb.ref(`sessions/${session.id}`).get()).val() as LobbyState | null;
+  return isAdmittedLobbyPlayer(room, uid, requestConnectionId(request));
 }
 
 export class LobbyAccessError extends Error {
