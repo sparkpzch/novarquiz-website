@@ -71,7 +71,7 @@ function SessionCard({
       </div>
       <div className="flex flex-1 flex-col p-5">
         <div className="mb-3 flex items-start justify-between gap-3">
-          <h3 className="line-clamp-2 flex-1 text-[1.75rem] font-bold leading-tight text-[#16324F]">
+          <h3 className="line-clamp-2 flex-1 text-[1.75rem] font-bold min-[600px]:max-md:text-[1.375rem] leading-tight text-[#16324F]">
             {session.name}
           </h3>
           <span className="shrink-0 whitespace-nowrap rounded-full bg-[#0460A9]/10 px-3 py-1.5 text-sm font-bold text-[#0460A9]">
@@ -318,7 +318,7 @@ function QuizzesContent() {
 
         {/* Cards Grid */}
         {loading ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 min-[600px]:grid-cols-2 xl:grid-cols-3">
             {[1, 2, 3, 4, 5, 6].map((k) => (
               <div key={k} className="nq-card-soft animate-pulse rounded-xl p-7 min-h-[220px]">
                 <div className="mb-4 h-5 w-3/4 rounded-full bg-[#70A2F9]/18" />
@@ -356,7 +356,7 @@ function QuizzesContent() {
             </button>
           </motion.div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 min-[600px]:grid-cols-2 xl:grid-cols-3">
             {filtered.map((session, i) => (
               <SessionCard
                 key={session.id}
@@ -381,7 +381,7 @@ export default function QuizzesPage() {
       fallback={
         <div className="mx-auto max-w-[1500px] space-y-6">
           <div className="nq-card-soft animate-pulse rounded-xl p-5 h-32" />
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 min-[600px]:grid-cols-2 xl:grid-cols-3">
             {[1, 2, 3, 4, 5, 6].map((k) => (
               <div key={k} className="nq-card-soft animate-pulse rounded-xl p-7 min-h-[220px]" />
             ))}

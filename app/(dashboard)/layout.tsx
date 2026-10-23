@@ -171,7 +171,7 @@ function DashboardLayoutContent({ children, modal }: { children: ReactNode; moda
     <div className={`nq-dashboard-shell nq-theme-${theme} min-h-dvh`}>
       <SurveyGate />
       <div className="flex min-h-dvh">
-        <aside className="nq-dashboard-sidebar sticky top-0 hidden h-dvh w-[264px] shrink-0 overflow-hidden border-r px-4 py-5 lg:flex">
+        <aside className="nq-dashboard-sidebar sticky top-0 hidden h-dvh w-[264px] shrink-0 overflow-hidden border-r px-4 py-5 shell:flex">
           <div className="nq-sidebar-scroll flex min-h-0 w-full flex-col overflow-y-auto pr-1">
             <Link href="/" className="flex h-10 items-center px-1">
               <Image
@@ -290,7 +290,7 @@ function DashboardLayoutContent({ children, modal }: { children: ReactNode; moda
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="nq-dashboard-mobile-header sticky top-0 z-30 flex h-[68px] items-center justify-between border-b border-white/8 bg-[#080e2d]/92 px-4 backdrop-blur-xl lg:hidden">
+          <header className="nq-dashboard-mobile-header sticky top-0 z-30 flex h-[68px] items-center justify-between border-b border-white/8 bg-[#080e2d]/92 px-4 backdrop-blur-xl shell:hidden">
             <Link href="/" className="flex items-center">
               <Image
                 src="/image/icon/novarquiz-logo.png"
@@ -312,8 +312,8 @@ function DashboardLayoutContent({ children, modal }: { children: ReactNode; moda
           </header>
 
           <main
-            className={`flex-1 px-4 pt-4 sm:px-5 md:px-7 lg:px-8 lg:pt-7 xl:px-10 ${
-              isProfileDetail ? 'pb-8' : 'pb-[calc(7.5rem+env(safe-area-inset-bottom))] lg:pb-8'
+            className={`flex-1 px-4 pt-4 sm:px-5 md:px-7 lg:px-8 shell:pt-7 xl:px-10 ${
+              isProfileDetail ? 'pb-8' : 'pb-[calc(7.5rem+env(safe-area-inset-bottom))] shell:pb-8'
             }`}
           >
             <motion.div
@@ -329,7 +329,7 @@ function DashboardLayoutContent({ children, modal }: { children: ReactNode; moda
       </div>
 
       {!isProfileDetail && (
-        <nav aria-label={t('nav.main_navigation', { defaultValue: 'Main navigation' })} className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(0.65rem+env(safe-area-inset-bottom))] lg:hidden">
+        <nav aria-label={t('nav.main_navigation', { defaultValue: 'Main navigation' })} className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(0.65rem+env(safe-area-inset-bottom))] shell:hidden">
           <div className="nq-dashboard-mobile-nav mx-auto flex h-[80px] max-w-[500px] items-center justify-around gap-1 rounded-[32px] border border-white/10 bg-[#0b1337]/94 px-2 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
             {mobileNavItems.map((item) => {
               const active = isActive(item.href, item.exact);
