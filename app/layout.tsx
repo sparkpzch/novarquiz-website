@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { connection } from "next/server";
 import { headers, cookies } from "next/headers";
 import { resolveTheme, THEME_KEY } from "@/lib/client/theme-preference";
@@ -28,6 +28,15 @@ const jakarta = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: "NovarQuiz - Interactive Quiz Platform",
   description: "A Kahoot-like quiz platform with node-based question flows, real-time scoring, and leaderboards.",
+};
+
+// Keep the page at 1x: iOS Safari otherwise zooms in when focusing inputs
+// and selects under 16px, and the page stays zoomed afterwards.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default async function RootLayout({

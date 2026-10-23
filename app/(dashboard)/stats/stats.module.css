@@ -228,7 +228,8 @@
 .page :global(.history-metrics) > div, .page :global(.history-metrics) > div:first-child { padding: 14px 16px; border: 0; border-radius: 14px; background: color-mix(in srgb, var(--tone) 9%, var(--history-card)); }
 .page :global(.history-metrics) dt { display: flex; align-items: center; gap: 6px; color: var(--tone); font-size: 12px; font-weight: 700; }
 .page :global(.history-metrics) dt svg { width: 15px; height: 15px; stroke-width: 2.2; }
-.page :global(.history-metrics) dd { font-size: 24px; font-weight: 800; white-space: nowrap; }
+/* Let values wrap: a nowrap "12 น. 34 วิ." is wider than a phone tile and widens the page. */
+.page :global(.history-metrics) dd { font-size: 24px; font-weight: 800; }
 
 /* Topic rows. */
 .page :global(.history-area-card) { padding: 20px 22px 8px; }
@@ -258,7 +259,7 @@
 .page :global(.lscvd-meter) span { height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--tone-pink) 14%, transparent); }
 .page :global(.lscvd-meter) span[data-on] { background: var(--tone-pink); }
 .page :global(.lscvd-message) { margin: 0; font-size: 14px; line-height: 1.6; color: var(--history-ink); }
-.page :global(.lscvd-factors) { gap: 0 24px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.page :global(.lscvd-factors) { gap: 0 24px; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
 .page :global(.lscvd-factors) li { align-items: center; padding: 12px 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--history-line) 70%, transparent); border-radius: 0; font-size: 14px; }
 .page :global(.lscvd-factors) li > span:nth-child(2) { flex: 1; min-width: 0; }
 .page :global(.lscvd-dot) { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: var(--history-line); }
