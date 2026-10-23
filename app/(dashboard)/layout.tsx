@@ -289,7 +289,8 @@ function DashboardLayoutContent({ children, modal }: { children: ReactNode; moda
           </div>
         </aside>
 
-        <div className="min-w-0 flex-1">
+        {/* clip, not hidden: stops iOS Safari zooming out on stray overflow without breaking sticky. */}
+        <div className="min-w-0 flex-1 overflow-x-clip">
           <header className="nq-dashboard-mobile-header sticky top-0 z-30 flex h-[68px] items-center justify-between border-b border-white/8 bg-[#080e2d]/92 px-4 backdrop-blur-xl shell:hidden">
             <Link href="/" className="flex items-center">
               <Image
